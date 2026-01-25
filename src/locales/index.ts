@@ -18,6 +18,8 @@ import zhExport from './zh/export.json';
 import zhHistory from './zh/history.json';
 import zhEditionDetail from './zh/editionDetail.json';
 import zhArtworkDetail from './zh/artworkDetail.json';
+import zhLinks from './zh/links.json';
+import zhPublicView from './zh/publicView.json';
 
 // English translations
 import enCommon from './en/common.json';
@@ -35,6 +37,8 @@ import enExport from './en/export.json';
 import enHistory from './en/history.json';
 import enEditionDetail from './en/editionDetail.json';
 import enArtworkDetail from './en/artworkDetail.json';
+import enLinks from './en/links.json';
+import enPublicView from './en/publicView.json';
 
 const resources = {
   zh: {
@@ -53,6 +57,8 @@ const resources = {
     history: zhHistory,
     editionDetail: zhEditionDetail,
     artworkDetail: zhArtworkDetail,
+    links: zhLinks,
+    publicView: zhPublicView,
   },
   en: {
     common: enCommon,
@@ -70,6 +76,8 @@ const resources = {
     history: enHistory,
     editionDetail: enEditionDetail,
     artworkDetail: enArtworkDetail,
+    links: enLinks,
+    publicView: enPublicView,
   },
 };
 

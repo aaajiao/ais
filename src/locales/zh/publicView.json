@@ -1,0 +1,29 @@
+{
+  "subtitle": "共 {{count}} 件作品",
+  "noItems": "暂无作品",
+  "viewDetails": "查看原网站 →",
+  "year": "年份：",
+  "type": "类型：",
+  "materials": "材料：",
+  "dimensions": "尺寸：",
+  "duration": "时长：",
+  "edition": "版本：",
+  "status": {
+    "in_production": "制作中",
+    "in_studio": "在库",
+    "at_gallery": "寄售",
+    "at_museum": "美术馆",
+    "in_transit": "运输中",
+    "sold": "已售",
+    "gifted": "赠送",
+    "lost": "遗失",
+    "damaged": "损坏"
+  },
+  "errors": {
+    "invalidToken": "无效的链接",
+    "loadFailed": "加载失败",
+    "networkError": "网络错误，请稍后重试",
+    "linkDisabled": "链接已禁用",
+    "linkInvalid": "链接无效"
+  }
+}

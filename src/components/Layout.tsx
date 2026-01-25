@@ -25,6 +25,7 @@ const PAGE_WIDTH_CONFIG: Record<string, PageWidthConfig> = {
   // 设置和位置：表单类页面
   '/settings': { maxWidth: 'max-w-3xl', centered: true },
   '/locations': { maxWidth: 'max-w-4xl', centered: true },
+  '/links': { maxWidth: 'max-w-4xl', centered: true },
   // 导入页面
   '/import': { maxWidth: 'max-w-4xl', centered: true },
   // 回收站
@@ -108,6 +109,14 @@ export default function Layout() {
               }
             >
               {t('locations')}
+            </NavLink>
+            <NavLink
+              to="/links"
+              className={({ isActive }) =>
+                `nav-link ${isActive ? 'text-foreground active' : 'text-muted-foreground'}`
+              }
+            >
+              {t('links')}
             </NavLink>
             <NavLink
               to="/import"

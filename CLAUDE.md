@@ -98,7 +98,7 @@ Core tables in Supabase:
 - `edition_history` - Audit trail of status changes
 - `locations` - Storage/gallery locations
 - `users` - User accounts with roles (admin/editor)
-- `gallery_links` - Public gallery share links
+- `gallery_links` - Public share links for locations
 
 ### Soft Delete
 
@@ -159,6 +159,29 @@ Import artworks directly from web pages by typing "导入 URL" in chat. The syst
 - `api/chat.ts` - `import_artwork_from_url` tool definition
 
 **Note:** The URL import always uses Claude Sonnet 4.5 regardless of user's chat model selection.
+
+## Public Links Feature
+
+Create shareable links for locations to display artworks publicly without login.
+
+**Routes:**
+- `/links` - Manage public links (requires auth)
+- `/view/:token` - Public view page (no auth required)
+
+**Key files:**
+- `api/links/index.ts` - Links CRUD API
+- `api/view/[token].ts` - Public view API (fetches editions by location)
+- `src/pages/Links.tsx` - Links management page
+- `src/pages/PublicView.tsx` - Public display page
+- `src/hooks/useLinks.ts` - Links data hook
+
+**Features:**
+- Create link for any location
+- Toggle price visibility
+- Enable/disable links
+- Reset token (invalidates old URL)
+- Track access count and last accessed time
+- Display: thumbnail, title (EN/CN), year, type, materials, dimensions, edition info, status, price, source URL
 
 ## Code Conventions
 
@@ -313,7 +336,9 @@ src/locales/
 │   ├── import.json
 │   ├── export.json
 │   ├── trash.json
-│   └── history.json
+│   ├── history.json
+│   ├── links.json
+│   └── publicView.json
 └── en/               # English translations (same structure)
 ```
 

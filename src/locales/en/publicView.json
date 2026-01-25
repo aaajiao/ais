@@ -1,0 +1,29 @@
+{
+  "subtitle": "{{count}} artworks",
+  "noItems": "No artworks",
+  "viewDetails": "View on Website →",
+  "year": "Year:",
+  "type": "Type:",
+  "materials": "Materials:",
+  "dimensions": "Dimensions:",
+  "duration": "Duration:",
+  "edition": "Edition:",
+  "status": {
+    "in_production": "In Production",
+    "in_studio": "In Studio",
+    "at_gallery": "At Gallery",
+    "at_museum": "At Museum",
+    "in_transit": "In Transit",
+    "sold": "Sold",
+    "gifted": "Gifted",
+    "lost": "Lost",
+    "damaged": "Damaged"
+  },
+  "errors": {
+    "invalidToken": "Invalid link",
+    "loadFailed": "Failed to load",
+    "networkError": "Network error, please try again",
+    "linkDisabled": "Link Disabled",
+    "linkInvalid": "Link Invalid"
+  }
+}

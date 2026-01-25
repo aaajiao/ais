@@ -21,6 +21,8 @@ const Import = lazy(() => import('./pages/Import'));
 const Locations = lazy(() => import('./pages/Locations'));
 const Trash = lazy(() => import('./pages/Trash'));
 const Settings = lazy(() => import('./pages/Settings'));
+const Links = lazy(() => import('./pages/Links'));
+const PublicView = lazy(() => import('./pages/PublicView'));
 
 function App() {
   return (
@@ -31,6 +33,14 @@ function App() {
           <Routes>
             {/* 公开路由 */}
             <Route path="/login" element={<Login />} />
+            <Route
+              path="/view/:token"
+              element={
+                <Suspense fallback={<PageLoader />}>
+                  <PublicView />
+                </Suspense>
+              }
+            />
 
             {/* 受保护路由 */}
             <Route
@@ -111,6 +121,14 @@ function App() {
                 element={
                   <Suspense fallback={<PageLoader />}>
                     <Settings />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="links"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <Links />
                   </Suspense>
                 }
               />
