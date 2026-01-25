@@ -3,7 +3,7 @@
  * 使用 Lucide React 图标替代 emoji
  */
 
-import { Image, FileText, Video, FileSpreadsheet, Link, Paperclip } from 'lucide-react';
+import { Image, FileText, Video, FileSpreadsheet, Link, Paperclip, FileCode } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 /**
@@ -19,6 +19,8 @@ export function getFileTypeIcon(fileType: string, className = 'w-5 h-5'): ReactN
       return <Video className={className} />;
     case 'document':
       return <FileText className={className} />;
+    case 'markdown':
+      return <FileCode className={className} />;
     case 'spreadsheet':
       return <FileSpreadsheet className={className} />;
     case 'link':
@@ -41,6 +43,8 @@ export function getFileTypeLabel(fileType: string): string {
       return '视频';
     case 'document':
       return '文档';
+    case 'markdown':
+      return 'Markdown';
     case 'spreadsheet':
       return '表格';
     case 'link':

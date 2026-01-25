@@ -184,6 +184,7 @@ export function detectFileType(file: File | string): string {
   if (mimeOrUrl === 'application/pdf') return 'pdf';
   if (mimeOrUrl.startsWith('video/')) return 'video';
   if (mimeOrUrl.includes('spreadsheet') || mimeOrUrl.includes('excel') || mimeOrUrl === 'text/csv') return 'spreadsheet';
+  if (mimeOrUrl === 'text/markdown' || mimeOrUrl === 'text/x-markdown') return 'markdown';
   if (mimeOrUrl.includes('document') || mimeOrUrl.includes('word')) return 'document';
 
   // 根据扩展名判断
@@ -206,6 +207,9 @@ export function detectFileType(file: File | string): string {
     case 'xls':
     case 'csv':
       return 'spreadsheet';
+    case 'md':
+    case 'markdown':
+      return 'markdown';
     case 'doc':
     case 'docx':
     case 'txt':

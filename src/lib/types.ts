@@ -29,7 +29,7 @@ export type Condition = 'excellent' | 'good' | 'fair' | 'poor' | 'damaged';
 export type Currency = 'USD' | 'EUR' | 'CNY' | 'GBP' | 'CHF' | 'HKD' | 'JPY';
 
 // 文件类型
-export type FileType = 'image' | 'pdf' | 'video' | 'document' | 'spreadsheet' | 'link' | 'other';
+export type FileType = 'image' | 'pdf' | 'video' | 'document' | 'markdown' | 'spreadsheet' | 'link' | 'other';
 
 // 文件来源
 export type FileSourceType = 'upload' | 'link';

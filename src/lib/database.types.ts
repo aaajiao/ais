@@ -25,7 +25,7 @@ export type EditionStatus =
   | 'damaged';
 export type ConditionType = 'excellent' | 'good' | 'fair' | 'poor' | 'damaged';
 export type CurrencyType = 'USD' | 'EUR' | 'CNY' | 'GBP' | 'CHF' | 'HKD' | 'JPY';
-export type FileType = 'image' | 'pdf' | 'video' | 'document' | 'spreadsheet' | 'link' | 'other';
+export type FileType = 'image' | 'pdf' | 'video' | 'document' | 'markdown' | 'spreadsheet' | 'link' | 'other';
 export type FileSourceType = 'upload' | 'link';
 export type HistoryAction =
   | 'created'

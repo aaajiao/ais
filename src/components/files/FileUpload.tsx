@@ -19,7 +19,7 @@ interface FileUploadProps {
 }
 
 // 接受的文件类型
-const DEFAULT_ACCEPT = 'image/*,application/pdf,video/*,.xlsx,.xls,.csv';
+const DEFAULT_ACCEPT = 'image/*,application/pdf,video/*,.xlsx,.xls,.csv,.md,.markdown,text/markdown';
 const MAX_SIZE_MB = 50;
 
 export default function FileUpload({
@@ -213,7 +213,7 @@ export default function FileUpload({
           )}
         </div>
         <div className="text-xs text-muted-foreground mt-1">
-          支持图片、PDF、视频 (最大 {maxSizeMB}MB)
+          支持图片、PDF、视频、Markdown (最大 {maxSizeMB}MB)
         </div>
       </div>
 

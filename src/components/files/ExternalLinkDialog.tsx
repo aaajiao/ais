@@ -6,7 +6,7 @@ import { useState, useCallback, useEffect, type ReactNode } from 'react';
 import { insertIntoTable, insertIntoTableNoReturn, type EditionFilesInsert, type EditionHistoryInsert } from '@/lib/supabase';
 import { detectLinkType } from '@/lib/imageCompressor';
 import type { FileType, FileSourceType } from '@/lib/database.types';
-import { Link2, Video, Image, FileText, FileSpreadsheet, Paperclip, X } from 'lucide-react';
+import { Link2, Video, Image, FileText, FileSpreadsheet, Paperclip, FileCode, X } from 'lucide-react';
 
 interface ExternalLinkDialogProps {
   isOpen: boolean;
@@ -36,6 +36,7 @@ const FILE_TYPE_ICONS: Record<FileType, ReactNode> = {
   image: <Image className="w-4 h-4" />,
   pdf: <FileText className="w-4 h-4" />,
   document: <FileText className="w-4 h-4" />,
+  markdown: <FileCode className="w-4 h-4" />,
   spreadsheet: <FileSpreadsheet className="w-4 h-4" />,
   other: <Paperclip className="w-4 h-4" />,
 };
@@ -46,6 +47,7 @@ const FILE_TYPE_OPTIONS: { value: FileType; label: string }[] = [
   { value: 'image', label: '图片' },
   { value: 'pdf', label: 'PDF' },
   { value: 'document', label: '文档' },
+  { value: 'markdown', label: 'Markdown' },
   { value: 'spreadsheet', label: '表格' },
   { value: 'other', label: '其他' },
 ];
