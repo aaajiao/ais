@@ -88,11 +88,15 @@ async function compressImage(inputBuffer: Buffer): Promise<{ buffer: Buffer; inf
   };
 }
 
+// Supabase 客户端类型（简化以避免泛型问题）
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SupabaseClientType = ReturnType<typeof createClient<any>>;
+
 // 处理单个图片
 export async function processExternalImage(
   url: string,
   artworkId: string,
-  supabase: ReturnType<typeof createClient>
+  supabase: SupabaseClientType
 ): Promise<ProcessImageResponse> {
   // 跳过已经是 Supabase URL 的图片
   if (isSupabaseUrl(url)) {
