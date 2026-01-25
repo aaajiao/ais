@@ -127,6 +127,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // 如果没有 source_url 或没找到，尝试通过标题匹配（仅当只有一个匹配时，且未删除）
+        // 但如果导入的作品有 source_url，而匹配到的作品有不同的 source_url，则视为不同作品
         if (!existing && artwork.title_en) {
           const { data } = await supabase
             .from('artworks')
@@ -135,7 +136,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             .is('deleted_at', null);
           // 只有当恰好有一个匹配时才使用，避免同名作品冲突
           if (data && data.length === 1) {
-            existing = data[0];
+            const matched = data[0];
+            // 如果两者都有 source_url 且不同，则是不同作品（如同系列不同版本）
+            if (artwork.source_url && matched.source_url && artwork.source_url !== matched.source_url) {
+              // 不匹配，视为新作品
+              console.log(`[MD Import] Same title but different source_url: "${artwork.title_en}" - treating as new artwork`);
+            } else {
+              existing = matched;
+            }
           }
         }
 
@@ -223,12 +231,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!existing && artwork.title_en) {
           const { data } = await supabase
             .from('artworks')
-            .select('id')
+            .select('id, source_url')
             .eq('title_en', artwork.title_en)
             .is('deleted_at', null);
           // 只有当恰好有一个匹配时才使用，避免同名作品冲突
           if (data && data.length === 1) {
-            existing = data[0];
+            const matched = data[0];
+            // 如果两者都有 source_url 且不同，则是不同作品（如同系列不同版本）
+            if (artwork.source_url && matched.source_url && artwork.source_url !== matched.source_url) {
+              // 不匹配，视为新作品
+              console.log(`[MD Import Execute] Same title but different source_url: "${artwork.title_en}" - creating new artwork`);
+            } else {
+              existing = matched;
+            }
           }
         }
 
