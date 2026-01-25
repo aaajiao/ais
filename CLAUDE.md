@@ -10,9 +10,12 @@ An artwork inventory management system for artist aaajiao, built with React, Typ
 # Install dependencies
 bun install
 
-# Start development (run both in separate terminals)
-bun run dev        # Frontend on port 5173
-bun run dev:api    # API server on port 3000
+# Start development (recommended - full Vercel environment)
+bun run dev:vercel    # Frontend + API on port 3000
+
+# Alternative: run separately
+bun run dev           # Frontend only (Vite on port 5173)
+bun run dev:api       # API only (server.ts on port 3000)
 
 # Build for production
 bun run build
@@ -135,9 +138,20 @@ bunx supabase gen types typescript --project-id <project-id> > src/lib/database.
 - **API Routes**: `/api/*` handled by Vercel Functions
 - **SPA Routing**: All other routes serve `index.html`
 
+## Local Development
+
+首次设置需要链接 Vercel 项目并拉取环境变量：
+
+```bash
+vercel link          # 链接到 Vercel 项目
+vercel env pull      # 拉取环境变量到 .env.local
+```
+
+详细部署说明见 `docs/vercel-setup.md`。
+
 ## Claude Code Skills
 
-本项目安装了以下 skills（位于 `.claude/skills/` 和 `.agents/skills/`）：
+本项目安装了以下 skills（位于 `.claude/skills/`）：
 
 - **react-best-practices** - Vercel 官方 React/Next.js 性能优化规则（57 条规则）
 - **postgres-best-practices** - Supabase 官方 PostgreSQL 最佳实践
