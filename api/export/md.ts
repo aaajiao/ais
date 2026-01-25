@@ -66,8 +66,13 @@ export async function handleMarkdownExport(request: ExportRequest): Promise<{
     throw new Error('No artworks found');
   }
 
-  // 生成 Markdown
-  const content = generateFullMarkdown(artworksData, request.options);
+  // 生成 Markdown（提供默认 options）
+  const options = request.options ?? {
+    includePrice: false,
+    includeStatus: false,
+    includeLocation: false,
+  };
+  const content = generateFullMarkdown(artworksData, options);
 
   // 生成文件名
   const dateStr = new Date().toISOString().split('T')[0];

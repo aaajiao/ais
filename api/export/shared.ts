@@ -1,9 +1,9 @@
 // 共享导出工具模块
 
 import { createClient } from '@supabase/supabase-js';
-import type { Artwork, Edition, Location } from '../../src/lib/types';
-import type { ArtworkExportData } from '../../src/lib/exporters/index';
-import { calculateEditionStats, getArtworkPriceInfo } from '../../src/lib/exporters/index';
+import type { Artwork, Edition, Location } from '../../src/lib/types.js';
+import type { ArtworkExportData } from '../../src/lib/exporters/index.js';
+import { calculateEditionStats, getArtworkPriceInfo } from '../../src/lib/exporters/index.js';
 
 // 创建 Supabase 客户端
 export function getSupabaseClient() {

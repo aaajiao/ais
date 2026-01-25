@@ -459,8 +459,13 @@ export async function handlePDFExport(request: ExportRequest): Promise<{
     throw new Error('No artworks found');
   }
 
-  // 生成 PDF
-  const buffer = await generatePDF(artworksData, request.options);
+  // 生成 PDF（提供默认 options）
+  const options = request.options ?? {
+    includePrice: false,
+    includeStatus: false,
+    includeLocation: false,
+  };
+  const buffer = await generatePDF(artworksData, options);
 
   // 生成文件名
   const dateStr = new Date().toISOString().split('T')[0];
