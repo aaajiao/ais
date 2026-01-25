@@ -72,7 +72,7 @@ const startServer = async () => {
         const request = new Request(`http://localhost:3000${req.url}`, {
           method: req.method,
           headers: Object.fromEntries(
-            Object.entries(req.headers).filter(([_, v]) => v !== undefined) as [string, string][]
+            Object.entries(req.headers).filter(([, v]) => v !== undefined) as [string, string][]
           ),
           body: body,
         });

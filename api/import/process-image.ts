@@ -67,9 +67,6 @@ async function fetchImage(url: string, timeoutMs: number = 15000): Promise<Buffe
 async function compressImage(inputBuffer: Buffer): Promise<{ buffer: Buffer; info: sharp.OutputInfo }> {
   const image = sharp(inputBuffer);
 
-  // 获取原始图片信息
-  const metadata = await image.metadata();
-
   // 压缩处理
   const processedBuffer = await image
     .resize(1200, 1200, {
@@ -109,7 +106,7 @@ export async function processExternalImage(
     const originalSize = originalBuffer.length;
 
     // 2. 压缩图片
-    const { buffer: compressedBuffer, info } = await compressImage(originalBuffer);
+    const { buffer: compressedBuffer } = await compressImage(originalBuffer);
     const compressedSize = compressedBuffer.length;
 
     // 3. 生成文件路径

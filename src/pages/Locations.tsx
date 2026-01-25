@@ -88,13 +88,8 @@ export default function Locations() {
 
   // 删除位置
   const handleDelete = useCallback(async (location: Location) => {
-    try {
-      await deleteLocation(location.id);
-      toast.success(`位置 "${location.name}" 已删除`);
-    } catch (err) {
-      // 错误会在 LocationItem 中显示
-      throw err;
-    }
+    await deleteLocation(location.id);
+    toast.success(`位置 "${location.name}" 已删除`);
   }, [deleteLocation]);
 
   // 对话框关闭

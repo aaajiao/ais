@@ -12,7 +12,15 @@ export default function Chat() {
   const location = useLocation();
   const inputRef = useRef<HTMLInputElement>(null);
   const historyLoadedRef = useRef(false);
-  const [inputValue, setInputValue] = useState('');
+  const contextFromRoute = location.state?.context as { artworkTitle?: string; editionNumber?: number } | undefined;
+
+  // 初始化输入值，如果有路由上下文则预填充
+  const [inputValue, setInputValue] = useState(() => {
+    if (contextFromRoute?.artworkTitle && contextFromRoute?.editionNumber) {
+      return `${contextFromRoute.artworkTitle} ${contextFromRoute.editionNumber} `;
+    }
+    return '';
+  });
   const { session, loading: authLoading } = useAuth();
 
   // 获取用户选择的模型（现在存储的是完整的模型 ID）
@@ -64,32 +72,29 @@ export default function Chat() {
     return modelId;
   };
 
-  // 从路由状态获取上下文（如从版本详情页跳转过来）
-  const contextFromRoute = location.state?.context;
+  // 获取当前 token
+  const accessToken = session?.access_token;
 
-  // 使用 ref 保存最新的 access_token，避免 transport 闭包问题
-  const accessTokenRef = useRef(session?.access_token);
-  useEffect(() => {
-    accessTokenRef.current = session?.access_token;
-  }, [session?.access_token]);
-
-  // 创建 transport - 使用自定义 fetch 获取最新 token
-  const transport = useMemo(() => new DefaultChatTransport({
-    api: '/api/chat',
-    fetch: async (url, options) => {
-      const token = accessTokenRef.current;
-      return fetch(url, {
-        ...options,
-        headers: {
-          ...options?.headers,
-          'Authorization': `Bearer ${token || ''}`,
+  // 创建 transport - 当 token 或 model 变化时重新创建
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: '/api/chat',
+        fetch: async (url, options) => {
+          return fetch(url, {
+            ...options,
+            headers: {
+              ...options?.headers,
+              Authorization: `Bearer ${accessToken || ''}`,
+            },
+          });
         },
-      });
-    },
-    body: {
-      model: selectedModel,
-    },
-  }), [selectedModel]);
+        body: {
+          model: selectedModel,
+        },
+      }),
+    [selectedModel, accessToken]
+  );
 
   const {
     messages,
@@ -121,14 +126,10 @@ export default function Chat() {
     }
   }, [setMessages]);
 
-  // 如果有上下文，自动填充输入
+  // 如果有上下文，自动聚焦输入框
   useEffect(() => {
     if (contextFromRoute && inputRef.current) {
-      const { artworkTitle, editionNumber } = contextFromRoute;
-      if (artworkTitle && editionNumber) {
-        setInputValue(`${artworkTitle} ${editionNumber} `);
-        inputRef.current.focus();
-      }
+      inputRef.current.focus();
     }
   }, [contextFromRoute]);
 

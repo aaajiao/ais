@@ -28,21 +28,15 @@ const resolveTheme = (theme: Theme): 'dark' | 'light' => {
 
 export function useTheme() {
   const [theme, setThemeState] = useState<Theme>(getInitialTheme);
-  const [resolvedTheme, setResolvedTheme] = useState<'dark' | 'light'>(() => resolveTheme(getInitialTheme()));
+  // 直接从 theme 派生 resolvedTheme，避免额外的 state
+  const resolvedTheme = resolveTheme(theme);
 
   // 应用主题到 DOM
-  const applyTheme = useCallback((resolved: 'dark' | 'light') => {
+  useLayoutEffect(() => {
     const root = document.documentElement;
     root.classList.remove('light', 'dark');
-    root.classList.add(resolved);
-  }, []);
-
-  // 使用 useLayoutEffect 确保主题在渲染前应用，避免闪烁
-  useLayoutEffect(() => {
-    const resolved = resolveTheme(theme);
-    setResolvedTheme(resolved);
-    applyTheme(resolved);
-  }, [theme, applyTheme]);
+    root.classList.add(resolvedTheme);
+  }, [resolvedTheme]);
 
   // 设置主题
   const setTheme = useCallback((newTheme: Theme) => {
@@ -55,20 +49,20 @@ export function useTheme() {
     setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
   }, [resolvedTheme, setTheme]);
 
-  // 监听系统主题变化
+  // 监听系统主题变化 - 强制组件重新渲染以获取新的 resolvedTheme
+  const [, forceUpdate] = useState(0);
   useEffect(() => {
     if (theme !== 'system') return;
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = () => {
-      const resolved = getSystemTheme();
-      setResolvedTheme(resolved);
-      applyTheme(resolved);
+      // 强制重新渲染以重新计算 resolvedTheme
+      forceUpdate(n => n + 1);
     };
 
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
-  }, [theme, applyTheme]);
+  }, [theme]);
 
   return {
     theme,           // 用户设置的主题 (dark/light/system)

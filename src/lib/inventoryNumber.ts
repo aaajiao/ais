@@ -217,7 +217,7 @@ export function validateNumberFormat(
     return { valid: false, message: '编号过长' };
   }
 
-  if (!/^[A-Za-z0-9\-\/\_]+$/.test(number)) {
+  if (!/^[A-Za-z0-9\-/_]+$/.test(number)) {
     return { valid: false, message: '编号只能包含字母、数字和常用分隔符' };
   }
 

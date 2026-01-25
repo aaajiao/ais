@@ -3,7 +3,7 @@
  * 使用 Lucide React 图标替代 emoji
  */
 
-import { Image, FileText, Video, FileSpreadsheet, File, Link, Paperclip } from 'lucide-react';
+import { Image, FileText, Video, FileSpreadsheet, Link, Paperclip } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 /**

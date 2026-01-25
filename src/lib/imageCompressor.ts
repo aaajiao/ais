@@ -55,7 +55,7 @@ export async function compressImage(
   const img = await loadImage(file);
 
   // 计算缩放尺寸
-  let { width, height } = calculateDimensions(
+  const { width, height } = calculateDimensions(
     img.width,
     img.height,
     maxWidth,

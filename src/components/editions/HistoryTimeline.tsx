@@ -214,17 +214,19 @@ export default function HistoryTimeline({
   // 获取历史项的描述
   const getDescription = (item: EditionHistory): string => {
     switch (item.action) {
-      case 'status_change':
+      case 'status_change': {
         const fromStatus = item.from_status ? STATUS_LABELS[item.from_status] || item.from_status : '未知';
         const toStatus = item.to_status ? STATUS_LABELS[item.to_status] || item.to_status : '未知';
         return `状态从 "${fromStatus}" 变更为 "${toStatus}"`;
+      }
 
-      case 'location_change':
+      case 'location_change': {
         const fromLoc = item.from_location || '未知';
         const toLoc = item.to_location || '未知';
         return `位置从 "${fromLoc}" 变更为 "${toLoc}"`;
+      }
 
-      case 'sold':
+      case 'sold': {
         let soldDesc = '已售出';
         if (item.price && item.currency) {
           soldDesc += ` (${item.currency} ${item.price.toLocaleString()})`;
@@ -233,6 +235,7 @@ export default function HistoryTimeline({
           soldDesc += ` - 买家: ${item.related_party}`;
         }
         return soldDesc;
+      }
 
       case 'consigned':
         return item.related_party ? `寄售至 ${item.related_party}` : '开始寄售';

@@ -19,5 +19,9 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      // 允许在同一文件中导出组件和非组件（如 hooks、常量）
+      'react-refresh/only-export-components': 'warn',
+    },
   },
 ])
