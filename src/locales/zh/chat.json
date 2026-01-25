@@ -30,7 +30,9 @@
     "search_locations": "搜索位置",
     "get_statistics": "获取统计",
     "generate_update_confirmation": "生成确认",
-    "execute_edition_update": "执行更新"
+    "execute_edition_update": "执行更新",
+    "export_artworks": "导出作品",
+    "import_artwork_from_url": "导入作品"
   },
   "toolExecution": "正在{{action}}...",
   "toolError": "工具执行失败",

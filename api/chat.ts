@@ -4,6 +4,8 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
 import { createClient } from '@supabase/supabase-js';
 import { verifyAuth, unauthorizedResponse } from './lib/auth.js';
+import { extractArtworkFromUrl } from './lib/artwork-extractor.js';
+import { selectBestImage } from './lib/image-downloader.js';
 
 // 延迟创建 provider 实例的函数
 function getAnthropicProvider() {
@@ -68,14 +70,22 @@ const systemPrompt = `你是 aaajiao 艺术作品库存管理系统的 AI 助手
 2. 更新版本状态（如标记为已售、寄售、在库等）
 3. 记录销售信息（价格、买家、日期）
 4. 管理版本位置
+5. 从网页 URL 导入作品
 
 重要规则：
 - 对于查询操作，直接执行并返回结果
 - 对于修改操作（更新状态、记录销售等），必须先生成确认卡片让用户确认
+- 对于导入操作，直接执行并返回结果
 - 使用中文回复用户
 - 回答要简洁明了
 - 当工具返回的结果包含 message 字段时，务必将该信息传达给用户
 - 如果数据库为空或没有找到数据，要明确告知用户，不要沉默不语
+
+导入功能：
+- 当用户说「导入 URL」、「从 URL 添加作品」或直接发送网址时，使用 import_artwork_from_url 工具
+- 导入会自动抓取网页、提取作品信息、下载缩略图并创建作品
+- 如果作品已存在（通过 source_url 匹配），会更新而非重复创建
+- 导入完成后告知用户作品名称和导入结果
 
 导出功能：
 - 当用户说「导出 XXX」或「导出作品」时，使用 export_artworks 工具
@@ -513,6 +523,132 @@ function getTools() {
           artworkCount: finalArtworkIds.length || '全部',
           exportRequest,
           message: `已准备好 ${format.toUpperCase()} 导出，点击下方按钮下载`,
+        };
+      },
+    }),
+
+    // 从 URL 导入作品
+    import_artwork_from_url: tool({
+      description: '从网页 URL 抓取作品信息并自动创建作品。会自动提取标题、年份、类型、尺寸、材料等信息，并获取缩略图 URL。',
+      inputSchema: z.object({
+        url: z.string().url().describe('作品页面的完整 URL'),
+      }),
+      execute: async ({ url }) => {
+        console.log('[import_artwork_from_url] Starting import:', url);
+
+        // 1. 抓取并解析网页
+        const extractResult = await extractArtworkFromUrl(url);
+
+        if (!extractResult.success || !extractResult.artwork) {
+          return {
+            error: extractResult.error || '无法从页面提取作品信息',
+          };
+        }
+
+        const { artwork, images } = extractResult;
+        console.log('[import_artwork_from_url] Extracted:', artwork.title_en);
+
+        // 2. 检查是否已存在（通过 source_url）
+        let existingId: string | null = null;
+        const { data: existingByUrl } = await supabase
+          .from('artworks')
+          .select('id, title_en')
+          .eq('source_url', url)
+          .is('deleted_at', null)
+          .maybeSingle();
+
+        if (existingByUrl) {
+          existingId = existingByUrl.id;
+          console.log('[import_artwork_from_url] Found existing by URL:', existingId);
+        }
+
+        // 3. 如果没有通过 URL 找到，尝试通过标题匹配
+        if (!existingId && artwork.title_en) {
+          const { data: existingByTitle } = await supabase
+            .from('artworks')
+            .select('id, source_url')
+            .eq('title_en', artwork.title_en)
+            .is('deleted_at', null);
+
+          if (existingByTitle && existingByTitle.length === 1) {
+            const matched = existingByTitle[0];
+            // 如果两者都有 source_url 且不同，视为不同作品
+            if (!(url && matched.source_url && url !== matched.source_url)) {
+              existingId = matched.id;
+              console.log('[import_artwork_from_url] Found existing by title:', existingId);
+            }
+          }
+        }
+
+        // 4. 准备作品数据
+        const artworkData: Record<string, unknown> = {
+          title_en: artwork.title_en,
+          title_cn: artwork.title_cn,
+          year: artwork.year,
+          type: artwork.type,
+          dimensions: artwork.dimensions,
+          materials: artwork.materials,
+          duration: artwork.duration,
+          source_url: url,
+          updated_at: new Date().toISOString(),
+        };
+
+        let artworkId: string;
+        let action: 'created' | 'updated';
+
+        // 5. 创建或更新作品
+        if (existingId) {
+          // 更新现有作品
+          const { error: updateError } = await supabase
+            .from('artworks')
+            .update(artworkData)
+            .eq('id', existingId);
+
+          if (updateError) {
+            return { error: `更新作品失败: ${updateError.message}` };
+          }
+
+          artworkId = existingId;
+          action = 'updated';
+        } else {
+          // 创建新作品
+          artworkData.created_at = new Date().toISOString();
+          const { data: newArtwork, error: insertError } = await supabase
+            .from('artworks')
+            .insert(artworkData)
+            .select('id')
+            .single();
+
+          if (insertError || !newArtwork) {
+            return { error: `创建作品失败: ${insertError?.message || '未知错误'}` };
+          }
+
+          artworkId = newArtwork.id;
+          action = 'created';
+        }
+
+        // 6. 设置缩略图 URL（存储远程 URL，后续由系统自动压缩上传）
+        const bestImage = selectBestImage(images);
+
+        if (bestImage) {
+          console.log('[import_artwork_from_url] Setting thumbnail URL:', bestImage);
+          await supabase
+            .from('artworks')
+            .update({ thumbnail_url: bestImage })
+            .eq('id', artworkId);
+        }
+
+        // 7. 返回结果
+        const actionText = action === 'created' ? '已创建' : '已更新';
+        const thumbnailText = bestImage ? '，已获取缩略图' : '';
+
+        return {
+          success: true,
+          action,
+          artwork_id: artworkId,
+          artwork_title: artwork.title_en,
+          has_thumbnail: !!bestImage,
+          message: `${actionText}作品「${artwork.title_en}」${thumbnailText}`,
         };
       },
     }),

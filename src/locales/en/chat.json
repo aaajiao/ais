@@ -30,7 +30,9 @@
     "search_locations": "Searching locations",
     "get_statistics": "Getting statistics",
     "generate_update_confirmation": "Generating confirmation",
-    "execute_edition_update": "Executing update"
+    "execute_edition_update": "Executing update",
+    "export_artworks": "Exporting artworks",
+    "import_artwork_from_url": "Importing artwork"
   },
   "toolExecution": "{{action}}...",
   "toolError": "Tool execution failed",

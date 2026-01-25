@@ -464,7 +464,7 @@ src/
 - [x] 增量更新检测逻辑（通过 source_url 匹配）
 - [x] 导入预览界面（对比显示新增/更新/无变化）
 - [x] 缩略图选择器（集成在 MDImport.tsx）
-- [ ] URL 抓取导入（Firecrawl）- 延后
+- [x] AI 对话 URL 抓取导入（使用 LLM 解析网页内容）
 - [x] 导出功能
   - [x] PDF 导出（带嵌入图片、中英双语支持）
   - [x] Markdown 导出（带图片链接、完整中英文）
@@ -568,6 +568,50 @@ src/
 4. **Markdown 结构化** - 添加 YAML frontmatter
 5. **移除未使用依赖** - 删除 pdfmake, jspdf-autotable
 
+### 已完成的 AI URL 抓取导入功能
+
+#### 功能说明
+在 AI 对话中直接输入 URL（如 `导入 https://eventstructure.com/Guard-I`），系统自动：
+1. 抓取网页 HTML 内容
+2. 使用 LLM（Claude Sonnet）智能提取作品信息
+3. 提取页面中最合适的缩略图 URL
+4. 检查数据库是否已存在（通过 source_url 匹配）
+5. 创建或更新作品记录
+
+#### 技术实现
+- **网页抓取**: 直接 fetch HTML
+- **内容解析**: AI SDK `generateObject` + Zod schema
+- **图片处理**: 存储远程 URL，由系统后续自动压缩上传
+- **去重机制**: 通过 `source_url` 或 `title_en` 匹配
+
+#### 新增文件
+```
+api/lib/
+├── artwork-extractor.ts   # LLM 解析模块（generateObject + Zod）
+└── image-downloader.ts    # 图片 URL 选择器（selectBestImage）
+```
+
+#### LLM 提取 Schema
+```typescript
+const artworkSchema = z.object({
+  title_en: z.string().describe('英文标题'),
+  title_cn: z.string().nullable().describe('中文标题'),
+  year: z.string().nullable().describe('年份'),
+  type: z.string().nullable().describe('作品类型'),
+  dimensions: z.string().nullable().describe('尺寸'),
+  materials: z.string().nullable().describe('材料'),
+  duration: z.string().nullable().describe('视频时长'),
+  description_en: z.string().nullable().describe('英文描述'),
+  description_cn: z.string().nullable().describe('中文描述'),
+});
+```
+
+#### 使用示例
+```
+用户: 导入 https://eventstructure.com/Guard-I
+AI: 已创建作品「Guard, I...」，已获取缩略图
+```
+
 ### 相关文件
 ```
 src/lib/exporters/
@@ -642,7 +686,8 @@ src/components/export/
 - [ ] 画廊门户页面（GalleryPortal.tsx）
   - 只读展示寄售作品
   - 无需登录
-- [ ] 主题切换（深色/亮色）
+- [x] 主题切换（深色/亮色）- 已在设置页实现
+- [x] 国际化支持（中文/英文）- 已完成
 - [ ] PWA 配置
   - manifest.json
   - Service Worker
