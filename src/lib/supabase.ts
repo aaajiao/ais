@@ -84,7 +84,6 @@ export async function deleteFile(
 }
 
 // 辅助函数：插入数据（带类型安全）
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function insertIntoTable<T extends keyof Database['public']['Tables']>(
   table: T,
   data: Database['public']['Tables'][T]['Insert']
@@ -94,7 +93,6 @@ export async function insertIntoTable<T extends keyof Database['public']['Tables
 }
 
 // 辅助函数：插入数据不返回（带类型安全）
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function insertIntoTableNoReturn<T extends keyof Database['public']['Tables']>(
   table: T,
   data: Database['public']['Tables'][T]['Insert']
@@ -104,7 +102,6 @@ export async function insertIntoTableNoReturn<T extends keyof Database['public']
 }
 
 // 辅助函数：更新数据（带类型安全）
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function updateTable<T extends keyof Database['public']['Tables']>(
   table: T,
   data: Database['public']['Tables'][T]['Update'],

@@ -26,7 +26,8 @@ interface ValidationResult {
 }
 
 export function useInventoryNumber(options: UseInventoryNumberOptions = {}) {
-  const { excludeEditionId, debounceMs = 300 } = options;
+  // excludeEditionId 目前未实现，保留接口以备将来使用
+  const { debounceMs = 300 } = options;
 
   const [existingNumbers, setExistingNumbers] = useState<string[]>([]);
   const [suggestion, setSuggestion] = useState<NumberSuggestion | null>(null);
@@ -115,7 +116,7 @@ export function useInventoryNumber(options: UseInventoryNumberOptions = {}) {
 
       setIsChecking(false);
     }, debounceMs);
-  }, [debounceMs, excludeEditionId, existingNumbers, pattern]);
+  }, [debounceMs, existingNumbers, pattern]);
 
   // 清理定时器
   useEffect(() => {
