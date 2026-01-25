@@ -1,9 +1,9 @@
-import { streamText, tool, convertToModelMessages, type UIMessage } from 'ai';
+import { streamText, tool, convertToModelMessages, stepCountIs, type UIMessage } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
 import { createClient } from '@supabase/supabase-js';
-import { verifyAuth, unauthorizedResponse } from './lib/auth';
+import { verifyAuth, unauthorizedResponse } from './lib/auth.js';
 
 // 延迟创建 provider 实例的函数
 function getAnthropicProvider() {
@@ -547,7 +547,7 @@ export default async function handler(req: Request) {
       system: systemPrompt,
       messages: modelMessages,
       tools,
-      maxSteps: 5,
+      stopWhen: stepCountIs(5),
     });
 
     return result.toUIMessageStreamResponse();

@@ -1,9 +1,9 @@
 // Markdown 导出 API
 
-import type { ExportRequest } from '../../src/lib/exporters/index';
-import { generateFullMarkdown } from '../../src/lib/exporters/formatters';
-import { getSupabaseClient, fetchArtworkExportData } from './shared';
-import { verifyAuth, unauthorizedResponse } from '../lib/auth';
+import type { ExportRequest } from '../../src/lib/exporters/index.js';
+import { generateFullMarkdown } from '../../src/lib/exporters/formatters.js';
+import { getSupabaseClient, fetchArtworkExportData } from './shared.js';
+import { verifyAuth, unauthorizedResponse } from '../lib/auth.js';
 
 // Vercel API Handler
 export default async function handler(req: Request): Promise<Response> {

@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { verifyAuth, unauthorizedResponse } from '../lib/auth';
+import { verifyAuth, unauthorizedResponse } from '../lib/auth.js';
 
 // 请求体类型
 interface ImportArtwork {

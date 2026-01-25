@@ -4,10 +4,10 @@ import { jsPDF } from 'jspdf';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import type { ExportRequest, ArtworkExportData } from '../../src/lib/exporters/index';
-import { preparePDFData, type PDFArtworkData } from '../../src/lib/exporters/formatters';
-import { getSupabaseClient, fetchArtworkExportData } from './shared';
-import { verifyAuth, unauthorizedResponse } from '../lib/auth';
+import type { ExportRequest, ArtworkExportData } from '../../src/lib/exporters/index.js';
+import { preparePDFData, type PDFArtworkData } from '../../src/lib/exporters/formatters.js';
+import { getSupabaseClient, fetchArtworkExportData } from './shared.js';
+import { verifyAuth, unauthorizedResponse } from '../lib/auth.js';
 
 // Vercel 配置：使用 Node.js runtime（需要文件系统访问）
 export const config = {
