@@ -1,13 +1,13 @@
 // 导出格式化工具
 
-import type { ArtworkExportData, ExportOptions } from './index';
+import type { ArtworkExportData, ExportOptions } from './index.js';
 import {
   formatEditionInfo,
   formatPrice,
   formatStatusStats,
   getLocationNames,
   formatEditionLines,
-} from './index';
+} from './index.js';
 
 // 生成单个作品的 Markdown
 export function generateArtworkMarkdown(

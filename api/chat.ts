@@ -260,8 +260,10 @@ function getTools() {
             .select('location_id, locations (name)');
           const locationCounts: Record<string, number> = {};
           editions?.forEach(e => {
-            const name = (e.locations as { name: string } | null)?.name || '未知';
-            locationCounts[name] = (locationCounts[name] || 0) + 1;
+            // Supabase 返回的 locations 可能是对象或数组
+            const loc = e.locations as { name: string } | { name: string }[] | null;
+            const name = Array.isArray(loc) ? loc[0]?.name : loc?.name;
+            locationCounts[name || '未知'] = (locationCounts[name || '未知'] || 0) + 1;
           });
           return { by_location: locationCounts };
         }

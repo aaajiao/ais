@@ -1,6 +1,6 @@
 // 导出功能类型定义和数据获取
 
-import type { Artwork, Edition, Location, EditionStatus } from '../types';
+import type { Artwork, Edition, Location, EditionStatus } from '../types.js';
 
 // 导出请求参数
 export interface ExportRequest {
