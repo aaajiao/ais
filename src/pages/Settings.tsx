@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
@@ -36,9 +36,13 @@ export default function Settings() {
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [exporting, setExporting] = useState<string | null>(null);
+  const hasInitializedModels = useRef(false);
 
   // 从 API 加载可用模型列表
   useEffect(() => {
+    if (hasInitializedModels.current) return;
+    hasInitializedModels.current = true;
+
     async function fetchModels() {
       try {
         setLoadingModels(true);
@@ -64,7 +68,7 @@ export default function Settings() {
     }
 
     fetchModels();
-  }, []);
+  }, [selectedModel]);
 
   const handleModelChange = (modelId: string) => {
     setSelectedModel(modelId);

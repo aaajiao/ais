@@ -54,7 +54,7 @@ export default function ThumbnailMigration() {
       setError(err instanceof Error ? err.message : '预览失败');
       setStep('idle');
     }
-  }, []);
+  }, [session?.access_token]);
 
   // 执行迁移
   const handleMigrate = useCallback(async () => {
@@ -82,7 +82,7 @@ export default function ThumbnailMigration() {
       setError(err instanceof Error ? err.message : '迁移失败');
       setStep('preview');
     }
-  }, []);
+  }, [session?.access_token]);
 
   // 重置状态
   const handleReset = useCallback(() => {

@@ -139,7 +139,7 @@ export default function MDImport() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [session?.access_token]);
 
   // 处理缩略图选择（使用 UID 作为 key）
   const handleThumbnailSelect = (uid: string, imageUrl: string) => {
