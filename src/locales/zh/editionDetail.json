@@ -40,6 +40,9 @@
   },
   "info": {
     "location": "位置：",
+    "locationAddress": "地址：",
+    "locationContact": "联系方式：",
+    "locationNotes": "备注：",
     "soldPrice": "成交价：",
     "listPrice": "定价：",
     "saleDate": "售出日期：",

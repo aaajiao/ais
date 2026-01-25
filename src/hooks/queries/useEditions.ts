@@ -19,7 +19,7 @@ interface EditionQueryResult extends Edition {
     Artwork,
     'id' | 'title_en' | 'title_cn' | 'thumbnail_url' | 'edition_total' | 'deleted_at'
   > | null;
-  location: Pick<Location, 'id' | 'name'> | null;
+  location: Pick<Location, 'id' | 'name' | 'address' | 'contact' | 'notes'> | null;
 }
 
 export interface EditionWithDetails extends Edition {
@@ -27,7 +27,7 @@ export interface EditionWithDetails extends Edition {
     Artwork,
     'id' | 'title_en' | 'title_cn' | 'thumbnail_url' | 'edition_total'
   > | null;
-  location?: Pick<Location, 'id' | 'name'> | null;
+  location?: Pick<Location, 'id' | 'name' | 'address' | 'contact' | 'notes'> | null;
 }
 
 // Fetch paginated editions with filters
@@ -46,7 +46,7 @@ export async function fetchEditionsPaginated(params: {
       `
       *,
       artwork:artworks!left(id, title_en, title_cn, thumbnail_url, edition_total, deleted_at),
-      location:locations!left(id, name)
+      location:locations!left(id, name, address, contact, notes)
     `
     )
     .order('updated_at', { ascending: false })
@@ -190,7 +190,7 @@ export async function fetchEditionDetail(
       `
       *,
       artwork:artworks!left(id, title_en, title_cn, thumbnail_url, edition_total, deleted_at),
-      location:locations!left(id, name)
+      location:locations!left(id, name, address, contact, notes)
     `
     )
     .eq('id', id)

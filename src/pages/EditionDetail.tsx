@@ -20,7 +20,7 @@ import InventoryNumberInput from '@/components/editions/InventoryNumberInput';
 import LocationPicker from '@/components/editions/LocationPicker';
 import CreateLocationDialog from '@/components/editions/CreateLocationDialog';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
-import { Image, MessageSquare, Pencil } from 'lucide-react';
+import { Image, MessageSquare, Pencil, ChevronDown, ChevronUp } from 'lucide-react';
 
 // 状态选项 - 使用 EditionStatus 类型
 const STATUS_OPTIONS: EditionStatus[] = [
@@ -93,6 +93,7 @@ export default function EditionDetail() {
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [showCreateLocation, setShowCreateLocation] = useState(false);
   const [createLocationInitialName, setCreateLocationInitialName] = useState('');
+  const [locationExpanded, setLocationExpanded] = useState(false);
 
   // 格式化版本号
   const formatEditionNumber = (): string => {
@@ -623,12 +624,42 @@ export default function EditionDetail() {
 
             {/* 详细信息 */}
             <div className="space-y-2 text-sm">
-              {edition.location && (
-                <p>
-                  <span className="text-muted-foreground">{t('info.location')}</span>
-                  {edition.location.name}
-                </p>
-              )}
+              {edition.location && (() => {
+                const hasLocationDetails = Boolean(
+                  edition.location.address || edition.location.contact || edition.location.notes
+                );
+                return (
+                  <div>
+                    <p
+                      className={hasLocationDetails ? 'cursor-pointer inline-flex items-center gap-1' : ''}
+                      onClick={() => hasLocationDetails && setLocationExpanded(!locationExpanded)}
+                    >
+                      <span className="text-muted-foreground">{t('info.location')}</span>
+                      <span className={hasLocationDetails ? 'underline decoration-dotted underline-offset-2' : ''}>
+                        {edition.location.name}
+                      </span>
+                      {hasLocationDetails && (
+                        locationExpanded
+                          ? <ChevronUp className="w-3 h-3 text-muted-foreground" />
+                          : <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                      )}
+                    </p>
+                    {locationExpanded && hasLocationDetails && (
+                      <div className="mt-2 ml-4 p-2 bg-muted/50 rounded text-xs space-y-1">
+                        {edition.location.address && (
+                          <p><span className="text-muted-foreground">{t('info.locationAddress')}</span>{edition.location.address}</p>
+                        )}
+                        {edition.location.contact && (
+                          <p><span className="text-muted-foreground">{t('info.locationContact')}</span>{edition.location.contact}</p>
+                        )}
+                        {edition.location.notes && (
+                          <p><span className="text-muted-foreground">{t('info.locationNotes')}</span>{edition.location.notes}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
               {/* 价格信息（所有状态都显示） */}
               {edition.sale_price && (
                 <p>

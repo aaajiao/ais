@@ -40,6 +40,9 @@
   },
   "info": {
     "location": "Location:",
+    "locationAddress": "Address:",
+    "locationContact": "Contact:",
+    "locationNotes": "Notes:",
     "soldPrice": "Sale Price:",
     "listPrice": "List Price:",
     "saleDate": "Sale Date:",

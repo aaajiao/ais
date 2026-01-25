@@ -7,7 +7,7 @@ import { useState, useCallback, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Location } from '@/hooks/useLocations';
 import type { LocationType } from '@/lib/database.types';
-import { Home, Image, Building2, MapPin, Pencil, Trash2 } from 'lucide-react';
+import { Home, Image, Building2, MapPin, Pencil, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface LocationItemProps {
   location: Location;
@@ -31,9 +31,14 @@ export default function LocationItem({
   onDelete,
 }: LocationItemProps) {
   const { t } = useTranslation('common');
+  const { t: tLocations } = useTranslation('locations');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
+
+  // 检查是否有详情信息
+  const hasDetails = Boolean(location.address || location.contact || location.notes);
 
   const handleDelete = useCallback(async () => {
     setDeleting(true);
@@ -50,7 +55,10 @@ export default function LocationItem({
 
   return (
     <div className="group relative">
-      <div className="flex items-center justify-between p-3 bg-muted/30 hover:bg-muted/50 rounded-lg transition-colors">
+      <div
+        className={`flex items-center justify-between p-3 bg-muted/30 hover:bg-muted/50 rounded-lg transition-colors ${hasDetails ? 'cursor-pointer' : ''} ${expanded ? 'rounded-b-none' : ''}`}
+        onClick={() => hasDetails && setExpanded(!expanded)}
+      >
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <span className="text-muted-foreground flex-shrink-0">{TYPE_ICONS[location.type]}</span>
           <div className="min-w-0 flex-1">
@@ -72,10 +80,19 @@ export default function LocationItem({
               {t('location.editionsCount', { count: usageCount })}
             </span>
           )}
+          {/* 展开/收起图标 */}
+          {hasDetails && (
+            <span className="text-muted-foreground flex-shrink-0 ml-1">
+              {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </span>
+          )}
         </div>
 
         {/* 操作按钮 */}
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-2">
+        <div
+          className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-2"
+          onClick={e => e.stopPropagation()}
+        >
           <button
             onClick={() => onEdit(location)}
             className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
@@ -92,6 +109,30 @@ export default function LocationItem({
           </button>
         </div>
       </div>
+
+      {/* 展开的详情区域 */}
+      {expanded && hasDetails && (
+        <div className="px-4 py-3 bg-muted/20 border-t border-border/50 rounded-b-lg text-sm space-y-2">
+          {location.address && (
+            <div>
+              <span className="text-muted-foreground">{tLocations('fields.address')}: </span>
+              <span>{location.address}</span>
+            </div>
+          )}
+          {location.contact && (
+            <div>
+              <span className="text-muted-foreground">{tLocations('fields.contact')}: </span>
+              <span>{location.contact}</span>
+            </div>
+          )}
+          {location.notes && (
+            <div>
+              <span className="text-muted-foreground">{tLocations('fields.notes')}: </span>
+              <span className="whitespace-pre-wrap">{location.notes}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 删除确认弹窗 */}
       {showDeleteConfirm && (
