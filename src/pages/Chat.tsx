@@ -14,24 +14,48 @@ export default function Chat() {
   const [inputValue, setInputValue] = useState('');
   const { session, loading: authLoading } = useAuth();
 
-  // 获取用户选择的模型
+  // 获取用户选择的模型（现在存储的是完整的模型 ID）
   const [selectedModel] = useState(() => {
-    return localStorage.getItem('ai-model') || 'claude-sonnet-4.5';
+    return localStorage.getItem('ai-model') || 'claude-sonnet-4-5-20250929';
   });
+
+  // 获取模型显示名称
+  const getModelDisplayName = (modelId: string) => {
+    // 提取模型名称的核心部分
+    if (modelId.includes('sonnet')) return 'Claude Sonnet';
+    if (modelId.includes('opus')) return 'Claude Opus';
+    if (modelId.includes('haiku')) return 'Claude Haiku';
+    if (modelId.startsWith('gpt-')) return modelId.replace(/-/g, ' ').replace(/gpt (\d)/gi, 'GPT-$1');
+    if (modelId.startsWith('o1') || modelId.startsWith('o3') || modelId.startsWith('o4')) return modelId.toUpperCase();
+    return modelId;
+  };
 
   // 从路由状态获取上下文（如从版本详情页跳转过来）
   const contextFromRoute = location.state?.context;
 
-  // 创建 transport - 添加认证 header
+  // 使用 ref 保存最新的 access_token，避免 transport 闭包问题
+  const accessTokenRef = useRef(session?.access_token);
+  useEffect(() => {
+    accessTokenRef.current = session?.access_token;
+  }, [session?.access_token]);
+
+  // 创建 transport - 使用自定义 fetch 获取最新 token
   const transport = useMemo(() => new DefaultChatTransport({
     api: '/api/chat',
-    headers: {
-      'Authorization': `Bearer ${session?.access_token || ''}`,
+    fetch: async (url, options) => {
+      const token = accessTokenRef.current;
+      return fetch(url, {
+        ...options,
+        headers: {
+          ...options?.headers,
+          'Authorization': `Bearer ${token || ''}`,
+        },
+      });
     },
     body: {
       model: selectedModel,
     },
-  }), [selectedModel, session?.access_token]);
+  }), [selectedModel]);
 
   const {
     messages,
@@ -189,13 +213,13 @@ export default function Chat() {
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder="输入消息..."
-            disabled={isLoading}
+            placeholder={authLoading ? "正在验证登录..." : (!session?.access_token ? "请先登录" : "输入消息...")}
+            disabled={isLoading || authLoading || !session?.access_token}
             className="flex-1 px-4 py-3 bg-card border border-border rounded-xl focus:ring-2 focus:ring-ring focus:border-transparent outline-none disabled:opacity-50"
           />
           <button
             type="submit"
-            disabled={isLoading || !inputValue.trim()}
+            disabled={isLoading || authLoading || !session?.access_token || !inputValue.trim()}
             className="px-4 py-3 bg-primary text-primary-foreground rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
           >
             {isLoading ? '...' : '发送'}
@@ -203,8 +227,8 @@ export default function Chat() {
         </form>
 
         {/* 当前模型指示 */}
-        <div className="mt-2 text-xs text-muted-foreground text-center">
-          使用模型：{selectedModel}
+        <div className="mt-2 text-xs text-muted-foreground text-center" title={selectedModel}>
+          使用模型：{getModelDisplayName(selectedModel)}
         </div>
       </div>
     </div>

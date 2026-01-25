@@ -9,6 +9,9 @@ import { verifyAuth, unauthorizedResponse } from './lib/auth.js';
 function getAnthropicProvider() {
   return createAnthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
+    // Explicitly set baseURL to avoid issues with system ANTHROPIC_BASE_URL
+    // (e.g., Claude Desktop sets it without /v1)
+    baseURL: 'https://api.anthropic.com/v1',
   });
 }
 
@@ -26,24 +29,27 @@ function getSupabase() {
   );
 }
 
-// 获取模型的函数
-function getModel(modelKey: string) {
+// 默认模型 ID
+const DEFAULT_MODEL = 'claude-sonnet-4-5-20250929';
+
+// 根据模型 ID 动态选择 provider
+function getModel(modelId: string) {
   const anthropic = getAnthropicProvider();
   const openai = getOpenAIProvider();
 
-  // 精选模型列表
-  const modelMap: Record<string, ReturnType<typeof anthropic>> = {
-    // Anthropic Claude 系列
-    'claude-sonnet-4.5': anthropic('claude-sonnet-4-5-20250929'),
-    'claude-opus-4.5': anthropic('claude-opus-4-5-20251124'),
-    'claude-haiku-4.5': anthropic('claude-haiku-4-5-20251015'),
-    // OpenAI GPT 系列
-    'gpt-5.2': openai('gpt-5.2'),
-    'gpt-5.1': openai('gpt-5.1'),
-    'gpt-4.1': openai('gpt-4.1'),
-  };
+  // 使用完整的模型 ID
+  const id = modelId || DEFAULT_MODEL;
 
-  return modelMap[modelKey] || modelMap['claude-sonnet-4.5'];
+  // 根据模型 ID 前缀判断使用哪个 provider
+  if (id.startsWith('claude-')) {
+    return anthropic(id);
+  } else if (id.startsWith('gpt-') || id.startsWith('o1') || id.startsWith('o3') || id.startsWith('o4')) {
+    return openai(id);
+  }
+
+  // 默认使用 Anthropic
+  console.warn(`[chat] Unknown model prefix for "${id}", falling back to Anthropic`);
+  return anthropic(id);
 }
 
 /**
@@ -554,10 +560,21 @@ export default async function handler(req: Request) {
 
     return result.toUIMessageStreamResponse();
   } catch (error) {
-    console.error('[chat] Error:', (error as Error).message);
+    const err = error as Error & { cause?: Error; status?: number; statusText?: string };
+    console.error('[chat] Error:', {
+      message: err.message,
+      name: err.name,
+      cause: err.cause?.message,
+      status: err.status,
+      statusText: err.statusText,
+      stack: err.stack?.slice(0, 500),
+    });
+
+    // 返回更具体的错误信息
+    const errorMessage = err.message || 'Internal server error';
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: errorMessage }),
+      { status: err.status || 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
 }

@@ -1,33 +1,66 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
 
 type Artwork = Database['public']['Tables']['artworks']['Row'];
 
-type AIModel = 'claude-sonnet-4.5' | 'claude-opus-4.5' | 'claude-haiku-4.5' | 'gpt-5.2' | 'gpt-5.1' | 'gpt-4.1';
+interface ModelInfo {
+  id: string;
+  name: string;
+  provider: 'anthropic' | 'openai';
+  description?: string;
+}
 
-const modelOptions: { id: AIModel; name: string; description: string; category: 'anthropic' | 'openai' }[] = [
-  { id: 'claude-sonnet-4.5', name: 'Claude Sonnet 4.5', description: '推荐，平衡性能和成本', category: 'anthropic' },
-  { id: 'claude-opus-4.5', name: 'Claude Opus 4.5', description: '最强大，编码和代理任务最佳', category: 'anthropic' },
-  { id: 'claude-haiku-4.5', name: 'Claude Haiku 4.5', description: '快速低成本', category: 'anthropic' },
-  { id: 'gpt-5.2', name: 'GPT-5.2', description: '最新旗舰，最精确', category: 'openai' },
-  { id: 'gpt-5.1', name: 'GPT-5.1', description: '旗舰推理模型', category: 'openai' },
-  { id: 'gpt-4.1', name: 'GPT-4.1', description: '编码优化，1M token 上下文', category: 'openai' },
-];
+interface ModelsResponse {
+  anthropic: ModelInfo[];
+  openai: ModelInfo[];
+  defaultModel: string | null;
+}
 
 export default function Settings() {
   const { user, signOut } = useAuthContext();
-  const [selectedModel, setSelectedModel] = useState<AIModel>(() => {
-    const saved = localStorage.getItem('ai-model') as AIModel;
-    return saved || 'claude-sonnet-4.5';
+  const [selectedModel, setSelectedModel] = useState<string>(() => {
+    return localStorage.getItem('ai-model') || '';
   });
+  const [models, setModels] = useState<ModelsResponse | null>(null);
+  const [loadingModels, setLoadingModels] = useState(true);
+  const [modelsError, setModelsError] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [exporting, setExporting] = useState<string | null>(null);
 
-  const handleModelChange = (model: AIModel) => {
-    setSelectedModel(model);
-    localStorage.setItem('ai-model', model);
+  // 从 API 加载可用模型列表
+  useEffect(() => {
+    async function fetchModels() {
+      try {
+        setLoadingModels(true);
+        setModelsError(null);
+        const response = await fetch('/api/models');
+        if (!response.ok) {
+          throw new Error(`Failed to fetch models: ${response.status}`);
+        }
+        const data: ModelsResponse = await response.json();
+        setModels(data);
+
+        // 如果没有保存的模型选择，使用默认模型
+        if (!selectedModel && data.defaultModel) {
+          setSelectedModel(data.defaultModel);
+          localStorage.setItem('ai-model', data.defaultModel);
+        }
+      } catch (err) {
+        console.error('Failed to load models:', err);
+        setModelsError(err instanceof Error ? err.message : 'Failed to load models');
+      } finally {
+        setLoadingModels(false);
+      }
+    }
+
+    fetchModels();
+  }, []);
+
+  const handleModelChange = (modelId: string) => {
+    setSelectedModel(modelId);
+    localStorage.setItem('ai-model', modelId);
   };
 
   const handleSignOut = async () => {
@@ -38,9 +71,6 @@ export default function Settings() {
       setIsSigningOut(false);
     }
   };
-
-  const anthropicModels = modelOptions.filter(m => m.category === 'anthropic');
-  const openaiModels = modelOptions.filter(m => m.category === 'openai');
 
   // 导出 JSON（完整备份）
   const handleExportJSON = async () => {
@@ -172,6 +202,116 @@ export default function Settings() {
     }
   };
 
+  // 渲染模型选择器
+  const renderModelSelector = () => {
+    if (loadingModels) {
+      return (
+        <div className="text-center py-8 text-muted-foreground">
+          加载可用模型中...
+        </div>
+      );
+    }
+
+    if (modelsError) {
+      return (
+        <div className="text-center py-8">
+          <p className="text-destructive mb-2">加载模型失败</p>
+          <p className="text-sm text-muted-foreground">{modelsError}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90"
+          >
+            重试
+          </button>
+        </div>
+      );
+    }
+
+    if (!models) {
+      return null;
+    }
+
+    return (
+      <div className="space-y-6">
+        {/* Anthropic Claude */}
+        {models.anthropic.length > 0 && (
+          <div>
+            <h3 className="text-sm font-medium text-muted-foreground mb-3">Anthropic Claude</h3>
+            <div className="space-y-2">
+              {models.anthropic.map(model => (
+                <label
+                  key={model.id}
+                  className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                    selectedModel === model.id
+                      ? 'bg-primary/10 border border-primary/30'
+                      : 'hover:bg-muted'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="model"
+                    value={model.id}
+                    checked={selectedModel === model.id}
+                    onChange={() => handleModelChange(model.id)}
+                    className="w-4 h-4 accent-primary"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium">{model.name}</span>
+                    {model.description && (
+                      <span className="text-sm text-muted-foreground ml-2">({model.description})</span>
+                    )}
+                    <p className="text-xs text-muted-foreground truncate">{model.id}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* OpenAI GPT */}
+        {models.openai.length > 0 && (
+          <div>
+            <h3 className="text-sm font-medium text-muted-foreground mb-3">OpenAI GPT</h3>
+            <div className="space-y-2">
+              {models.openai.map(model => (
+                <label
+                  key={model.id}
+                  className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                    selectedModel === model.id
+                      ? 'bg-primary/10 border border-primary/30'
+                      : 'hover:bg-muted'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="model"
+                    value={model.id}
+                    checked={selectedModel === model.id}
+                    onChange={() => handleModelChange(model.id)}
+                    className="w-4 h-4 accent-primary"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium">{model.name}</span>
+                    {model.description && (
+                      <span className="text-sm text-muted-foreground ml-2">({model.description})</span>
+                    )}
+                    <p className="text-xs text-muted-foreground truncate">{model.id}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {models.anthropic.length === 0 && models.openai.length === 0 && (
+          <div className="text-center py-8 text-muted-foreground">
+            没有可用的模型。请检查 API 密钥配置。
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-6">设置</h1>
@@ -180,68 +320,10 @@ export default function Settings() {
       <div className="bg-card border border-border rounded-xl p-6 mb-6">
         <h2 className="text-lg font-semibold mb-4">AI 模型</h2>
 
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">Anthropic Claude</h3>
-            <div className="space-y-2">
-              {anthropicModels.map(model => (
-                <label
-                  key={model.id}
-                  className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
-                    selectedModel === model.id
-                      ? 'bg-primary/10 border border-primary/30'
-                      : 'hover:bg-muted'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="model"
-                    value={model.id}
-                    checked={selectedModel === model.id}
-                    onChange={() => handleModelChange(model.id)}
-                    className="w-4 h-4 accent-primary"
-                  />
-                  <div>
-                    <span className="font-medium">{model.name}</span>
-                    <span className="text-sm text-muted-foreground ml-2">({model.description})</span>
-                  </div>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">OpenAI GPT</h3>
-            <div className="space-y-2">
-              {openaiModels.map(model => (
-                <label
-                  key={model.id}
-                  className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
-                    selectedModel === model.id
-                      ? 'bg-primary/10 border border-primary/30'
-                      : 'hover:bg-muted'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="model"
-                    value={model.id}
-                    checked={selectedModel === model.id}
-                    onChange={() => handleModelChange(model.id)}
-                    className="w-4 h-4 accent-primary"
-                  />
-                  <div>
-                    <span className="font-medium">{model.name}</span>
-                    <span className="text-sm text-muted-foreground ml-2">({model.description})</span>
-                  </div>
-                </label>
-              ))}
-            </div>
-          </div>
-        </div>
+        {renderModelSelector()}
 
         <p className="text-sm text-muted-foreground mt-4 p-3 bg-muted/50 rounded-lg">
-          💡 对话时可说「用 Opus」或「用 GPT」临时切换模型
+          💡 模型列表从 API 动态加载，显示当前可用的所有模型
         </p>
       </div>
 
