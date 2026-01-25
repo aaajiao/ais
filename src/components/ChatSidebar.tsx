@@ -25,16 +25,31 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
     return localStorage.getItem('ai-model') || 'claude-sonnet-4.5';
   });
 
-  // 创建 transport - 添加认证 header
-  const transport = useMemo(() => new DefaultChatTransport({
-    api: '/api/chat',
-    headers: {
-      'Authorization': `Bearer ${session?.access_token || ''}`,
-    },
-    body: {
-      model: selectedModel,
-    },
-  }), [selectedModel, session?.access_token]);
+  // 使用 ref 保存最新的 token，确保 fetch 函数总是使用最新值
+  const accessTokenRef = useRef(session?.access_token);
+  accessTokenRef.current = session?.access_token;
+
+  // 创建 transport - 使用 fetch 函数动态添加认证 header
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: '/api/chat',
+        fetch: async (url, options) => {
+          const token = accessTokenRef.current;
+          return fetch(url, {
+            ...options,
+            headers: {
+              ...options?.headers,
+              Authorization: `Bearer ${token || ''}`,
+            },
+          });
+        },
+        body: {
+          model: selectedModel,
+        },
+      }),
+    [selectedModel]
+  );
 
   const {
     messages,
@@ -88,12 +103,12 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
 
   const handleSubmit = useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!inputValue.trim() || isLoading) return;
+    if (!inputValue.trim() || isLoading || !session?.access_token) return;
 
     const message = inputValue.trim();
     setInputValue('');
     await sendMessage({ text: message });
-  }, [inputValue, isLoading, sendMessage]);
+  }, [inputValue, isLoading, session?.access_token, sendMessage]);
 
   return (
     <>
@@ -191,13 +206,13 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder="输入消息..."
-              disabled={isLoading}
+              placeholder={!session?.access_token ? "请先登录" : "输入消息..."}
+              disabled={isLoading || !session?.access_token}
               className="flex-1 px-3 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent outline-none text-sm disabled:opacity-50"
             />
             <button
               type="submit"
-              disabled={isLoading || !inputValue.trim()}
+              disabled={isLoading || !inputValue.trim() || !session?.access_token}
               className="px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ArrowUp className="w-4 h-4" />

@@ -30,6 +30,7 @@ bun run lint
 
 - **Frontend**: React 19 + TypeScript 5.9 + Vite 7 + TailwindCSS 4
 - **UI**: shadcn/ui (Radix UI primitives) + Lucide icons
+- **Data Fetching**: TanStack React Query (caching, infinite queries) + TanStack Virtual (virtual scrolling)
 - **Backend**: Vercel Functions (serverless)
 - **Database**: Supabase (PostgreSQL + Storage + Auth)
 - **AI**: Vercel AI SDK with Claude (Anthropic) and GPT (OpenAI)
@@ -63,6 +64,10 @@ bun run lint
 
 - `src/lib/database.types.ts` - Auto-generated Supabase types
 - `src/lib/types.ts` - App-specific TypeScript types
+- `src/lib/queryClient.ts` - React Query client configuration
+- `src/lib/queryKeys.ts` - Query key factory for cache management
+- `src/hooks/queries/` - React Query hooks (useArtworks, useEditions, useDashboard)
+- `src/hooks/useInfiniteVirtualList.ts` - Virtual scrolling + infinite loading hook
 - `api/chat.ts` - AI chat handler with tool definitions
 - `src/lib/supabase.ts` - Supabase client initialization
 
@@ -119,9 +124,37 @@ System prompt is in Chinese for the target user.
 - **TypeScript**: Strict mode enabled, no unused variables
 - **Imports**: Use `@/` path alias for src directory
 - **Components**: Feature-based organization in `/components`
-- **State**: React contexts for global state (auth, theme)
+- **State**: React contexts for global state (auth, theme); React Query for server state
+- **Data Fetching**: Use React Query hooks in `src/hooks/queries/`; query keys in `queryKeys.ts`
 - **Validation**: Zod schemas for API inputs
 - **Styling**: TailwindCSS utilities, shadcn/ui components
+
+## Performance Patterns
+
+### Virtual Scrolling + Infinite Loading
+
+List pages (Artworks, Editions) use `useInfiniteVirtualList` hook combining:
+- **TanStack React Query** `useInfiniteQuery` for cursor-based pagination
+- **TanStack Virtual** `useVirtualizer` for rendering only visible items
+
+Key requirements:
+- Container must have explicit height (e.g., `h-[calc(100dvh-80px)]`)
+- Inner container uses `virtualizer.getTotalSize()` for height
+- Items positioned absolutely with `transform: translateY()`
+
+### Route Lazy Loading
+
+Non-critical pages use `React.lazy()` for code splitting:
+- Chat, Import, Settings loaded on demand
+- Reduces initial bundle size
+
+### Query Caching
+
+React Query provides:
+- 5-minute stale time (data considered fresh)
+- 30-minute garbage collection
+- Automatic background refetching
+- Query key invalidation on mutations
 
 ## Common Tasks
 

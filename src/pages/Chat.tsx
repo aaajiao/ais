@@ -72,20 +72,22 @@ export default function Chat() {
     return modelId;
   };
 
-  // 获取当前 token
-  const accessToken = session?.access_token;
+  // 使用 ref 保存最新的 token，确保 fetch 函数总是使用最新值
+  const accessTokenRef = useRef(session?.access_token);
+  accessTokenRef.current = session?.access_token;
 
-  // 创建 transport - 当 token 或 model 变化时重新创建
+  // 创建 transport - model 变化时重新创建
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
         api: '/api/chat',
         fetch: async (url, options) => {
+          const token = accessTokenRef.current;
           return fetch(url, {
             ...options,
             headers: {
               ...options?.headers,
-              Authorization: `Bearer ${accessToken || ''}`,
+              Authorization: `Bearer ${token || ''}`,
             },
           });
         },
@@ -93,7 +95,7 @@ export default function Chat() {
           model: selectedModel,
         },
       }),
-    [selectedModel, accessToken]
+    [selectedModel]
   );
 
   const {

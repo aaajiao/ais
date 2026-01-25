@@ -1,6 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { queryKeys } from '@/lib/queryKeys';
+import {
+  useEditionDetail,
+  useEditionHistory,
+  useEditionFiles,
+} from '@/hooks/queries/useEditions';
 import type { Database, EditionStatus, CurrencyType } from '@/lib/database.types';
 
 // 新增组件导入
@@ -14,16 +21,9 @@ import CreateLocationDialog from '@/components/editions/CreateLocationDialog';
 import { StatusIndicator, STATUS_CONFIG } from '@/components/ui/StatusIndicator';
 import { Image, MessageSquare, Pencil } from 'lucide-react';
 
-type Artwork = Database['public']['Tables']['artworks']['Row'];
-type Edition = Database['public']['Tables']['editions']['Row'];
 type Location = Database['public']['Tables']['locations']['Row'];
 type EditionHistory = Database['public']['Tables']['edition_history']['Row'];
 type EditionFile = Database['public']['Tables']['edition_files']['Row'];
-
-interface EditionWithDetails extends Edition {
-  artwork?: Artwork | null;
-  location?: Location | null;
-}
 
 // 编辑表单类型
 interface EditionFormData {
@@ -42,13 +42,30 @@ interface EditionFormData {
 export default function EditionDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [edition, setEdition] = useState<EditionWithDetails | null>(null);
-  const [history, setHistory] = useState<EditionHistory[]>([]);
-  const [files, setFiles] = useState<EditionFile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  // React Query hooks - parallel queries
+  const {
+    data: edition,
+    isLoading: editionLoading,
+    error: editionError,
+  } = useEditionDetail(id);
+
+  const {
+    data: history = [],
+    isLoading: historyLoading,
+  } = useEditionHistory(id);
+
+  const {
+    data: files = [],
+    isLoading: filesLoading,
+  } = useEditionFiles(id);
+
+  const loading = editionLoading || historyLoading || filesLoading;
+
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // 编辑状态
   const [isEditing, setIsEditing] = useState(false);
@@ -59,81 +76,6 @@ export default function EditionDetail() {
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [showCreateLocation, setShowCreateLocation] = useState(false);
   const [createLocationInitialName, setCreateLocationInitialName] = useState('');
-
-  // 加载数据
-  const fetchEditionDetail = useCallback(async () => {
-    if (!id) return;
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      // 获取版本详情
-      const { data: editionData, error: editionError } = await supabase
-        .from('editions')
-        .select('*')
-        .eq('id', id)
-        .single<Edition>();
-
-      if (editionError) throw editionError;
-
-      // 获取作品信息（排除已删除的）
-      let artwork: Artwork | null = null;
-      if (editionData && editionData.artwork_id) {
-        const { data: artworkData } = await supabase
-          .from('artworks')
-          .select('*')
-          .eq('id', editionData.artwork_id)
-          .is('deleted_at', null)
-          .single<Artwork>();
-        artwork = artworkData;
-      }
-
-      // 获取位置信息
-      let location: Location | null = null;
-      if (editionData && editionData.location_id) {
-        const { data: locationData } = await supabase
-          .from('locations')
-          .select('*')
-          .eq('id', editionData.location_id)
-          .single<Location>();
-        location = locationData;
-      }
-
-      setEdition({
-        ...(editionData as Edition),
-        artwork,
-        location,
-      });
-
-      // 获取历史记录
-      const { data: historyData } = await supabase
-        .from('edition_history')
-        .select('*')
-        .eq('edition_id', id)
-        .order('created_at', { ascending: false });
-
-      setHistory(historyData || []);
-
-      // 获取附件
-      const { data: filesData } = await supabase
-        .from('edition_files')
-        .select('*')
-        .eq('edition_id', id)
-        .order('created_at', { ascending: false });
-
-      setFiles(filesData || []);
-    } catch (err) {
-      console.error('获取版本详情失败:', err);
-      setError(err instanceof Error ? err.message : '获取版本详情失败');
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
-
-  useEffect(() => {
-    fetchEditionDetail();
-  }, [fetchEditionDetail]);
 
   // 格式化版本号
   const formatEditionNumber = (): string => {
@@ -169,24 +111,45 @@ export default function EditionDetail() {
 
   // 处理文件上传完成
   const handleFileUploaded = useCallback((file: FileListEditionFile) => {
-    setFiles(prev => [file as EditionFile, ...prev]);
-  }, []);
+    // Invalidate files cache
+    if (id) {
+      queryClient.setQueryData<EditionFile[]>(
+        queryKeys.editions.files(id),
+        (old) => [file as EditionFile, ...(old || [])]
+      );
+    }
+  }, [id, queryClient]);
 
   // 处理文件删除
   const handleFileDeleted = useCallback((fileId: string) => {
-    setFiles(prev => prev.filter(f => f.id !== fileId));
-  }, []);
+    if (id) {
+      queryClient.setQueryData<EditionFile[]>(
+        queryKeys.editions.files(id),
+        (old) => old?.filter(f => f.id !== fileId) || []
+      );
+    }
+  }, [id, queryClient]);
 
   // 处理外部链接添加
   const handleLinkAdded = useCallback((file: FileListEditionFile) => {
-    setFiles(prev => [file as EditionFile, ...prev]);
+    if (id) {
+      queryClient.setQueryData<EditionFile[]>(
+        queryKeys.editions.files(id),
+        (old) => [file as EditionFile, ...(old || [])]
+      );
+    }
     setShowLinkDialog(false);
-  }, []);
+  }, [id, queryClient]);
 
   // 处理历史记录添加
   const handleHistoryAdded = useCallback((newHistory: TimelineEditionHistory) => {
-    setHistory(prev => [newHistory as EditionHistory, ...prev]);
-  }, []);
+    if (id) {
+      queryClient.setQueryData<EditionHistory[]>(
+        queryKeys.editions.history(id),
+        (old) => [newHistory as EditionHistory, ...(old || [])]
+      );
+    }
+  }, [id, queryClient]);
 
   // 处理位置创建
   const handleLocationCreated = useCallback((location: Location) => {
@@ -195,39 +158,6 @@ export default function EditionDetail() {
     }
     setShowCreateLocation(false);
   }, [formData]);
-
-  if (loading) {
-    return (
-      <div className="p-6">
-        {/* 骨架屏 */}
-        <div className="h-8 w-24 bg-muted rounded mb-6 animate-pulse" />
-        <div className="bg-card border border-border rounded-xl p-6 mb-6">
-          <div className="flex flex-col md:flex-row gap-6">
-            <div className="w-full md:w-48 h-48 bg-muted rounded-lg animate-pulse" />
-            <div className="flex-1 space-y-4">
-              <div className="h-8 bg-muted rounded w-3/4 animate-pulse" />
-              <div className="h-4 bg-muted rounded w-1/2 animate-pulse" />
-              <div className="h-4 bg-muted rounded w-2/3 animate-pulse" />
-              <div className="h-4 bg-muted rounded w-1/3 animate-pulse" />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !edition) {
-    return (
-      <div className="p-6">
-        <Link to="/editions" className="text-primary hover:underline mb-6 inline-block">
-          ← 返回版本列表
-        </Link>
-        <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-destructive">
-          {error || '版本不存在'}
-        </div>
-      </div>
-    );
-  }
 
   // 处理对话操作
   const handleChatAction = () => {
@@ -293,8 +223,8 @@ export default function EditionDetail() {
 
       if (updateError) throw updateError;
 
-      // 重新加载数据以获取最新的位置信息
-      await fetchEditionDetail();
+      // Invalidate and refetch
+      await queryClient.invalidateQueries({ queryKey: queryKeys.editions.detail(id) });
       setIsEditing(false);
       setFormData(null);
     } catch (err) {
@@ -332,6 +262,9 @@ export default function EditionDetail() {
 
       if (deleteError) throw deleteError;
 
+      // Invalidate editions cache
+      await queryClient.invalidateQueries({ queryKey: queryKeys.editions.all });
+
       navigate(`/artworks/${edition.artwork_id}`, { replace: true });
     } catch (err) {
       console.error('删除版本失败:', err);
@@ -341,6 +274,39 @@ export default function EditionDetail() {
       setDeleting(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="p-6">
+        {/* 骨架屏 */}
+        <div className="h-8 w-24 bg-muted rounded mb-6 animate-pulse" />
+        <div className="bg-card border border-border rounded-xl p-6 mb-6">
+          <div className="flex flex-col md:flex-row gap-6">
+            <div className="w-full md:w-48 h-48 bg-muted rounded-lg animate-pulse" />
+            <div className="flex-1 space-y-4">
+              <div className="h-8 bg-muted rounded w-3/4 animate-pulse" />
+              <div className="h-4 bg-muted rounded w-1/2 animate-pulse" />
+              <div className="h-4 bg-muted rounded w-2/3 animate-pulse" />
+              <div className="h-4 bg-muted rounded w-1/3 animate-pulse" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (editionError || !edition) {
+    return (
+      <div className="p-6">
+        <Link to="/editions" className="text-primary hover:underline mb-6 inline-block">
+          ← 返回版本列表
+        </Link>
+        <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-destructive">
+          {editionError instanceof Error ? editionError.message : '版本不存在'}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 pb-24 md:pb-6">
@@ -570,6 +536,14 @@ export default function EditionDetail() {
         initialName={createLocationInitialName}
       />
 
+      {/* 错误提示 */}
+      {error && (
+        <div className="mb-4 bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-destructive">
+          {error}
+          <button onClick={() => setError(null)} className="ml-2 underline">关闭</button>
+        </div>
+      )}
+
       {/* 返回链接 */}
       <div className="flex items-center justify-between mb-6">
         <Link to="/editions" className="text-primary hover:underline">
@@ -635,7 +609,6 @@ export default function EditionDetail() {
                 <p>
                   <span className="text-muted-foreground">位置：</span>
                   {edition.location.name}
-                  {edition.location.city && `, ${edition.location.city}`}
                 </p>
               )}
               {/* 价格信息（所有状态都显示） */}
@@ -687,7 +660,7 @@ export default function EditionDetail() {
               onClick={() => setShowLinkDialog(true)}
               className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
             >
-              🔗 添加链接
+              + 添加链接
             </button>
           </div>
         </div>
@@ -696,7 +669,7 @@ export default function EditionDetail() {
         <FileUpload
           editionId={id!}
           onUploadComplete={handleFileUploaded}
-          onError={(error) => console.error('上传失败:', error)}
+          onError={(uploadError) => console.error('上传失败:', uploadError)}
         />
 
         {/* 文件列表 */}

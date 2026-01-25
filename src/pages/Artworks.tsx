@@ -1,30 +1,26 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-import type { Database, EditionStatus } from '@/lib/database.types';
 import ExportDialog from '@/components/export/ExportDialog';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
+import ListEndIndicator from '@/components/ui/ListEndIndicator';
 import { Image, Check } from 'lucide-react';
-
-type Artwork = Database['public']['Tables']['artworks']['Row'];
-type Edition = Database['public']['Tables']['editions']['Row'];
-
-interface ArtworkWithStats extends Artwork {
-  editions: Edition[];
-  stats: {
-    total: number;
-    inStudio: number;
-    atGallery: number;
-    sold: number;
-  };
-}
+import { queryKeys } from '@/lib/queryKeys';
+import {
+  useArtworksQueryFn,
+  useArtworksTotalCount,
+  getArtworkMainStatus,
+  type ArtworkWithStats,
+} from '@/hooks/queries/useArtworks';
+import {
+  useInfiniteVirtualList,
+  isGroupHeader,
+  type GroupHeaderData,
+} from '@/hooks/useInfiniteVirtualList';
 
 type FilterStatus = 'all' | 'in_studio' | 'at_gallery' | 'sold';
 
 export default function Artworks() {
-  const [artworks, setArtworks] = useState<ArtworkWithStats[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterStatus>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -35,97 +31,53 @@ export default function Artworks() {
   const [deleting, setDeleting] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
 
-  // 获取作品数据
-  useEffect(() => {
-    const fetchArtworks = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+  // Total count for "全部" tab
+  const { data: totalCount } = useArtworksTotalCount();
 
-        // 获取所有作品（排除已删除的）
-        const { data: artworksData, error: artworksError } = await supabase
-          .from('artworks')
-          .select('*')
-          .is('deleted_at', null)
-          .order('created_at', { ascending: false });
+  // Create query function with current filters
+  const filters = useMemo(
+    () => ({
+      status: filter,
+      search: searchQuery,
+    }),
+    [filter, searchQuery]
+  );
 
-        if (artworksError) throw artworksError;
+  const queryFn = useArtworksQueryFn(filters);
 
-        // 获取所有版本
-        const { data: editionsData, error: editionsError } = await supabase
-          .from('editions')
-          .select('*')
-          .returns<Edition[]>();
-
-        if (editionsError) throw editionsError;
-
-        // 组合数据并计算统计
-        const artworksWithStats: ArtworkWithStats[] = (artworksData || []).map((artwork: Artwork) => {
-          const editions = (editionsData || []).filter((e: Edition) => e.artwork_id === artwork.id);
-          return {
-            ...artwork,
-            editions,
-            stats: {
-              total: editions.length,
-              inStudio: editions.filter((e: Edition) => e.status === 'in_studio').length,
-              atGallery: editions.filter((e: Edition) => e.status === 'at_gallery').length,
-              sold: editions.filter((e: Edition) => e.status === 'sold').length,
-            },
-          };
-        });
-
-        setArtworks(artworksWithStats);
-      } catch (err) {
-        console.error('获取作品失败:', err);
-        setError(err instanceof Error ? err.message : '获取作品失败');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchArtworks();
+  // Group by year-month
+  const groupBy = useCallback((artwork: ArtworkWithStats) => {
+    const date = new Date(artwork.created_at);
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    return `${year}-${String(month).padStart(2, '0')}`;
   }, []);
 
-  // 筛选和搜索
-  const filteredArtworks = useMemo(() => {
-    let result = artworks;
+  const groupLabelFn = useCallback((key: string) => {
+    const [year, month] = key.split('-');
+    return `${year}年${parseInt(month)}月`;
+  }, []);
 
-    // 按状态筛选
-    if (filter !== 'all') {
-      result = result.filter(artwork => {
-        const hasMatchingEdition = artwork.editions.some(e => {
-          if (filter === 'in_studio') return e.status === 'in_studio';
-          if (filter === 'at_gallery') return e.status === 'at_gallery';
-          if (filter === 'sold') return e.status === 'sold';
-          return false;
-        });
-        return hasMatchingEdition;
-      });
-    }
-
-    // 搜索
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(artwork =>
-        artwork.title_en.toLowerCase().includes(query) ||
-        artwork.title_cn?.toLowerCase().includes(query) ||
-        artwork.year?.includes(query) ||
-        artwork.type?.toLowerCase().includes(query)
-      );
-    }
-
-    return result;
-  }, [artworks, filter, searchQuery]);
-
-  // 获取作品的主要状态（用于显示）
-  const getMainStatus = (editions: Edition[]): EditionStatus | null => {
-    if (editions.length === 0) return null;
-    // 优先级：at_gallery > in_studio > sold > others
-    if (editions.some(e => e.status === 'at_gallery')) return 'at_gallery';
-    if (editions.some(e => e.status === 'in_studio')) return 'in_studio';
-    if (editions.some(e => e.status === 'sold')) return 'sold';
-    return editions[0].status;
-  };
+  // Use infinite virtual list with grouping
+  const {
+    items,
+    flattenedItems,
+    totalLoaded,
+    isLoading,
+    isFetchingNextPage,
+    error,
+    hasNextPage,
+    virtualizer,
+    parentRef,
+    refetch,
+  } = useInfiniteVirtualList<ArtworkWithStats>({
+    queryKey: queryKeys.artworks.infinite(filters),
+    queryFn,
+    getItemId: (item) => item.id,
+    groupBy,
+    groupLabelFn,
+    estimateSize: (item) => (item.type === 'header' ? 48 : 112),
+  });
 
   // 切换选择模式
   const toggleSelectMode = () => {
@@ -147,12 +99,12 @@ export default function Artworks() {
     setSelectedIds(newSelected);
   };
 
-  // 全选/全不选
+  // 全选/全不选 (只对已加载的项目)
   const handleSelectAll = () => {
-    if (selectedIds.size === filteredArtworks.length) {
+    if (selectedIds.size === items.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredArtworks.map(a => a.id)));
+      setSelectedIds(new Set(items.map((a) => a.id)));
     }
   };
 
@@ -172,63 +124,41 @@ export default function Artworks() {
 
       if (deleteError) throw deleteError;
 
-      // 更新本地状态
-      setArtworks(prev => prev.filter(a => !selectedIds.has(a.id)));
+      // Refetch data
+      await refetch();
       setSelectedIds(new Set());
       setSelectMode(false);
       setShowDeleteConfirm(false);
     } catch (err) {
       console.error('批量删除失败:', err);
-      setError(err instanceof Error ? err.message : '批量删除失败');
     } finally {
       setDeleting(false);
     }
   };
 
-  // 按时间分组
-  const groupedArtworks = useMemo(() => {
-    const groups: { label: string; artworks: ArtworkWithStats[] }[] = [];
-    const groupMap = new Map<string, ArtworkWithStats[]>();
+  // Calculate total editions for selected artworks
+  const selectedEditionsCount = useMemo(() => {
+    return items
+      .filter((a) => selectedIds.has(a.id))
+      .reduce((sum, a) => sum + a.editions.length, 0);
+  }, [items, selectedIds]);
 
-    filteredArtworks.forEach(artwork => {
-      const date = new Date(artwork.created_at);
-      const year = date.getFullYear();
-      const month = date.getMonth() + 1;
-      const key = `${year}-${month}`;
-
-      if (!groupMap.has(key)) {
-        groupMap.set(key, []);
-      }
-      groupMap.get(key)!.push(artwork);
-    });
-
-    // 按时间倒序排列
-    const sortedKeys = Array.from(groupMap.keys()).sort((a, b) => b.localeCompare(a));
-
-    sortedKeys.forEach(key => {
-      const [year, month] = key.split('-');
-      groups.push({
-        label: `${year}年${month}月`,
-        artworks: groupMap.get(key)!,
-      });
-    });
-
-    return groups;
-  }, [filteredArtworks]);
-
-  if (loading) {
+  if (isLoading && items.length === 0) {
     return (
       <div className="p-6">
         <h1 className="text-page-title mb-6 xl:mb-8">作品</h1>
         {/* 骨架屏 */}
         <div className="flex gap-2 mb-6">
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="h-10 w-16 bg-muted rounded-full animate-pulse" />
+          {[1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className="h-10 w-16 bg-muted rounded-full animate-pulse"
+            />
           ))}
         </div>
         <div className="h-12 bg-muted rounded-xl mb-6 animate-pulse" />
         <div className="space-y-4">
-          {[1, 2, 3].map(i => (
+          {[1, 2, 3].map((i) => (
             <div key={i} className="bg-card border border-border rounded-xl p-4">
               <div className="flex gap-4">
                 <div className="w-20 h-20 bg-muted rounded-lg animate-pulse" />
@@ -250,14 +180,14 @@ export default function Artworks() {
       <div className="p-6">
         <h1 className="text-page-title mb-6 xl:mb-8">作品</h1>
         <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-destructive">
-          {error}
+          {error.message}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6 flex flex-col h-[calc(100dvh-80px)] md:h-[calc(100dvh-73px)]">
       {/* 导出对话框 */}
       <ExportDialog
         isOpen={showExportDialog}
@@ -274,17 +204,14 @@ export default function Artworks() {
             <p className="text-muted-foreground mb-2">
               确定要删除选中的 {selectedIds.size} 个作品吗？
             </p>
-            {(() => {
-              const totalEditions = artworks
-                .filter(a => selectedIds.has(a.id))
-                .reduce((sum, a) => sum + a.editions.length, 0);
-              return totalEditions > 0 ? (
-                <p className="text-muted-foreground text-sm mb-4">
-                  关联的 {totalEditions} 个版本也将被隐藏。
-                </p>
-              ) : null;
-            })()}
-            <p className="text-sm text-muted-foreground mb-4">作品将被移至回收站，可在回收站中恢复。</p>
+            {selectedEditionsCount > 0 && (
+              <p className="text-muted-foreground text-sm mb-4">
+                关联的 {selectedEditionsCount} 个版本也将被隐藏。
+              </p>
+            )}
+            <p className="text-sm text-muted-foreground mb-4">
+              作品将被移至回收站，可在回收站中恢复。
+            </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
@@ -315,7 +242,7 @@ export default function Artworks() {
                 onClick={handleSelectAll}
                 className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
               >
-                {selectedIds.size === filteredArtworks.length ? '全不选' : '全选'}
+                {selectedIds.size === items.length ? '全不选' : '全选'}
               </button>
               {selectedIds.size > 0 && (
                 <>
@@ -361,7 +288,7 @@ export default function Artworks() {
               : 'bg-muted text-muted-foreground hover:bg-accent'
           }`}
         >
-          全部 ({artworks.length})
+          全部 ({totalCount ?? '...'})
         </button>
         <button
           onClick={() => setFilter('in_studio')}
@@ -409,146 +336,214 @@ export default function Artworks() {
         />
       </div>
 
-      {/* 作品列表（按时间分组） */}
-      <div className="space-y-6">
-        {filteredArtworks.length === 0 ? (
+      {/* 虚拟滚动列表 */}
+      <div
+        ref={parentRef}
+        className="flex-1 overflow-y-auto"
+        style={{ contain: 'strict' }}
+      >
+        {flattenedItems.length === 0 && !isLoading ? (
           <div className="bg-card border border-border rounded-xl p-8 text-center text-muted-foreground">
-            {searchQuery || filter !== 'all' ? '没有找到匹配的作品' : '暂无作品数据'}
+            {searchQuery || filter !== 'all'
+              ? '没有找到匹配的作品'
+              : '暂无作品数据'}
           </div>
         ) : (
-          groupedArtworks.map(group => (
-            <div key={group.label}>
-              {/* 分组标题 */}
-              <h2 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wider">
-                {group.label}
-                <span className="ml-2 text-xs">({group.artworks.length})</span>
-              </h2>
+          <div
+            style={{
+              height: `${virtualizer.getTotalSize()}px`,
+              width: '100%',
+              position: 'relative',
+            }}
+          >
+            {virtualizer.getVirtualItems().map((virtualRow) => {
+              const item = flattenedItems[virtualRow.index];
 
-              {/* 该组的作品列表 */}
-              <div className="space-y-3">
-                {group.artworks.map(artwork => {
-                  const mainStatus = getMainStatus(artwork.editions);
-                  const isSelected = selectedIds.has(artwork.id);
+              // Loading indicator at end
+              if (!item) {
+                return (
+                  <div
+                    key="loading-indicator"
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    <ListEndIndicator
+                      isLoading={isFetchingNextPage}
+                      hasMore={hasNextPage}
+                      totalLoaded={totalLoaded}
+                    />
+                  </div>
+                );
+              }
 
-                  const cardContent = (
-                    <div className="flex gap-4">
-                      {/* 选择框 */}
-                      {selectMode && (
-                        <div
-                          className="flex items-center"
-                          onClick={(e) => toggleSelect(artwork.id, e)}
-                        >
-                          <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
-                            isSelected
-                              ? 'bg-primary border-primary'
-                              : 'border-border hover:border-primary/50'
-                          }`}>
-                            {isSelected && (
-                              <Check className="w-4 h-4 text-primary-foreground" />
-                            )}
-                          </div>
-                        </div>
-                      )}
+              // Render group header
+              if (isGroupHeader(item)) {
+                const headerData = item.data as GroupHeaderData;
+                return (
+                  <div
+                    key={virtualRow.key}
+                    data-index={virtualRow.index}
+                    ref={virtualizer.measureElement}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    <h2 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wider pt-4">
+                      {headerData.label}
+                      <span className="ml-2 text-xs">({headerData.count})</span>
+                    </h2>
+                  </div>
+                );
+              }
 
-                      {/* 缩略图 */}
-                      <div className="w-20 h-20 bg-muted rounded-lg overflow-hidden flex-shrink-0">
-                        {artwork.thumbnail_url ? (
-                          <img
-                            src={artwork.thumbnail_url}
-                            alt={artwork.title_en}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                            <Image className="w-8 h-8" />
-                          </div>
-                        )}
-                      </div>
+              // Render artwork card
+              const artwork = item.data as ArtworkWithStats;
+              const mainStatus = getArtworkMainStatus(artwork.editions);
+              const isSelected = selectedIds.has(artwork.id);
 
-                      {/* 作品信息 */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <h3 className="font-medium truncate">
-                            {artwork.title_en}
-                            {artwork.title_cn && (
-                              <span className="text-muted-foreground ml-2">
-                                {artwork.title_cn}
-                              </span>
-                            )}
-                          </h3>
-                          {mainStatus && (
-                            <StatusIndicator status={mainStatus} size="lg" />
-                          )}
-                        </div>
-
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {artwork.year && <span>{artwork.year}</span>}
-                          {artwork.type && <span> · {artwork.type}</span>}
-                        </p>
-
-                        {/* 版本统计 */}
-                        <div className="flex gap-3 mt-2 text-xs text-muted-foreground">
-                          {artwork.stats.total > 0 && (
-                            <>
-                              <span>共 {artwork.stats.total} 版</span>
-                              {artwork.stats.inStudio > 0 && (
-                                <span className="flex items-center gap-1">
-                                  <StatusIndicator status="in_studio" size="sm" />
-                                  {artwork.stats.inStudio}
-                                </span>
-                              )}
-                              {artwork.stats.atGallery > 0 && (
-                                <span className="flex items-center gap-1">
-                                  <StatusIndicator status="at_gallery" size="sm" />
-                                  {artwork.stats.atGallery}
-                                </span>
-                              )}
-                              {artwork.stats.sold > 0 && (
-                                <span className="flex items-center gap-1">
-                                  <StatusIndicator status="sold" size="sm" />
-                                  {artwork.stats.sold}
-                                </span>
-                              )}
-                            </>
-                          )}
-                          {artwork.stats.total === 0 && (
-                            <span>暂无版本</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-
-                  // 选择模式下用 div，否则用 Link
-                  if (selectMode) {
-                    return (
+              const cardContent = (
+                <div className="flex gap-4">
+                  {/* 选择框 */}
+                  {selectMode && (
+                    <div
+                      className="flex items-center"
+                      onClick={(e) => toggleSelect(artwork.id, e)}
+                    >
                       <div
-                        key={artwork.id}
-                        onClick={(e) => toggleSelect(artwork.id, e)}
-                        className={`bg-card border rounded-xl p-4 cursor-pointer transition-colors ${
+                        className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
                           isSelected
-                            ? 'border-primary bg-primary/5'
+                            ? 'bg-primary border-primary'
                             : 'border-border hover:border-primary/50'
                         }`}
                       >
-                        {cardContent}
+                        {isSelected && (
+                          <Check className="w-4 h-4 text-primary-foreground" />
+                        )}
                       </div>
-                    );
-                  }
+                    </div>
+                  )}
 
-                  return (
+                  {/* 缩略图 */}
+                  <div className="w-20 h-20 bg-muted rounded-lg overflow-hidden flex-shrink-0">
+                    {artwork.thumbnail_url ? (
+                      <img
+                        src={artwork.thumbnail_url}
+                        alt={artwork.title_en}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                        <Image className="w-8 h-8" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 作品信息 */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-medium truncate">
+                        {artwork.title_en}
+                        {artwork.title_cn && (
+                          <span className="text-muted-foreground ml-2">
+                            {artwork.title_cn}
+                          </span>
+                        )}
+                      </h3>
+                      {mainStatus && (
+                        <StatusIndicator status={mainStatus} size="lg" />
+                      )}
+                    </div>
+
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {artwork.year && <span>{artwork.year}</span>}
+                      {artwork.type && <span> · {artwork.type}</span>}
+                    </p>
+
+                    {/* 版本统计 */}
+                    <div className="flex gap-3 mt-2 text-xs text-muted-foreground">
+                      {artwork.stats.total > 0 && (
+                        <>
+                          <span>共 {artwork.stats.total} 版</span>
+                          {artwork.stats.inStudio > 0 && (
+                            <span className="flex items-center gap-1">
+                              <StatusIndicator status="in_studio" size="sm" />
+                              {artwork.stats.inStudio}
+                            </span>
+                          )}
+                          {artwork.stats.atGallery > 0 && (
+                            <span className="flex items-center gap-1">
+                              <StatusIndicator status="at_gallery" size="sm" />
+                              {artwork.stats.atGallery}
+                            </span>
+                          )}
+                          {artwork.stats.sold > 0 && (
+                            <span className="flex items-center gap-1">
+                              <StatusIndicator status="sold" size="sm" />
+                              {artwork.stats.sold}
+                            </span>
+                          )}
+                        </>
+                      )}
+                      {artwork.stats.total === 0 && <span>暂无版本</span>}
+                    </div>
+                  </div>
+                </div>
+              );
+
+              return (
+                <div
+                  key={virtualRow.key}
+                  data-index={virtualRow.index}
+                  ref={virtualizer.measureElement}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                >
+                  {selectMode ? (
+                    <div
+                      onClick={(e) => toggleSelect(artwork.id, e)}
+                      className={`bg-card border rounded-xl p-4 cursor-pointer transition-colors mb-3 ${
+                        isSelected
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      {cardContent}
+                    </div>
+                  ) : (
                     <Link
-                      key={artwork.id}
                       to={`/artworks/${artwork.id}`}
-                      className="block bg-card border border-border rounded-xl p-4 hover:border-primary/50 transition-colors"
+                      className="block bg-card border border-border rounded-xl p-4 hover:border-primary/50 transition-colors mb-3"
                     >
                       {cardContent}
                     </Link>
-                  );
-                })}
-              </div>
-            </div>
-          ))
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* End indicator */}
+        {!hasNextPage && totalLoaded > 0 && flattenedItems.length > 0 && (
+          <ListEndIndicator
+            isLoading={false}
+            hasMore={false}
+            totalLoaded={totalLoaded}
+          />
         )}
       </div>
     </div>

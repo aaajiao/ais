@@ -1,23 +1,34 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
-import type { Database, EditionStatus } from '@/lib/database.types';
-import { StatusIndicator, getStatusLabel } from '@/components/ui/StatusIndicator';
+import { useState, useMemo, useCallback } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import type { EditionStatus } from '@/lib/database.types';
+import {
+  StatusIndicator,
+  getStatusLabel,
+} from '@/components/ui/StatusIndicator';
+import ListEndIndicator from '@/components/ui/ListEndIndicator';
 import { Image } from 'lucide-react';
+import { queryKeys } from '@/lib/queryKeys';
+import {
+  useEditionsQueryFn,
+  useEditionStatusCounts,
+  type EditionWithDetails,
+} from '@/hooks/queries/useEditions';
+import { useInfiniteVirtualList } from '@/hooks/useInfiniteVirtualList';
 
-type Artwork = Database['public']['Tables']['artworks']['Row'];
-type Edition = Database['public']['Tables']['editions']['Row'];
-type Location = Database['public']['Tables']['locations']['Row'];
-
-interface EditionWithDetails extends Edition {
-  artwork?: Artwork | null;
-  location?: Location | null;
-}
-
-type FilterStatus = 'all' | 'in_studio' | 'at_gallery' | 'at_museum' | 'sold' | 'in_transit';
+type FilterStatus =
+  | 'all'
+  | 'in_studio'
+  | 'at_gallery'
+  | 'at_museum'
+  | 'sold'
+  | 'in_transit';
 
 // 筛选按钮配置
-const filterButtons: { key: FilterStatus; label: string; status?: EditionStatus }[] = [
+const filterButtons: {
+  key: FilterStatus;
+  label: string;
+  status?: EditionStatus;
+}[] = [
   { key: 'all', label: '全部' },
   { key: 'in_studio', label: '在库', status: 'in_studio' },
   { key: 'at_gallery', label: '寄售', status: 'at_gallery' },
@@ -27,85 +38,59 @@ const filterButtons: { key: FilterStatus; label: string; status?: EditionStatus 
 ];
 
 export default function Editions() {
-  const [editions, setEditions] = useState<EditionWithDetails[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<FilterStatus>('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialFilter =
+    (searchParams.get('status') as FilterStatus) || 'all';
+
+  const [filter, setFilter] = useState<FilterStatus>(initialFilter);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // 获取版本数据
-  useEffect(() => {
-    const fetchEditions = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+  // Status counts for filter tabs
+  const { data: statusCounts } = useEditionStatusCounts();
 
-        // 获取所有版本
-        const { data: editionsData, error: editionsError } = await supabase
-          .from('editions')
-          .select('*')
-          .order('updated_at', { ascending: false })
-          .returns<Edition[]>();
+  // Create query function with current filters
+  const filters = useMemo(
+    () => ({
+      status: filter,
+      search: searchQuery,
+    }),
+    [filter, searchQuery]
+  );
 
-        if (editionsError) throw editionsError;
+  const queryFn = useEditionsQueryFn(filters);
 
-        // 获取所有作品（排除已删除的）
-        const artworkIds = [...new Set((editionsData || []).map((e: Edition) => e.artwork_id).filter(Boolean))];
-        let artworksMap: Record<string, Artwork> = {};
+  // Use infinite virtual list
+  const {
+    items,
+    flattenedItems,
+    totalLoaded,
+    isLoading,
+    isFetchingNextPage,
+    error,
+    hasNextPage,
+    virtualizer,
+    parentRef,
+  } = useInfiniteVirtualList<EditionWithDetails>({
+    queryKey: queryKeys.editions.infinite(filters),
+    queryFn,
+    getItemId: (item) => item.id,
+    estimateSize: () => 96,
+  });
 
-        if (artworkIds.length > 0) {
-          const { data: artworksData, error: artworksError } = await supabase
-            .from('artworks')
-            .select('*')
-            .in('id', artworkIds)
-            .is('deleted_at', null)
-            .returns<Artwork[]>();
-
-          if (!artworksError && artworksData) {
-            artworksMap = artworksData.reduce((acc: Record<string, Artwork>, art: Artwork) => {
-              acc[art.id] = art;
-              return acc;
-            }, {} as Record<string, Artwork>);
-          }
-        }
-
-        // 获取所有位置
-        const locationIds = [...new Set((editionsData || []).map((e: Edition) => e.location_id).filter(Boolean))];
-        let locationsMap: Record<string, Location> = {};
-
-        if (locationIds.length > 0) {
-          const { data: locationsData, error: locationsError } = await supabase
-            .from('locations')
-            .select('*')
-            .in('id', locationIds)
-            .returns<Location[]>();
-
-          if (!locationsError && locationsData) {
-            locationsMap = locationsData.reduce((acc: Record<string, Location>, loc: Location) => {
-              acc[loc.id] = loc;
-              return acc;
-            }, {} as Record<string, Location>);
-          }
-        }
-
-        // 合并数据
-        const editionsWithDetails: EditionWithDetails[] = (editionsData || []).map((edition: Edition) => ({
-          ...edition,
-          artwork: edition.artwork_id ? artworksMap[edition.artwork_id] : null,
-          location: edition.location_id ? locationsMap[edition.location_id] : null,
-        }));
-
-        setEditions(editionsWithDetails);
-      } catch (err) {
-        console.error('获取版本失败:', err);
-        setError(err instanceof Error ? err.message : '获取版本失败');
-      } finally {
-        setLoading(false);
+  // Handle filter change
+  const handleFilterChange = useCallback(
+    (newFilter: FilterStatus) => {
+      setFilter(newFilter);
+      if (newFilter !== 'all') {
+        setSearchParams({ status: newFilter });
+      } else {
+        setSearchParams({});
       }
-    };
-
-    fetchEditions();
-  }, []);
+      // Reset scroll position
+      parentRef.current?.scrollTo(0, 0);
+    },
+    [setSearchParams, parentRef]
+  );
 
   // 格式化版本号
   const formatEditionNumber = (edition: EditionWithDetails): string => {
@@ -114,62 +99,22 @@ export default function Editions() {
     return `${edition.edition_number || '?'}/${edition.artwork?.edition_total || '?'}`;
   };
 
-  // 筛选和搜索
-  const filteredEditions = useMemo(() => {
-    let result = editions;
-
-    // 按状态筛选
-    if (filter !== 'all') {
-      result = result.filter(edition => edition.status === filter);
-    }
-
-    // 搜索
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(edition =>
-        edition.artwork?.title_en.toLowerCase().includes(query) ||
-        edition.artwork?.title_cn?.toLowerCase().includes(query) ||
-        edition.inventory_number?.toLowerCase().includes(query) ||
-        edition.location?.name.toLowerCase().includes(query)
-      );
-    }
-
-    return result;
-  }, [editions, filter, searchQuery]);
-
-  // 计算各状态数量
-  const statusCounts = useMemo(() => {
-    const counts: Record<FilterStatus, number> = {
-      all: editions.length,
-      in_studio: 0,
-      at_gallery: 0,
-      at_museum: 0,
-      in_transit: 0,
-      sold: 0,
-    };
-
-    editions.forEach(edition => {
-      if (edition.status in counts) {
-        counts[edition.status as FilterStatus]++;
-      }
-    });
-
-    return counts;
-  }, [editions]);
-
-  if (loading) {
+  if (isLoading && items.length === 0) {
     return (
       <div className="p-6">
         <h1 className="text-page-title mb-6 xl:mb-8">版本</h1>
         {/* 骨架屏 */}
         <div className="flex gap-2 mb-6">
-          {[1, 2, 3, 4, 5, 6].map(i => (
-            <div key={i} className="h-10 w-16 bg-muted rounded-full animate-pulse" />
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div
+              key={i}
+              className="h-10 w-16 bg-muted rounded-full animate-pulse"
+            />
           ))}
         </div>
         <div className="h-12 bg-muted rounded-xl mb-6 animate-pulse" />
         <div className="space-y-4">
-          {[1, 2, 3, 4].map(i => (
+          {[1, 2, 3, 4].map((i) => (
             <div key={i} className="bg-card border border-border rounded-xl p-4">
               <div className="flex gap-4">
                 <div className="w-16 h-16 bg-muted rounded-lg animate-pulse" />
@@ -191,22 +136,22 @@ export default function Editions() {
       <div className="p-6">
         <h1 className="text-page-title mb-6 xl:mb-8">版本</h1>
         <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-destructive">
-          {error}
+          {error.message}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6 flex flex-col h-[calc(100dvh-80px)] md:h-[calc(100dvh-73px)]">
       <h1 className="text-page-title mb-6 xl:mb-8">版本</h1>
 
       {/* 筛选标签 */}
       <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-        {filterButtons.map(btn => (
+        {filterButtons.map((btn) => (
           <button
             key={btn.key}
-            onClick={() => setFilter(btn.key)}
+            onClick={() => handleFilterChange(btn.key)}
             className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-1.5 ${
               filter === btn.key
                 ? 'bg-foreground text-background'
@@ -215,7 +160,7 @@ export default function Editions() {
           >
             {btn.status && <StatusIndicator status={btn.status} size="sm" />}
             {btn.label}
-            {btn.key === 'all' && ` (${statusCounts.all})`}
+            {btn.key === 'all' && statusCounts && ` (${statusCounts.all})`}
           </button>
         ))}
       </div>
@@ -231,70 +176,137 @@ export default function Editions() {
         />
       </div>
 
-      {/* 版本列表 */}
-      <div className="space-y-4">
-        {filteredEditions.length === 0 ? (
+      {/* 虚拟滚动列表 */}
+      <div
+        ref={parentRef}
+        className="flex-1 overflow-y-auto"
+        style={{ contain: 'strict' }}
+      >
+        {flattenedItems.length === 0 && !isLoading ? (
           <div className="bg-card border border-border rounded-xl p-8 text-center text-muted-foreground">
-            {searchQuery || filter !== 'all' ? '没有找到匹配的版本' : '暂无版本数据'}
+            {searchQuery || filter !== 'all'
+              ? '没有找到匹配的版本'
+              : '暂无版本数据'}
           </div>
         ) : (
-          filteredEditions.map(edition => (
-            <Link
-              key={edition.id}
-              to={`/editions/${edition.id}`}
-              className="block bg-card border border-border rounded-xl p-4 hover:border-primary/50 transition-colors"
-            >
-              <div className="flex gap-4">
-                {/* 缩略图 */}
-                <div className="w-16 h-16 bg-muted rounded-lg overflow-hidden flex-shrink-0">
-                  {edition.artwork?.thumbnail_url ? (
-                    <img
-                      src={edition.artwork.thumbnail_url}
-                      alt={edition.artwork.title_en}
-                      className="w-full h-full object-cover"
+          <div
+            style={{
+              height: `${virtualizer.getTotalSize()}px`,
+              width: '100%',
+              position: 'relative',
+            }}
+          >
+            {virtualizer.getVirtualItems().map((virtualRow) => {
+              const item = flattenedItems[virtualRow.index];
+
+              // Loading indicator at end
+              if (!item) {
+                return (
+                  <div
+                    key="loading-indicator"
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    <ListEndIndicator
+                      isLoading={isFetchingNextPage}
+                      hasMore={hasNextPage}
+                      totalLoaded={totalLoaded}
                     />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                      <Image className="w-6 h-6" />
-                    </div>
-                  )}
-                </div>
-
-                {/* 版本信息 */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <h3 className="font-medium truncate">
-                        {edition.artwork?.title_en || '未知作品'}
-                        {edition.artwork?.title_cn && (
-                          <span className="text-muted-foreground ml-2">
-                            {edition.artwork.title_cn}
-                          </span>
-                        )}
-                      </h3>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {formatEditionNumber(edition)}
-                        {edition.inventory_number && (
-                          <span className="ml-2">#{edition.inventory_number}</span>
-                        )}
-                      </p>
-                    </div>
-                    <StatusIndicator status={edition.status} size="lg" />
                   </div>
+                );
+              }
 
-                  <div className="flex items-center gap-2 mt-2 text-xs">
-                    <span>{getStatusLabel(edition.status)}</span>
-                    {edition.location && (
-                      <>
-                        <span className="text-muted-foreground">·</span>
-                        <span className="text-muted-foreground">{edition.location.name}</span>
-                      </>
-                    )}
-                  </div>
+              const edition = item.data as EditionWithDetails;
+
+              return (
+                <div
+                  key={virtualRow.key}
+                  data-index={virtualRow.index}
+                  ref={virtualizer.measureElement}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                >
+                  <Link
+                    to={`/editions/${edition.id}`}
+                    className="block bg-card border border-border rounded-xl p-4 hover:border-primary/50 transition-colors mb-4"
+                  >
+                    <div className="flex gap-4">
+                      {/* 缩略图 */}
+                      <div className="w-16 h-16 bg-muted rounded-lg overflow-hidden flex-shrink-0">
+                        {edition.artwork?.thumbnail_url ? (
+                          <img
+                            src={edition.artwork.thumbnail_url}
+                            alt={edition.artwork.title_en}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                            <Image className="w-6 h-6" />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 版本信息 */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <h3 className="font-medium truncate">
+                              {edition.artwork?.title_en || '未知作品'}
+                              {edition.artwork?.title_cn && (
+                                <span className="text-muted-foreground ml-2">
+                                  {edition.artwork.title_cn}
+                                </span>
+                              )}
+                            </h3>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {formatEditionNumber(edition)}
+                              {edition.inventory_number && (
+                                <span className="ml-2">
+                                  #{edition.inventory_number}
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                          <StatusIndicator status={edition.status} size="lg" />
+                        </div>
+
+                        <div className="flex items-center gap-2 mt-2 text-xs">
+                          <span>{getStatusLabel(edition.status)}</span>
+                          {edition.location && (
+                            <>
+                              <span className="text-muted-foreground">·</span>
+                              <span className="text-muted-foreground">
+                                {edition.location.name}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
                 </div>
-              </div>
-            </Link>
-          ))
+              );
+            })}
+          </div>
+        )}
+
+        {/* End indicator when not using virtual scroll */}
+        {!hasNextPage && totalLoaded > 0 && flattenedItems.length > 0 && (
+          <ListEndIndicator
+            isLoading={false}
+            hasMore={false}
+            totalLoaded={totalLoaded}
+          />
         )}
       </div>
     </div>

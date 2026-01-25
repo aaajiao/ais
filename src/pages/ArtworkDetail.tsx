@@ -1,18 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import type { Database, EditionStatus } from '@/lib/database.types';
+import { queryKeys } from '@/lib/queryKeys';
+import { useArtworkDetail } from '@/hooks/queries/useArtworks';
+import { useEditionsByArtwork } from '@/hooks/queries/useEditions';
+import type { EditionStatus } from '@/lib/database.types';
 import ExportDialog from '@/components/export/ExportDialog';
 import { StatusIndicator, getStatusLabel } from '@/components/ui/StatusIndicator';
 import { Image } from 'lucide-react';
-
-type Artwork = Database['public']['Tables']['artworks']['Row'];
-type Edition = Database['public']['Tables']['editions']['Row'];
-type Location = Database['public']['Tables']['locations']['Row'];
-
-interface EditionWithLocation extends Edition {
-  location?: Location | null;
-}
 
 // 编辑表单数据类型
 interface ArtworkFormData {
@@ -34,12 +30,23 @@ interface ArtworkFormData {
 export default function ArtworkDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [artwork, setArtwork] = useState<Artwork | null>(null);
-  const [editions, setEditions] = useState<EditionWithLocation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  // React Query hooks - parallel queries
+  const {
+    data: artwork,
+    isLoading: artworkLoading,
+    error: artworkError,
+  } = useArtworkDetail(id);
+
+  const {
+    data: editions = [],
+    isLoading: editionsLoading,
+  } = useEditionsByArtwork(id);
+
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // 编辑状态
   const [isEditing, setIsEditing] = useState(false);
@@ -58,74 +65,10 @@ export default function ArtworkDetail() {
     notes: '',
   });
 
-  useEffect(() => {
-    const fetchArtworkDetail = async () => {
-      if (!id) return;
-
-      try {
-        setLoading(true);
-        setError(null);
-
-        // 获取作品详情（排除已删除的）
-        const { data: artworkData, error: artworkError } = await supabase
-          .from('artworks')
-          .select('*')
-          .eq('id', id)
-          .is('deleted_at', null)
-          .single();
-
-        if (artworkError) throw artworkError;
-        setArtwork(artworkData);
-
-        // 获取版本列表
-        const { data: editionsData, error: editionsError } = await supabase
-          .from('editions')
-          .select('*')
-          .eq('artwork_id', id)
-          .order('edition_number', { ascending: true })
-          .returns<Edition[]>();
-
-        if (editionsError) throw editionsError;
-
-        // 获取位置信息
-        const locationIds = [...new Set((editionsData || []).map((e: Edition) => e.location_id).filter(Boolean))];
-        let locationsMap: Record<string, Location> = {};
-
-        if (locationIds.length > 0) {
-          const { data: locationsData, error: locationsError } = await supabase
-            .from('locations')
-            .select('*')
-            .in('id', locationIds)
-            .returns<Location[]>();
-
-          if (!locationsError && locationsData) {
-            locationsMap = locationsData.reduce((acc: Record<string, Location>, loc: Location) => {
-              acc[loc.id] = loc;
-              return acc;
-            }, {} as Record<string, Location>);
-          }
-        }
-
-        // 合并版本和位置数据
-        const editionsWithLocation: EditionWithLocation[] = (editionsData || []).map((edition: Edition) => ({
-          ...edition,
-          location: edition.location_id ? locationsMap[edition.location_id] : null,
-        }));
-
-        setEditions(editionsWithLocation);
-      } catch (err) {
-        console.error('获取作品详情失败:', err);
-        setError(err instanceof Error ? err.message : '获取作品详情失败');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchArtworkDetail();
-  }, [id]);
+  const loading = artworkLoading || editionsLoading;
 
   // 格式化版本号
-  const formatEditionNumber = (edition: Edition): string => {
+  const formatEditionNumber = (edition: { edition_type: string; edition_number: number | null }): string => {
     if (edition.edition_type === 'unique') return '独版';
     if (edition.edition_type === 'ap') return `AP${edition.edition_number || ''}`;
     return `${edition.edition_number || '?'}/${artwork?.edition_total || '?'}`;
@@ -188,24 +131,8 @@ export default function ArtworkDetail() {
 
       if (updateError) throw updateError;
 
-      // 更新本地状态
-      setArtwork(prev => prev ? {
-        ...prev,
-        title_en: formData.title_en,
-        title_cn: formData.title_cn || null,
-        year: formData.year || null,
-        type: formData.type || null,
-        materials: formData.materials || null,
-        dimensions: formData.dimensions || null,
-        duration: formData.duration || null,
-        edition_total: formData.edition_total || null,
-        ap_total: formData.ap_total || null,
-        is_unique: formData.is_unique,
-        source_url: formData.source_url || null,
-        thumbnail_url: formData.thumbnail_url || null,
-        notes: formData.notes || null,
-        updated_at: new Date().toISOString(),
-      } : null);
+      // Invalidate and refetch
+      await queryClient.invalidateQueries({ queryKey: queryKeys.artworks.detail(id) });
       setIsEditing(false);
       setFormData(null);
     } catch (err) {
@@ -232,7 +159,7 @@ export default function ArtworkDetail() {
         notes: newEdition.notes || null,
       };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error: insertError } = await (supabase as any)
+      const { error: insertError } = await (supabase as any)
         .from('editions')
         .insert(insertData)
         .select()
@@ -240,10 +167,8 @@ export default function ArtworkDetail() {
 
       if (insertError) throw insertError;
 
-      // 添加到本地列表
-      if (data) {
-        setEditions(prev => [...prev, { ...data, location: null } as EditionWithLocation]);
-      }
+      // Invalidate and refetch editions
+      await queryClient.invalidateQueries({ queryKey: queryKeys.editions.byArtwork(id) });
 
       // 重置表单
       setNewEdition({
@@ -278,6 +203,9 @@ export default function ArtworkDetail() {
 
       if (deleteError) throw deleteError;
 
+      // Invalidate artworks cache
+      await queryClient.invalidateQueries({ queryKey: queryKeys.artworks.all });
+
       // 删除成功，返回作品列表
       navigate('/artworks', { replace: true });
     } catch (err) {
@@ -309,14 +237,14 @@ export default function ArtworkDetail() {
     );
   }
 
-  if (error || !artwork) {
+  if (artworkError || !artwork) {
     return (
       <div className="p-6">
         <Link to="/artworks" className="text-primary hover:underline mb-6 inline-block">
           ← 返回作品列表
         </Link>
         <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-destructive">
-          {error || '作品不存在'}
+          {artworkError instanceof Error ? artworkError.message : '作品不存在'}
         </div>
       </div>
     );
@@ -332,6 +260,14 @@ export default function ArtworkDetail() {
           artworkIds={[id]}
           artworkCount={1}
         />
+      )}
+
+      {/* 错误提示 */}
+      {error && (
+        <div className="mb-4 bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-destructive">
+          {error}
+          <button onClick={() => setError(null)} className="ml-2 underline">关闭</button>
+        </div>
       )}
 
       {/* 删除确认对话框 */}
