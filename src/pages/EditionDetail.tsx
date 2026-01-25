@@ -578,7 +578,7 @@ export default function EditionDetail() {
       <CreateLocationDialog
         isOpen={showCreateLocation}
         onClose={() => setShowCreateLocation(false)}
-        onCreated={handleLocationCreated}
+        onSaved={handleLocationCreated}
         initialName={createLocationInitialName}
       />
 

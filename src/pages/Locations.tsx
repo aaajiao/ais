@@ -52,7 +52,7 @@ export default function Locations() {
 
       // 统计每个位置被引用的次数
       const counts: Record<string, number> = {};
-      for (const edition of data || []) {
+      for (const edition of (data as { location_id: string | null }[]) || []) {
         if (edition.location_id) {
           counts[edition.location_id] = (counts[edition.location_id] || 0) + 1;
         }

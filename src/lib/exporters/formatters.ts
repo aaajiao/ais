@@ -14,7 +14,7 @@ export function generateArtworkMarkdown(
   data: ArtworkExportData,
   options: ExportOptions
 ): string {
-  const { artwork, stats, priceInfo, editions, locations } = data;
+  const { artwork, priceInfo, editions, locations } = data;
   const lines: string[] = [];
 
   // 标题
