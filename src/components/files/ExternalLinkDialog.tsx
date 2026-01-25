@@ -2,10 +2,11 @@
  * 外部链接添加对话框
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, type ReactNode } from 'react';
 import { insertIntoTable, insertIntoTableNoReturn, type EditionFilesInsert, type EditionHistoryInsert } from '@/lib/supabase';
 import { detectLinkType } from '@/lib/imageCompressor';
 import type { FileType, FileSourceType } from '@/lib/database.types';
+import { Link2, Video, Image, FileText, FileSpreadsheet, Paperclip, X } from 'lucide-react';
 
 interface ExternalLinkDialogProps {
   isOpen: boolean;
@@ -28,14 +29,25 @@ export interface EditionFile {
   created_by: string | null;
 }
 
-const FILE_TYPE_OPTIONS: { value: FileType; label: string; icon: string }[] = [
-  { value: 'link', label: '链接', icon: '🔗' },
-  { value: 'video', label: '视频', icon: '🎬' },
-  { value: 'image', label: '图片', icon: '🖼' },
-  { value: 'pdf', label: 'PDF', icon: '📄' },
-  { value: 'document', label: '文档', icon: '📝' },
-  { value: 'spreadsheet', label: '表格', icon: '📊' },
-  { value: 'other', label: '其他', icon: '📎' },
+// 文件类型图标
+const FILE_TYPE_ICONS: Record<FileType, ReactNode> = {
+  link: <Link2 className="w-4 h-4" />,
+  video: <Video className="w-4 h-4" />,
+  image: <Image className="w-4 h-4" />,
+  pdf: <FileText className="w-4 h-4" />,
+  document: <FileText className="w-4 h-4" />,
+  spreadsheet: <FileSpreadsheet className="w-4 h-4" />,
+  other: <Paperclip className="w-4 h-4" />,
+};
+
+const FILE_TYPE_OPTIONS: { value: FileType; label: string }[] = [
+  { value: 'link', label: '链接' },
+  { value: 'video', label: '视频' },
+  { value: 'image', label: '图片' },
+  { value: 'pdf', label: 'PDF' },
+  { value: 'document', label: '文档' },
+  { value: 'spreadsheet', label: '表格' },
+  { value: 'other', label: '其他' },
 ];
 
 export default function ExternalLinkDialog({
@@ -168,7 +180,7 @@ export default function ExternalLinkDialog({
             onClick={handleClose}
             className="p-1 text-muted-foreground hover:text-foreground"
           >
-            ✕
+            <X className="w-4 h-4" />
           </button>
         </div>
 
@@ -197,13 +209,14 @@ export default function ExternalLinkDialog({
                   key={option.value}
                   type="button"
                   onClick={() => setFileType(option.value)}
-                  className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                  className={`px-3 py-1.5 text-sm rounded-lg border transition-colors flex items-center gap-1.5 ${
                     fileType === option.value
                       ? 'bg-primary text-primary-foreground border-primary'
                       : 'bg-background border-border hover:border-primary/50'
                   }`}
                 >
-                  {option.icon} {option.label}
+                  {FILE_TYPE_ICONS[option.value]}
+                  {option.label}
                 </button>
               ))}
             </div>

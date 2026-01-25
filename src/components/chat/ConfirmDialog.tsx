@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { Loader2 } from 'lucide-react';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -109,7 +110,7 @@ export default function ConfirmDialog({
           >
             {isLoading ? (
               <span className="flex items-center gap-2">
-                <span className="animate-spin">⏳</span>
+                <Loader2 className="w-4 h-4 animate-spin" />
                 处理中...
               </span>
             ) : (

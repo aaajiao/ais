@@ -6,6 +6,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useFileUpload, type UploadingFile, type UploadedFile } from '@/hooks/useFileUpload';
 import { formatFileSize, getFileTypeIcon, detectFileType } from '@/lib/imageCompressor';
+import { X, Check } from 'lucide-react';
 
 interface FileUploadProps {
   editionId: string;
@@ -277,12 +278,12 @@ export default function FileUpload({
                     className="p-1 text-muted-foreground hover:text-foreground"
                     title="取消"
                   >
-                    ✕
+                    <X className="w-4 h-4" />
                   </button>
                 )}
 
                 {file.status === 'complete' && (
-                  <span className="text-green-500">✓</span>
+                  <Check className="w-4 h-4 text-green-500" />
                 )}
               </div>
             ))}

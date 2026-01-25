@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { parseAndValidateMDFile, type ParsedArtwork } from '@/lib/md-parser';
+import { Loader2, FileText } from 'lucide-react';
 
 interface PreviewResult {
   new: Array<{
@@ -536,12 +537,12 @@ export default function MDImport() {
           <label htmlFor="md-upload" className="cursor-pointer block">
             {loading ? (
               <>
-                <span className="text-4xl mb-4 block animate-spin">⏳</span>
+                <Loader2 className="w-12 h-12 mx-auto mb-4 text-muted-foreground animate-spin" />
                 <p className="font-medium">解析中...</p>
               </>
             ) : (
               <>
-                <span className="text-4xl mb-4 block">📄</span>
+                <FileText className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                 <p className="font-medium">点击上传 Markdown 文件</p>
                 <p className="text-sm text-muted-foreground mt-2">
                   支持 .md / .markdown / .txt 格式

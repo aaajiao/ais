@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
+import { StatusIndicator, getStatusLabel } from '@/components/ui/StatusIndicator';
+import { Search, Package, FileDown, MessageSquare, Settings } from 'lucide-react';
 import type { Database, EditionStatus } from '@/lib/database.types';
 
 type Artwork = Database['public']['Tables']['artworks']['Row'];
@@ -15,24 +17,11 @@ interface RecentUpdate {
   id: string;
   type: 'edition' | 'artwork';
   title: string;
-  action: string;
+  status: EditionStatus;
   date: string;
   editionId?: string;
   artworkId?: string;
 }
-
-// 状态图标
-const statusIcons: Record<EditionStatus, string> = {
-  in_production: '🔵',
-  in_studio: '🟢',
-  at_gallery: '🟡',
-  at_museum: '🟣',
-  in_transit: '🔵',
-  sold: '🔴',
-  gifted: '🟠',
-  lost: '⚫',
-  damaged: '⚪',
-};
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
@@ -107,7 +96,7 @@ export default function Dashboard() {
             id: edition.id,
             type: 'edition' as const,
             title: artwork ? `${artwork.title_en} - ${editionLabel}` : editionLabel,
-            action: `状态: ${statusIcons[edition.status as EditionStatus] || ''}`,
+            status: edition.status as EditionStatus,
             date: edition.updated_at,
             editionId: edition.id,
             artworkId: edition.artwork_id,
@@ -139,8 +128,8 @@ export default function Dashboard() {
 
   if (error) {
     return (
-      <div className="p-6">
-        <h1 className="text-2xl font-bold mb-6">首页</h1>
+      <div className="p-4 sm:p-6 lg:p-8">
+        <h1 className="text-xl sm:text-2xl mb-6">首页</h1>
         <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-destructive">
           {error}
         </div>
@@ -150,11 +139,15 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="p-6">
-        <h1 className="text-2xl font-bold mb-6">首页</h1>
-        {/* 骨架屏 */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-          {[1, 2, 3, 4].map(i => (
+      <div className="p-4 sm:p-6 lg:p-8">
+        <h1 className="text-xl sm:text-2xl mb-6">首页</h1>
+        {/* 骨架屏 - 不对称网格 */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8">
+          <div className="col-span-2 md:row-span-2 bg-card border border-border rounded-xl p-6">
+            <div className="h-16 w-24 bg-muted rounded animate-pulse mb-2" />
+            <div className="h-4 w-20 bg-muted rounded animate-pulse" />
+          </div>
+          {[1, 2, 3].map(i => (
             <div key={i} className="bg-card border border-border rounded-xl p-4">
               <div className="h-9 w-12 bg-muted rounded animate-pulse mb-2" />
               <div className="h-4 w-16 bg-muted rounded animate-pulse" />
@@ -162,14 +155,9 @@ export default function Dashboard() {
           ))}
         </div>
         <div className="h-6 w-24 bg-muted rounded animate-pulse mb-4" />
-        <div className="grid grid-cols-2 gap-4 mb-8">
-          <div className="h-20 bg-muted rounded-xl animate-pulse" />
-          <div className="h-20 bg-muted rounded-xl animate-pulse" />
-        </div>
-        <div className="h-6 w-24 bg-muted rounded animate-pulse mb-4" />
-        <div className="space-y-3">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="h-16 bg-muted rounded-xl animate-pulse" />
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-8">
+          {[1, 2, 3, 4, 5].map(i => (
+            <div key={i} className="h-20 bg-muted rounded-xl animate-pulse" />
           ))}
         </div>
       </div>
@@ -177,92 +165,112 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">首页</h1>
+    <div className="p-4 sm:p-6 lg:p-8">
+      <h1 className="text-xl sm:text-2xl mb-6">首页</h1>
 
-      {/* 统计卡片 */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+      {/* 统计卡片 - 不对称网格 */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8">
+        {/* 主卡片 - 总作品数 */}
         <Link
           to="/artworks"
-          className="bg-card border border-border rounded-xl p-4 hover:border-primary/50 transition-colors"
+          className="col-span-2 md:row-span-2 bg-card border border-border rounded-xl p-6 card-interactive animate-enter"
         >
-          <div className="text-3xl font-bold">{stats.totalArtworks}</div>
-          <div className="text-muted-foreground text-sm">总作品</div>
+          <div className="text-5xl md:text-6xl lg:text-7xl font-mono font-bold tracking-tighter">
+            {stats.totalArtworks}
+          </div>
+          <div className="text-muted-foreground text-sm uppercase tracking-wider mt-2">
+            总作品 / Total Works
+          </div>
         </Link>
+
+        {/* 在库 */}
         <Link
           to="/editions?status=in_studio"
-          className="bg-card border border-border rounded-xl p-4 hover:border-primary/50 transition-colors"
+          className="bg-card border border-border rounded-xl p-4 card-interactive animate-enter animate-enter-1"
         >
-          <div className="text-3xl font-bold text-green-500">{stats.inStudio}</div>
-          <div className="text-muted-foreground text-sm flex items-center gap-1">
-            <span>🟢</span> 在库
+          <div className="text-3xl font-mono font-bold" style={{ color: 'var(--status-available)' }}>
+            {stats.inStudio}
+          </div>
+          <div className="text-muted-foreground text-sm flex items-center gap-2 mt-1">
+            <StatusIndicator status="in_studio" size="sm" />
+            <span>在库</span>
           </div>
         </Link>
+
+        {/* 寄售 */}
         <Link
           to="/editions?status=at_gallery"
-          className="bg-card border border-border rounded-xl p-4 hover:border-primary/50 transition-colors"
+          className="bg-card border border-border rounded-xl p-4 card-interactive animate-enter animate-enter-2"
         >
-          <div className="text-3xl font-bold text-yellow-500">{stats.atGallery}</div>
-          <div className="text-muted-foreground text-sm flex items-center gap-1">
-            <span>🟡</span> 寄售中
+          <div className="text-3xl font-mono font-bold" style={{ color: 'var(--status-consigned)' }}>
+            {stats.atGallery}
+          </div>
+          <div className="text-muted-foreground text-sm flex items-center gap-2 mt-1">
+            <StatusIndicator status="at_gallery" size="sm" />
+            <span>寄售</span>
           </div>
         </Link>
+
+        {/* 已售 */}
         <Link
           to="/editions?status=sold"
-          className="bg-card border border-border rounded-xl p-4 hover:border-primary/50 transition-colors"
+          className="bg-card border border-border rounded-xl p-4 card-interactive animate-enter animate-enter-3"
         >
-          <div className="text-3xl font-bold text-red-500">{stats.sold}</div>
-          <div className="text-muted-foreground text-sm flex items-center gap-1">
-            <span>🔴</span> 已售
+          <div className="text-3xl font-mono font-bold" style={{ color: 'var(--status-sold)' }}>
+            {stats.sold}
+          </div>
+          <div className="text-muted-foreground text-sm flex items-center gap-2 mt-1">
+            <StatusIndicator status="sold" size="sm" />
+            <span>已售</span>
           </div>
         </Link>
       </div>
 
       {/* 快捷操作 */}
       <div className="mb-8">
-        <h2 className="text-lg font-semibold mb-4">快捷操作</h2>
+        <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-4">快捷操作</h2>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
           <Link
             to="/artworks"
-            className="bg-card border border-border rounded-xl p-4 text-center hover:bg-accent transition-colors"
+            className="bg-card border border-border rounded-xl p-4 flex flex-col items-center justify-center gap-2 card-interactive"
           >
-            <span className="text-2xl mb-2 block">🔍</span>
-            <span className="text-sm">搜索作品</span>
+            <Search className="w-6 h-6" />
+            <span className="text-xs uppercase tracking-wider">搜索</span>
           </Link>
           <Link
             to="/editions"
-            className="bg-card border border-border rounded-xl p-4 text-center hover:bg-accent transition-colors"
+            className="bg-card border border-border rounded-xl p-4 flex flex-col items-center justify-center gap-2 card-interactive"
           >
-            <span className="text-2xl mb-2 block">📦</span>
-            <span className="text-sm">浏览版本</span>
+            <Package className="w-6 h-6" />
+            <span className="text-xs uppercase tracking-wider">版本</span>
           </Link>
           <Link
             to="/import"
-            className="bg-card border border-border rounded-xl p-4 text-center hover:bg-accent transition-colors"
+            className="bg-card border border-border rounded-xl p-4 flex flex-col items-center justify-center gap-2 card-interactive"
           >
-            <span className="text-2xl mb-2 block">📥</span>
-            <span className="text-sm">导入作品</span>
+            <FileDown className="w-6 h-6" />
+            <span className="text-xs uppercase tracking-wider">导入</span>
           </Link>
           <Link
             to="/chat"
-            className="bg-card border border-border rounded-xl p-4 text-center hover:bg-accent transition-colors"
+            className="bg-card border border-border rounded-xl p-4 flex flex-col items-center justify-center gap-2 card-interactive"
           >
-            <span className="text-2xl mb-2 block">💬</span>
-            <span className="text-sm">AI 对话</span>
+            <MessageSquare className="w-6 h-6" />
+            <span className="text-xs uppercase tracking-wider">对话</span>
           </Link>
           <Link
             to="/settings"
-            className="bg-card border border-border rounded-xl p-4 text-center hover:bg-accent transition-colors"
+            className="bg-card border border-border rounded-xl p-4 flex flex-col items-center justify-center gap-2 card-interactive"
           >
-            <span className="text-2xl mb-2 block">⚙️</span>
-            <span className="text-sm">设置</span>
+            <Settings className="w-6 h-6" />
+            <span className="text-xs uppercase tracking-wider">设置</span>
           </Link>
         </div>
       </div>
 
       {/* 最近更新 */}
       <div>
-        <h2 className="text-lg font-semibold mb-4">最近更新</h2>
+        <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-4">最近更新</h2>
         {recentUpdates.length === 0 ? (
           <div className="bg-card border border-border rounded-xl p-8 text-center text-muted-foreground">
             暂无更新记录
@@ -275,11 +283,18 @@ export default function Dashboard() {
                 to={update.editionId ? `/editions/${update.editionId}` : `/artworks/${update.artworkId}`}
                 className="flex items-center justify-between p-4 hover:bg-accent transition-colors first:rounded-t-xl last:rounded-b-xl"
               >
-                <div>
-                  <p className="font-medium">{update.title}</p>
-                  <p className="text-sm text-muted-foreground">{update.action}</p>
+                <div className="flex items-center gap-3">
+                  <StatusIndicator status={update.status} size="md" />
+                  <div>
+                    <p className="font-medium">{update.title}</p>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                      {getStatusLabel(update.status)}
+                    </p>
+                  </div>
                 </div>
-                <span className="text-sm text-muted-foreground">{formatDate(update.date)}</span>
+                <span className="text-xs text-muted-foreground uppercase tracking-wider">
+                  {formatDate(update.date)}
+                </span>
               </Link>
             ))}
           </div>

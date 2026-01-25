@@ -11,6 +11,8 @@ import HistoryTimeline, { type EditionHistory as TimelineEditionHistory } from '
 import InventoryNumberInput from '@/components/editions/InventoryNumberInput';
 import LocationPicker from '@/components/editions/LocationPicker';
 import CreateLocationDialog from '@/components/editions/CreateLocationDialog';
+import { StatusIndicator, STATUS_CONFIG } from '@/components/ui/StatusIndicator';
+import { Image, MessageSquare, Pencil } from 'lucide-react';
 
 type Artwork = Database['public']['Tables']['artworks']['Row'];
 type Edition = Database['public']['Tables']['editions']['Row'];
@@ -22,19 +24,6 @@ interface EditionWithDetails extends Edition {
   artwork?: Artwork | null;
   location?: Location | null;
 }
-
-// 状态配置
-const statusConfig: Record<EditionStatus, { icon: string; label: string; color: string; bgColor: string }> = {
-  in_production: { icon: '🔵', label: '制作中', color: 'text-blue-600', bgColor: 'bg-blue-100' },
-  in_studio: { icon: '🟢', label: '在库', color: 'text-green-600', bgColor: 'bg-green-100' },
-  at_gallery: { icon: '🟡', label: '寄售', color: 'text-yellow-600', bgColor: 'bg-yellow-100' },
-  at_museum: { icon: '🟣', label: '美术馆', color: 'text-purple-600', bgColor: 'bg-purple-100' },
-  in_transit: { icon: '🔵', label: '运输中', color: 'text-blue-600', bgColor: 'bg-blue-100' },
-  sold: { icon: '🔴', label: '已售', color: 'text-red-600', bgColor: 'bg-red-100' },
-  gifted: { icon: '🟠', label: '赠送', color: 'text-orange-600', bgColor: 'bg-orange-100' },
-  lost: { icon: '⚫', label: '遗失', color: 'text-gray-600', bgColor: 'bg-gray-100' },
-  damaged: { icon: '⚪', label: '损坏', color: 'text-gray-400', bgColor: 'bg-gray-100' },
-};
 
 // 编辑表单类型
 interface EditionFormData {
@@ -239,8 +228,6 @@ export default function EditionDetail() {
     );
   }
 
-  const status = statusConfig[edition.status];
-
   // 处理对话操作
   const handleChatAction = () => {
     navigate('/chat', {
@@ -402,9 +389,9 @@ export default function EditionDetail() {
                   onChange={(e) => setFormData({ ...formData, status: e.target.value as EditionStatus })}
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 >
-                  {Object.entries(statusConfig).map(([value, config]) => (
+                  {Object.entries(STATUS_CONFIG).map(([value, config]) => (
                     <option key={value} value={value}>
-                      {config.icon} {config.label}
+                      {config.label}
                     </option>
                   ))}
                 </select>
@@ -607,8 +594,8 @@ export default function EditionDetail() {
                 className="w-full h-full object-cover"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-muted-foreground text-4xl">
-                🖼
+              <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                <Image className="w-12 h-12" />
               </div>
             )}
           </div>
@@ -637,9 +624,8 @@ export default function EditionDetail() {
             </h1>
 
             {/* 状态标签 */}
-            <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full ${status.bgColor} mb-4`}>
-              <span>{status.icon}</span>
-              <span className={`font-medium ${status.color}`}>{status.label}</span>
+            <div className="inline-flex items-center gap-2 mb-4">
+              <StatusIndicator status={edition.status} showLabel size="lg" />
             </div>
 
             {/* 详细信息 */}
@@ -742,14 +728,14 @@ export default function EditionDetail() {
           onClick={handleChatAction}
           className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
         >
-          <span>💬</span>
+          <MessageSquare className="w-4 h-4" />
           <span>对话操作</span>
         </button>
         <button
           onClick={startEditing}
           className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-muted text-muted-foreground rounded-lg hover:bg-accent transition-colors"
         >
-          <span>✏️</span>
+          <Pencil className="w-4 h-4" />
           <span>编辑</span>
         </button>
       </div>

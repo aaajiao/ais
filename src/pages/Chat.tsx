@@ -6,6 +6,7 @@ import type { ConfirmCardData } from '@/components/chat/EditableConfirmCard';
 import CollapsibleChatHistory from '@/components/chat/CollapsibleChatHistory';
 import { saveChatHistory, loadChatHistory, clearChatHistory, getChatTimestamp } from '@/lib/chatStorage';
 import { useAuth } from '@/hooks/useAuth';
+import { MessageSquare, Trash2 } from 'lucide-react';
 
 export default function Chat() {
   const location = useLocation();
@@ -191,9 +192,9 @@ export default function Chat() {
           </span>
           <button
             onClick={handleClearChat}
-            className="flex items-center gap-1 hover:text-foreground transition-colors"
+            className="flex items-center gap-1.5 hover:text-foreground transition-colors"
           >
-            <span>🗑️</span>
+            <Trash2 className="w-3.5 h-3.5" />
             <span>清除对话</span>
           </button>
         </div>
@@ -203,7 +204,7 @@ export default function Chat() {
       {messages.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center text-muted-foreground py-8">
-            <div className="text-4xl mb-4">💬</div>
+            <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p className="font-medium">开始对话</p>
             <p className="text-sm mt-2 mb-6">
               试试说：「Guard 有几个版本？」或「哪些作品在寄售？」

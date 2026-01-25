@@ -7,6 +7,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { supabase, getSignedUrl, deleteFile } from '@/lib/supabase';
 import { getFileTypeIcon, formatFileSize } from '@/lib/imageCompressor';
 import type { FileType } from '@/lib/database.types';
+import { Trash2, Eye, X, Image as ImageIcon } from 'lucide-react';
 
 export interface EditionFile {
   id: string;
@@ -224,7 +225,7 @@ export default function FileList({
                         className="p-2 text-muted-foreground hover:text-red-500 hover:bg-background rounded-lg transition-colors"
                         title="删除"
                       >
-                        🗑
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     )}
                   </>
@@ -259,7 +260,7 @@ export default function FileList({
                   className="p-2 bg-white/20 hover:bg-white/30 rounded-full text-white"
                   title="打开"
                 >
-                  👁
+                  <Eye className="w-5 h-5" />
                 </button>
                 {isEditing && (
                   <button
@@ -267,7 +268,7 @@ export default function FileList({
                     className="p-2 bg-white/20 hover:bg-red-500/50 rounded-full text-white"
                     title="删除"
                   >
-                    🗑
+                    <Trash2 className="w-5 h-5" />
                   </button>
                 )}
               </div>
@@ -297,7 +298,7 @@ export default function FileList({
               onClick={closePreview}
               className="absolute -top-3 -right-3 w-8 h-8 bg-white text-black rounded-full flex items-center justify-center hover:bg-gray-200"
             >
-              ✕
+              <X className="w-4 h-4" />
             </button>
             <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-sm p-3 rounded-b-lg">
               {previewFile.file_name}
@@ -388,7 +389,7 @@ function ImageThumbnail({ file, size = 48 }: { file: EditionFile; size?: number 
         className="flex-shrink-0 bg-muted animate-pulse rounded-lg flex items-center justify-center"
         style={{ width: size, height: size }}
       >
-        <span className="text-lg">🖼</span>
+        <ImageIcon className="w-5 h-5 text-muted-foreground" />
       </div>
     );
   }
@@ -399,7 +400,7 @@ function ImageThumbnail({ file, size = 48 }: { file: EditionFile; size?: number 
         className="flex-shrink-0 bg-muted rounded-lg flex items-center justify-center"
         style={{ width: size, height: size }}
       >
-        <span className="text-lg">🖼</span>
+        <ImageIcon className="w-5 h-5 text-muted-foreground" />
       </div>
     );
   }
@@ -454,7 +455,7 @@ function ImagePreview({ file }: { file: EditionFile }) {
   if (loading) {
     return (
       <div className="absolute inset-0 flex items-center justify-center bg-muted animate-pulse">
-        <span className="text-2xl">🖼</span>
+        <ImageIcon className="w-8 h-8 text-muted-foreground" />
       </div>
     );
   }
@@ -466,8 +467,8 @@ function ImagePreview({ file }: { file: EditionFile }) {
       className="absolute inset-0 w-full h-full object-cover"
     />
   ) : (
-    <div className="absolute inset-0 flex items-center justify-center text-5xl">
-      🖼
+    <div className="absolute inset-0 flex items-center justify-center">
+      <ImageIcon className="w-12 h-12 text-muted-foreground" />
     </div>
   );
 }

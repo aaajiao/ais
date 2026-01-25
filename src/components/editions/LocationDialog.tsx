@@ -2,10 +2,11 @@
  * 位置对话框 - 支持创建和编辑两种模式
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, type ReactNode } from 'react';
 import { useLocations, type CreateLocationData, type Location } from '@/hooks/useLocations';
 import type { LocationType } from '@/lib/database.types';
 import { toast } from 'sonner';
+import { Home, Image, Building2, MapPin, X, ChevronDown, ChevronRight } from 'lucide-react';
 
 interface LocationDialogProps {
   isOpen: boolean;
@@ -17,12 +18,20 @@ interface LocationDialogProps {
   mode?: 'create' | 'edit';
 }
 
+// 位置类型图标
+const LOCATION_TYPE_ICONS: Record<LocationType, ReactNode> = {
+  studio: <Home className="w-4 h-4" />,
+  gallery: <Image className="w-4 h-4" />,
+  museum: <Building2 className="w-4 h-4" />,
+  other: <MapPin className="w-4 h-4" />,
+};
+
 // 位置类型选项
-const LOCATION_TYPES: { value: LocationType; label: string; icon: string }[] = [
-  { value: 'studio', label: '工作室', icon: '🏠' },
-  { value: 'gallery', label: '画廊', icon: '🖼' },
-  { value: 'museum', label: '美术馆', icon: '🏛' },
-  { value: 'other', label: '其他', icon: '📍' },
+const LOCATION_TYPES: { value: LocationType; label: string }[] = [
+  { value: 'studio', label: '工作室' },
+  { value: 'gallery', label: '画廊' },
+  { value: 'museum', label: '美术馆' },
+  { value: 'other', label: '其他' },
 ];
 
 export default function LocationDialog({
@@ -187,7 +196,7 @@ export default function LocationDialog({
             onClick={onClose}
             className="p-1 text-muted-foreground hover:text-foreground"
           >
-            ✕
+            <X className="w-4 h-4" />
           </button>
         </div>
 
@@ -225,7 +234,7 @@ export default function LocationDialog({
                     }
                   `}
                 >
-                  <span>{type.icon}</span>
+                  <span>{LOCATION_TYPE_ICONS[type.value]}</span>
                   <span>{type.label}</span>
                 </button>
               ))}
@@ -272,7 +281,7 @@ export default function LocationDialog({
                       onClick={() => handleRemoveAlias(alias)}
                       className="text-muted-foreground hover:text-foreground"
                     >
-                      ✕
+                      <X className="w-3 h-3" />
                     </button>
                   </span>
                 ))}
@@ -290,7 +299,7 @@ export default function LocationDialog({
               onClick={() => setShowAdvanced(!showAdvanced)}
               className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1"
             >
-              <span>{showAdvanced ? '▼' : '▶'}</span>
+              {showAdvanced ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
               <span>更多信息（可选）</span>
             </button>
           </div>

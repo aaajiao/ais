@@ -3,6 +3,8 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import type { Database, EditionStatus } from '@/lib/database.types';
 import ExportDialog from '@/components/export/ExportDialog';
+import { StatusIndicator, getStatusLabel } from '@/components/ui/StatusIndicator';
+import { Image } from 'lucide-react';
 
 type Artwork = Database['public']['Tables']['artworks']['Row'];
 type Edition = Database['public']['Tables']['editions']['Row'];
@@ -11,19 +13,6 @@ type Location = Database['public']['Tables']['locations']['Row'];
 interface EditionWithLocation extends Edition {
   location?: Location | null;
 }
-
-// 状态图标和标签
-const statusConfig: Record<EditionStatus, { icon: string; label: string; color: string }> = {
-  in_production: { icon: '🔵', label: '制作中', color: 'text-blue-600' },
-  in_studio: { icon: '🟢', label: '在库', color: 'text-green-600' },
-  at_gallery: { icon: '🟡', label: '寄售', color: 'text-yellow-600' },
-  at_museum: { icon: '🟣', label: '美术馆', color: 'text-purple-600' },
-  in_transit: { icon: '🔵', label: '运输中', color: 'text-blue-600' },
-  sold: { icon: '🔴', label: '已售', color: 'text-red-600' },
-  gifted: { icon: '🟠', label: '赠送', color: 'text-orange-600' },
-  lost: { icon: '⚫', label: '遗失', color: 'text-gray-600' },
-  damaged: { icon: '⚪', label: '损坏', color: 'text-gray-400' },
-};
 
 // 编辑表单数据类型
 interface ArtworkFormData {
@@ -591,8 +580,8 @@ export default function ArtworkDetail() {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-muted-foreground text-4xl">
-                  🖼
+                <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                  <Image className="w-12 h-12" />
                 </div>
               )}
             </div>
@@ -773,39 +762,36 @@ export default function ArtworkDetail() {
           </div>
         ) : editions.length === 0 ? null : (
           <div className="space-y-3">
-            {editions.map(edition => {
-              const status = statusConfig[edition.status];
-              return (
-                <Link
-                  key={edition.id}
-                  to={`/editions/${edition.id}`}
-                  className="block p-4 bg-muted/50 rounded-lg hover:bg-muted transition-colors"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="text-lg">{status.icon}</span>
-                      <div>
-                        <p className="font-medium">
-                          {formatEditionNumber(edition)}
-                          {edition.inventory_number && (
-                            <span className="text-muted-foreground ml-2 text-sm">
-                              #{edition.inventory_number}
-                            </span>
-                          )}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          <span className={status.color}>{status.label}</span>
-                          {edition.location && (
-                            <span> · {edition.location.name}</span>
-                          )}
-                        </p>
-                      </div>
+            {editions.map(edition => (
+              <Link
+                key={edition.id}
+                to={`/editions/${edition.id}`}
+                className="block p-4 bg-muted/50 rounded-lg hover:bg-muted transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <StatusIndicator status={edition.status} size="lg" />
+                    <div>
+                      <p className="font-medium">
+                        {formatEditionNumber(edition)}
+                        {edition.inventory_number && (
+                          <span className="text-muted-foreground ml-2 text-sm">
+                            #{edition.inventory_number}
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {getStatusLabel(edition.status)}
+                        {edition.location && (
+                          <span> · {edition.location.name}</span>
+                        )}
+                      </p>
                     </div>
-                    <span className="text-muted-foreground">→</span>
                   </div>
-                </Link>
-              );
-            })}
+                  <span className="text-muted-foreground">→</span>
+                </div>
+              </Link>
+            ))}
           </div>
         )}
       </div>

@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import MessageBubble from '@/components/chat/MessageBubble';
 import { saveChatHistory, loadChatHistory, clearChatHistory, getChatTimestamp } from '@/lib/chatStorage';
 import { useAuth } from '@/hooks/useAuth';
+import { Trash2, X, MessageSquare, ArrowUp } from 'lucide-react';
 
 const MAX_SIDEBAR_MESSAGES = 15;
 
@@ -112,7 +113,7 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                 title="清除对话"
               >
-                🗑️
+                <Trash2 className="w-4 h-4" />
               </button>
             )}
           </div>
@@ -121,7 +122,7 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
             className="p-1 hover:bg-accent rounded transition-colors"
             title="关闭对话面板"
           >
-            ✕
+            <X className="w-4 h-4" />
           </button>
         </div>
 
@@ -153,7 +154,7 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
         <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
           {recentMessages.length === 0 ? (
             <div className="text-center text-muted-foreground py-8">
-              <p className="text-4xl mb-4">💬</p>
+              <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
               <p className="text-sm">
                 通过对话管理作品和版本
               </p>
@@ -199,7 +200,7 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
               disabled={isLoading || !inputValue.trim()}
               className="px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              ↑
+              <ArrowUp className="w-4 h-4" />
             </button>
           </div>
         </form>
@@ -212,7 +213,7 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
           className="hidden lg:flex fixed right-4 bottom-4 w-12 h-12 bg-primary text-primary-foreground rounded-full items-center justify-center shadow-lg hover:opacity-90 transition-opacity z-40"
           title="打开对话面板"
         >
-          💬
+          <MessageSquare className="w-5 h-5" />
         </button>
       )}
     </>

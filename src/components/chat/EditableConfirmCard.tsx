@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import type { EditionStatus, Currency } from '@/lib/types';
 import { STATUS_CONFIG } from '@/lib/types';
+import { Check, Pencil } from 'lucide-react';
 
 // 确认卡片数据类型
 export interface ConfirmCardData {
@@ -209,7 +210,7 @@ export default function EditableConfirmCard({
             disabled={isSubmitting}
             className="flex-1 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm hover:opacity-90 disabled:opacity-50"
           >
-            {isSubmitting ? '处理中...' : '✓ 确认'}
+            {isSubmitting ? '处理中...' : <><Check className="w-4 h-4 inline mr-1" />确认</>}
           </button>
           <button
             onClick={handleFullEdit}
@@ -237,7 +238,7 @@ export default function EditableConfirmCard({
         {/* 标题 */}
         <div className="flex items-center justify-between">
           <div className="font-medium flex items-center gap-2">
-            <span>✏️</span>
+            <Pencil className="w-4 h-4" />
             <span>编辑更新内容</span>
           </div>
           <div className="flex gap-2">

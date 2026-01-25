@@ -1,6 +1,9 @@
 import { useState, useCallback, useMemo, memo } from 'react';
 import type { UIMessage } from 'ai';
 import EditableConfirmCard, { type ConfirmCardData } from './EditableConfirmCard';
+import { StatusIndicator, getStatusLabel } from '@/components/ui/StatusIndicator';
+import type { EditionStatus } from '@/lib/database.types';
+import { Loader2, CheckCircle, XCircle, Undo2 } from 'lucide-react';
 
 interface MessageBubbleProps {
   message: UIMessage;
@@ -146,7 +149,7 @@ function ToolResult({
   if (state === 'input-streaming' || state === 'input') {
     return (
       <div className="text-sm text-muted-foreground flex items-center gap-2">
-        <span className="animate-spin">⏳</span>
+        <Loader2 className="w-4 h-4 animate-spin" />
         <span>正在{getToolLabel(toolName)}...</span>
       </div>
     );
@@ -155,8 +158,9 @@ function ToolResult({
   // 错误
   if (state === 'error' || errorText) {
     return (
-      <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg text-red-700 dark:text-red-300 text-sm">
-        ❌ {errorText || '工具执行失败'}
+      <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg text-red-700 dark:text-red-300 text-sm flex items-center gap-2">
+        <XCircle className="w-4 h-4 flex-shrink-0" />
+        <span>{errorText || '工具执行失败'}</span>
       </div>
     );
   }
@@ -168,7 +172,7 @@ function ToolResult({
       if (confirmed) {
         return (
           <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg text-green-700 dark:text-green-300 text-sm flex items-center gap-2">
-            <span>✅</span>
+            <CheckCircle className="w-4 h-4 flex-shrink-0" />
             <span>已确认更新</span>
           </div>
         );
@@ -177,7 +181,7 @@ function ToolResult({
       if (cancelled) {
         return (
           <div className="p-3 bg-muted rounded-lg text-muted-foreground text-sm flex items-center gap-2">
-            <span>↩️</span>
+            <Undo2 className="w-4 h-4 flex-shrink-0" />
             <span>已取消操作</span>
           </div>
         );
@@ -214,8 +218,9 @@ function ToolResult({
     // 更新成功
     if (output.success) {
       return (
-        <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg text-green-700 dark:text-green-300 text-sm">
-          ✅ {String(output.message)}
+        <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg text-green-700 dark:text-green-300 text-sm flex items-center gap-2">
+          <CheckCircle className="w-4 h-4 flex-shrink-0" />
+          <span>{String(output.message)}</span>
         </div>
       );
     }
@@ -223,8 +228,9 @@ function ToolResult({
     // 错误
     if (output.error) {
       return (
-        <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg text-red-700 dark:text-red-300 text-sm">
-          ❌ {String(output.error)}
+        <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg text-red-700 dark:text-red-300 text-sm flex items-center gap-2">
+          <XCircle className="w-4 h-4 flex-shrink-0" />
+          <span>{String(output.error)}</span>
         </div>
       );
     }
@@ -272,18 +278,6 @@ function ArtworkResults({ artworks }: { artworks: Record<string, unknown>[] }) {
 
 // 版本搜索结果
 function EditionResults({ editions }: { editions: Record<string, unknown>[] }) {
-  const statusConfig: Record<string, { emoji: string; label: string }> = {
-    in_production: { emoji: '🔨', label: '制作中' },
-    in_studio: { emoji: '🏠', label: '在库' },
-    at_gallery: { emoji: '🖼️', label: '寄售' },
-    at_museum: { emoji: '🏛️', label: '美术馆' },
-    in_transit: { emoji: '🚚', label: '在途' },
-    sold: { emoji: '✅', label: '已售' },
-    gifted: { emoji: '🎁', label: '赠送' },
-    lost: { emoji: '❌', label: '遗失' },
-    damaged: { emoji: '⚠️', label: '损坏' },
-  };
-
   if (editions.length === 0) {
     return <div className="text-sm text-muted-foreground">未找到匹配的版本</div>;
   }
@@ -294,19 +288,20 @@ function EditionResults({ editions }: { editions: Record<string, unknown>[] }) {
       {editions.slice(0, 5).map((edition) => {
         const artwork = edition.artworks as Record<string, unknown> | undefined;
         const location = edition.locations as Record<string, unknown> | undefined;
-        const status = edition.status as string;
-        const config = statusConfig[status] || { emoji: '❓', label: status };
+        const status = edition.status as EditionStatus;
 
         return (
           <div key={String(edition.id)} className="p-2 bg-muted/50 rounded-lg text-sm">
-            <p className="font-medium">
-              {artwork?.title_en ? String(artwork.title_en) : '未知作品'}{' '}
-              {String(edition.edition_number)}/{artwork?.edition_total ? String(artwork.edition_total) : '?'}
-              <span className="ml-2">{config.emoji}</span>
+            <p className="font-medium flex items-center gap-2">
+              <span>
+                {artwork?.title_en ? String(artwork.title_en) : '未知作品'}{' '}
+                {String(edition.edition_number)}/{artwork?.edition_total ? String(artwork.edition_total) : '?'}
+              </span>
+              <StatusIndicator status={status} size="sm" />
             </p>
             <p className="text-xs text-muted-foreground">
-              {config.label}
-              {location && ` · 📍 ${String(location.name)}`}
+              {getStatusLabel(status)}
+              {location && ` · ${String(location.name)}`}
             </p>
           </div>
         );
@@ -328,8 +323,9 @@ function LocationResults({ locations }: { locations: Record<string, unknown>[] }
     <div className="space-y-1">
       <div className="text-xs text-muted-foreground">找到 {locations.length} 个位置：</div>
       {locations.map((location) => (
-        <div key={String(location.id)} className="text-sm">
-          📍 {String(location.name)} {location.city != null ? `(${String(location.city)})` : ''}
+        <div key={String(location.id)} className="text-sm flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-status-transit flex-shrink-0" />
+          <span>{String(location.name)} {location.city != null ? `(${String(location.city)})` : ''}</span>
         </div>
       ))}
     </div>
@@ -338,33 +334,24 @@ function LocationResults({ locations }: { locations: Record<string, unknown>[] }
 
 // 统计结果
 function StatisticsResult({ data }: { data: Record<string, unknown> }) {
-  const statusLabels: Record<string, string> = {
-    in_production: '制作中',
-    in_studio: '在库',
-    at_gallery: '寄售',
-    at_museum: '美术馆',
-    in_transit: '运输中',
-    sold: '已售',
-    gifted: '赠送',
-    lost: '遗失',
-    damaged: '损坏',
-  };
-
   const breakdown = data.status_breakdown as Record<string, number> | undefined;
 
   return (
     <div className="p-3 bg-muted/50 rounded-lg space-y-2">
-      <div className="text-sm font-medium">📊 库存统计</div>
+      <div className="text-sm font-medium uppercase tracking-wider">库存统计</div>
       <div className="grid grid-cols-2 gap-2 text-sm">
-        <div>作品总数：<span className="font-medium">{String(data.total_artworks)}</span></div>
-        <div>版本总数：<span className="font-medium">{String(data.total_editions)}</span></div>
+        <div>作品总数：<span className="font-mono font-medium">{String(data.total_artworks)}</span></div>
+        <div>版本总数：<span className="font-mono font-medium">{String(data.total_editions)}</span></div>
       </div>
       {breakdown && Object.keys(breakdown).length > 0 && (
-        <div className="text-xs space-y-1 pt-2 border-t border-border">
+        <div className="text-xs space-y-1.5 pt-2 border-t border-border">
           {Object.entries(breakdown).map(([status, count]) => (
-            <div key={status} className="flex justify-between">
-              <span>{statusLabels[status] || status}</span>
-              <span className="font-medium">{count}</span>
+            <div key={status} className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <StatusIndicator status={status as EditionStatus} size="sm" />
+                <span>{getStatusLabel(status as EditionStatus)}</span>
+              </span>
+              <span className="font-mono font-medium">{count}</span>
             </div>
           ))}
         </div>

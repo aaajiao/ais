@@ -4,6 +4,7 @@ import type { UIMessage } from 'ai';
 import MessageBubble from './MessageBubble';
 import { groupMessagesByDate, getTodayDateKey, type MessageGroup } from '@/lib/chatUtils';
 import type { ConfirmCardData } from './EditableConfirmCard';
+import { MessageSquare, ChevronDown, ChevronRight } from 'lucide-react';
 
 interface CollapsibleChatHistoryProps {
   messages: UIMessage[];
@@ -85,7 +86,7 @@ export default function CollapsibleChatHistory({
     return (
       <div className="flex-1 flex items-center justify-center text-muted-foreground">
         <div className="text-center py-8">
-          <p className="text-4xl mb-4">💬</p>
+          <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
           <p className="font-medium">开始对话</p>
           <p className="text-sm mt-2">
             试试说：「Guard 有几个版本？」或「哪些作品在寄售？」
@@ -198,8 +199,8 @@ function DateGroupHeader({
       className="w-full flex items-center justify-between px-4 py-3 bg-muted/30 hover:bg-muted/50 transition-colors border-b border-border"
     >
       <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground">
-          {isExpanded ? '▼' : '▶'}
+        <span className="text-muted-foreground">
+          {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         </span>
         <span className="font-medium text-sm">{group.displayDate}</span>
       </div>

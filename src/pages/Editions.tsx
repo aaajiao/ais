@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import type { Database, EditionStatus } from '@/lib/database.types';
+import { StatusIndicator, getStatusLabel } from '@/components/ui/StatusIndicator';
+import { Image } from 'lucide-react';
 
 type Artwork = Database['public']['Tables']['artworks']['Row'];
 type Edition = Database['public']['Tables']['editions']['Row'];
@@ -14,27 +16,14 @@ interface EditionWithDetails extends Edition {
 
 type FilterStatus = 'all' | 'in_studio' | 'at_gallery' | 'at_museum' | 'sold' | 'in_transit';
 
-// 状态配置
-const statusConfig: Record<EditionStatus, { icon: string; label: string; color: string }> = {
-  in_production: { icon: '🔵', label: '制作中', color: 'text-blue-600' },
-  in_studio: { icon: '🟢', label: '在库', color: 'text-green-600' },
-  at_gallery: { icon: '🟡', label: '寄售', color: 'text-yellow-600' },
-  at_museum: { icon: '🟣', label: '美术馆', color: 'text-purple-600' },
-  in_transit: { icon: '🔵', label: '运输中', color: 'text-blue-600' },
-  sold: { icon: '🔴', label: '已售', color: 'text-red-600' },
-  gifted: { icon: '🟠', label: '赠送', color: 'text-orange-600' },
-  lost: { icon: '⚫', label: '遗失', color: 'text-gray-600' },
-  damaged: { icon: '⚪', label: '损坏', color: 'text-gray-400' },
-};
-
 // 筛选按钮配置
-const filterButtons: { key: FilterStatus; label: string; icon: string }[] = [
-  { key: 'all', label: '全部', icon: '' },
-  { key: 'in_studio', label: '在库', icon: '🟢' },
-  { key: 'at_gallery', label: '寄售', icon: '🟡' },
-  { key: 'at_museum', label: '美术馆', icon: '🟣' },
-  { key: 'in_transit', label: '运输中', icon: '🔵' },
-  { key: 'sold', label: '已售', icon: '🔴' },
+const filterButtons: { key: FilterStatus; label: string; status?: EditionStatus }[] = [
+  { key: 'all', label: '全部' },
+  { key: 'in_studio', label: '在库', status: 'in_studio' },
+  { key: 'at_gallery', label: '寄售', status: 'at_gallery' },
+  { key: 'at_museum', label: '美术馆', status: 'at_museum' },
+  { key: 'in_transit', label: '运输中', status: 'in_transit' },
+  { key: 'sold', label: '已售', status: 'sold' },
 ];
 
 export default function Editions() {
@@ -217,13 +206,13 @@ export default function Editions() {
           <button
             key={btn.key}
             onClick={() => setFilter(btn.key)}
-            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-1.5 ${
               filter === btn.key
                 ? 'bg-foreground text-background'
                 : 'bg-muted text-muted-foreground hover:bg-accent'
             }`}
           >
-            {btn.icon && <span className="mr-1">{btn.icon}</span>}
+            {btn.status && <StatusIndicator status={btn.status} size="sm" />}
             {btn.label}
             {btn.key === 'all' && ` (${statusCounts.all})`}
           </button>
@@ -248,66 +237,63 @@ export default function Editions() {
             {searchQuery || filter !== 'all' ? '没有找到匹配的版本' : '暂无版本数据'}
           </div>
         ) : (
-          filteredEditions.map(edition => {
-            const status = statusConfig[edition.status];
-            return (
-              <Link
-                key={edition.id}
-                to={`/editions/${edition.id}`}
-                className="block bg-card border border-border rounded-xl p-4 hover:border-primary/50 transition-colors"
-              >
-                <div className="flex gap-4">
-                  {/* 缩略图 */}
-                  <div className="w-16 h-16 bg-muted rounded-lg overflow-hidden flex-shrink-0">
-                    {edition.artwork?.thumbnail_url ? (
-                      <img
-                        src={edition.artwork.thumbnail_url}
-                        alt={edition.artwork.title_en}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xl">
-                        🖼
-                      </div>
+          filteredEditions.map(edition => (
+            <Link
+              key={edition.id}
+              to={`/editions/${edition.id}`}
+              className="block bg-card border border-border rounded-xl p-4 hover:border-primary/50 transition-colors"
+            >
+              <div className="flex gap-4">
+                {/* 缩略图 */}
+                <div className="w-16 h-16 bg-muted rounded-lg overflow-hidden flex-shrink-0">
+                  {edition.artwork?.thumbnail_url ? (
+                    <img
+                      src={edition.artwork.thumbnail_url}
+                      alt={edition.artwork.title_en}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                      <Image className="w-6 h-6" />
+                    </div>
+                  )}
+                </div>
+
+                {/* 版本信息 */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h3 className="font-medium truncate">
+                        {edition.artwork?.title_en || '未知作品'}
+                        {edition.artwork?.title_cn && (
+                          <span className="text-muted-foreground ml-2">
+                            {edition.artwork.title_cn}
+                          </span>
+                        )}
+                      </h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {formatEditionNumber(edition)}
+                        {edition.inventory_number && (
+                          <span className="ml-2">#{edition.inventory_number}</span>
+                        )}
+                      </p>
+                    </div>
+                    <StatusIndicator status={edition.status} size="lg" />
+                  </div>
+
+                  <div className="flex items-center gap-2 mt-2 text-xs">
+                    <span>{getStatusLabel(edition.status)}</span>
+                    {edition.location && (
+                      <>
+                        <span className="text-muted-foreground">·</span>
+                        <span className="text-muted-foreground">{edition.location.name}</span>
+                      </>
                     )}
                   </div>
-
-                  {/* 版本信息 */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <h3 className="font-medium truncate">
-                          {edition.artwork?.title_en || '未知作品'}
-                          {edition.artwork?.title_cn && (
-                            <span className="text-muted-foreground ml-2">
-                              {edition.artwork.title_cn}
-                            </span>
-                          )}
-                        </h3>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {formatEditionNumber(edition)}
-                          {edition.inventory_number && (
-                            <span className="ml-2">#{edition.inventory_number}</span>
-                          )}
-                        </p>
-                      </div>
-                      <span className="text-lg flex-shrink-0">{status.icon}</span>
-                    </div>
-
-                    <div className="flex items-center gap-2 mt-2 text-xs">
-                      <span className={status.color}>{status.label}</span>
-                      {edition.location && (
-                        <>
-                          <span className="text-muted-foreground">·</span>
-                          <span className="text-muted-foreground">{edition.location.name}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
                 </div>
-              </Link>
-            );
-          })
+              </div>
+            </Link>
+          ))
         )}
       </div>
     </div>

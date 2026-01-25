@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useInventoryNumber } from '@/hooks/useInventoryNumber';
+import { Check, X, AlertTriangle, Loader2 } from 'lucide-react';
 
 interface InventoryNumberInputProps {
   value: string;
@@ -53,13 +54,15 @@ export default function InventoryNumberInput({
     }
   }, [applySuggestion, onChange]);
 
-  // 获取状态图标
-  const getStatusIcon = (): string | null => {
-    if (isChecking) return '⏳';
+  // 获取状态图标类型
+  type StatusIconType = 'loading' | 'error' | 'warning' | 'success' | null;
+
+  const getStatusIconType = (): StatusIconType => {
+    if (isChecking) return 'loading';
     if (!value) return null;
-    if (!validation.isUnique) return '❌';
-    if (validation.message) return '⚠️';
-    return '✓';
+    if (!validation.isUnique) return 'error';
+    if (validation.message) return 'warning';
+    return 'success';
   };
 
   // 获取状态颜色
@@ -101,17 +104,17 @@ export default function InventoryNumberInput({
 
         {/* 状态图标 */}
         <div className="absolute right-3 top-1/2 -translate-y-1/2">
-          {getStatusIcon() && (
-            <span
-              className={`text-sm ${
-                getStatusIcon() === '✓' ? 'text-green-500' :
-                getStatusIcon() === '❌' ? 'text-red-500' :
-                getStatusIcon() === '⚠️' ? 'text-yellow-500' :
-                'text-muted-foreground'
-              }`}
-            >
-              {getStatusIcon()}
-            </span>
+          {getStatusIconType() === 'loading' && (
+            <Loader2 className="w-4 h-4 text-muted-foreground animate-spin" />
+          )}
+          {getStatusIconType() === 'success' && (
+            <Check className="w-4 h-4 text-green-500" />
+          )}
+          {getStatusIconType() === 'error' && (
+            <X className="w-4 h-4 text-red-500" />
+          )}
+          {getStatusIconType() === 'warning' && (
+            <AlertTriangle className="w-4 h-4 text-yellow-500" />
           )}
         </div>
       </div>

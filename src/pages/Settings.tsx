@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Lightbulb } from 'lucide-react';
 
 type Artwork = Database['public']['Tables']['artworks']['Row'];
 
@@ -328,8 +329,9 @@ export default function Settings() {
 
         {renderModelSelector()}
 
-        <p className="text-sm text-muted-foreground mt-4 p-3 bg-muted/50 rounded-lg">
-          💡 模型列表从 API 动态加载，显示当前可用的所有模型
+        <p className="text-sm text-muted-foreground mt-4 p-3 bg-muted/50 rounded-lg flex items-start gap-2">
+          <Lightbulb className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <span>模型列表从 API 动态加载，显示当前可用的所有模型</span>
         </p>
       </div>
 
@@ -384,8 +386,9 @@ export default function Settings() {
           </div>
         </div>
 
-        <p className="text-sm text-muted-foreground mt-4 p-3 bg-muted/50 rounded-lg">
-          💡 建议定期导出 JSON 备份，以防数据丢失
+        <p className="text-sm text-muted-foreground mt-4 p-3 bg-muted/50 rounded-lg flex items-start gap-2">
+          <Lightbulb className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <span>建议定期导出 JSON 备份，以防数据丢失</span>
         </p>
       </div>
 

@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import type { Database, EditionStatus } from '@/lib/database.types';
 import ExportDialog from '@/components/export/ExportDialog';
+import { StatusIndicator } from '@/components/ui/StatusIndicator';
+import { Image, Check } from 'lucide-react';
 
 type Artwork = Database['public']['Tables']['artworks']['Row'];
 type Edition = Database['public']['Tables']['editions']['Row'];
@@ -18,19 +20,6 @@ interface ArtworkWithStats extends Artwork {
 }
 
 type FilterStatus = 'all' | 'in_studio' | 'at_gallery' | 'sold';
-
-// 状态图标映射
-const statusIcons: Record<string, string> = {
-  in_production: '🔵',
-  in_studio: '🟢',
-  at_gallery: '🟡',
-  at_museum: '🟣',
-  in_transit: '🔵',
-  sold: '🔴',
-  gifted: '🟠',
-  lost: '⚫',
-  damaged: '⚪',
-};
 
 export default function Artworks() {
   const [artworks, setArtworks] = useState<ArtworkWithStats[]>([]);
@@ -392,33 +381,36 @@ export default function Artworks() {
         </button>
         <button
           onClick={() => setFilter('in_studio')}
-          className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+          className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-1.5 ${
             filter === 'in_studio'
               ? 'bg-foreground text-background'
               : 'bg-muted text-muted-foreground hover:bg-accent'
           }`}
         >
-          🟢 在库
+          <StatusIndicator status="in_studio" size="sm" />
+          在库
         </button>
         <button
           onClick={() => setFilter('at_gallery')}
-          className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+          className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-1.5 ${
             filter === 'at_gallery'
               ? 'bg-foreground text-background'
               : 'bg-muted text-muted-foreground hover:bg-accent'
           }`}
         >
-          🟡 寄售
+          <StatusIndicator status="at_gallery" size="sm" />
+          寄售
         </button>
         <button
           onClick={() => setFilter('sold')}
-          className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+          className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-1.5 ${
             filter === 'sold'
               ? 'bg-foreground text-background'
               : 'bg-muted text-muted-foreground hover:bg-accent'
           }`}
         >
-          🔴 已售
+          <StatusIndicator status="sold" size="sm" />
+          已售
         </button>
       </div>
 
@@ -443,10 +435,9 @@ export default function Artworks() {
           groupedArtworks.map(group => (
             <div key={group.label}>
               {/* 分组标题 */}
-              <h2 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
-                <span>📅</span>
-                <span>{group.label}</span>
-                <span className="text-xs">({group.artworks.length})</span>
+              <h2 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wider">
+                {group.label}
+                <span className="ml-2 text-xs">({group.artworks.length})</span>
               </h2>
 
               {/* 该组的作品列表 */}
@@ -469,7 +460,7 @@ export default function Artworks() {
                               : 'border-border hover:border-primary/50'
                           }`}>
                             {isSelected && (
-                              <span className="text-primary-foreground text-sm">✓</span>
+                              <Check className="w-4 h-4 text-primary-foreground" />
                             )}
                           </div>
                         </div>
@@ -484,8 +475,8 @@ export default function Artworks() {
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-muted-foreground text-2xl">
-                            🖼
+                          <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                            <Image className="w-8 h-8" />
                           </div>
                         )}
                       </div>
@@ -502,9 +493,7 @@ export default function Artworks() {
                             )}
                           </h3>
                           {mainStatus && (
-                            <span className="text-lg flex-shrink-0">
-                              {statusIcons[mainStatus]}
-                            </span>
+                            <StatusIndicator status={mainStatus} size="lg" />
                           )}
                         </div>
 
@@ -519,13 +508,22 @@ export default function Artworks() {
                             <>
                               <span>共 {artwork.stats.total} 版</span>
                               {artwork.stats.inStudio > 0 && (
-                                <span className="text-green-600">🟢 {artwork.stats.inStudio}</span>
+                                <span className="flex items-center gap-1">
+                                  <StatusIndicator status="in_studio" size="sm" />
+                                  {artwork.stats.inStudio}
+                                </span>
                               )}
                               {artwork.stats.atGallery > 0 && (
-                                <span className="text-yellow-600">🟡 {artwork.stats.atGallery}</span>
+                                <span className="flex items-center gap-1">
+                                  <StatusIndicator status="at_gallery" size="sm" />
+                                  {artwork.stats.atGallery}
+                                </span>
                               )}
                               {artwork.stats.sold > 0 && (
-                                <span className="text-red-600">🔴 {artwork.stats.sold}</span>
+                                <span className="flex items-center gap-1">
+                                  <StatusIndicator status="sold" size="sm" />
+                                  {artwork.stats.sold}
+                                </span>
                               )}
                             </>
                           )}

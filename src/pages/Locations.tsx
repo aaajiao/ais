@@ -3,20 +3,29 @@
  * 独立管理所有位置的增删改查
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, type ReactNode } from 'react';
 import { useLocations, type Location } from '@/hooks/useLocations';
 import type { LocationType } from '@/lib/database.types';
 import LocationDialog from '@/components/editions/LocationDialog';
 import LocationItem from '@/components/locations/LocationItem';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { Home, Image, Building2, MapPin, X, Plus } from 'lucide-react';
+
+// 位置类型图标组件
+const LOCATION_TYPE_ICONS: Record<LocationType, ReactNode> = {
+  studio: <Home className="w-5 h-5" />,
+  gallery: <Image className="w-5 h-5" />,
+  museum: <Building2 className="w-5 h-5" />,
+  other: <MapPin className="w-5 h-5" />,
+};
 
 // 位置类型信息
-const LOCATION_TYPE_INFO: Record<LocationType, { label: string; icon: string }> = {
-  studio: { label: '工作室', icon: '🏠' },
-  gallery: { label: '画廊', icon: '🖼' },
-  museum: { label: '美术馆', icon: '🏛' },
-  other: { label: '其他', icon: '📍' },
+const LOCATION_TYPE_INFO: Record<LocationType, { label: string }> = {
+  studio: { label: '工作室' },
+  gallery: { label: '画廊' },
+  museum: { label: '美术馆' },
+  other: { label: '其他' },
 };
 
 export default function Locations() {
@@ -122,7 +131,7 @@ export default function Locations() {
 
   if (isLoading) {
     return (
-      <div className="p-6 max-w-4xl mx-auto">
+      <div className="p-6">
         <div className="animate-pulse space-y-4">
           <div className="h-8 w-48 bg-muted rounded"></div>
           <div className="h-12 bg-muted rounded"></div>
@@ -137,7 +146,7 @@ export default function Locations() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-6">
       {/* 页面标题 */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -150,9 +159,7 @@ export default function Locations() {
           onClick={handleCreate}
           className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 flex items-center gap-2"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
+          <Plus className="w-5 h-5" />
           添加位置
         </button>
       </div>
@@ -165,7 +172,7 @@ export default function Locations() {
             className="bg-card border border-border rounded-lg p-4"
           >
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xl">{LOCATION_TYPE_INFO[type].icon}</span>
+              <span className="text-muted-foreground">{LOCATION_TYPE_ICONS[type]}</span>
               <span className="text-sm text-muted-foreground">{LOCATION_TYPE_INFO[type].label}</span>
             </div>
             <p className="text-2xl font-semibold">{typeCounts[type] || 0}</p>
@@ -196,7 +203,7 @@ export default function Locations() {
               onClick={() => setSearchQuery('')}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
-              ✕
+              <X className="w-4 h-4" />
             </button>
           )}
         </div>
@@ -212,7 +219,7 @@ export default function Locations() {
       {/* 位置列表 */}
       {totalLocations === 0 ? (
         <div className="text-center py-12">
-          <div className="text-6xl mb-4">📍</div>
+          <MapPin className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
           <h3 className="text-lg font-medium mb-2">还没有位置</h3>
           <p className="text-muted-foreground mb-4">
             添加工作室、画廊、美术馆等位置来管理作品存放
@@ -233,7 +240,7 @@ export default function Locations() {
             return (
               <div key={type}>
                 <h2 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
-                  <span>{LOCATION_TYPE_INFO[type].icon}</span>
+                  <span className="text-muted-foreground">{LOCATION_TYPE_ICONS[type]}</span>
                   <span>{LOCATION_TYPE_INFO[type].label}</span>
                   <span className="text-xs bg-muted px-2 py-0.5 rounded-full">
                     {filteredLocs.length}

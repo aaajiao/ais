@@ -159,8 +159,29 @@ vercel env pull      # 拉取环境变量到 .env.local
 - **postgres-best-practices** - Supabase 官方 PostgreSQL 最佳实践
 - **context7** - 通过 Context7 API 获取最新库文档
 - **ai-sdk** - Vercel AI SDK 文档和最佳实践，用于构建 AI 功能（generateText、streamText、tool calling 等）
+- **frontend-design** - Anthropic 官方前端设计 skill，创建有设计感的界面，避免千篇一律的 AI 风格
 
 Skills 会在处理相关代码时自动生效。
+
+## UI/UX Style Guide
+
+本项目采用 **Brutalist Minimalism（粗野极简主义）** 设计风格。
+
+### 核心原则
+
+- **图标**: 使用 Lucide React，不使用 emoji
+- **配色**: OKLCH 色彩空间，护眼的离白/离黑
+- **状态**: 使用 `StatusIndicator` 组件，低饱和度语义色
+- **布局**: 统一由 `Layout.tsx` 管理页面宽度
+- **响应式**: 移动优先，触摸目标 ≥ 44px
+
+### 关键组件
+
+- `src/components/ui/StatusIndicator.tsx` - 版本状态指示器
+- `src/components/Layout.tsx` - 统一布局和页面宽度管理
+- `src/index.css` - CSS 变量和全局样式
+
+详细规范见 `docs/style-guide.md`。
 
 ## Notes
 

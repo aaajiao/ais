@@ -3,9 +3,23 @@
  * 支持折叠、合并同类操作、限制显示数量
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, type ReactNode } from 'react';
 import { insertIntoTable, type EditionHistoryInsert } from '@/lib/supabase';
 import type { HistoryAction } from '@/lib/database.types';
+import {
+  PartyPopper,
+  RefreshCw,
+  MapPin,
+  DollarSign,
+  Building2,
+  Undo2,
+  FileText,
+  Paperclip,
+  Tag,
+  ChevronRight,
+  ChevronDown,
+  ScrollText,
+} from 'lucide-react';
 
 export interface EditionHistory {
   id: string;
@@ -34,21 +48,21 @@ interface HistoryTimelineProps {
 
 // 操作类型配置
 const ACTION_CONFIG: Record<HistoryAction, {
-  icon: string;
+  icon: ReactNode;
   label: string;
   color: string;
   bgColor: string;
   importance: 'high' | 'medium' | 'low'; // 重要性
 }> = {
-  created: { icon: '🎉', label: '创建', color: 'text-green-600', bgColor: 'bg-green-100 dark:bg-green-900/30', importance: 'high' },
-  status_change: { icon: '🔄', label: '状态变更', color: 'text-blue-600', bgColor: 'bg-blue-100 dark:bg-blue-900/30', importance: 'high' },
-  location_change: { icon: '📍', label: '位置变更', color: 'text-purple-600', bgColor: 'bg-purple-100 dark:bg-purple-900/30', importance: 'high' },
-  sold: { icon: '💰', label: '售出', color: 'text-red-600', bgColor: 'bg-red-100 dark:bg-red-900/30', importance: 'high' },
-  consigned: { icon: '🏛️', label: '寄售', color: 'text-yellow-600', bgColor: 'bg-yellow-100 dark:bg-yellow-900/30', importance: 'high' },
-  returned: { icon: '↩️', label: '返回', color: 'text-gray-600', bgColor: 'bg-gray-100 dark:bg-gray-900/30', importance: 'medium' },
-  condition_update: { icon: '📋', label: '备注', color: 'text-orange-600', bgColor: 'bg-orange-100 dark:bg-orange-900/30', importance: 'medium' },
-  file_added: { icon: '📎', label: '添加附件', color: 'text-cyan-600', bgColor: 'bg-cyan-100 dark:bg-cyan-900/30', importance: 'low' },
-  number_assigned: { icon: '🏷️', label: '分配编号', color: 'text-indigo-600', bgColor: 'bg-indigo-100 dark:bg-indigo-900/30', importance: 'medium' },
+  created: { icon: <PartyPopper className="w-4 h-4" />, label: '创建', color: 'text-status-available', bgColor: 'bg-status-available/20', importance: 'high' },
+  status_change: { icon: <RefreshCw className="w-4 h-4" />, label: '状态变更', color: 'text-status-transit', bgColor: 'bg-status-transit/20', importance: 'high' },
+  location_change: { icon: <MapPin className="w-4 h-4" />, label: '位置变更', color: 'text-status-production', bgColor: 'bg-status-production/20', importance: 'high' },
+  sold: { icon: <DollarSign className="w-4 h-4" />, label: '售出', color: 'text-status-sold', bgColor: 'bg-status-sold/20', importance: 'high' },
+  consigned: { icon: <Building2 className="w-4 h-4" />, label: '寄售', color: 'text-status-consigned', bgColor: 'bg-status-consigned/20', importance: 'high' },
+  returned: { icon: <Undo2 className="w-4 h-4" />, label: '返回', color: 'text-status-inactive', bgColor: 'bg-status-inactive/20', importance: 'medium' },
+  condition_update: { icon: <FileText className="w-4 h-4" />, label: '备注', color: 'text-status-consigned', bgColor: 'bg-status-consigned/20', importance: 'medium' },
+  file_added: { icon: <Paperclip className="w-4 h-4" />, label: '添加附件', color: 'text-accent-blue', bgColor: 'bg-accent-blue/20', importance: 'low' },
+  number_assigned: { icon: <Tag className="w-4 h-4" />, label: '分配编号', color: 'text-status-production', bgColor: 'bg-status-production/20', importance: 'medium' },
 };
 
 // 状态标签
@@ -293,11 +307,11 @@ export default function HistoryTimeline({
         <div
           className={`
             absolute left-0 w-8 h-8 rounded-full flex items-center justify-center
-            ${config.bgColor}
+            ${config.bgColor} ${config.color}
             ${isFirst ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}
           `}
         >
-          <span className="text-sm">{config.icon}</span>
+          {config.icon}
         </div>
 
         {/* 内容卡片 */}
@@ -355,11 +369,11 @@ export default function HistoryTimeline({
         <div
           className={`
             absolute left-0 w-8 h-8 rounded-full flex items-center justify-center
-            ${config.bgColor}
+            ${config.bgColor} ${config.color}
             ${isFirst ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}
           `}
         >
-          <span className="text-sm">{config.icon}</span>
+          {config.icon}
         </div>
 
         {/* 内容卡片 */}
@@ -387,8 +401,8 @@ export default function HistoryTimeline({
               <span className="text-xs text-muted-foreground" title={formatDateTime(merged.items[0].created_at)}>
                 {formatRelativeTime(merged.items[0].created_at)}
               </span>
-              <span className="text-xs text-muted-foreground">
-                {isExpanded ? '▼' : '▶'}
+              <span className="text-muted-foreground">
+                {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
               </span>
             </div>
           </div>
@@ -424,7 +438,7 @@ export default function HistoryTimeline({
   if (history.length === 0 && !showAddNoteButton) {
     return (
       <div className="text-center py-8 text-muted-foreground">
-        <div className="text-4xl mb-2">📜</div>
+        <ScrollText className="w-10 h-10 mx-auto mb-2 opacity-50" />
         <div className="text-sm">暂无历史记录</div>
       </div>
     );

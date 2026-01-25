@@ -2,9 +2,10 @@
  * 位置选择器组件
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, type ReactNode } from 'react';
 import { useLocations, type Location, type LocationSearchResult } from '@/hooks/useLocations';
 import type { LocationType } from '@/lib/database.types';
+import { Home, Image, Building2, MapPin, X, ChevronUp, ChevronDown, Plus, Check } from 'lucide-react';
 
 interface LocationPickerProps {
   value: string | null;
@@ -16,11 +17,11 @@ interface LocationPickerProps {
 }
 
 // 位置类型图标
-const TYPE_ICONS: Record<LocationType, string> = {
-  studio: '🏠',
-  gallery: '🖼',
-  museum: '🏛',
-  other: '📍',
+const TYPE_ICONS: Record<LocationType, ReactNode> = {
+  studio: <Home className="w-4 h-4" />,
+  gallery: <Image className="w-4 h-4" />,
+  museum: <Building2 className="w-4 h-4" />,
+  other: <MapPin className="w-4 h-4" />,
 };
 
 export default function LocationPicker({
@@ -166,22 +167,22 @@ export default function LocationPicker({
               className="p-1 text-muted-foreground hover:text-foreground"
               title="清除"
             >
-              ✕
+              <X className="w-4 h-4" />
             </button>
           )}
           <button
             onClick={() => setIsOpen(!isOpen)}
             className="p-1 text-muted-foreground hover:text-foreground"
           >
-            {isOpen ? '▲' : '▼'}
+            {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
         </div>
       </div>
 
       {/* 当前选中位置的类型标签 */}
       {selectedLocation && !isOpen && (
-        <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-          <span>{TYPE_ICONS[selectedLocation.type]}</span>
+        <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
+          <span className="text-muted-foreground">{TYPE_ICONS[selectedLocation.type]}</span>
           <span>{typeLabels[selectedLocation.type]}</span>
           {selectedLocation.city && (
             <>
@@ -225,12 +226,12 @@ export default function LocationPicker({
                 ${value === location.id ? 'bg-primary/5' : ''}
               `}
             >
-              <span className="text-lg">{TYPE_ICONS[location.type]}</span>
+              <span className="text-muted-foreground">{TYPE_ICONS[location.type]}</span>
               <div className="flex-1 min-w-0">
-                <div className="font-medium truncate">
+                <div className="font-medium truncate flex items-center">
                   {location.name}
                   {value === location.id && (
-                    <span className="text-primary ml-2">✓</span>
+                    <Check className="w-4 h-4 text-primary ml-2" />
                   )}
                 </div>
                 <div className="text-xs text-muted-foreground flex items-center gap-1">
@@ -268,7 +269,7 @@ export default function LocationPicker({
                 }
               `}
             >
-              <span className="text-lg">➕</span>
+              <Plus className="w-4 h-4 text-muted-foreground" />
               <div>
                 <div className="font-medium">
                   添加新位置

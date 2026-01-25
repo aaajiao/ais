@@ -18,11 +18,22 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 
 ## 技术栈
 
-- **前端**: React 19 + TypeScript + Vite + TailwindCSS
-- **UI**: shadcn/ui (Radix UI)
+- **前端**: React 19 + TypeScript + Vite 7 + TailwindCSS 4
+- **UI**: shadcn/ui (Radix UI) + Lucide Icons
 - **后端**: Vercel Functions
-- **数据库**: Supabase (PostgreSQL)
+- **数据库**: Supabase (PostgreSQL + Storage + Auth)
 - **AI**: Vercel AI SDK + Claude / GPT
+
+## 设计风格
+
+采用 **Brutalist Minimalism（粗野极简主义）** 设计语言：
+
+- 护眼配色：OKLCH 色彩空间，避免纯黑纯白
+- 统一图标：Lucide React，不使用 emoji
+- 响应式布局：移动优先，统一页面宽度管理
+- 状态指示：低饱和度语义色 + 脉冲动画
+
+详见 `docs/style-guide.md`。
 
 ## 开发
 
@@ -30,12 +41,18 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 # 安装依赖
 bun install
 
-# 启动开发服务器
+# 启动开发服务器（推荐）
+bun start          # 前端 + API (port 3000)
+
+# 或分别启动
 bun run dev        # 前端 (port 5173)
 bun run dev:api    # API (port 3000)
 
 # 构建
 bun run build
+
+# 代码检查
+bun run lint
 ```
 
 ## 环境变量
