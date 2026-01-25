@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import MessageBubble from '@/components/chat/MessageBubble';
 import { saveChatHistory, loadChatHistory, clearChatHistory, getChatTimestamp } from '@/lib/chatStorage';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuthContext } from '@/contexts/AuthContext';
 import { Trash2, X, MessageSquare, ArrowUp } from 'lucide-react';
 
 const MAX_SIDEBAR_MESSAGES = 15;
@@ -18,37 +18,35 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const historyLoadedRef = useRef(false);
   const [inputValue, setInputValue] = useState('');
-  const { session } = useAuth();
+  const { session } = useAuthContext();
 
   // 获取用户选择的模型
   const [selectedModel] = useState(() => {
     return localStorage.getItem('ai-model') || 'claude-sonnet-4.5';
   });
 
-  // 使用 ref 保存最新的 token，确保 fetch 函数总是使用最新值
-  const accessTokenRef = useRef(session?.access_token);
-  accessTokenRef.current = session?.access_token;
+  // 创建带认证的 fetch 函数
+  const authenticatedFetch = useCallback(async (url: RequestInfo | URL, options?: RequestInit) => {
+    return fetch(url, {
+      ...options,
+      headers: {
+        ...options?.headers,
+        Authorization: `Bearer ${session?.access_token || ''}`,
+      },
+    });
+  }, [session?.access_token]);
 
-  // 创建 transport - 使用 fetch 函数动态添加认证 header
+  // 创建 transport - model 或 fetch 函数变化时重新创建
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
         api: '/api/chat',
-        fetch: async (url, options) => {
-          const token = accessTokenRef.current;
-          return fetch(url, {
-            ...options,
-            headers: {
-              ...options?.headers,
-              Authorization: `Bearer ${token || ''}`,
-            },
-          });
-        },
+        fetch: authenticatedFetch,
         body: {
           model: selectedModel,
         },
       }),
-    [selectedModel]
+    [selectedModel, authenticatedFetch]
   );
 
   const {

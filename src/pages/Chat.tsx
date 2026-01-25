@@ -5,7 +5,7 @@ import { useLocation } from 'react-router-dom';
 import type { ConfirmCardData } from '@/components/chat/EditableConfirmCard';
 import CollapsibleChatHistory from '@/components/chat/CollapsibleChatHistory';
 import { saveChatHistory, loadChatHistory, clearChatHistory, getChatTimestamp } from '@/lib/chatStorage';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuthContext } from '@/contexts/AuthContext';
 import { MessageSquare, Trash2 } from 'lucide-react';
 
 export default function Chat() {
@@ -21,7 +21,7 @@ export default function Chat() {
     }
     return '';
   });
-  const { session, loading: authLoading } = useAuth();
+  const { session, loading: authLoading } = useAuthContext();
 
   // 获取用户选择的模型（现在存储的是完整的模型 ID）
   const [selectedModel] = useState(() => {
@@ -72,30 +72,28 @@ export default function Chat() {
     return modelId;
   };
 
-  // 使用 ref 保存最新的 token，确保 fetch 函数总是使用最新值
-  const accessTokenRef = useRef(session?.access_token);
-  accessTokenRef.current = session?.access_token;
+  // 创建带认证的 fetch 函数
+  const authenticatedFetch = useCallback(async (url: RequestInfo | URL, options?: RequestInit) => {
+    return fetch(url, {
+      ...options,
+      headers: {
+        ...options?.headers,
+        Authorization: `Bearer ${session?.access_token || ''}`,
+      },
+    });
+  }, [session?.access_token]);
 
-  // 创建 transport - model 变化时重新创建
+  // 创建 transport - model 或 fetch 函数变化时重新创建
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
         api: '/api/chat',
-        fetch: async (url, options) => {
-          const token = accessTokenRef.current;
-          return fetch(url, {
-            ...options,
-            headers: {
-              ...options?.headers,
-              Authorization: `Bearer ${token || ''}`,
-            },
-          });
-        },
+        fetch: authenticatedFetch,
         body: {
           model: selectedModel,
         },
       }),
-    [selectedModel]
+    [selectedModel, authenticatedFetch]
   );
 
   const {
