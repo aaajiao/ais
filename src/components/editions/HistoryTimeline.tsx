@@ -19,6 +19,7 @@ import {
   ChevronRight,
   ChevronDown,
   ScrollText,
+  Trash2,
 } from 'lucide-react';
 
 export interface EditionHistory {
@@ -62,6 +63,7 @@ const ACTION_CONFIG: Record<HistoryAction, {
   returned: { icon: <Undo2 className="w-4 h-4" />, label: '返回', color: 'text-status-inactive', bgColor: 'bg-status-inactive/20', importance: 'medium' },
   condition_update: { icon: <FileText className="w-4 h-4" />, label: '备注', color: 'text-status-consigned', bgColor: 'bg-status-consigned/20', importance: 'medium' },
   file_added: { icon: <Paperclip className="w-4 h-4" />, label: '添加附件', color: 'text-accent-blue', bgColor: 'bg-accent-blue/20', importance: 'low' },
+  file_deleted: { icon: <Trash2 className="w-4 h-4" />, label: '删除附件', color: 'text-status-sold', bgColor: 'bg-status-sold/20', importance: 'low' },
   number_assigned: { icon: <Tag className="w-4 h-4" />, label: '分配编号', color: 'text-status-production', bgColor: 'bg-status-production/20', importance: 'medium' },
 };
 
@@ -141,7 +143,7 @@ export default function HistoryTimeline({
     let currentDate: string | null = null;
 
     // 可以合并的低重要性操作
-    const mergableActions: HistoryAction[] = ['file_added'];
+    const mergableActions: HistoryAction[] = ['file_added', 'file_deleted', 'condition_update'];
 
     for (const item of history) {
       const itemDate = getDateKey(item.created_at);
@@ -245,6 +247,9 @@ export default function HistoryTimeline({
 
       case 'file_added':
         return item.notes || '添加了新附件';
+
+      case 'file_deleted':
+        return item.notes || '删除了附件';
 
       case 'number_assigned':
         return item.notes || '分配了库存编号';
@@ -415,6 +420,10 @@ export default function HistoryTimeline({
             <p className="text-sm text-muted-foreground">
               {merged.action === 'file_added'
                 ? `添加了 ${merged.items.length} 个附件`
+                : merged.action === 'file_deleted'
+                ? `删除了 ${merged.items.length} 个附件`
+                : merged.action === 'condition_update'
+                ? `${merged.items.length} 条备注`
                 : `${merged.items.length} 条记录`
               }
             </p>

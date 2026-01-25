@@ -44,6 +44,7 @@ export type HistoryAction =
   | 'returned'
   | 'condition_update'
   | 'file_added'
+  | 'file_deleted'
   | 'number_assigned';
 
 // 用户

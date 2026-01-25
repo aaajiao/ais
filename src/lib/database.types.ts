@@ -36,6 +36,7 @@ export type HistoryAction =
   | 'returned'
   | 'condition_update'
   | 'file_added'
+  | 'file_deleted'
   | 'number_assigned';
 export type GalleryLinkStatus = 'active' | 'disabled';
 

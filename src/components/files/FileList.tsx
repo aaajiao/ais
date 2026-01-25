@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { supabase, getSignedUrl, deleteFile } from '@/lib/supabase';
+import { supabase, getSignedUrl, deleteFile, insertIntoTableNoReturn, type EditionHistoryInsert } from '@/lib/supabase';
 import { formatFileSize } from '@/lib/imageCompressor';
 import { getFileTypeIcon } from '@/lib/fileIcons';
 import type { FileType } from '@/lib/database.types';
@@ -34,13 +34,11 @@ interface FileListProps {
 
 export default function FileList({
   files,
-  editionId: _editionId,
+  editionId,
   onDelete,
   viewMode = 'list',
   isEditing = false,
 }: FileListProps) {
-  // editionId reserved for future use (e.g., batch operations)
-  void _editionId;
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -104,6 +102,14 @@ export default function FileList({
 
       if (error) throw error;
 
+      // 记录删除历史
+      const historyData: EditionHistoryInsert = {
+        edition_id: editionId,
+        action: 'file_deleted',
+        notes: `删除文件: ${file.file_name || '未命名文件'}`,
+      };
+      await insertIntoTableNoReturn('edition_history', historyData);
+
       onDelete?.(file.id);
     } catch (err) {
       console.error('删除文件失败:', err);
@@ -111,7 +117,7 @@ export default function FileList({
     } finally {
       setDeletingId(null);
     }
-  }, [deletingId, onDelete]);
+  }, [deletingId, editionId, onDelete]);
 
   // 关闭预览
   const closePreview = useCallback(() => {

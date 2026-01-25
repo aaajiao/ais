@@ -108,6 +108,25 @@ Editions track through these states:
 - `in_production` → `in_studio` → `at_gallery` / `at_museum` / `in_transit`
 - Terminal states: `sold`, `gifted`, `lost`, `damaged`
 
+## Edition History
+
+The `edition_history` table provides a complete audit trail. Supported action types:
+
+| Action | Description | Auto-merge |
+|--------|-------------|------------|
+| `created` | Edition created | No |
+| `status_change` | Status updated (auto-triggered) | No |
+| `location_change` | Location updated (auto-triggered) | No |
+| `sold` | Marked as sold with price/buyer | No |
+| `consigned` | Sent to gallery/museum | No |
+| `returned` | Returned from consignment | No |
+| `condition_update` | Notes/condition updated | Yes (same day) |
+| `file_added` | Attachment uploaded | Yes (same day) |
+| `file_deleted` | Attachment removed | Yes (same day) |
+| `number_assigned` | Inventory number assigned | No |
+
+**Auto-merge**: Low-importance actions (`file_added`, `file_deleted`, `condition_update`) from the same day are collapsed in the timeline UI and can be expanded to view details.
+
 ## AI Chat Tools
 
 The chat interface (`/chat`) provides natural language access to:
