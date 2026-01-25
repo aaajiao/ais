@@ -149,7 +149,7 @@ vercel link          # 链接到 Vercel 项目
 vercel env pull      # 拉取环境变量到 .env.local
 ```
 
-详细部署说明见 `docs/vercel-setup.md`。
+详细开发说明见 `docs/local-dev.md`。
 
 ## Claude Code Skills
 
