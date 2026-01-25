@@ -12,7 +12,7 @@ export default function Chat() {
   const inputRef = useRef<HTMLInputElement>(null);
   const historyLoadedRef = useRef(false);
   const [inputValue, setInputValue] = useState('');
-  const { session } = useAuth();
+  const { session, loading: authLoading } = useAuth();
 
   // 获取用户选择的模型
   const [selectedModel] = useState(() => {
@@ -84,21 +84,22 @@ export default function Chat() {
 
   const handleSubmit = useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!inputValue.trim() || isLoading) return;
+    if (!inputValue.trim() || isLoading || authLoading || !session?.access_token) return;
 
     const message = inputValue.trim();
     setInputValue('');
     await sendMessage({ text: message });
-  }, [inputValue, isLoading, sendMessage]);
+  }, [inputValue, isLoading, authLoading, session?.access_token, sendMessage]);
 
   const handleQuickAction = useCallback((prompt: string) => {
+    if (authLoading || !session?.access_token) return;
     setInputValue(prompt);
     // 稍后提交让 state 更新
     setTimeout(() => {
       sendMessage({ text: prompt });
       setInputValue('');
     }, 0);
-  }, [sendMessage]);
+  }, [authLoading, session?.access_token, sendMessage]);
 
   // 处理确认更新
   const handleConfirmUpdate = useCallback(async (data: ConfirmCardData) => {

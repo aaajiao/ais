@@ -10,11 +10,11 @@ An artwork inventory management system for artist aaajiao, built with React, Typ
 # Install dependencies
 bun install
 
-# Start development (recommended - full Vercel environment)
-bun run dev:vercel    # Frontend + API on port 3000
+# Start development (recommended)
+bun run dev           # Vite (5173) + API server (3000) concurrently
 
 # Alternative: run separately
-bun run dev           # Frontend only (Vite on port 5173)
+bun run dev:vite      # Frontend only (Vite on port 5173)
 bun run dev:api       # API only (server.ts on port 3000)
 
 # Build for production
@@ -23,6 +23,8 @@ bun run build
 # Lint
 bun run lint
 ```
+
+**Note**: `vercel dev` has compatibility issues with Vite 7. Use `bun run dev` for local development.
 
 ## Tech Stack
 
