@@ -4,16 +4,8 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>aaajiao 作品管理</title>
-    <script>
-      // 在页面加载前应用主题，避免闪烁
-      (function() {
-        const theme = localStorage.getItem('theme');
-        const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const isDark = theme === 'dark' || (theme !== 'light' && systemDark);
-        document.documentElement.classList.add(isDark ? 'dark' : 'light');
-      })();
-    </script>
+    <title>aaajiao Inventory</title>
+    <script src="/theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>
