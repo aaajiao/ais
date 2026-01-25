@@ -24,7 +24,7 @@ bun run build
 bun run lint
 ```
 
-**Note**: `vercel dev` has compatibility issues with Vite 7. Use `bun run dev` for local development.
+**Note**: `vercel dev` has compatibility issues with Vite 7's SPA rewrites. Use `bun run dev` for local development instead.
 
 ## Tech Stack
 
