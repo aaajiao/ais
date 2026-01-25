@@ -24,7 +24,7 @@ bun run build
 bun run lint
 ```
 
-**Note**: 本地开发使用 `vercel-dev.json` 覆盖生产环境的 SPA rewrites 配置，确保 Vite 7 正常工作。
+**Note**: Local development uses `vercel-dev.json` to override production SPA rewrites config for Vite 7 compatibility.
 
 ## Tech Stack
 
@@ -92,10 +92,10 @@ Core tables in Supabase:
 
 ### Soft Delete
 
-作品使用软删除机制（`deleted_at` 字段）：
-- 删除作品时设置 `deleted_at` 时间戳，而非硬删除
-- 所有查询需添加 `.is('deleted_at', null)` 过滤
-- 回收站页面 (`/trash`) 可恢复或永久删除作品
+Artworks use soft delete mechanism (`deleted_at` field):
+- Deletion sets `deleted_at` timestamp instead of hard delete
+- All queries must add `.is('deleted_at', null)` filter
+- Trash page (`/trash`) allows restore or permanent deletion
 
 ## Edition Status Flow
 
@@ -149,58 +149,58 @@ bunx supabase gen types typescript --project-id <project-id> > src/lib/database.
 
 ## Local Development
 
-首次设置需要链接 Vercel 项目并拉取环境变量：
+First-time setup requires linking Vercel project and pulling environment variables:
 
 ```bash
-vercel link          # 链接到 Vercel 项目
-vercel env pull      # 拉取环境变量到 .env.local
+vercel link          # Link to Vercel project
+vercel env pull      # Pull env vars to .env.local
 ```
 
-详细开发说明见 `docs/local-dev.md`。
+See `docs/local-dev.md` for detailed development instructions.
 
 ## Claude Code Skills
 
-本项目安装了以下 skills（位于 `.claude/skills/`）：
+This project has the following skills installed (in `.claude/skills/`):
 
-- **react-best-practices** - Vercel 官方 React/Next.js 性能优化规则（57 条规则）
-- **postgres-best-practices** - Supabase 官方 PostgreSQL 最佳实践
-- **context7** - 通过 Context7 API 获取最新库文档
-- **ai-sdk** - Vercel AI SDK 文档和最佳实践，用于构建 AI 功能（generateText、streamText、tool calling 等）
-- **frontend-design** - Anthropic 官方前端设计 skill，创建有设计感的界面，避免千篇一律的 AI 风格
+- **react-best-practices** - Vercel's official React/Next.js performance optimization rules (57 rules)
+- **postgres-best-practices** - Supabase's official PostgreSQL best practices
+- **context7** - Fetch latest library documentation via Context7 API
+- **ai-sdk** - Vercel AI SDK docs and best practices for building AI features (generateText, streamText, tool calling, etc.)
+- **frontend-design** - Anthropic's official frontend design skill for creating distinctive interfaces
 
-Skills 会在处理相关代码时自动生效。
+Skills are automatically applied when working with relevant code.
 
 ## UI/UX Style Guide
 
-本项目采用 **Brutalist Minimalism（粗野极简主义）** 设计风格。
+This project uses **Brutalist Minimalism** design style.
 
-### 核心原则
+### Core Principles
 
-- **图标**: 使用 Lucide React，不使用 emoji
-- **配色**: OKLCH 色彩空间，护眼的离白/离黑
-- **状态**: 使用 `StatusIndicator` 组件，低饱和度语义色
-- **布局**: 统一由 `Layout.tsx` 管理页面宽度
-- **响应式**: 移动优先，触摸目标 ≥ 44px
+- **Icons**: Use Lucide React, no emoji
+- **Colors**: OKLCH color space, eye-friendly off-white/off-black
+- **Status**: Use `StatusIndicator` component with low-saturation semantic colors
+- **Layout**: Unified page width management via `Layout.tsx`
+- **Responsive**: Mobile-first, touch targets ≥ 44px
 
-### 关键组件
+### Key Components
 
-- `src/components/ui/StatusIndicator.tsx` - 版本状态指示器
-- `src/components/Layout.tsx` - 统一布局和页面宽度管理
-- `src/index.css` - CSS 变量和全局样式
+- `src/components/ui/StatusIndicator.tsx` - Edition status indicator
+- `src/components/Layout.tsx` - Unified layout and page width management
+- `src/index.css` - CSS variables and global styles
 
-详细规范见 `docs/style-guide.md`。
+See `docs/style-guide.md` for detailed specifications.
 
 ## MD Import Logic
 
-导入作品时的匹配规则（`api/import/md.ts`）：
+Matching rules when importing artworks (`api/import/md.ts`):
 
-1. **优先通过 `source_url` 精确匹配**（排除已软删除的）
-2. **其次通过 `title_en` 匹配**（仅当只有一个匹配时）
-   - 如果两者都有 `source_url` 且不同，视为**不同作品**（同系列不同版本）
-3. **匹配成功** → 更新现有作品
-4. **无匹配** → 创建新作品
+1. **First match by `source_url`** (excluding soft-deleted)
+2. **Then match by `title_en`** (only when exactly one match)
+   - If both have `source_url` but different, treat as **different artworks** (same series, different versions)
+3. **Match found** → Update existing artwork
+4. **No match** → Create new artwork
 
-这确保同名但不同 URL 的作品（如 `Guard, I…` 的不同版本）被正确识别为独立作品。
+This ensures artworks with same title but different URLs (e.g., different versions of `Guard, I…`) are correctly identified as separate works.
 
 ## Notes
 
