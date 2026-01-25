@@ -82,13 +82,20 @@ ALLOWED_EMAILS=email1@example.com,email2@example.com
 ## Database Schema
 
 Core tables in Supabase:
-- `artworks` - Artwork metadata (title, year, dimensions, medium)
+- `artworks` - Artwork metadata (title, year, dimensions, medium, deleted_at for soft delete)
 - `editions` - Individual editions with status tracking
 - `edition_files` - File attachments (images, PDFs)
 - `edition_history` - Audit trail of status changes
 - `locations` - Storage/gallery locations
 - `users` - User accounts with roles (admin/editor)
 - `gallery_links` - Public gallery share links
+
+### Soft Delete
+
+作品使用软删除机制（`deleted_at` 字段）：
+- 删除作品时设置 `deleted_at` 时间戳，而非硬删除
+- 所有查询需添加 `.is('deleted_at', null)` 过滤
+- 回收站页面 (`/trash`) 可恢复或永久删除作品
 
 ## Edition Status Flow
 
@@ -182,6 +189,18 @@ Skills 会在处理相关代码时自动生效。
 - `src/index.css` - CSS 变量和全局样式
 
 详细规范见 `docs/style-guide.md`。
+
+## MD Import Logic
+
+导入作品时的匹配规则（`api/import/md.ts`）：
+
+1. **优先通过 `source_url` 精确匹配**（排除已软删除的）
+2. **其次通过 `title_en` 匹配**（仅当只有一个匹配时）
+   - 如果两者都有 `source_url` 且不同，视为**不同作品**（同系列不同版本）
+3. **匹配成功** → 更新现有作品
+4. **无匹配** → 创建新作品
+
+这确保同名但不同 URL 的作品（如 `Guard, I…` 的不同版本）被正确识别为独立作品。
 
 ## Notes
 
