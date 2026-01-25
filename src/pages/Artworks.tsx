@@ -42,10 +42,11 @@ export default function Artworks() {
         setLoading(true);
         setError(null);
 
-        // 获取所有作品
+        // 获取所有作品（排除已删除的）
         const { data: artworksData, error: artworksError } = await supabase
           .from('artworks')
           .select('*')
+          .is('deleted_at', null)
           .order('created_at', { ascending: false });
 
         if (artworksError) throw artworksError;
@@ -155,35 +156,18 @@ export default function Artworks() {
     }
   };
 
-  // 批量删除
+  // 批量删除（软删除）
   const handleBatchDelete = async () => {
     if (selectedIds.size === 0) return;
 
     try {
       setDeleting(true);
 
-      // 获取所有要删除的作品的版本 ID
-      const artworksToDelete = artworks.filter(a => selectedIds.has(a.id));
-      const allEditionIds = artworksToDelete.flatMap(a => a.editions.map(e => e.id));
-
-      // 删除版本历史
-      if (allEditionIds.length > 0) {
-        await supabase
-          .from('edition_history')
-          .delete()
-          .in('edition_id', allEditionIds);
-
-        // 删除版本
-        await supabase
-          .from('editions')
-          .delete()
-          .in('artwork_id', Array.from(selectedIds));
-      }
-
-      // 删除作品
-      const { error: deleteError } = await supabase
+      // 软删除：设置 deleted_at 时间戳
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: deleteError } = await (supabase as any)
         .from('artworks')
-        .delete()
+        .update({ deleted_at: new Date().toISOString() })
         .in('id', Array.from(selectedIds));
 
       if (deleteError) throw deleteError;
@@ -295,12 +279,12 @@ export default function Artworks() {
                 .filter(a => selectedIds.has(a.id))
                 .reduce((sum, a) => sum + a.editions.length, 0);
               return totalEditions > 0 ? (
-                <p className="text-destructive text-sm mb-4">
-                  将同时删除 {totalEditions} 个版本及其所有历史记录！
+                <p className="text-muted-foreground text-sm mb-4">
+                  关联的 {totalEditions} 个版本也将被隐藏。
                 </p>
               ) : null;
             })()}
-            <p className="text-sm text-destructive mb-4">此操作不可撤销！</p>
+            <p className="text-sm text-muted-foreground mb-4">作品将被移至回收站，可在回收站中恢复。</p>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}

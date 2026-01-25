@@ -43,9 +43,9 @@ export default function Dashboard() {
     try {
       setLoading(true);
 
-      // 获取统计数据
+      // 获取统计数据（排除已删除的作品）
       const [artworksResult, editionsResult] = await Promise.all([
-        supabase.from('artworks').select('*', { count: 'exact', head: true }),
+        supabase.from('artworks').select('*', { count: 'exact', head: true }).is('deleted_at', null),
         supabase.from('editions').select('status').returns<EditionStatusOnly[]>(),
       ]);
 
@@ -71,12 +71,13 @@ export default function Dashboard() {
         .returns<EditionPartial[]>();
 
       if (recentEditions && recentEditions.length > 0) {
-        // 获取关联的作品信息
+        // 获取关联的作品信息（排除已删除的）
         const artworkIds = [...new Set(recentEditions.map((e: EditionPartial) => e.artwork_id).filter(Boolean))];
         const { data: artworks } = await supabase
           .from('artworks')
           .select('id, title_en, title_cn')
           .in('id', artworkIds)
+          .is('deleted_at', null)
           .returns<ArtworkPartial[]>();
 
         const artworksMap = (artworks || []).reduce((acc: Record<string, ArtworkPartial>, art: ArtworkPartial) => {

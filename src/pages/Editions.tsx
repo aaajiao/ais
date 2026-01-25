@@ -49,7 +49,7 @@ export default function Editions() {
 
         if (editionsError) throw editionsError;
 
-        // 获取所有作品
+        // 获取所有作品（排除已删除的）
         const artworkIds = [...new Set((editionsData || []).map((e: Edition) => e.artwork_id).filter(Boolean))];
         let artworksMap: Record<string, Artwork> = {};
 
@@ -58,6 +58,7 @@ export default function Editions() {
             .from('artworks')
             .select('*')
             .in('id', artworkIds)
+            .is('deleted_at', null)
             .returns<Artwork[]>();
 
           if (!artworksError && artworksData) {

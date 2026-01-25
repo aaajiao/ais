@@ -14,6 +14,7 @@ import Chat from './pages/Chat';
 import Settings from './pages/Settings';
 import Import from './pages/Import';
 import Locations from './pages/Locations';
+import Trash from './pages/Trash';
 
 function App() {
   return (
@@ -42,6 +43,7 @@ function App() {
             <Route path="chat" element={<Chat />} />
             <Route path="import" element={<Import />} />
             <Route path="locations" element={<Locations />} />
+            <Route path="trash" element={<Trash />} />
             <Route path="settings" element={<Settings />} />
           </Route>
           </Routes>

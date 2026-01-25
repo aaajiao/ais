@@ -77,13 +77,14 @@ export default function EditionDetail() {
 
       if (editionError) throw editionError;
 
-      // 获取作品信息
+      // 获取作品信息（排除已删除的）
       let artwork: Artwork | null = null;
       if (editionData && editionData.artwork_id) {
         const { data: artworkData } = await supabase
           .from('artworks')
           .select('*')
           .eq('id', editionData.artwork_id)
+          .is('deleted_at', null)
           .single<Artwork>();
         artwork = artworkData;
       }

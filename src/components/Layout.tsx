@@ -25,6 +25,8 @@ const PAGE_WIDTH_CONFIG: Record<string, PageWidthConfig> = {
   '/locations': { maxWidth: 'max-w-4xl', centered: true },
   // 导入页面
   '/import': { maxWidth: 'max-w-4xl', centered: true },
+  // 回收站
+  '/trash': { maxWidth: 'max-w-4xl', centered: true },
   // 对话页面：特殊处理，需要全高度
   '/chat': { maxWidth: 'max-w-4xl', centered: true },
 };
@@ -111,6 +113,14 @@ export default function Layout() {
               }
             >
               导入
+            </NavLink>
+            <NavLink
+              to="/trash"
+              className={({ isActive }) =>
+                `nav-link ${isActive ? 'text-foreground active' : 'text-muted-foreground'}`
+              }
+            >
+              回收站
             </NavLink>
             <NavLink
               to="/settings"

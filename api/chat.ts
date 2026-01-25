@@ -113,7 +113,8 @@ function getTools() {
         type: z.string().optional().describe('作品类型'),
       }),
       execute: async ({ query, year, type }) => {
-        let queryBuilder = supabase.from('artworks').select('*');
+        // 排除已删除的作品
+        let queryBuilder = supabase.from('artworks').select('*').is('deleted_at', null);
 
         if (query) {
           const sanitized = sanitizeSearchTerm(query);
@@ -157,13 +158,14 @@ function getTools() {
         location: z.string().optional().describe('位置'),
       }),
       execute: async ({ artwork_title, edition_number, status, location }) => {
-        // 先搜索作品
+        // 先搜索作品（排除已删除的）
         let artworkIds: string[] = [];
         if (artwork_title) {
           const sanitized = sanitizeSearchTerm(artwork_title);
           const { data: artworks } = await supabase
             .from('artworks')
             .select('id')
+            .is('deleted_at', null)
             .or(`title_en.ilike.%${sanitized}%,title_cn.ilike.%${sanitized}%`);
           artworkIds = artworks?.map(a => a.id) || [];
         }
@@ -224,7 +226,8 @@ function getTools() {
       }),
       execute: async ({ type }) => {
         if (type === 'overview') {
-          const { data: artworks } = await supabase.from('artworks').select('id');
+          // 排除已删除的作品
+          const { data: artworks } = await supabase.from('artworks').select('id').is('deleted_at', null);
           const { data: editions } = await supabase.from('editions').select('id, status');
 
           const totalArtworks = artworks?.length || 0;
@@ -458,9 +461,11 @@ function getTools() {
 
         if (artwork_title && finalArtworkIds.length === 0) {
           const sanitized = sanitizeSearchTerm(artwork_title);
+          // 排除已删除的作品
           const { data: artworks, error } = await supabase
             .from('artworks')
             .select('id, title_en')
+            .is('deleted_at', null)
             .or(`title_en.ilike.%${sanitized}%,title_cn.ilike.%${sanitized}%`)
             .limit(5);
 

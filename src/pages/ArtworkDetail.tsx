@@ -66,11 +66,12 @@ export default function ArtworkDetail() {
         setLoading(true);
         setError(null);
 
-        // 获取作品详情
+        // 获取作品详情（排除已删除的）
         const { data: artworkData, error: artworkError } = await supabase
           .from('artworks')
           .select('*')
           .eq('id', id)
+          .is('deleted_at', null)
           .single();
 
         if (artworkError) throw artworkError;
@@ -261,32 +262,18 @@ export default function ArtworkDetail() {
     }
   };
 
-  // 删除作品
+  // 删除作品（软删除）
   const handleDelete = async () => {
     if (!id) return;
 
     try {
       setDeleting(true);
 
-      // 先删除所有关联的版本历史
-      const editionIds = editions.map(e => e.id);
-      if (editionIds.length > 0) {
-        await supabase
-          .from('edition_history')
-          .delete()
-          .in('edition_id', editionIds);
-
-        // 再删除所有版本
-        await supabase
-          .from('editions')
-          .delete()
-          .eq('artwork_id', id);
-      }
-
-      // 最后删除作品
-      const { error: deleteError } = await supabase
+      // 软删除：设置 deleted_at 时间戳，保留所有数据
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: deleteError } = await (supabase as any)
         .from('artworks')
-        .delete()
+        .update({ deleted_at: new Date().toISOString() })
         .eq('id', id);
 
       if (deleteError) throw deleteError;
@@ -355,12 +342,12 @@ export default function ArtworkDetail() {
             <p className="text-muted-foreground mb-4">
               确定要删除作品「{artwork?.title_en}」吗？
               {editions.length > 0 && (
-                <span className="block text-destructive mt-2">
-                  此操作将同时删除 {editions.length} 个版本及其历史记录！
+                <span className="block text-muted-foreground mt-2">
+                  关联的 {editions.length} 个版本也将被隐藏。
                 </span>
               )}
             </p>
-            <p className="text-sm text-destructive mb-4">此操作不可撤销！</p>
+            <p className="text-sm text-muted-foreground mb-4">作品将被移至回收站，可在回收站中恢复。</p>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}

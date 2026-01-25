@@ -25,8 +25,8 @@ export async function fetchArtworkExportData(
   supabase: SupabaseClient,
   artworkIds?: string[]
 ): Promise<ArtworkExportData[]> {
-  // 获取作品
-  let artworksQuery = supabase.from('artworks').select('*');
+  // 获取作品（排除已删除的）
+  let artworksQuery = supabase.from('artworks').select('*').is('deleted_at', null);
   if (artworkIds && artworkIds.length > 0) {
     artworksQuery = artworksQuery.in('id', artworkIds);
   }
