@@ -18,7 +18,7 @@ export default function Layout() {
   const showChatSidebar = location.pathname !== '/chat';
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="h-screen bg-background flex flex-col overflow-hidden">
       {/* 桌面端顶部导航 */}
       <header className="hidden md:flex items-center justify-between px-6 py-4 border-b border-border">
         <div className="flex items-center gap-8">
@@ -127,7 +127,7 @@ export default function Layout() {
       {/* 主内容区 + 侧边栏 */}
       <div className="flex-1 flex overflow-hidden">
         {/* 主内容区 */}
-        <main className="flex-1 overflow-y-auto pb-20 md:pb-0">
+        <main className="flex-1 overflow-y-auto pb-20 md:pb-0 relative">
           <Outlet />
         </main>
 

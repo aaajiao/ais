@@ -84,7 +84,7 @@ const MessageBubble = memo(function MessageBubble({ message, onConfirmUpdate }: 
 
         {/* 工具调用结果 */}
         {toolParts.length > 0 && (
-          <div className="mt-2 space-y-2">
+          <div className="mt-3 space-y-3">
             {toolParts.map((tool, index) => (
               <ToolResult
                 key={tool.toolCallId || String(index)}

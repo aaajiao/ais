@@ -134,6 +134,8 @@ export default function CollapsibleChatHistory({
             return (
               <div
                 key={virtualItem.key}
+                data-index={virtualItem.index}
+                ref={virtualizer.measureElement}
                 style={{
                   position: 'absolute',
                   top: 0,
@@ -149,7 +151,7 @@ export default function CollapsibleChatHistory({
                     onToggle={() => toggleDate(item.group.date)}
                   />
                 ) : (
-                  <div className="px-4 py-2">
+                  <div className="px-4 py-3">
                     <MessageBubble
                       message={item.message}
                       onConfirmUpdate={onConfirmUpdate}
