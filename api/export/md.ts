@@ -1,43 +1,36 @@
 // Markdown 导出 API
 
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { ExportRequest } from '../../src/lib/exporters/index.js';
 import { generateFullMarkdown } from '../../src/lib/exporters/formatters.js';
 import { getSupabaseClient, fetchArtworkExportData } from './shared.js';
-import { verifyAuth, unauthorizedResponse } from '../lib/auth.js';
+import { verifyAuth } from '../lib/auth.js';
 
-// Vercel API Handler
-export default async function handler(req: Request): Promise<Response> {
+// Vercel API Handler (Node.js runtime with VercelRequest/VercelResponse)
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   // 只允许 POST 请求
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   // 认证检查
   const authResult = await verifyAuth(req);
   if (!authResult.success) {
-    return unauthorizedResponse(authResult.error || 'Unauthorized');
+    return res.status(401).json({ error: authResult.error || 'Unauthorized' });
   }
 
   try {
-    const requestData: ExportRequest = await req.json();
+    const requestData = req.body as ExportRequest;
     const { content, filename } = await handleMarkdownExport(requestData);
 
-    return new Response(content, {
-      status: 200,
-      headers: {
-        'Content-Type': 'text/markdown; charset=utf-8',
-        'Content-Disposition': `attachment; filename="${filename}"`,
-      },
-    });
+    // 设置响应头并发送文本内容
+    res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    return res.send(content);
   } catch (error) {
-    console.error('Export Error:', error);
-    return new Response(JSON.stringify({ error: (error as Error).message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    console.error('[MD Export] Error:', error);
+    return res.status(500).json({ error: (error as Error).message });
   }
 }
 

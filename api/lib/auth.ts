@@ -7,12 +7,48 @@ export interface AuthResult {
   error?: string;
 }
 
+// 兼容 Request 和 VercelRequest 的类型
+export type CompatibleRequest = Request | {
+  headers: Record<string, string | string[] | undefined>;
+  body?: unknown;
+  method?: string;
+};
+
+/**
+ * 从请求中获取 header（兼容 Request 和 VercelRequest）
+ */
+export function getHeader(req: CompatibleRequest, name: string): string | null {
+  // 标准 Request API
+  if (typeof req.headers.get === 'function') {
+    return req.headers.get(name);
+  }
+  // VercelRequest 的 headers 是对象
+  const headers = req.headers as Record<string, string | string[] | undefined>;
+  const value = headers[name] || headers[name.toLowerCase()];
+  if (Array.isArray(value)) {
+    return value[0] || null;
+  }
+  return value || null;
+}
+
+/**
+ * 从请求中获取 JSON body（兼容 Request 和 VercelRequest）
+ */
+export async function getJsonBody<T>(req: CompatibleRequest): Promise<T> {
+  // 标准 Request API
+  if (typeof (req as Request).json === 'function') {
+    return (req as Request).json();
+  }
+  // VercelRequest 的 body 已经被解析
+  return (req as { body: T }).body;
+}
+
 /**
  * 验证请求的身份认证
  * 使用 Supabase 验证 Bearer token
  */
-export async function verifyAuth(req: Request): Promise<AuthResult> {
-  const authHeader = req.headers.get('Authorization');
+export async function verifyAuth(req: CompatibleRequest): Promise<AuthResult> {
+  const authHeader = getHeader(req, 'Authorization');
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return { success: false, error: 'Missing authorization token' };

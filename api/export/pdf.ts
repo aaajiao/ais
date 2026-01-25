@@ -7,7 +7,8 @@ import { fileURLToPath } from 'url';
 import type { ExportRequest, ArtworkExportData } from '../../src/lib/exporters/index.js';
 import { preparePDFData, type PDFArtworkData } from '../../src/lib/exporters/formatters.js';
 import { getSupabaseClient, fetchArtworkExportData } from './shared.js';
-import { verifyAuth, unauthorizedResponse } from '../lib/auth.js';
+import { verifyAuth } from '../lib/auth.js';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // Vercel 配置：使用 Node.js runtime（需要文件系统访问）
 export const config = {
@@ -15,39 +16,32 @@ export const config = {
   maxDuration: 30,
 };
 
-// Vercel API Handler
-export default async function handler(req: Request): Promise<Response> {
+// Vercel API Handler (Node.js runtime with VercelRequest/VercelResponse)
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   // 只允许 POST 请求
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   // 认证检查
   const authResult = await verifyAuth(req);
   if (!authResult.success) {
-    return unauthorizedResponse(authResult.error || 'Unauthorized');
+    return res.status(401).json({ error: authResult.error || 'Unauthorized' });
   }
 
   try {
-    const requestData: ExportRequest = await req.json();
+    const requestData = req.body as ExportRequest;
     const { buffer, filename } = await handlePDFExport(requestData);
 
-    return new Response(buffer, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${filename}"`,
-      },
-    });
+    // 设置响应头并发送二进制数据
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', buffer.byteLength);
+
+    return res.send(Buffer.from(buffer));
   } catch (error) {
-    console.error('PDF Export Error:', error);
-    return new Response(JSON.stringify({ error: (error as Error).message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    console.error('[PDF Export] Error:', error);
+    return res.status(500).json({ error: (error as Error).message });
   }
 }
 
@@ -94,10 +88,15 @@ interface CachedImage {
   alias: string;
 }
 
-// 获取图片 base64 和尺寸
-async function fetchImageAsBase64(url: string): Promise<ImageData | null> {
+// 获取图片 base64 和尺寸（带超时）
+async function fetchImageAsBase64(url: string, timeoutMs: number = 10000): Promise<ImageData | null> {
   try {
-    const response = await fetch(url);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
     if (!response.ok) return null;
 
     const arrayBuffer = await response.arrayBuffer();
@@ -114,7 +113,11 @@ async function fetchImageAsBase64(url: string): Promise<ImageData | null> {
       height: dimensions.height,
     };
   } catch (error) {
-    console.error('Failed to fetch image:', error);
+    if ((error as Error).name === 'AbortError') {
+      console.error(`[PDF Export] Image fetch timeout: ${url}`);
+    } else {
+      console.error('[PDF Export] Failed to fetch image:', error);
+    }
     return null;
   }
 }
@@ -144,10 +147,16 @@ async function fetchImagesInBatches(
   // 分批获取
   for (let i = 0; i < uniqueUrls.length; i += batchSize) {
     const batch = uniqueUrls.slice(i, i + batchSize);
+
     const batchResults = await Promise.all(
       batch.map(async (url) => {
-        const imageData = await fetchImageAsBase64(url);
-        return { url, imageData };
+        try {
+          const imageData = await fetchImageAsBase64(url);
+          return { url, imageData };
+        } catch (err) {
+          console.error(`[PDF Export] Failed to fetch image: ${url}`, err);
+          return { url, imageData: null };
+        }
       })
     );
 

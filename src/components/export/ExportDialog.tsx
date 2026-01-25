@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, FileText, FileType } from 'lucide-react';
 import type { ExportRequest, ExportOptions } from '@/lib/exporters';
+import { useAuthContext } from '@/contexts/AuthContext';
 
 interface ExportDialogProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ export default function ExportDialog({
   artworkIds,
   artworkCount,
 }: ExportDialogProps) {
+  const { session } = useAuthContext();
   const [format, setFormat] = useState<ExportFormat>('pdf');
   const [options, setOptions] = useState<ExportOptions>({
     includePrice: false,
@@ -32,6 +34,13 @@ export default function ExportDialog({
     setExporting(true);
     setError(null);
 
+    // 检查认证状态
+    if (!session?.access_token) {
+      setError('请先登录');
+      setExporting(false);
+      return;
+    }
+
     try {
       const request: ExportRequest = {
         scope: artworkCount === 1 ? 'single' : 'selected',
@@ -42,7 +51,10 @@ export default function ExportDialog({
 
       const response = await fetch(`/api/export/${format}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
         body: JSON.stringify(request),
       });
 
