@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo, memo } from 'react';
 import type { UIMessage } from 'ai';
 import EditableConfirmCard, { type ConfirmCardData } from './EditableConfirmCard';
 
@@ -49,17 +49,22 @@ function getToolName(part: ToolPart): string {
   return 'unknown';
 }
 
-export default function MessageBubble({ message, onConfirmUpdate }: MessageBubbleProps) {
+// 使用 memo 包装组件，添加自定义比较函数
+const MessageBubble = memo(function MessageBubble({ message, onConfirmUpdate }: MessageBubbleProps) {
   const isUser = message.role === 'user';
 
-  // 从 parts 中提取文本内容
-  const textContent = message.parts
-    ?.filter(isTextPart)
-    .map(part => part.text)
-    .join('') || '';
+  // 缓存文本内容计算
+  const textContent = useMemo(() => {
+    return message.parts
+      ?.filter(isTextPart)
+      .map(part => part.text)
+      .join('') || '';
+  }, [message.parts]);
 
-  // 从 parts 中提取工具调用
-  const toolParts: ToolPart[] = (message.parts?.filter(isToolPart) || []) as ToolPart[];
+  // 缓存工具调用计算
+  const toolParts = useMemo(() => {
+    return (message.parts?.filter(isToolPart) || []) as ToolPart[];
+  }, [message.parts]);
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -92,7 +97,13 @@ export default function MessageBubble({ message, onConfirmUpdate }: MessageBubbl
       </div>
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  // 只在消息内容变化时重新渲染
+  return prevProps.message.id === nextProps.message.id &&
+         prevProps.message.parts === nextProps.message.parts;
+});
+
+export default MessageBubble;
 
 // 工具调用结果组件
 function ToolResult({

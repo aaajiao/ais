@@ -1,8 +1,12 @@
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import MessageBubble from '@/components/chat/MessageBubble';
 import { saveChatHistory, loadChatHistory, clearChatHistory, getChatTimestamp } from '@/lib/chatStorage';
+import { useAuth } from '@/hooks/useAuth';
+
+const MAX_SIDEBAR_MESSAGES = 15;
 
 interface ChatSidebarProps {
   isOpen: boolean;
@@ -11,21 +15,25 @@ interface ChatSidebarProps {
 
 export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const historyLoadedRef = useRef(false);
   const [inputValue, setInputValue] = useState('');
-  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const { session } = useAuth();
 
   // 获取用户选择的模型
   const [selectedModel] = useState(() => {
     return localStorage.getItem('ai-model') || 'claude-sonnet-4.5';
   });
 
-  // 创建 transport - 使用 useMemo 避免每次渲染都创建新实例
+  // 创建 transport - 添加认证 header
   const transport = useMemo(() => new DefaultChatTransport({
     api: '/api/chat',
+    headers: {
+      'Authorization': `Bearer ${session?.access_token || ''}`,
+    },
     body: {
       model: selectedModel,
     },
-  }), [selectedModel]);
+  }), [selectedModel, session?.access_token]);
 
   const {
     messages,
@@ -34,27 +42,34 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
     setMessages,
   } = useChat({
     transport,
+    experimental_throttle: 50,  // 减少流式响应时的渲染次数
+    onFinish: ({ messages: finalMessages }) => {
+      // 只在完成时保存（官方推荐方式）
+      if (finalMessages.length > 0) {
+        saveChatHistory(finalMessages);
+      }
+    },
   });
 
   const isLoading = status === 'submitted' || status === 'streaming';
 
-  // 组件挂载时加载历史对话
+  // 截取最近消息用于显示（解决"越说话越长"问题）
+  const recentMessages = useMemo(() => {
+    return messages.slice(-MAX_SIDEBAR_MESSAGES);
+  }, [messages]);
+
+  const hasMoreMessages = messages.length > MAX_SIDEBAR_MESSAGES;
+
+  // 组件挂载时加载历史对话（使用 ref 避免 lint 警告）
   useEffect(() => {
-    if (!historyLoaded) {
+    if (!historyLoadedRef.current) {
+      historyLoadedRef.current = true;
       const savedMessages = loadChatHistory();
       if (savedMessages.length > 0) {
         setMessages(savedMessages);
       }
-      setHistoryLoaded(true);
     }
-  }, [historyLoaded, setMessages]);
-
-  // 保存对话历史（当消息变化且不在加载中时）
-  useEffect(() => {
-    if (historyLoaded && messages.length > 0 && !isLoading) {
-      saveChatHistory(messages);
-    }
-  }, [messages, isLoading, historyLoaded]);
+  }, [setMessages]);
 
   // 滚动到底部
   useEffect(() => {
@@ -109,21 +124,34 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
             ✕
           </button>
         </div>
-        {/* 对话时间提示 */}
-        {chatTimestamp && messages.length > 0 && (
-          <div className="px-4 py-1 text-xs text-muted-foreground border-b border-border">
-            对话开始于 {chatTimestamp.toLocaleString('zh-CN', {
-              month: 'short',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit'
-            })}
+
+        {/* 对话时间提示 + 查看完整对话链接 */}
+        {(chatTimestamp || hasMoreMessages) && messages.length > 0 && (
+          <div className="px-4 py-2 text-xs text-muted-foreground border-b border-border flex items-center justify-between">
+            {chatTimestamp && (
+              <span>
+                开始于 {chatTimestamp.toLocaleString('zh-CN', {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </span>
+            )}
+            {hasMoreMessages && (
+              <Link
+                to="/chat"
+                className="text-primary hover:underline"
+              >
+                查看全部 ({messages.length})
+              </Link>
+            )}
           </div>
         )}
 
         {/* 消息区域 */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {messages.length === 0 ? (
+          {recentMessages.length === 0 ? (
             <div className="text-center text-muted-foreground py-8">
               <p className="text-4xl mb-4">💬</p>
               <p className="text-sm">
@@ -134,7 +162,7 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
               </p>
             </div>
           ) : (
-            messages.map((message) => (
+            recentMessages.map((message) => (
               <MessageBubble key={message.id} message={message} />
             ))
           )}

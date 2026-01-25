@@ -1,22 +1,26 @@
 import type { UIMessage } from 'ai';
 
 const STORAGE_KEY = 'chat-history';
-const EXPIRY_HOURS = 24;
 
 interface StoredChat {
   messages: UIMessage[];
-  timestamp: number;
+  createdAt: number;      // 会话创建时间
+  updatedAt: number;      // 最后更新时间
 }
 
 /**
  * 保存对话到 localStorage
+ * 保留所有消息直到用户手动删除
  */
 export function saveChatHistory(messages: UIMessage[]): void {
   if (messages.length === 0) return;
 
+  // 获取现有创建时间或使用当前时间
+  const existing = loadStoredChat();
   const data: StoredChat = {
     messages,
-    timestamp: Date.now(),
+    createdAt: existing?.createdAt || Date.now(),
+    updatedAt: Date.now(),
   };
 
   try {
@@ -30,27 +34,23 @@ export function saveChatHistory(messages: UIMessage[]): void {
 
 /**
  * 从 localStorage 加载对话历史
- * 如果超过 24 小时则返回空数组
  */
 export function loadChatHistory(): UIMessage[] {
+  const stored = loadStoredChat();
+  return stored?.messages || [];
+}
+
+/**
+ * 内部函数：加载完整的存储数据
+ */
+function loadStoredChat(): StoredChat | null {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return [];
-
-    const data: StoredChat = JSON.parse(stored);
-    const now = Date.now();
-    const expiryMs = EXPIRY_HOURS * 60 * 60 * 1000;
-
-    // 检查是否过期
-    if (now - data.timestamp > expiryMs) {
-      localStorage.removeItem(STORAGE_KEY);
-      return [];
-    }
-
-    return data.messages || [];
+    if (!stored) return null;
+    return JSON.parse(stored) as StoredChat;
   } catch (error) {
     console.warn('Failed to load chat history:', error);
-    return [];
+    return null;
   }
 }
 
@@ -62,16 +62,17 @@ export function clearChatHistory(): void {
 }
 
 /**
- * 获取对话历史的时间戳
+ * 获取对话历史的创建时间
  */
 export function getChatTimestamp(): Date | null {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return null;
+  const stored = loadStoredChat();
+  return stored ? new Date(stored.createdAt) : null;
+}
 
-    const data: StoredChat = JSON.parse(stored);
-    return new Date(data.timestamp);
-  } catch {
-    return null;
-  }
+/**
+ * 获取对话历史的最后更新时间
+ */
+export function getChatUpdatedAt(): Date | null {
+  const stored = loadStoredChat();
+  return stored ? new Date(stored.updatedAt) : null;
 }

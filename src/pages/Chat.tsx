@@ -2,16 +2,17 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
-import MessageBubble from '@/components/chat/MessageBubble';
 import type { ConfirmCardData } from '@/components/chat/EditableConfirmCard';
+import CollapsibleChatHistory from '@/components/chat/CollapsibleChatHistory';
 import { saveChatHistory, loadChatHistory, clearChatHistory, getChatTimestamp } from '@/lib/chatStorage';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function Chat() {
   const location = useLocation();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const historyLoadedRef = useRef(false);
   const [inputValue, setInputValue] = useState('');
-  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const { session } = useAuth();
 
   // 获取用户选择的模型
   const [selectedModel] = useState(() => {
@@ -21,13 +22,16 @@ export default function Chat() {
   // 从路由状态获取上下文（如从版本详情页跳转过来）
   const contextFromRoute = location.state?.context;
 
-  // 创建 transport（使用 useMemo 避免重复创建）
+  // 创建 transport - 添加认证 header
   const transport = useMemo(() => new DefaultChatTransport({
     api: '/api/chat',
+    headers: {
+      'Authorization': `Bearer ${session?.access_token || ''}`,
+    },
     body: {
       model: selectedModel,
     },
-  }), [selectedModel]);
+  }), [selectedModel, session?.access_token]);
 
   const {
     messages,
@@ -37,33 +41,27 @@ export default function Chat() {
     setMessages,
   } = useChat({
     transport,
+    experimental_throttle: 50,  // 减少流式响应时的渲染次数
+    onFinish: ({ messages: finalMessages }) => {
+      // 只在完成时保存（官方推荐方式）
+      if (finalMessages.length > 0) {
+        saveChatHistory(finalMessages);
+      }
+    },
   });
 
   const isLoading = status === 'submitted' || status === 'streaming';
 
-  // 组件挂载时加载历史对话
+  // 组件挂载时加载历史对话（使用 ref 避免 lint 警告）
   useEffect(() => {
-    if (!historyLoaded) {
+    if (!historyLoadedRef.current) {
+      historyLoadedRef.current = true;
       const savedMessages = loadChatHistory();
       if (savedMessages.length > 0) {
         setMessages(savedMessages);
       }
-      setHistoryLoaded(true);
     }
-  }, [historyLoaded, setMessages]);
-
-  // 保存对话历史（当消息变化且不在加载中时）
-  useEffect(() => {
-    // 只在历史加载完成后才保存，避免覆盖
-    if (historyLoaded && messages.length > 0 && !isLoading) {
-      saveChatHistory(messages);
-    }
-  }, [messages, isLoading, historyLoaded]);
-
-  // 滚动到底部
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [setMessages]);
 
   // 如果有上下文，自动填充输入
   useEffect(() => {
@@ -143,9 +141,9 @@ export default function Chat() {
         </div>
       )}
 
-      {/* 消息列表 */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
-        {messages.length === 0 ? (
+      {/* 消息列表 - 使用折叠式历史组件 */}
+      {messages.length === 0 ? (
+        <div className="flex-1 flex items-center justify-center">
           <div className="text-center text-muted-foreground py-8">
             <div className="text-4xl mb-4">💬</div>
             <p className="font-medium">开始对话</p>
@@ -166,38 +164,21 @@ export default function Chat() {
               ))}
             </div>
           </div>
-        ) : (
-          messages.map((message) => (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              onConfirmUpdate={handleConfirmUpdate}
-            />
-          ))
-        )}
+        </div>
+      ) : (
+        <CollapsibleChatHistory
+          messages={messages}
+          onConfirmUpdate={handleConfirmUpdate}
+          isLoading={isLoading}
+        />
+      )}
 
-        {/* 加载指示器 */}
-        {isLoading && (
-          <div className="flex justify-start">
-            <div className="bg-card border border-border rounded-2xl px-4 py-3">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <span className="animate-pulse">●</span>
-                <span className="animate-pulse animation-delay-200">●</span>
-                <span className="animate-pulse animation-delay-400">●</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 错误提示 */}
-        {error && (
-          <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive text-sm">
-            出错了：{error.message}
-          </div>
-        )}
-
-        <div ref={messagesEndRef} />
-      </div>
+      {/* 错误提示 */}
+      {error && (
+        <div className="mx-4 mb-2 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive text-sm">
+          出错了：{error.message}
+        </div>
+      )}
 
       {/* 输入框 */}
       <div className="p-4 border-t border-border">
