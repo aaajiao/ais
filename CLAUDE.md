@@ -10,11 +10,11 @@ An artwork inventory management system for artist aaajiao, built with React, Typ
 # Install dependencies
 bun install
 
-# Start development (recommended)
-bun run dev           # Vite (5173) + API server (3000) concurrently
+# Start development (recommended - full Vercel environment)
+bun start             # Frontend + API on port 3000
 
 # Alternative: run separately
-bun run dev:vite      # Frontend only (Vite on port 5173)
+bun run dev           # Frontend only (Vite on port 5173)
 bun run dev:api       # API only (server.ts on port 3000)
 
 # Build for production
@@ -24,7 +24,7 @@ bun run build
 bun run lint
 ```
 
-**Note**: `vercel dev` has compatibility issues with Vite 7's SPA rewrites. Use `bun run dev` for local development instead.
+**Note**: 本地开发使用 `vercel-dev.json` 覆盖生产环境的 SPA rewrites 配置，确保 Vite 7 正常工作。
 
 ## Tech Stack
 

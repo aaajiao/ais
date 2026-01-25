@@ -4,9 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n vite,api -c blue,green \"vite\" \"bunx tsx server.ts\"",
-    "dev:vite": "vite",
-    "dev:vercel": "vercel dev",
+    "dev": "vite",
+    "start": "vercel dev --local-config vercel-dev.json",
     "dev:api": "bunx tsx server.ts",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
