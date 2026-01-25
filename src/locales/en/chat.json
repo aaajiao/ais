@@ -3,7 +3,7 @@
   "chatStartedAt": "Chat started at",
   "clearChat": "Clear chat",
   "startConversation": "Start a conversation",
-  "tryAsking": "Try asking: \"How many editions of Guard?\" or \"Which works are consigned?\"",
+  "tryAsking": "Try asking: \"How many editions of Guard?\" or \"Import https://...\"",
   "quickActions": {
     "inventoryStats": "Inventory stats",
     "consignedWorks": "Consigned works",

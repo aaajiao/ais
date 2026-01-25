@@ -3,7 +3,7 @@
   "chatStartedAt": "对话开始于",
   "clearChat": "清除对话",
   "startConversation": "开始对话",
-  "tryAsking": "试试说：「Guard 有几个版本？」或「哪些作品在寄售？」",
+  "tryAsking": "试试说：「Guard 有几个版本？」或「导入 https://...」",
   "quickActions": {
     "inventoryStats": "库存统计",
     "consignedWorks": "寄售作品",
