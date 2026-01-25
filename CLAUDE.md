@@ -42,6 +42,9 @@ bun run lint
 ./
 ├── api/                    # Serverless API handlers
 │   ├── chat.ts            # AI chat with tools
+│   ├── lib/               # Shared API utilities
+│   │   ├── artwork-extractor.ts  # LLM-based HTML parsing
+│   │   └── image-downloader.ts   # Image URL selection
 │   ├── export/            # PDF/Markdown export
 │   └── import/            # Markdown import
 ├── src/
@@ -137,8 +140,25 @@ The chat interface (`/chat`) provides natural language access to:
 - Record sales with price/buyer
 - Manage locations
 - Export data
+- **Import artworks from URL** (e.g., "导入 https://eventstructure.com/Guard-I")
 
 System prompt is in Chinese for the target user.
+
+### URL Import Feature
+
+Import artworks directly from web pages by typing "导入 URL" in chat. The system:
+1. Fetches HTML content from the URL
+2. Uses LLM (Claude Sonnet 4.5) to extract artwork info via `generateObject`
+3. Extracts the best thumbnail image URL from the page
+4. Checks for duplicates via `source_url` matching
+5. Creates or updates the artwork record
+
+**Key files:**
+- `api/lib/artwork-extractor.ts` - LLM extraction with Zod schema
+- `api/lib/image-downloader.ts` - Image URL selection (`selectBestImage`)
+- `api/chat.ts` - `import_artwork_from_url` tool definition
+
+**Note:** The URL import always uses Claude Sonnet 4.5 regardless of user's chat model selection.
 
 ## Code Conventions
 
