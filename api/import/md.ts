@@ -1,5 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
-import { verifyAuth, unauthorizedResponse } from '../lib/auth.js';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { verifyAuth } from '../lib/auth.js';
+import { processExternalImage, isSupabaseUrl } from './process-image.js';
+
+// Vercel 配置：使用 Node.js runtime（因为 process-image 使用 sharp）
+export const config = {
+  runtime: 'nodejs',
+  maxDuration: 60, // 图片处理需要更长时间
+};
 
 // 请求体类型
 interface ImportArtwork {
@@ -49,6 +57,10 @@ interface ExecuteResult {
   created: string[];
   updated: string[];
   errors: string[];
+  imageProcessing?: {
+    processed: number;
+    failed: number;
+  };
 }
 
 // 网站字段（允许导入时更新）
@@ -66,18 +78,15 @@ const FIELD_LABELS: Record<string, string> = {
   thumbnail_url: '缩略图',
 };
 
-export default async function handler(req: Request) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   // 认证检查
   const authResult = await verifyAuth(req);
   if (!authResult.success) {
-    return unauthorizedResponse(authResult.error || 'Unauthorized');
+    return res.status(401).json({ error: authResult.error || 'Unauthorized' });
   }
 
   // 使用 service key 绕过 RLS，支持新的 secret key 格式
@@ -94,7 +103,7 @@ export default async function handler(req: Request) {
   );
 
   try {
-    const body: ImportRequest = await req.json();
+    const body: ImportRequest = req.body;
 
     if (body.mode === 'preview') {
       // 预览模式：分析变更
@@ -142,18 +151,30 @@ export default async function handler(req: Request) {
           for (const field of WEBSITE_FIELDS) {
             const oldVal = existing[field];
             const newVal = artwork[field as keyof ImportArtwork];
-            // 只有新值存在且与旧值不同时才记录变更
-            if (newVal !== null && newVal !== undefined && oldVal !== newVal) {
+
+            // 标准化值：将空字符串、undefined 都视为 null（用于比较）
+            const normalizedOld = (oldVal === '' || oldVal === undefined || oldVal === null) ? null : String(oldVal).trim();
+            const normalizedNew = (newVal === '' || newVal === undefined || newVal === null) ? null : String(newVal).trim();
+
+            // 调试日志
+            if (normalizedOld !== normalizedNew) {
+              console.log(`[MD Import] Field ${field}: old="${normalizedOld}" new="${normalizedNew}" (newIsNull=${normalizedNew === null})`);
+            }
+
+            // 只有新值有实际内容且与旧值不同时才记录变更
+            // 不用空值覆盖已有值
+            if (normalizedNew !== null && normalizedOld !== normalizedNew) {
               changes.push({
                 field,
                 fieldLabel: FIELD_LABELS[field] || field,
-                oldValue: oldVal ?? null,
-                newValue: newVal as string | null,
+                oldValue: normalizedOld,
+                newValue: normalizedNew,
               });
             }
           }
 
           if (changes.length > 0) {
+            console.log('[MD Import] Artwork has changes:', existing.title_en, changes);
             result.updates.push({
               existingId: existing.id,
               existingArtwork: existing,
@@ -161,6 +182,7 @@ export default async function handler(req: Request) {
               changes,
             });
           } else {
+            console.log('[MD Import] Artwork unchanged:', existing.title_en);
             result.unchanged.push({
               existingId: existing.id,
               title: existing.title_en,
@@ -169,9 +191,7 @@ export default async function handler(req: Request) {
         }
       }
 
-      return new Response(JSON.stringify(result), {
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return res.json(result);
     }
 
     // 执行模式：实际导入
@@ -179,6 +199,10 @@ export default async function handler(req: Request) {
       created: [],
       updated: [],
       errors: [],
+      imageProcessing: {
+        processed: 0,
+        failed: 0,
+      },
     };
 
     for (const artwork of body.artworks) {
@@ -223,6 +247,32 @@ export default async function handler(req: Request) {
             .single();
 
           if (error) throw error;
+
+          // 处理缩略图：下载、压缩、上传到本地存储
+          if (artwork.thumbnail_url && !isSupabaseUrl(artwork.thumbnail_url)) {
+            try {
+              const imageResult = await processExternalImage(
+                artwork.thumbnail_url,
+                data.id,
+                supabase
+              );
+              if (imageResult.success && imageResult.publicUrl) {
+                await supabase
+                  .from('artworks')
+                  .update({ thumbnail_url: imageResult.publicUrl })
+                  .eq('id', data.id);
+                results.imageProcessing!.processed++;
+              } else {
+                // 图片处理失败，保留原 URL
+                results.imageProcessing!.failed++;
+              }
+            } catch (imgErr) {
+              // 图片处理失败不影响作品创建
+              console.warn('Image processing failed for new artwork:', imgErr);
+              results.imageProcessing!.failed++;
+            }
+          }
+
           results.created.push(data.id);
         } else {
           // 更新现有作品（只更新网站字段，保护管理字段）
@@ -246,7 +296,30 @@ export default async function handler(req: Request) {
               .single();
 
             if (!currentArtwork?.thumbnail_url) {
-              updateData.thumbnail_url = artwork.thumbnail_url;
+              // 处理缩略图：下载、压缩、上传到本地存储
+              if (!isSupabaseUrl(artwork.thumbnail_url)) {
+                try {
+                  const imageResult = await processExternalImage(
+                    artwork.thumbnail_url,
+                    existing.id,
+                    supabase
+                  );
+                  if (imageResult.success && imageResult.publicUrl) {
+                    updateData.thumbnail_url = imageResult.publicUrl;
+                    results.imageProcessing!.processed++;
+                  } else {
+                    // 图片处理失败，使用原 URL
+                    updateData.thumbnail_url = artwork.thumbnail_url;
+                    results.imageProcessing!.failed++;
+                  }
+                } catch (imgErr) {
+                  console.warn('Image processing failed for existing artwork:', imgErr);
+                  updateData.thumbnail_url = artwork.thumbnail_url;
+                  results.imageProcessing!.failed++;
+                }
+              } else {
+                updateData.thumbnail_url = artwork.thumbnail_url;
+              }
             }
           }
 
@@ -265,14 +338,9 @@ export default async function handler(req: Request) {
       }
     }
 
-    return new Response(JSON.stringify(results), {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return res.json(results);
   } catch (err) {
     console.error('Import API error:', err);
-    return new Response(
-      JSON.stringify({ error: err instanceof Error ? err.message : 'Import failed' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+    return res.status(500).json({ error: err instanceof Error ? err.message : 'Import failed' });
   }
 }

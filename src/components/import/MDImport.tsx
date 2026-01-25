@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { parseAndValidateMDFile, type ParsedArtwork } from '@/lib/md-parser';
-import { Loader2, FileText } from 'lucide-react';
+import { useAuthContext } from '@/contexts/AuthContext';
+import { Loader2, FileText, ImageIcon, CheckCircle } from 'lucide-react';
 
 interface PreviewResult {
   new: Array<{
@@ -36,11 +37,16 @@ interface ExecuteResult {
   created: string[];
   updated: string[];
   errors: string[];
+  imageProcessing?: {
+    processed: number;
+    failed: number;
+  };
 }
 
 type ImportStep = 'upload' | 'preview' | 'result';
 
 export default function MDImport() {
+  const { session } = useAuthContext();
   const [step, setStep] = useState<ImportStep>('upload');
   const [parsedArtworks, setParsedArtworks] = useState<ParsedArtwork[]>([]);
   const [previewResult, setPreviewResult] = useState<PreviewResult | null>(null);
@@ -86,7 +92,10 @@ export default function MDImport() {
       // 调用预览 API
       const response = await fetch('/api/import/md', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || ''}`,
+        },
         body: JSON.stringify({
           artworks: artworks.map((a, index) => ({
             ...a,
@@ -192,7 +201,10 @@ export default function MDImport() {
 
       const response = await fetch('/api/import/md', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || ''}`,
+        },
         body: JSON.stringify({
           artworks: artworksToImport,
           mode: 'execute',
@@ -440,10 +452,13 @@ export default function MDImport() {
   const renderResult = () => {
     if (!executeResult) return null;
 
+    const imageStats = executeResult.imageProcessing;
+    const hasImageProcessing = imageStats && (imageStats.processed > 0 || imageStats.failed > 0);
+
     return (
       <div className="space-y-6">
         <div className="text-center py-8">
-          <span className="text-6xl mb-4 block">✅</span>
+          <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-500" />
           <h2 className="text-xl font-semibold mb-2">导入完成</h2>
         </div>
 
@@ -461,6 +476,26 @@ export default function MDImport() {
             <p className="text-sm text-muted-foreground">失败</p>
           </div>
         </div>
+
+        {/* 图片处理统计 */}
+        {hasImageProcessing && (
+          <div className="bg-muted/50 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <ImageIcon className="w-4 h-4 text-muted-foreground" />
+              <span className="font-medium text-sm">图片本地化处理</span>
+            </div>
+            <div className="flex gap-4 text-sm">
+              <span className="text-green-600">
+                成功: {imageStats.processed}
+              </span>
+              {imageStats.failed > 0 && (
+                <span className="text-muted-foreground">
+                  失败: {imageStats.failed}（保留原链接）
+                </span>
+              )}
+            </div>
+          </div>
+        )}
 
         {executeResult.errors.length > 0 && (
           <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4">

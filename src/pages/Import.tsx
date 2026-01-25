@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import MDImport from '@/components/import/MDImport';
+import ThumbnailMigration from '@/components/import/ThumbnailMigration';
 
 export default function Import() {
   return (
@@ -26,6 +27,19 @@ export default function Import() {
         </div>
 
         <MDImport />
+      </div>
+
+      {/* 缩略图迁移工具 */}
+      <div className="mt-6 bg-card border border-border rounded-xl p-6">
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold mb-2">缩略图本地化</h2>
+          <p className="text-sm text-muted-foreground">
+            将已有作品的外部图片链接迁移到本地存储，提高加载速度和稳定性。
+            图片会自动压缩优化后上传到 Supabase Storage。
+          </p>
+        </div>
+
+        <ThumbnailMigration />
       </div>
 
       {/* 帮助信息 */}
