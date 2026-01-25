@@ -575,7 +575,7 @@ export default function ArtworkDetail() {
 
             {/* 作品信息 */}
             <div className="flex-1">
-              <h1 className="text-2xl font-bold mb-2">
+              <h1 className="text-page-title mb-2">
                 {artwork.title_en}
                 {artwork.title_cn && (
                   <span className="text-muted-foreground font-normal ml-2">

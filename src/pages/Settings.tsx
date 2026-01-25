@@ -321,7 +321,7 @@ export default function Settings() {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">设置</h1>
+      <h1 className="text-page-title mb-6 xl:mb-8">设置</h1>
 
       {/* AI 模型设置 */}
       <div className="bg-card border border-border rounded-xl p-6 mb-6">

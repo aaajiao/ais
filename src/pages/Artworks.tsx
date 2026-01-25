@@ -219,7 +219,7 @@ export default function Artworks() {
   if (loading) {
     return (
       <div className="p-6">
-        <h1 className="text-2xl font-bold mb-6">作品</h1>
+        <h1 className="text-page-title mb-6 xl:mb-8">作品</h1>
         {/* 骨架屏 */}
         <div className="flex gap-2 mb-6">
           {[1, 2, 3, 4].map(i => (
@@ -248,7 +248,7 @@ export default function Artworks() {
   if (error) {
     return (
       <div className="p-6">
-        <h1 className="text-2xl font-bold mb-6">作品</h1>
+        <h1 className="text-page-title mb-6 xl:mb-8">作品</h1>
         <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-destructive">
           {error}
         </div>
@@ -307,7 +307,7 @@ export default function Artworks() {
 
       {/* 标题和批量操作按钮 */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">作品</h1>
+        <h1 className="text-page-title">作品</h1>
         <div className="flex gap-2">
           {selectMode ? (
             <>

@@ -181,12 +181,25 @@ This project uses **Brutalist Minimalism** design style.
 - **Status**: Use `StatusIndicator` component with low-saturation semantic colors
 - **Layout**: Unified page width management via `Layout.tsx`
 - **Responsive**: Mobile-first, touch targets ≥ 44px
+- **Typography**: Centralized in `index.css` via Tailwind v4 `@theme` custom utilities
+
+### Typography System
+
+Custom typography classes defined in `src/index.css`:
+
+| Class | Usage | base | xl (1280px+) |
+|-------|-------|------|--------------|
+| `text-page-title` | Page titles | 28px | 40px |
+| `text-section-title` | Section headings | 18px | 26px |
+| `.nav-link` | Navigation links | 14px | 21px |
+
+To adjust global typography, modify CSS variables in `index.css` only.
 
 ### Key Components
 
 - `src/components/ui/StatusIndicator.tsx` - Edition status indicator
 - `src/components/Layout.tsx` - Unified layout and page width management
-- `src/index.css` - CSS variables and global styles
+- `src/index.css` - CSS variables, typography system, and global styles
 
 See `docs/style-guide.md` for detailed specifications.
 

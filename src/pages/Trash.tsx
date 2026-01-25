@@ -133,7 +133,7 @@ export default function Trash() {
   if (loading) {
     return (
       <div className="p-6">
-        <h1 className="text-2xl font-bold mb-6">回收站</h1>
+        <h1 className="text-page-title mb-6 xl:mb-8">回收站</h1>
         <div className="space-y-4">
           {[1, 2, 3].map(i => (
             <div key={i} className="bg-card border border-border rounded-xl p-4">
@@ -154,7 +154,7 @@ export default function Trash() {
   if (error) {
     return (
       <div className="p-6">
-        <h1 className="text-2xl font-bold mb-6">回收站</h1>
+        <h1 className="text-page-title mb-6 xl:mb-8">回收站</h1>
         <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-destructive">
           {error}
         </div>
@@ -196,7 +196,7 @@ export default function Trash() {
         </div>
       )}
 
-      <h1 className="text-2xl font-bold mb-6">回收站</h1>
+      <h1 className="text-page-title mb-6 xl:mb-8">回收站</h1>
 
       {artworks.length === 0 ? (
         <div className="bg-card border border-border rounded-xl p-8 text-center text-muted-foreground">

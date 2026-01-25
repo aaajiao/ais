@@ -150,7 +150,7 @@ export default function Locations() {
       {/* 页面标题 */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">位置管理</h1>
+          <h1 className="text-page-title">位置管理</h1>
           <p className="text-muted-foreground mt-1">
             管理作品存放的位置，共 {totalLocations} 个位置
           </p>

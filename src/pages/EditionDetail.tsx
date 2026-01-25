@@ -615,7 +615,7 @@ export default function EditionDetail() {
             </Link>
 
             {/* 版本号 */}
-            <h1 className="text-2xl font-bold mb-4">
+            <h1 className="text-page-title mb-4">
               {formatEditionNumber()}
               {edition.inventory_number && (
                 <span className="text-muted-foreground font-normal ml-2">

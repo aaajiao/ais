@@ -160,7 +160,7 @@ export default function Editions() {
   if (loading) {
     return (
       <div className="p-6">
-        <h1 className="text-2xl font-bold mb-6">版本</h1>
+        <h1 className="text-page-title mb-6 xl:mb-8">版本</h1>
         {/* 骨架屏 */}
         <div className="flex gap-2 mb-6">
           {[1, 2, 3, 4, 5, 6].map(i => (
@@ -189,7 +189,7 @@ export default function Editions() {
   if (error) {
     return (
       <div className="p-6">
-        <h1 className="text-2xl font-bold mb-6">版本</h1>
+        <h1 className="text-page-title mb-6 xl:mb-8">版本</h1>
         <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-destructive">
           {error}
         </div>
@@ -199,7 +199,7 @@ export default function Editions() {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">版本</h1>
+      <h1 className="text-page-title mb-6 xl:mb-8">版本</h1>
 
       {/* 筛选标签 */}
       <div className="flex gap-2 mb-6 overflow-x-auto pb-2">

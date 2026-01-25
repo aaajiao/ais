@@ -174,6 +174,33 @@ getStatusLabel('at_gallery') // → "寄售中"
 <button className="min-h-[44px] min-w-[44px]">
 ```
 
+### 排版工具类
+
+项目在 `index.css` 的 `@theme` 中定义了自定义排版工具类，实现**一处定义、全局生效**：
+
+| 工具类 | 用途 | base | xl (1280px+) |
+|--------|------|------|--------------|
+| `text-page-title` | 页面主标题 | 28px | 40px |
+| `text-section-title` | 分区标题 | 18px | 26px |
+| `.nav-link` | 导航链接（CSS类） | 14px | 21px |
+
+**使用示例**：
+
+```tsx
+// 页面标题
+<h1 className="text-page-title mb-6 xl:mb-8">作品</h1>
+
+// 分区标题
+<h2 className="text-section-title uppercase text-muted-foreground mb-4 xl:mb-5">
+  快捷操作
+</h2>
+```
+
+**注意**：
+- 导航链接 `.nav-link` 已内置响应式，无需额外处理
+- 快捷操作图标使用 `w-6 h-6 xl:w-7 xl:h-7` 响应式尺寸
+- 如需调整全局排版尺寸，只需修改 `index.css` 中的 CSS 变量
+
 ---
 
 ## 动效

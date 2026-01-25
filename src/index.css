@@ -229,7 +229,7 @@ h1, h2, h3, .font-display {
   font-family: var(--font-display);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
 }
 
 .nav-link::after {
@@ -296,7 +296,30 @@ h1, h2, h3, .font-display {
   --color-status-inactive: var(--status-inactive);
   --color-status-production: var(--status-production);
   --color-accent-blue: var(--accent-blue);
+
+  /* ===== 自定义排版尺寸 ===== */
+  /* 页面标题：text-page-title */
+  --text-page-title: 1.75rem;
+  --text-page-title--line-height: 1.2;
+  --text-page-title--font-weight: 700;
+
+  /* 分区标题：text-section-title */
+  --text-section-title: 1.125rem;
+  --text-section-title--line-height: 1.4;
+  --text-section-title--letter-spacing: 0.05em;
 }
+
+/* ===== 桌面端排版增强 (xl: 1280px+) ===== */
+@media (min-width: 1280px) {
+  :root {
+    --text-page-title: 2.5rem;
+    --text-section-title: 1.625rem;
+  }
+  .nav-link {
+    font-size: 1.3125rem;
+  }
+}
+
 /* ---break---*/
 @layer base {
   * {

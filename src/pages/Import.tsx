@@ -7,7 +7,7 @@ export default function Import() {
     <div className="p-6">
       {/* 页面标题 */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">导入作品</h1>
+        <h1 className="text-page-title">导入作品</h1>
         <Link
           to="/artworks"
           className="text-sm text-muted-foreground hover:text-foreground transition-colors"

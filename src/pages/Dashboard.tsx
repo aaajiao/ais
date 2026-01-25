@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { StatusIndicator, getStatusLabel } from '@/components/ui/StatusIndicator';
-import { Search, Package, FileDown, MessageSquare, Settings } from 'lucide-react';
+import { Search, Package, FileDown, MessageSquare, MapPin } from 'lucide-react';
 import type { Database, EditionStatus } from '@/lib/database.types';
 
 type Artwork = Database['public']['Tables']['artworks']['Row'];
@@ -130,7 +130,7 @@ export default function Dashboard() {
   if (error) {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
-        <h1 className="text-xl sm:text-2xl mb-6">首页</h1>
+        <h1 className="text-page-title mb-6 xl:mb-8">首页</h1>
         <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-destructive">
           {error}
         </div>
@@ -141,7 +141,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
-        <h1 className="text-xl sm:text-2xl mb-6">首页</h1>
+        <h1 className="text-page-title mb-6 xl:mb-8">首页</h1>
         {/* 骨架屏 - 不对称网格 */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8">
           <div className="col-span-2 md:row-span-2 bg-card border border-border rounded-xl p-6">
@@ -167,7 +167,7 @@ export default function Dashboard() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <h1 className="text-xl sm:text-2xl mb-6">首页</h1>
+      <h1 className="text-page-title mb-6 xl:mb-8">首页</h1>
 
       {/* 统计卡片 - 不对称网格 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8">
@@ -228,50 +228,50 @@ export default function Dashboard() {
       </div>
 
       {/* 快捷操作 */}
-      <div className="mb-8">
-        <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-4">快捷操作</h2>
+      <div className="mb-8 xl:mb-10">
+        <h2 className="text-section-title uppercase text-muted-foreground mb-4 xl:mb-5">快捷操作</h2>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
           <Link
             to="/artworks"
             className="bg-card border border-border rounded-xl p-4 flex flex-col items-center justify-center gap-2 card-interactive"
           >
-            <Search className="w-6 h-6" />
+            <Search className="w-6 h-6 xl:w-7 xl:h-7" />
             <span className="text-xs uppercase tracking-wider">搜索</span>
           </Link>
           <Link
             to="/editions"
             className="bg-card border border-border rounded-xl p-4 flex flex-col items-center justify-center gap-2 card-interactive"
           >
-            <Package className="w-6 h-6" />
+            <Package className="w-6 h-6 xl:w-7 xl:h-7" />
             <span className="text-xs uppercase tracking-wider">版本</span>
           </Link>
           <Link
             to="/import"
             className="bg-card border border-border rounded-xl p-4 flex flex-col items-center justify-center gap-2 card-interactive"
           >
-            <FileDown className="w-6 h-6" />
+            <FileDown className="w-6 h-6 xl:w-7 xl:h-7" />
             <span className="text-xs uppercase tracking-wider">导入</span>
           </Link>
           <Link
             to="/chat"
             className="bg-card border border-border rounded-xl p-4 flex flex-col items-center justify-center gap-2 card-interactive"
           >
-            <MessageSquare className="w-6 h-6" />
+            <MessageSquare className="w-6 h-6 xl:w-7 xl:h-7" />
             <span className="text-xs uppercase tracking-wider">对话</span>
           </Link>
           <Link
-            to="/settings"
+            to="/locations"
             className="bg-card border border-border rounded-xl p-4 flex flex-col items-center justify-center gap-2 card-interactive"
           >
-            <Settings className="w-6 h-6" />
-            <span className="text-xs uppercase tracking-wider">设置</span>
+            <MapPin className="w-6 h-6 xl:w-7 xl:h-7" />
+            <span className="text-xs uppercase tracking-wider">位置</span>
           </Link>
         </div>
       </div>
 
       {/* 最近更新 */}
       <div>
-        <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-4">最近更新</h2>
+        <h2 className="text-section-title uppercase text-muted-foreground mb-4 xl:mb-5">最近更新</h2>
         {recentUpdates.length === 0 ? (
           <div className="bg-card border border-border rounded-xl p-8 text-center text-muted-foreground">
             暂无更新记录
