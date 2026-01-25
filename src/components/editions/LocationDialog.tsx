@@ -3,6 +3,7 @@
  */
 
 import { useState, useCallback, useEffect, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useLocations, type CreateLocationData, type Location } from '@/hooks/useLocations';
 import type { LocationType } from '@/lib/database.types';
 import { toast } from 'sonner';
@@ -26,13 +27,8 @@ const LOCATION_TYPE_ICONS: Record<LocationType, ReactNode> = {
   other: <MapPin className="w-4 h-4" />,
 };
 
-// 位置类型选项
-const LOCATION_TYPES: { value: LocationType; label: string }[] = [
-  { value: 'studio', label: '工作室' },
-  { value: 'gallery', label: '画廊' },
-  { value: 'museum', label: '美术馆' },
-  { value: 'other', label: '其他' },
-];
+// 位置类型值
+const LOCATION_TYPE_VALUES: LocationType[] = ['studio', 'gallery', 'museum', 'other'];
 
 export default function LocationDialog({
   isOpen,
@@ -57,6 +53,7 @@ export default function LocationDialog({
   const [error, setError] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
+  const { t } = useTranslation('common');
   const { createLocation, updateLocation } = useLocations();
 
   const isEditMode = mode === 'edit' && editingLocation;
@@ -124,7 +121,7 @@ export default function LocationDialog({
     e.preventDefault();
 
     if (!formData.name.trim()) {
-      setError('请输入位置名称');
+      setError(t('location.nameRequired'));
       return;
     }
 
@@ -147,17 +144,17 @@ export default function LocationDialog({
       if (isEditMode && editingLocation) {
         // 编辑模式
         savedLocation = await updateLocation(editingLocation.id, locationData);
-        toast.success(`位置 "${savedLocation.name}" 已更新`);
+        toast.success(t('location.updated', { name: savedLocation.name }));
       } else {
         // 创建模式
         savedLocation = await createLocation(locationData);
-        toast.success(`位置 "${savedLocation.name}" 创建成功`);
+        toast.success(t('location.created', { name: savedLocation.name }));
       }
 
       onSaved?.(savedLocation);
       onClose();
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '操作失败';
+      const errorMessage = err instanceof Error ? err.message : t('location.operationFailed');
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -190,7 +187,7 @@ export default function LocationDialog({
       >
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">
-            {isEditMode ? '编辑位置' : '添加新位置'}
+            {isEditMode ? t('location.editTitle') : t('location.createTitle')}
           </h3>
           <button
             onClick={onClose}
@@ -204,13 +201,13 @@ export default function LocationDialog({
           {/* 名称 */}
           <div>
             <label className="block text-sm font-medium mb-1">
-              位置名称 <span className="text-red-500">*</span>
+              {t('location.nameLabel')} <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={formData.name}
               onChange={e => setFormData({ ...formData, name: e.target.value })}
-              placeholder="例如: Tabula Rasa Gallery"
+              placeholder={t('location.namePlaceholder')}
               className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
               autoFocus
             />
@@ -218,24 +215,24 @@ export default function LocationDialog({
 
           {/* 类型 */}
           <div>
-            <label className="block text-sm font-medium mb-2">类型</label>
+            <label className="block text-sm font-medium mb-2">{t('location.type')}</label>
             <div className="grid grid-cols-2 gap-2">
-              {LOCATION_TYPES.map(type => (
+              {LOCATION_TYPE_VALUES.map(type => (
                 <button
-                  key={type.value}
+                  key={type}
                   type="button"
-                  onClick={() => setFormData({ ...formData, type: type.value })}
+                  onClick={() => setFormData({ ...formData, type })}
                   className={`
                     px-3 py-2 text-sm rounded-lg border flex items-center gap-2
                     transition-colors
-                    ${formData.type === type.value
+                    ${formData.type === type
                       ? 'bg-primary text-primary-foreground border-primary'
                       : 'bg-background border-border hover:border-primary/50'
                     }
                   `}
                 >
-                  <span>{LOCATION_TYPE_ICONS[type.value]}</span>
-                  <span>{type.label}</span>
+                  <span>{LOCATION_TYPE_ICONS[type]}</span>
+                  <span>{t(`location.types.${type}`)}</span>
                 </button>
               ))}
             </div>
@@ -244,7 +241,7 @@ export default function LocationDialog({
           {/* 别名 */}
           <div>
             <label className="block text-sm font-medium mb-1">
-              别名（可选）
+              {t('location.aliasLabel')}
             </label>
             <div className="flex gap-2">
               <input
@@ -257,7 +254,7 @@ export default function LocationDialog({
                     handleAddAlias();
                   }
                 }}
-                placeholder="输入别名后按回车添加"
+                placeholder={t('location.aliasPlaceholder')}
                 className="flex-1 px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
               />
               <button
@@ -265,7 +262,7 @@ export default function LocationDialog({
                 onClick={handleAddAlias}
                 className="px-3 py-2 bg-muted text-foreground rounded-lg hover:bg-muted/80"
               >
-                添加
+                {t('add')}
               </button>
             </div>
             {formData.aliases && formData.aliases.length > 0 && (
@@ -288,7 +285,7 @@ export default function LocationDialog({
               </div>
             )}
             <p className="text-xs text-muted-foreground mt-1">
-              别名用于搜索匹配，例如 "TR" 可匹配 "Tabula Rasa"
+              {t('location.aliasHint')}
             </p>
           </div>
 
@@ -300,7 +297,7 @@ export default function LocationDialog({
               className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1"
             >
               {showAdvanced ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-              <span>更多信息（可选）</span>
+              <span>{t('location.moreOptions')}</span>
             </button>
           </div>
 
@@ -309,22 +306,22 @@ export default function LocationDialog({
               {/* 城市 */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">城市</label>
+                  <label className="block text-sm font-medium mb-1">{t('location.city')}</label>
                   <input
                     type="text"
                     value={formData.city || ''}
                     onChange={e => setFormData({ ...formData, city: e.target.value })}
-                    placeholder="北京"
+                    placeholder="Beijing"
                     className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">国家</label>
+                  <label className="block text-sm font-medium mb-1">{t('location.country')}</label>
                   <input
                     type="text"
                     value={formData.country || ''}
                     onChange={e => setFormData({ ...formData, country: e.target.value })}
-                    placeholder="中国"
+                    placeholder="China"
                     className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
                 </div>
@@ -332,35 +329,35 @@ export default function LocationDialog({
 
               {/* 地址 */}
               <div>
-                <label className="block text-sm font-medium mb-1">详细地址</label>
+                <label className="block text-sm font-medium mb-1">{t('location.address')}</label>
                 <input
                   type="text"
                   value={formData.address || ''}
                   onChange={e => setFormData({ ...formData, address: e.target.value })}
-                  placeholder="街道地址..."
+                  placeholder={t('location.addressPlaceholder')}
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
                 />
               </div>
 
               {/* 联系方式 */}
               <div>
-                <label className="block text-sm font-medium mb-1">联系方式</label>
+                <label className="block text-sm font-medium mb-1">{t('location.contact')}</label>
                 <input
                   type="text"
                   value={formData.contact || ''}
                   onChange={e => setFormData({ ...formData, contact: e.target.value })}
-                  placeholder="联系人或电话..."
+                  placeholder={t('location.contactPlaceholder')}
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
                 />
               </div>
 
               {/* 备注 */}
               <div>
-                <label className="block text-sm font-medium mb-1">备注</label>
+                <label className="block text-sm font-medium mb-1">{t('location.notes')}</label>
                 <textarea
                   value={formData.notes || ''}
                   onChange={e => setFormData({ ...formData, notes: e.target.value })}
-                  placeholder="其他说明..."
+                  placeholder={t('location.notesPlaceholder')}
                   rows={2}
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
                 />
@@ -382,14 +379,14 @@ export default function LocationDialog({
               onClick={onClose}
               className="px-4 py-2 text-sm bg-muted text-foreground rounded-lg hover:bg-muted/80"
             >
-              取消
+              {t('cancel')}
             </button>
             <button
               type="submit"
               disabled={saving || !formData.name.trim()}
               className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
             >
-              {saving ? (isEditMode ? '保存中...' : '创建中...') : (isEditMode ? '保存' : '创建位置')}
+              {saving ? (isEditMode ? t('location.saving') : t('location.creating')) : (isEditMode ? t('save') : t('location.createButton'))}
             </button>
           </div>
         </form>

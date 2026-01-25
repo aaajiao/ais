@@ -4,6 +4,7 @@
  */
 
 import { useState, useCallback, useMemo, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { insertIntoTable, type EditionHistoryInsert } from '@/lib/supabase';
 import type { HistoryAction } from '@/lib/database.types';
 import {
@@ -47,38 +48,25 @@ interface HistoryTimelineProps {
   defaultLimit?: number; // 默认显示数量
 }
 
-// 操作类型配置
+// 操作类型配置（不包含 label，label 在组件中用 i18n 获取）
 const ACTION_CONFIG: Record<HistoryAction, {
   icon: ReactNode;
-  label: string;
   color: string;
   bgColor: string;
-  importance: 'high' | 'medium' | 'low'; // 重要性
+  importance: 'high' | 'medium' | 'low';
 }> = {
-  created: { icon: <PartyPopper className="w-4 h-4" />, label: '创建', color: 'text-status-available', bgColor: 'bg-status-available/20', importance: 'high' },
-  status_change: { icon: <RefreshCw className="w-4 h-4" />, label: '状态变更', color: 'text-status-transit', bgColor: 'bg-status-transit/20', importance: 'high' },
-  location_change: { icon: <MapPin className="w-4 h-4" />, label: '位置变更', color: 'text-status-production', bgColor: 'bg-status-production/20', importance: 'high' },
-  sold: { icon: <DollarSign className="w-4 h-4" />, label: '售出', color: 'text-status-sold', bgColor: 'bg-status-sold/20', importance: 'high' },
-  consigned: { icon: <Building2 className="w-4 h-4" />, label: '寄售', color: 'text-status-consigned', bgColor: 'bg-status-consigned/20', importance: 'high' },
-  returned: { icon: <Undo2 className="w-4 h-4" />, label: '返回', color: 'text-status-inactive', bgColor: 'bg-status-inactive/20', importance: 'medium' },
-  condition_update: { icon: <FileText className="w-4 h-4" />, label: '备注', color: 'text-status-consigned', bgColor: 'bg-status-consigned/20', importance: 'medium' },
-  file_added: { icon: <Paperclip className="w-4 h-4" />, label: '添加附件', color: 'text-accent-blue', bgColor: 'bg-accent-blue/20', importance: 'low' },
-  file_deleted: { icon: <Trash2 className="w-4 h-4" />, label: '删除附件', color: 'text-status-sold', bgColor: 'bg-status-sold/20', importance: 'low' },
-  number_assigned: { icon: <Tag className="w-4 h-4" />, label: '分配编号', color: 'text-status-production', bgColor: 'bg-status-production/20', importance: 'medium' },
+  created: { icon: <PartyPopper className="w-4 h-4" />, color: 'text-status-available', bgColor: 'bg-status-available/20', importance: 'high' },
+  status_change: { icon: <RefreshCw className="w-4 h-4" />, color: 'text-status-transit', bgColor: 'bg-status-transit/20', importance: 'high' },
+  location_change: { icon: <MapPin className="w-4 h-4" />, color: 'text-status-production', bgColor: 'bg-status-production/20', importance: 'high' },
+  sold: { icon: <DollarSign className="w-4 h-4" />, color: 'text-status-sold', bgColor: 'bg-status-sold/20', importance: 'high' },
+  consigned: { icon: <Building2 className="w-4 h-4" />, color: 'text-status-consigned', bgColor: 'bg-status-consigned/20', importance: 'high' },
+  returned: { icon: <Undo2 className="w-4 h-4" />, color: 'text-status-inactive', bgColor: 'bg-status-inactive/20', importance: 'medium' },
+  condition_update: { icon: <FileText className="w-4 h-4" />, color: 'text-status-consigned', bgColor: 'bg-status-consigned/20', importance: 'medium' },
+  file_added: { icon: <Paperclip className="w-4 h-4" />, color: 'text-accent-blue', bgColor: 'bg-accent-blue/20', importance: 'low' },
+  file_deleted: { icon: <Trash2 className="w-4 h-4" />, color: 'text-status-sold', bgColor: 'bg-status-sold/20', importance: 'low' },
+  number_assigned: { icon: <Tag className="w-4 h-4" />, color: 'text-status-production', bgColor: 'bg-status-production/20', importance: 'medium' },
 };
 
-// 状态标签
-const STATUS_LABELS: Record<string, string> = {
-  in_production: '制作中',
-  in_studio: '在库',
-  at_gallery: '寄售',
-  at_museum: '美术馆',
-  in_transit: '运输中',
-  sold: '已售',
-  gifted: '赠送',
-  lost: '遗失',
-  damaged: '损坏',
-};
 
 // 合并后的历史项
 interface MergedHistoryItem {
@@ -95,16 +83,25 @@ export default function HistoryTimeline({
   onHistoryAdded,
   defaultLimit = 10,
 }: HistoryTimelineProps) {
+  const { t, i18n } = useTranslation('history');
+  const { t: tStatus } = useTranslation('status');
+  const { t: tCommon } = useTranslation('common');
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [noteText, setNoteText] = useState('');
   const [saving, setSaving] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [expandedMerged, setExpandedMerged] = useState<Set<string>>(new Set());
 
+  // 获取操作类型的本地化标签
+  const getActionLabel = (action: HistoryAction): string => {
+    return t(`actions.${action}`);
+  };
+
   // 格式化日期时间
   const formatDateTime = (dateStr: string): string => {
     const date = new Date(dateStr);
-    return date.toLocaleString('zh-CN', {
+    const locale = i18n.language === 'zh' ? 'zh-CN' : 'en-US';
+    return date.toLocaleString(locale, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -120,12 +117,12 @@ export default function HistoryTimeline({
     const diffMs = now.getTime() - date.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    if (diffDays === 0) return '今天';
-    if (diffDays === 1) return '昨天';
-    if (diffDays < 7) return `${diffDays}天前`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)}周前`;
-    if (diffDays < 365) return `${Math.floor(diffDays / 30)}个月前`;
-    return `${Math.floor(diffDays / 365)}年前`;
+    if (diffDays === 0) return t('relativeTime.today');
+    if (diffDays === 1) return t('relativeTime.yesterday');
+    if (diffDays < 7) return t('relativeTime.daysAgo', { count: diffDays });
+    if (diffDays < 30) return t('relativeTime.weeksAgo', { count: Math.floor(diffDays / 7) });
+    if (diffDays < 365) return t('relativeTime.monthsAgo', { count: Math.floor(diffDays / 30) });
+    return t('relativeTime.yearsAgo', { count: Math.floor(diffDays / 365) });
   };
 
   // 获取日期字符串 (YYYY-MM-DD)
@@ -217,48 +214,48 @@ export default function HistoryTimeline({
   const getDescription = (item: EditionHistory): string => {
     switch (item.action) {
       case 'status_change': {
-        const fromStatus = item.from_status ? STATUS_LABELS[item.from_status] || item.from_status : '未知';
-        const toStatus = item.to_status ? STATUS_LABELS[item.to_status] || item.to_status : '未知';
-        return `状态从 "${fromStatus}" 变更为 "${toStatus}"`;
+        const fromStatus = item.from_status ? tStatus(item.from_status) : t('descriptions.unknown');
+        const toStatus = item.to_status ? tStatus(item.to_status) : t('descriptions.unknown');
+        return t('descriptions.statusChange', { from: fromStatus, to: toStatus });
       }
 
       case 'location_change': {
-        const fromLoc = item.from_location || '未知';
-        const toLoc = item.to_location || '未知';
-        return `位置从 "${fromLoc}" 变更为 "${toLoc}"`;
+        const fromLoc = item.from_location || t('descriptions.unknown');
+        const toLoc = item.to_location || t('descriptions.unknown');
+        return t('descriptions.locationChange', { from: fromLoc, to: toLoc });
       }
 
       case 'sold': {
-        let soldDesc = '已售出';
+        let soldDesc = t('descriptions.sold');
         if (item.price && item.currency) {
-          soldDesc += ` (${item.currency} ${item.price.toLocaleString()})`;
+          soldDesc = t('descriptions.soldWithPrice', { currency: item.currency, price: item.price.toLocaleString() });
         }
         if (item.related_party) {
-          soldDesc += ` - 买家: ${item.related_party}`;
+          soldDesc += t('descriptions.soldBuyer', { buyer: item.related_party });
         }
         return soldDesc;
       }
 
       case 'consigned':
-        return item.related_party ? `寄售至 ${item.related_party}` : '开始寄售';
+        return item.related_party ? t('descriptions.consignedTo', { party: item.related_party }) : t('descriptions.consignedStart');
 
       case 'returned':
-        return item.from_location ? `从 ${item.from_location} 返回` : '已返回';
+        return item.from_location ? t('descriptions.returnedFrom', { location: item.from_location }) : t('descriptions.returned');
 
       case 'file_added':
-        return item.notes || '添加了新附件';
+        return item.notes || t('descriptions.fileAdded');
 
       case 'file_deleted':
-        return item.notes || '删除了附件';
+        return item.notes || t('descriptions.fileDeleted');
 
       case 'number_assigned':
-        return item.notes || '分配了库存编号';
+        return item.notes || t('descriptions.numberAssigned');
 
       case 'created':
-        return '版本创建';
+        return t('descriptions.created');
 
       case 'condition_update':
-        return item.notes || '品相状态更新';
+        return item.notes || t('descriptions.conditionUpdate');
 
       default:
         return item.notes || item.action;
@@ -285,8 +282,8 @@ export default function HistoryTimeline({
       setShowNoteInput(false);
       onHistoryAdded?.(data as EditionHistory);
     } catch (err) {
-      console.error('添加备注失败:', err);
-      alert('添加备注失败');
+      console.error('Failed to add note:', err);
+      alert(t('addNoteFailed'));
     } finally {
       setSaving(false);
     }
@@ -335,7 +332,7 @@ export default function HistoryTimeline({
           {/* 标题行 */}
           <div className="flex items-center justify-between mb-1">
             <span className={`text-sm font-medium ${config.color}`}>
-              {config.label}
+              {getActionLabel(item.action)}
             </span>
             <span className="text-xs text-muted-foreground" title={formatDateTime(item.created_at)}>
               {formatRelativeTime(item.created_at)}
@@ -350,14 +347,14 @@ export default function HistoryTimeline({
           {/* 备注（如果有且不是主要内容） */}
           {item.notes && item.action !== 'file_added' && item.action !== 'condition_update' && (
             <p className="text-xs text-muted-foreground mt-1 italic">
-              备注: {item.notes}
+              {t('details.notes')}: {item.notes}
             </p>
           )}
 
           {/* 操作者 */}
           {item.created_by && (
             <p className="text-xs text-muted-foreground mt-1">
-              操作者: {item.created_by}
+              {t('details.operator')}: {item.created_by}
             </p>
           )}
         </div>
@@ -399,10 +396,10 @@ export default function HistoryTimeline({
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
               <span className={`text-sm font-medium ${config.color}`}>
-                {config.label}
+                {getActionLabel(merged.action)}
               </span>
               <span className="text-xs bg-muted px-1.5 py-0.5 rounded">
-                ×{merged.items.length}
+                {t('times', { count: merged.items.length })}
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -419,12 +416,12 @@ export default function HistoryTimeline({
           {!isExpanded && (
             <p className="text-sm text-muted-foreground">
               {merged.action === 'file_added'
-                ? `添加了 ${merged.items.length} 个附件`
+                ? t('merged.filesAdded', { count: merged.items.length })
                 : merged.action === 'file_deleted'
-                ? `删除了 ${merged.items.length} 个附件`
+                ? t('merged.filesDeleted', { count: merged.items.length })
                 : merged.action === 'condition_update'
-                ? `${merged.items.length} 条备注`
-                : `${merged.items.length} 条记录`
+                ? t('merged.notes', { count: merged.items.length })
+                : t('merged.records', { count: merged.items.length })
               }
             </p>
           )}
@@ -435,7 +432,7 @@ export default function HistoryTimeline({
               {merged.items.map(item => (
                 <div key={item.id} className="text-sm">
                   <span className="text-muted-foreground text-xs">
-                    {new Date(item.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                    {new Date(item.created_at).toLocaleTimeString(i18n.language === 'zh' ? 'zh-CN' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
                   </span>
                   <span className="ml-2">{getDescription(item)}</span>
                 </div>
@@ -451,7 +448,7 @@ export default function HistoryTimeline({
     return (
       <div className="text-center py-8 text-muted-foreground">
         <ScrollText className="w-10 h-10 mx-auto mb-2 opacity-50" />
-        <div className="text-sm">暂无历史记录</div>
+        <div className="text-sm">{t('noHistory')}</div>
       </div>
     );
   }
@@ -461,9 +458,9 @@ export default function HistoryTimeline({
       {/* 标题和添加按钮 */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold">
-          历史记录
+          {t('title')}
           <span className="text-sm font-normal text-muted-foreground ml-2">
-            ({history.length})
+            {t('count', { count: history.length })}
           </span>
         </h3>
         {showAddNoteButton && !showNoteInput && (
@@ -471,7 +468,7 @@ export default function HistoryTimeline({
             onClick={() => setShowNoteInput(true)}
             className="text-sm text-primary hover:underline"
           >
-            + 添加备注
+            {t('addNote')}
           </button>
         )}
       </div>
@@ -482,7 +479,7 @@ export default function HistoryTimeline({
           <textarea
             value={noteText}
             onChange={e => setNoteText(e.target.value)}
-            placeholder="输入备注内容..."
+            placeholder={t('notePlaceholder')}
             className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
             rows={3}
             autoFocus
@@ -495,14 +492,14 @@ export default function HistoryTimeline({
               }}
               className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground"
             >
-              取消
+              {tCommon('cancel')}
             </button>
             <button
               onClick={handleAddNote}
               disabled={saving || !noteText.trim()}
               className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
             >
-              {saving ? '保存中...' : '保存'}
+              {saving ? t('saving') : t('save')}
             </button>
           </div>
         </div>
@@ -533,7 +530,7 @@ export default function HistoryTimeline({
               onClick={() => setShowAll(true)}
               className="text-sm text-primary hover:underline"
             >
-              查看更多 ({mergedHistory.length - defaultLimit} 条)
+              {t('showMore', { count: mergedHistory.length - defaultLimit })}
             </button>
           </div>
         )}
@@ -545,7 +542,7 @@ export default function HistoryTimeline({
               onClick={() => setShowAll(false)}
               className="text-sm text-muted-foreground hover:text-foreground"
             >
-              收起
+              {t('collapse')}
             </button>
           </div>
         )}
@@ -553,7 +550,7 @@ export default function HistoryTimeline({
         {/* 空状态 */}
         {history.length === 0 && (
           <div className="text-center py-8 text-muted-foreground pl-10">
-            <div className="text-sm">暂无历史记录</div>
+            <div className="text-sm">{t('noHistory')}</div>
           </div>
         )}
       </div>

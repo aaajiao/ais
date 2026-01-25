@@ -4,6 +4,7 @@
  */
 
 import { useState, useCallback, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Location } from '@/hooks/useLocations';
 import type { LocationType } from '@/lib/database.types';
 import { Home, Image, Building2, MapPin, Pencil, Trash2 } from 'lucide-react';
@@ -29,6 +30,7 @@ export default function LocationItem({
   onEdit,
   onDelete,
 }: LocationItemProps) {
+  const { t } = useTranslation('common');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -40,7 +42,7 @@ export default function LocationItem({
       await onDelete(location);
       setShowDeleteConfirm(false);
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : '删除失败');
+      setDeleteError(err instanceof Error ? err.message : t('location.deleteFailed'));
     } finally {
       setDeleting(false);
     }
@@ -60,14 +62,14 @@ export default function LocationItem({
               {location.aliases && location.aliases.length > 0 && (
                 <>
                   <span>·</span>
-                  <span className="text-xs">别名: {location.aliases.join(', ')}</span>
+                  <span className="text-xs">{t('location.alias')}: {location.aliases.join(', ')}</span>
                 </>
               )}
             </div>
           </div>
           {usageCount !== undefined && usageCount > 0 && (
             <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full flex-shrink-0">
-              {usageCount} 个版本
+              {t('location.editionsCount', { count: usageCount })}
             </span>
           )}
         </div>
@@ -77,14 +79,14 @@ export default function LocationItem({
           <button
             onClick={() => onEdit(location)}
             className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
-            title="编辑位置"
+            title={t('location.editLocation')}
           >
             <Pencil className="w-4 h-4" />
           </button>
           <button
             onClick={() => setShowDeleteConfirm(true)}
             className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
-            title="删除位置"
+            title={t('location.deleteLocation')}
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -98,9 +100,9 @@ export default function LocationItem({
             className="bg-card border border-border rounded-xl p-6 w-full max-w-sm"
             onClick={e => e.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold mb-2">确认删除</h3>
+            <h3 className="text-lg font-semibold mb-2">{t('location.confirmDelete')}</h3>
             <p className="text-muted-foreground mb-4">
-              确定要删除位置 "{location.name}" 吗？此操作无法撤销。
+              {t('location.confirmDeleteMessage', { name: location.name })}
             </p>
 
             {deleteError && (
@@ -118,14 +120,14 @@ export default function LocationItem({
                 disabled={deleting}
                 className="px-4 py-2 text-sm bg-muted text-foreground rounded-lg hover:bg-muted/80 disabled:opacity-50"
               >
-                取消
+                {t('cancel')}
               </button>
               <button
                 onClick={handleDelete}
                 disabled={deleting}
                 className="px-4 py-2 text-sm bg-destructive text-destructive-foreground rounded-lg hover:bg-destructive/90 disabled:opacity-50"
               >
-                {deleting ? '删除中...' : '删除'}
+                {deleting ? t('location.deleting') : t('delete')}
               </button>
             </div>
           </div>

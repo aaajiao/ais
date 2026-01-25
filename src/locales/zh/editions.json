@@ -1,0 +1,31 @@
+{
+  "title": "版本",
+  "searchPlaceholder": "搜索版本（作品名、编号、位置）...",
+  "noEditions": "暂无版本数据",
+  "noMatch": "没有找到匹配的版本",
+  "filters": {
+    "all": "全部",
+    "inStudio": "在库",
+    "atGallery": "寄售",
+    "atMuseum": "美术馆",
+    "inTransit": "运输中",
+    "sold": "已售"
+  },
+  "editionNumber": "版本号",
+  "status": "状态",
+  "location": "位置",
+  "price": "价格",
+  "buyer": "买家",
+  "soldAt": "售出日期",
+  "notes": "备注",
+  "unique": "独版",
+  "unknownArtwork": "未知作品",
+  "selector": {
+    "noEditions": "此作品暂无版本数据",
+    "allEditions": "全部版本 ({{count}})",
+    "selectSpecific": "选择特定版本",
+    "selectAll": "全选",
+    "deselectAll": "取消全选",
+    "selected": "已选 {{count}} 个"
+  }
+}

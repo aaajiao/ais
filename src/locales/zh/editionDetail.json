@@ -1,0 +1,61 @@
+{
+  "backToList": "← 返回版本列表",
+  "deleteEdition": "删除版本",
+  "notFound": "版本不存在",
+  "unique": "独版",
+  "editDialog": {
+    "title": "编辑版本",
+    "editionType": "版本类型",
+    "numbered": "编号版",
+    "ap": "AP 版",
+    "unique": "独版",
+    "apNumber": "AP 编号",
+    "editionNumber": "版本编号",
+    "numberPlaceholder": "如：1",
+    "status": "状态",
+    "location": "位置",
+    "inventoryNumber": "库存编号",
+    "priceSection": {
+      "sold": "销售信息",
+      "default": "定价"
+    },
+    "price": {
+      "sold": "成交价",
+      "default": "定价"
+    },
+    "amount": "金额",
+    "currency": "币种",
+    "saleDate": "售出日期",
+    "buyer": "买家",
+    "buyerPlaceholder": "买家姓名/机构",
+    "notes": "备注",
+    "notesPlaceholder": "可选备注信息"
+  },
+  "deleteDialog": {
+    "title": "确认删除",
+    "message": "确定要删除「{{title}}」的版本 {{edition}} 吗？",
+    "historyWarning": "将同时删除 {{count}} 条历史记录",
+    "warning": "此操作不可撤销！",
+    "deleting": "删除中..."
+  },
+  "info": {
+    "location": "位置：",
+    "soldPrice": "成交价：",
+    "listPrice": "定价：",
+    "saleDate": "售出日期：",
+    "buyer": "买家：",
+    "notes": "备注："
+  },
+  "attachments": {
+    "title": "附件",
+    "addLink": "+ 添加链接"
+  },
+  "actions": {
+    "chat": "对话操作",
+    "edit": "编辑"
+  },
+  "close": "关闭",
+  "saving": "保存中...",
+  "saveFailed": "保存失败",
+  "deleteFailed": "删除版本失败"
+}

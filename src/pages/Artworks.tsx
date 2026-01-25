@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '@/lib/supabase';
 import ExportDialog from '@/components/export/ExportDialog';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
@@ -21,6 +22,7 @@ import {
 type FilterStatus = 'all' | 'in_studio' | 'at_gallery' | 'sold';
 
 export default function Artworks() {
+  const { t, i18n } = useTranslation('artworks');
   const [filter, setFilter] = useState<FilterStatus>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -55,8 +57,12 @@ export default function Artworks() {
 
   const groupLabelFn = useCallback((key: string) => {
     const [year, month] = key.split('-');
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    if (i18n.language === 'en') {
+      return `${monthNames[parseInt(month) - 1]} ${year}`;
+    }
     return `${year}年${parseInt(month)}月`;
-  }, []);
+  }, [i18n.language]);
 
   // Use infinite virtual list with grouping
   const {
@@ -146,7 +152,7 @@ export default function Artworks() {
   if (isLoading && items.length === 0) {
     return (
       <div className="p-6">
-        <h1 className="text-page-title mb-6 xl:mb-8">作品</h1>
+        <h1 className="text-page-title mb-6 xl:mb-8">{t('title')}</h1>
         {/* 骨架屏 */}
         <div className="flex gap-2 mb-6">
           {[1, 2, 3, 4].map((i) => (
@@ -178,7 +184,7 @@ export default function Artworks() {
   if (error) {
     return (
       <div className="p-6">
-        <h1 className="text-page-title mb-6 xl:mb-8">作品</h1>
+        <h1 className="text-page-title mb-6 xl:mb-8">{t('title')}</h1>
         <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-destructive">
           {error.message}
         </div>
@@ -200,17 +206,17 @@ export default function Artworks() {
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-card border border-border rounded-xl p-6 max-w-md mx-4">
-            <h3 className="text-lg font-semibold mb-2">确认批量删除</h3>
+            <h3 className="text-lg font-semibold mb-2">{t('deleteDialog.title')}</h3>
             <p className="text-muted-foreground mb-2">
-              确定要删除选中的 {selectedIds.size} 个作品吗？
+              {t('deleteDialog.message', { count: selectedIds.size })}
             </p>
             {selectedEditionsCount > 0 && (
               <p className="text-muted-foreground text-sm mb-4">
-                关联的 {selectedEditionsCount} 个版本也将被隐藏。
+                {t('deleteDialog.editionsWarning', { count: selectedEditionsCount })}
               </p>
             )}
             <p className="text-sm text-muted-foreground mb-4">
-              作品将被移至回收站，可在回收站中恢复。
+              {t('deleteDialog.trashNote')}
             </p>
             <div className="flex gap-3">
               <button
@@ -218,14 +224,14 @@ export default function Artworks() {
                 disabled={deleting}
                 className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
               >
-                取消
+                {t('deleteDialog.cancel')}
               </button>
               <button
                 onClick={handleBatchDelete}
                 disabled={deleting}
                 className="flex-1 px-4 py-2 bg-destructive text-destructive-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
               >
-                {deleting ? '删除中...' : '确认删除'}
+                {deleting ? t('deleteDialog.deleting') : t('deleteDialog.confirm')}
               </button>
             </div>
           </div>
@@ -234,7 +240,7 @@ export default function Artworks() {
 
       {/* 标题和批量操作按钮 */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-page-title">作品</h1>
+        <h1 className="text-page-title">{t('title')}</h1>
         <div className="flex gap-2">
           {selectMode ? (
             <>
@@ -242,7 +248,7 @@ export default function Artworks() {
                 onClick={handleSelectAll}
                 className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
               >
-                {selectedIds.size === items.length ? '全不选' : '全选'}
+                {selectedIds.size === items.length ? t('bulkActions.deselectAll') : t('bulkActions.selectAll')}
               </button>
               {selectedIds.size > 0 && (
                 <>
@@ -250,13 +256,13 @@ export default function Artworks() {
                     onClick={() => setShowExportDialog(true)}
                     className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
                   >
-                    导出 ({selectedIds.size})
+                    {t('bulkActions.export')} ({selectedIds.size})
                   </button>
                   <button
                     onClick={() => setShowDeleteConfirm(true)}
                     className="px-3 py-1.5 text-sm text-destructive border border-destructive/30 rounded-lg hover:bg-destructive/10 transition-colors"
                   >
-                    删除 ({selectedIds.size})
+                    {t('bulkActions.delete')} ({selectedIds.size})
                   </button>
                 </>
               )}
@@ -264,7 +270,7 @@ export default function Artworks() {
                 onClick={toggleSelectMode}
                 className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
               >
-                取消
+                {t('bulkActions.cancel')}
               </button>
             </>
           ) : (
@@ -272,7 +278,7 @@ export default function Artworks() {
               onClick={toggleSelectMode}
               className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
             >
-              批量管理
+              {t('bulkActions.manage')}
             </button>
           )}
         </div>
@@ -288,7 +294,7 @@ export default function Artworks() {
               : 'bg-muted text-muted-foreground hover:bg-accent'
           }`}
         >
-          全部 ({totalCount ?? '...'})
+          {t('filters.all')} ({totalCount ?? '...'})
         </button>
         <button
           onClick={() => setFilter('in_studio')}
@@ -299,7 +305,7 @@ export default function Artworks() {
           }`}
         >
           <StatusIndicator status="in_studio" size="sm" />
-          在库
+          {t('filters.inStudio')}
         </button>
         <button
           onClick={() => setFilter('at_gallery')}
@@ -310,7 +316,7 @@ export default function Artworks() {
           }`}
         >
           <StatusIndicator status="at_gallery" size="sm" />
-          寄售
+          {t('filters.atGallery')}
         </button>
         <button
           onClick={() => setFilter('sold')}
@@ -321,7 +327,7 @@ export default function Artworks() {
           }`}
         >
           <StatusIndicator status="sold" size="sm" />
-          已售
+          {t('filters.sold')}
         </button>
       </div>
 
@@ -329,7 +335,7 @@ export default function Artworks() {
       <div className="mb-6">
         <input
           type="text"
-          placeholder="搜索作品..."
+          placeholder={t('searchPlaceholder')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full px-4 py-3 bg-card border border-border rounded-xl focus:ring-2 focus:ring-ring focus:border-transparent outline-none"
@@ -345,8 +351,8 @@ export default function Artworks() {
         {flattenedItems.length === 0 && !isLoading ? (
           <div className="bg-card border border-border rounded-xl p-8 text-center text-muted-foreground">
             {searchQuery || filter !== 'all'
-              ? '没有找到匹配的作品'
-              : '暂无作品数据'}
+              ? t('noMatch')
+              : t('noArtworks')}
           </div>
         ) : (
           <div
@@ -472,7 +478,7 @@ export default function Artworks() {
                     <div className="flex gap-3 mt-2 text-xs text-muted-foreground">
                       {artwork.stats.total > 0 && (
                         <>
-                          <span>共 {artwork.stats.total} 版</span>
+                          <span>{t('totalEditions', { count: artwork.stats.total })}</span>
                           {artwork.stats.inStudio > 0 && (
                             <span className="flex items-center gap-1">
                               <StatusIndicator status="in_studio" size="sm" />
@@ -493,7 +499,7 @@ export default function Artworks() {
                           )}
                         </>
                       )}
-                      {artwork.stats.total === 0 && <span>暂无版本</span>}
+                      {artwork.stats.total === 0 && <span>{t('noEditionsYet')}</span>}
                     </div>
                   </div>
                 </div>

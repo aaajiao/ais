@@ -1,0 +1,14 @@
+{
+  "title": "首页",
+  "quickActions": "快捷操作",
+  "recentUpdates": "最近更新",
+  "noUpdates": "暂无更新记录",
+  "viewAll": "查看全部",
+  "stats": {
+    "totalArtworks": "作品总数",
+    "totalEditions": "版本总数",
+    "inStudio": "在库",
+    "consigned": "寄售中",
+    "sold": "已售"
+  }
+}

@@ -1,0 +1,114 @@
+{
+  "title": "Import Artworks",
+  "viewArtworkList": "View Artwork List",
+  "fromMarkdown": "Import from Markdown",
+  "fromMarkdownDesc": "Import artwork information from Markdown files exported from eventstructure.com. The system will automatically match existing artworks by link or title and show changes.",
+  "thumbnailLocalization": "Thumbnail Localization",
+  "thumbnailLocalizationDesc": "Migrate external image links to local storage for faster loading and better stability. Images will be automatically compressed before uploading to Supabase Storage.",
+  "dropzone": {
+    "title": "Drop Markdown files here",
+    "or": "or",
+    "browse": "Browse files"
+  },
+  "preview": {
+    "title": "Import Preview",
+    "artworksFound": "{{count}} artworks found",
+    "newArtwork": "New",
+    "updateArtwork": "Update",
+    "willCreate": "Will create",
+    "willUpdate": "Will update"
+  },
+  "actions": {
+    "import": "Import",
+    "importing": "Importing...",
+    "cancel": "Cancel",
+    "clear": "Clear"
+  },
+  "result": {
+    "success": "Successfully imported {{count}} artworks",
+    "failed": "Import failed: {{error}}"
+  },
+  "mdImport": {
+    "steps": {
+      "upload": "Upload File",
+      "preview": "Preview Changes",
+      "complete": "Complete"
+    },
+    "upload": {
+      "click": "Click to upload Markdown file",
+      "parsing": "Parsing...",
+      "supportedFormats": "Supports .md / .markdown / .txt formats"
+    },
+    "errors": {
+      "noArtworks": "No artworks found in file. Please ensure the MD file format is correct (use ## for artwork titles)",
+      "previewFailed": "Preview request failed",
+      "parseFailed": "Parse failed",
+      "importFailed": "Import request failed",
+      "selectAtLeastOne": "Please select at least one artwork to import"
+    },
+    "selection": {
+      "selected": "{{selected}} / {{total}} artworks selected",
+      "existingCount": "({{count}} already exist)",
+      "selectAll": "Select all",
+      "deselectAll": "Deselect all"
+    },
+    "new": {
+      "title": "New Artworks",
+      "count": "New Artworks ({{count}})"
+    },
+    "updates": {
+      "title": "Need Update",
+      "count": "Need Update ({{count}})"
+    },
+    "unchanged": {
+      "title": "No Changes",
+      "count": "No Changes ({{count}})"
+    },
+    "fields": {
+      "year": "Year",
+      "type": "Type",
+      "dimensions": "Dimensions",
+      "materials": "Materials",
+      "duration": "Duration",
+      "empty": "(empty)"
+    },
+    "thumbnail": {
+      "select": "Select thumbnail:"
+    },
+    "noChanges": "All artworks are up to date, no import needed",
+    "reupload": "Reupload",
+    "confirmImport": "Confirm Import ({{count}})",
+    "result": {
+      "complete": "Import Complete",
+      "created": "Created",
+      "updated": "Updated",
+      "failed": "Failed",
+      "imageProcessing": "Image Localization",
+      "imageSuccess": "Success: {{count}}",
+      "imageFailed": "Failed: {{count}} (original links preserved)",
+      "errorDetails": "Error Details:"
+    },
+    "continueImport": "Continue Import",
+    "parseWarning": "Parse Warning:"
+  },
+  "help": {
+    "title": "MD File Format Guide",
+    "supportedFormat": "Supported Markdown format example:",
+    "supportedFields": "Supported fields:",
+    "updateRules": "Incremental update rules:",
+    "fieldMapping": {
+      "year": "年份 → year",
+      "type": "类型 → type",
+      "dimensions": "尺寸 → dimensions",
+      "materials": "材料 → materials",
+      "duration": "时长 → duration",
+      "link": "链接 → source_url"
+    },
+    "rules": {
+      "matchByLinkOrTitle": "Match existing artworks by \"link\" or \"title\"",
+      "onlyUpdateWebFields": "Only update website fields, protect management fields",
+      "preserveEditions": "Edition data fully preserved",
+      "thumbnailOnlyEmpty": "Thumbnail only updated when empty"
+    }
+  }
+}

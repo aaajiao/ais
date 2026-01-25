@@ -1,0 +1,38 @@
+{
+  "title": "作品",
+  "searchPlaceholder": "搜索作品...",
+  "noArtworks": "暂无作品数据",
+  "noMatch": "没有找到匹配的作品",
+  "addArtwork": "添加作品",
+  "filters": {
+    "all": "全部",
+    "inStudio": "在库",
+    "atGallery": "寄售",
+    "sold": "已售",
+    "hasEditions": "有版本",
+    "noEditions": "无版本"
+  },
+  "bulkActions": {
+    "manage": "批量管理",
+    "selectAll": "全选",
+    "deselectAll": "全不选",
+    "export": "导出",
+    "delete": "删除",
+    "cancel": "取消"
+  },
+  "deleteDialog": {
+    "title": "确认批量删除",
+    "message": "确定要删除选中的 {{count}} 个作品吗？",
+    "editionsWarning": "关联的 {{count}} 个版本也将被隐藏。",
+    "trashNote": "作品将被移至回收站，可在回收站中恢复。",
+    "cancel": "取消",
+    "confirm": "确认删除",
+    "deleting": "删除中..."
+  },
+  "year": "年份",
+  "type": "类型",
+  "editions": "版本",
+  "totalEditions": "共 {{count}} 版",
+  "noEditionsYet": "暂无版本",
+  "groupLabel": "{{year}}年{{month}}月"
+}

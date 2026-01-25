@@ -4,6 +4,7 @@
  */
 
 import { useState, useCallback, useEffect, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useLocations, type Location } from '@/hooks/useLocations';
 import type { LocationType } from '@/lib/database.types';
 import LocationDialog from '@/components/editions/LocationDialog';
@@ -20,15 +21,8 @@ const LOCATION_TYPE_ICONS: Record<LocationType, ReactNode> = {
   other: <MapPin className="w-5 h-5" />,
 };
 
-// 位置类型信息
-const LOCATION_TYPE_INFO: Record<LocationType, { label: string }> = {
-  studio: { label: '工作室' },
-  gallery: { label: '画廊' },
-  museum: { label: '美术馆' },
-  other: { label: '其他' },
-};
-
 export default function Locations() {
+  const { t } = useTranslation('locations');
   const {
     locations,
     locationsByType,
@@ -89,8 +83,8 @@ export default function Locations() {
   // 删除位置
   const handleDelete = useCallback(async (location: Location) => {
     await deleteLocation(location.id);
-    toast.success(`位置 "${location.name}" 已删除`);
-  }, [deleteLocation]);
+    toast.success(t('deleteSuccess', { name: location.name }));
+  }, [deleteLocation, t]);
 
   // 对话框关闭
   const handleDialogClose = useCallback(() => {
@@ -145,9 +139,9 @@ export default function Locations() {
       {/* 页面标题 */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-page-title">位置管理</h1>
+          <h1 className="text-page-title">{t('title')}</h1>
           <p className="text-muted-foreground mt-1">
-            管理作品存放的位置，共 {totalLocations} 个位置
+            {t('subtitle', { count: totalLocations })}
           </p>
         </div>
         <button
@@ -155,7 +149,7 @@ export default function Locations() {
           className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 flex items-center gap-2"
         >
           <Plus className="w-5 h-5" />
-          添加位置
+          {t('addLocation')}
         </button>
       </div>
 
@@ -168,7 +162,7 @@ export default function Locations() {
           >
             <div className="flex items-center gap-2 mb-1">
               <span className="text-muted-foreground">{LOCATION_TYPE_ICONS[type]}</span>
-              <span className="text-sm text-muted-foreground">{LOCATION_TYPE_INFO[type].label}</span>
+              <span className="text-sm text-muted-foreground">{t(`types.${type}`)}</span>
             </div>
             <p className="text-2xl font-semibold">{typeCounts[type] || 0}</p>
           </div>
@@ -190,7 +184,7 @@ export default function Locations() {
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="搜索位置名称、别名、城市..."
+            placeholder={t('searchPlaceholder')}
             className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
           {searchQuery && (
@@ -215,15 +209,15 @@ export default function Locations() {
       {totalLocations === 0 ? (
         <div className="text-center py-12">
           <MapPin className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-          <h3 className="text-lg font-medium mb-2">还没有位置</h3>
+          <h3 className="text-lg font-medium mb-2">{t('noLocations')}</h3>
           <p className="text-muted-foreground mb-4">
-            添加工作室、画廊、美术馆等位置来管理作品存放
+            {t('noLocationsHint')}
           </p>
           <button
             onClick={handleCreate}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
           >
-            添加第一个位置
+            {t('addFirstLocation')}
           </button>
         </div>
       ) : (
@@ -236,7 +230,7 @@ export default function Locations() {
               <div key={type}>
                 <h2 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
                   <span className="text-muted-foreground">{LOCATION_TYPE_ICONS[type]}</span>
-                  <span>{LOCATION_TYPE_INFO[type].label}</span>
+                  <span>{t(`types.${type}`)}</span>
                   <span className="text-xs bg-muted px-2 py-0.5 rounded-full">
                     {filteredLocs.length}
                   </span>

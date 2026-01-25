@@ -1,0 +1,35 @@
+{
+  "title": "Settings",
+  "ai": {
+    "title": "AI Model",
+    "loadingModels": "Loading available models...",
+    "loadError": "Failed to load models",
+    "noModels": "No models available. Please check API key configuration.",
+    "retry": "Retry",
+    "selectClaude": "Select Claude model",
+    "selectGPT": "Select GPT model",
+    "modelHint": "Model list is dynamically loaded from API, showing all currently available models"
+  },
+  "export": {
+    "title": "Data Export",
+    "jsonBackup": "JSON Full Backup",
+    "jsonDescription": "Export all data (artworks, editions, locations, history)",
+    "artworksCsv": "Artworks CSV",
+    "artworksCsvDescription": "Export artwork info, can be opened in Excel",
+    "editionsCsv": "Editions CSV",
+    "editionsCsvDescription": "Export all editions with status info",
+    "exportJson": "Export JSON",
+    "exportCsv": "Export CSV",
+    "exporting": "Exporting...",
+    "noArtworks": "No artworks to export",
+    "noEditions": "No editions to export",
+    "exportError": "Export failed",
+    "exportHint": "Regular JSON backups are recommended to prevent data loss"
+  },
+  "account": {
+    "title": "Account",
+    "notLoggedIn": "Not logged in",
+    "signOut": "Sign Out",
+    "signingOut": "Signing out..."
+  }
+}

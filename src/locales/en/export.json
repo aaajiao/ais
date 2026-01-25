@@ -1,0 +1,45 @@
+{
+  "title": "Export {{count}} Artworks",
+  "selectFormat": "Select Format",
+  "pdf": {
+    "name": "PDF",
+    "description": "With images, printable"
+  },
+  "markdown": {
+    "name": "Markdown",
+    "description": "With image links, editable"
+  },
+  "selectEditions": "Select Editions",
+  "allEditions": "All Editions",
+  "selectedEditions": "Select Specific Editions",
+  "includeInfo": "Include Information",
+  "priceInfo": "Price Information",
+  "statusDetails": "Edition status details (In Studio/Consigned/Sold)",
+  "locationInfo": "Location Information",
+  "backupHint": "For full data backup, go to Settings page",
+  "exporting": "Exporting...",
+  "export": "Export",
+  "exportFailed": "Export failed",
+  "loginRequired": "Please login first",
+  "format": "Format",
+  "options": {
+    "title": "Include",
+    "includePrice": "Price",
+    "includeStatus": "Status",
+    "includeLocation": "Location"
+  },
+  "editions": {
+    "title": "Select Editions",
+    "all": "All editions",
+    "selected": "{{count}} selected"
+  },
+  "actions": {
+    "export": "Export",
+    "exporting": "Exporting...",
+    "cancel": "Cancel"
+  },
+  "result": {
+    "success": "Export successful",
+    "failed": "Export failed: {{error}}"
+  }
+}

@@ -30,6 +30,7 @@ bun run lint
 
 - **Frontend**: React 19 + TypeScript 5.9 + Vite 7 + TailwindCSS 4
 - **UI**: shadcn/ui (Radix UI primitives) + Lucide icons
+- **i18n**: react-i18next + i18next-browser-languagedetector (Chinese/English)
 - **Data Fetching**: TanStack React Query (caching, infinite queries) + TanStack Virtual (virtual scrolling)
 - **Backend**: Vercel Functions (serverless)
 - **Database**: Supabase (PostgreSQL + Storage + Auth)
@@ -49,6 +50,7 @@ bun run lint
 │   │   ├── editions/      # Edition management
 │   │   ├── chat/          # AI chat interface
 │   │   └── ui/            # shadcn/ui components
+│   ├── locales/           # i18n translations (zh/en)
 │   ├── pages/             # Route pages
 │   ├── contexts/          # AuthContext, ThemeContext
 │   ├── hooks/             # useAuth, useFileUpload, etc.
@@ -267,9 +269,63 @@ Matching rules when importing artworks (`api/import/md.ts`):
 
 This ensures artworks with same title but different URLs (e.g., different versions of `Guard, I…`) are correctly identified as separate works.
 
+## Internationalization (i18n)
+
+The app supports Chinese (default) and English via `react-i18next`.
+
+### Structure
+
+```
+src/locales/
+├── index.ts          # i18n configuration
+├── zh/               # Chinese translations
+│   ├── common.json   # Shared UI strings
+│   ├── nav.json      # Navigation
+│   ├── status.json   # Edition statuses
+│   ├── dashboard.json
+│   ├── artworks.json
+│   ├── artworkDetail.json
+│   ├── editions.json
+│   ├── editionDetail.json
+│   ├── locations.json
+│   ├── chat.json
+│   ├── settings.json
+│   ├── import.json
+│   ├── export.json
+│   ├── trash.json
+│   └── history.json
+└── en/               # English translations (same structure)
+```
+
+### Usage
+
+```tsx
+import { useTranslation } from 'react-i18next';
+
+function MyComponent() {
+  const { t } = useTranslation('namespace'); // e.g., 'common', 'artworks'
+  return <p>{t('key.nested')}</p>;
+}
+
+// With interpolation
+t('selected', { count: 5 }) // "已选择 5 项" / "5 selected"
+```
+
+### Adding Translations
+
+1. Add key to both `zh/*.json` and `en/*.json`
+2. Use `useTranslation('namespace')` in component
+3. Replace hardcoded text with `t('key')`
+
+### Language Switching
+
+- `LanguageSwitcher` component in Settings page
+- Language preference stored in `localStorage` (`i18nextLng`)
+- Auto-detects browser language on first visit
+
 ## Notes
 
-- UI supports both Chinese and English (bilingual titles)
+- UI supports full Chinese/English internationalization
 - Images are compressed before upload
 - File storage uses Supabase Storage buckets
 - Auth restricts access via email allowlist

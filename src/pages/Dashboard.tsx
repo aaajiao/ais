@@ -1,12 +1,15 @@
 import { Link } from 'react-router-dom';
-import {
-  StatusIndicator,
-  getStatusLabel,
-} from '@/components/ui/StatusIndicator';
+import { useTranslation } from 'react-i18next';
+import { StatusIndicator } from '@/components/ui/StatusIndicator';
 import { Search, Package, FileDown, MessageSquare, MapPin } from 'lucide-react';
 import { useDashboardStats, useRecentUpdates } from '@/hooks/queries/useDashboard';
 
 export default function Dashboard() {
+  const { t } = useTranslation('dashboard');
+  const { t: tStatus } = useTranslation('status');
+  const { t: tNav } = useTranslation('nav');
+  const { t: tCommon } = useTranslation('common');
+
   const {
     data: stats,
     isLoading: statsLoading,
@@ -29,18 +32,18 @@ export default function Dashboard() {
     const diffMs = now.getTime() - date.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    if (diffDays === 0) return '今天';
-    if (diffDays === 1) return '昨天';
-    if (diffDays < 7) return `${diffDays}天前`;
+    if (diffDays === 0) return tCommon('today');
+    if (diffDays === 1) return tCommon('yesterday');
+    if (diffDays < 7) return tCommon('daysAgo', { count: diffDays });
     return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
   };
 
   if (error) {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
-        <h1 className="text-page-title mb-6 xl:mb-8">首页</h1>
+        <h1 className="text-page-title mb-6 xl:mb-8">{t('title')}</h1>
         <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-destructive">
-          {error instanceof Error ? error.message : '获取仪表盘数据失败'}
+          {error instanceof Error ? error.message : tCommon('error')}
         </div>
       </div>
     );
@@ -49,7 +52,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
-        <h1 className="text-page-title mb-6 xl:mb-8">首页</h1>
+        <h1 className="text-page-title mb-6 xl:mb-8">{t('title')}</h1>
         {/* 骨架屏 - 不对称网格 */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8">
           <div className="col-span-2 md:row-span-2 bg-card border border-border rounded-xl p-6">
@@ -83,7 +86,7 @@ export default function Dashboard() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <h1 className="text-page-title mb-6 xl:mb-8">首页</h1>
+      <h1 className="text-page-title mb-6 xl:mb-8">{t('title')}</h1>
 
       {/* 统计卡片 - 不对称网格 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8">
@@ -96,7 +99,7 @@ export default function Dashboard() {
             {displayStats.totalArtworks}
           </div>
           <div className="text-muted-foreground text-sm uppercase tracking-wider mt-2">
-            总作品 / Total Works
+            {t('stats.totalArtworks')}
           </div>
         </Link>
 
@@ -113,7 +116,7 @@ export default function Dashboard() {
           </div>
           <div className="text-muted-foreground text-sm flex items-center gap-2 mt-1">
             <StatusIndicator status="in_studio" size="sm" />
-            <span>在库</span>
+            <span>{tStatus('in_studio')}</span>
           </div>
         </Link>
 
@@ -130,7 +133,7 @@ export default function Dashboard() {
           </div>
           <div className="text-muted-foreground text-sm flex items-center gap-2 mt-1">
             <StatusIndicator status="at_gallery" size="sm" />
-            <span>寄售</span>
+            <span>{tStatus('at_gallery')}</span>
           </div>
         </Link>
 
@@ -147,7 +150,7 @@ export default function Dashboard() {
           </div>
           <div className="text-muted-foreground text-sm flex items-center gap-2 mt-1">
             <StatusIndicator status="sold" size="sm" />
-            <span>已售</span>
+            <span>{tStatus('sold')}</span>
           </div>
         </Link>
       </div>
@@ -155,7 +158,7 @@ export default function Dashboard() {
       {/* 快捷操作 */}
       <div className="mb-8 xl:mb-10">
         <h2 className="text-section-title uppercase text-muted-foreground mb-4 xl:mb-5">
-          快捷操作
+          {t('quickActions')}
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
           <Link
@@ -163,35 +166,35 @@ export default function Dashboard() {
             className="bg-card border border-border rounded-xl p-4 flex flex-col items-center justify-center gap-2 card-interactive"
           >
             <Search className="w-6 h-6 xl:w-7 xl:h-7" />
-            <span className="text-xs uppercase tracking-wider">搜索</span>
+            <span className="text-xs uppercase tracking-wider">{tCommon('search')}</span>
           </Link>
           <Link
             to="/editions"
             className="bg-card border border-border rounded-xl p-4 flex flex-col items-center justify-center gap-2 card-interactive"
           >
             <Package className="w-6 h-6 xl:w-7 xl:h-7" />
-            <span className="text-xs uppercase tracking-wider">版本</span>
+            <span className="text-xs uppercase tracking-wider">{tNav('editions')}</span>
           </Link>
           <Link
             to="/import"
             className="bg-card border border-border rounded-xl p-4 flex flex-col items-center justify-center gap-2 card-interactive"
           >
             <FileDown className="w-6 h-6 xl:w-7 xl:h-7" />
-            <span className="text-xs uppercase tracking-wider">导入</span>
+            <span className="text-xs uppercase tracking-wider">{tNav('import')}</span>
           </Link>
           <Link
             to="/chat"
             className="bg-card border border-border rounded-xl p-4 flex flex-col items-center justify-center gap-2 card-interactive"
           >
             <MessageSquare className="w-6 h-6 xl:w-7 xl:h-7" />
-            <span className="text-xs uppercase tracking-wider">对话</span>
+            <span className="text-xs uppercase tracking-wider">{tNav('chat')}</span>
           </Link>
           <Link
             to="/locations"
             className="bg-card border border-border rounded-xl p-4 flex flex-col items-center justify-center gap-2 card-interactive"
           >
             <MapPin className="w-6 h-6 xl:w-7 xl:h-7" />
-            <span className="text-xs uppercase tracking-wider">位置</span>
+            <span className="text-xs uppercase tracking-wider">{tNav('locations')}</span>
           </Link>
         </div>
       </div>
@@ -199,11 +202,11 @@ export default function Dashboard() {
       {/* 最近更新 */}
       <div>
         <h2 className="text-section-title uppercase text-muted-foreground mb-4 xl:mb-5">
-          最近更新
+          {t('recentUpdates')}
         </h2>
         {recentUpdates.length === 0 ? (
           <div className="bg-card border border-border rounded-xl p-8 text-center text-muted-foreground">
-            暂无更新记录
+            {t('noUpdates')}
           </div>
         ) : (
           <div className="bg-card border border-border rounded-xl divide-y divide-border">
@@ -222,7 +225,7 @@ export default function Dashboard() {
                   <div>
                     <p className="font-medium">{update.title}</p>
                     <p className="text-xs text-muted-foreground uppercase tracking-wider">
-                      {getStatusLabel(update.status)}
+                      {tStatus(update.status)}
                     </p>
                   </div>
                 </div>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { queryKeys } from '@/lib/queryKeys';
@@ -7,7 +8,7 @@ import { useArtworkDetail } from '@/hooks/queries/useArtworks';
 import { useEditionsByArtwork } from '@/hooks/queries/useEditions';
 import type { EditionStatus } from '@/lib/database.types';
 import ExportDialog from '@/components/export/ExportDialog';
-import { StatusIndicator, getStatusLabel } from '@/components/ui/StatusIndicator';
+import { StatusIndicator } from '@/components/ui/StatusIndicator';
 import { Image } from 'lucide-react';
 
 // 编辑表单数据类型
@@ -28,6 +29,9 @@ interface ArtworkFormData {
 }
 
 export default function ArtworkDetail() {
+  const { t } = useTranslation('artworkDetail');
+  const { t: tStatus } = useTranslation('status');
+  const { t: tCommon } = useTranslation('common');
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -69,7 +73,7 @@ export default function ArtworkDetail() {
 
   // 格式化版本号
   const formatEditionNumber = (edition: { edition_type: string; edition_number: number | null }): string => {
-    if (edition.edition_type === 'unique') return '独版';
+    if (edition.edition_type === 'unique') return t('info.unique');
     if (edition.edition_type === 'ap') return `AP${edition.edition_number || ''}`;
     return `${edition.edition_number || '?'}/${artwork?.edition_total || '?'}`;
   };
@@ -136,8 +140,8 @@ export default function ArtworkDetail() {
       setIsEditing(false);
       setFormData(null);
     } catch (err) {
-      console.error('保存失败:', err);
-      setError(err instanceof Error ? err.message : '保存失败');
+      console.error('Save failed:', err);
+      setError(err instanceof Error ? err.message : t('saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -180,8 +184,8 @@ export default function ArtworkDetail() {
       });
       setShowAddEdition(false);
     } catch (err) {
-      console.error('添加版本失败:', err);
-      setError(err instanceof Error ? err.message : '添加版本失败');
+      console.error('Add edition failed:', err);
+      setError(err instanceof Error ? err.message : t('addFailed'));
     } finally {
       setAddingEdition(false);
     }
@@ -209,8 +213,8 @@ export default function ArtworkDetail() {
       // 删除成功，返回作品列表
       navigate('/artworks', { replace: true });
     } catch (err) {
-      console.error('删除作品失败:', err);
-      setError(err instanceof Error ? err.message : '删除作品失败');
+      console.error('Delete artwork failed:', err);
+      setError(err instanceof Error ? err.message : t('deleteFailed'));
       setShowDeleteConfirm(false);
     } finally {
       setDeleting(false);
@@ -241,10 +245,10 @@ export default function ArtworkDetail() {
     return (
       <div className="p-6">
         <Link to="/artworks" className="text-primary hover:underline mb-6 inline-block">
-          ← 返回作品列表
+          {t('backToList')}
         </Link>
         <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-destructive">
-          {artworkError instanceof Error ? artworkError.message : '作品不存在'}
+          {artworkError instanceof Error ? artworkError.message : t('notFound')}
         </div>
       </div>
     );
@@ -267,7 +271,7 @@ export default function ArtworkDetail() {
       {error && (
         <div className="mb-4 bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-destructive">
           {error}
-          <button onClick={() => setError(null)} className="ml-2 underline">关闭</button>
+          <button onClick={() => setError(null)} className="ml-2 underline">{t('close')}</button>
         </div>
       )}
 
@@ -275,30 +279,30 @@ export default function ArtworkDetail() {
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-card border border-border rounded-xl p-6 max-w-md mx-4">
-            <h3 className="text-lg font-semibold mb-2">确认删除</h3>
+            <h3 className="text-lg font-semibold mb-2">{t('deleteDialog.title')}</h3>
             <p className="text-muted-foreground mb-4">
-              确定要删除作品「{artwork?.title_en}」吗？
+              {t('deleteDialog.message', { title: artwork?.title_en })}
               {editions.length > 0 && (
                 <span className="block text-muted-foreground mt-2">
-                  关联的 {editions.length} 个版本也将被隐藏。
+                  {t('deleteDialog.editionsWarning', { count: editions.length })}
                 </span>
               )}
             </p>
-            <p className="text-sm text-muted-foreground mb-4">作品将被移至回收站，可在回收站中恢复。</p>
+            <p className="text-sm text-muted-foreground mb-4">{t('deleteDialog.trashHint')}</p>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
                 disabled={deleting}
                 className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
               >
-                取消
+                {tCommon('cancel')}
               </button>
               <button
                 onClick={handleDelete}
                 disabled={deleting}
                 className="flex-1 px-4 py-2 bg-destructive text-destructive-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
               >
-                {deleting ? '删除中...' : '确认删除'}
+                {deleting ? t('deleteDialog.deleting') : tCommon('confirm')}
               </button>
             </div>
           </div>
@@ -308,7 +312,7 @@ export default function ArtworkDetail() {
       {/* 返回链接和操作按钮 */}
       <div className="flex items-center justify-between mb-6">
         <Link to="/artworks" className="text-primary hover:underline">
-          ← 返回作品列表
+          {t('backToList')}
         </Link>
         <div className="flex gap-2">
           {!isEditing && (
@@ -317,13 +321,13 @@ export default function ArtworkDetail() {
                 onClick={() => setShowExportDialog(true)}
                 className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
               >
-                导出
+                {t('export')}
               </button>
               <button
                 onClick={startEditing}
                 className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
               >
-                编辑作品
+                {t('editArtwork')}
               </button>
             </>
           )}
@@ -331,7 +335,7 @@ export default function ArtworkDetail() {
             onClick={() => setShowDeleteConfirm(true)}
             className="px-4 py-2 text-sm text-destructive border border-destructive/30 rounded-lg hover:bg-destructive/10 transition-colors"
           >
-            删除作品
+            {t('deleteArtwork')}
           </button>
         </div>
       </div>
@@ -343,7 +347,7 @@ export default function ArtworkDetail() {
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">标题 (英文) *</label>
+                <label className="block text-sm font-medium mb-1">{t('form.titleEn')} *</label>
                 <input
                   type="text"
                   value={formData.title_en}
@@ -352,7 +356,7 @@ export default function ArtworkDetail() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">标题 (中文)</label>
+                <label className="block text-sm font-medium mb-1">{t('form.titleCn')}</label>
                 <input
                   type="text"
                   value={formData.title_cn}
@@ -361,7 +365,7 @@ export default function ArtworkDetail() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">年份</label>
+                <label className="block text-sm font-medium mb-1">{t('form.year')}</label>
                 <input
                   type="text"
                   value={formData.year}
@@ -371,17 +375,17 @@ export default function ArtworkDetail() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">类型</label>
+                <label className="block text-sm font-medium mb-1">{t('form.type')}</label>
                 <input
                   type="text"
                   value={formData.type}
                   onChange={e => setFormData({ ...formData, type: e.target.value })}
                   className="w-full px-3 py-2 border border-border rounded-lg bg-background focus:ring-2 focus:ring-ring outline-none"
-                  placeholder="Video installation"
+                  placeholder={t('form.typePlaceholder')}
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium mb-1">材料</label>
+                <label className="block text-sm font-medium mb-1">{t('form.materials')}</label>
                 <input
                   type="text"
                   value={formData.materials}
@@ -390,7 +394,7 @@ export default function ArtworkDetail() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">尺寸</label>
+                <label className="block text-sm font-medium mb-1">{t('form.dimensions')}</label>
                 <input
                   type="text"
                   value={formData.dimensions}
@@ -399,17 +403,17 @@ export default function ArtworkDetail() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">时长</label>
+                <label className="block text-sm font-medium mb-1">{t('form.duration')}</label>
                 <input
                   type="text"
                   value={formData.duration}
                   onChange={e => setFormData({ ...formData, duration: e.target.value })}
                   className="w-full px-3 py-2 border border-border rounded-lg bg-background focus:ring-2 focus:ring-ring outline-none"
-                  placeholder="10:30"
+                  placeholder={t('form.durationPlaceholder')}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">缩略图 URL</label>
+                <label className="block text-sm font-medium mb-1">{t('form.thumbnailUrl')}</label>
                 <input
                   type="text"
                   value={formData.thumbnail_url}
@@ -418,7 +422,7 @@ export default function ArtworkDetail() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">来源链接</label>
+                <label className="block text-sm font-medium mb-1">{t('form.sourceUrl')}</label>
                 <input
                   type="text"
                   value={formData.source_url}
@@ -436,13 +440,13 @@ export default function ArtworkDetail() {
                   onChange={e => setFormData({ ...formData, is_unique: e.target.checked })}
                   className="w-4 h-4 accent-primary"
                 />
-                <span className="text-sm font-medium">独版作品</span>
+                <span className="text-sm font-medium">{t('form.isUnique')}</span>
               </label>
 
               {!formData.is_unique && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1">版数</label>
+                    <label className="block text-sm font-medium mb-1">{t('form.editionTotal')}</label>
                     <input
                       type="number"
                       value={formData.edition_total}
@@ -452,7 +456,7 @@ export default function ArtworkDetail() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">AP 数</label>
+                    <label className="block text-sm font-medium mb-1">{t('form.apTotal')}</label>
                     <input
                       type="number"
                       value={formData.ap_total}
@@ -466,7 +470,7 @@ export default function ArtworkDetail() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">备注</label>
+              <label className="block text-sm font-medium mb-1">{t('form.notes')}</label>
               <textarea
                 value={formData.notes}
                 onChange={e => setFormData({ ...formData, notes: e.target.value })}
@@ -481,14 +485,14 @@ export default function ArtworkDetail() {
                 disabled={saving}
                 className="px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
               >
-                取消
+                {tCommon('cancel')}
               </button>
               <button
                 onClick={saveEditing}
                 disabled={saving || !formData.title_en.trim()}
                 className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
               >
-                {saving ? '保存中...' : '保存'}
+                {saving ? t('saving') : tCommon('save')}
               </button>
             </div>
           </div>
@@ -524,37 +528,41 @@ export default function ArtworkDetail() {
               <div className="space-y-2 text-sm">
                 {artwork.year && (
                   <p>
-                    <span className="text-muted-foreground">年份：</span>
+                    <span className="text-muted-foreground">{t('info.year')}</span>
                     {artwork.year}
                   </p>
                 )}
                 {artwork.type && (
                   <p>
-                    <span className="text-muted-foreground">类型：</span>
+                    <span className="text-muted-foreground">{t('info.type')}</span>
                     {artwork.type}
                   </p>
                 )}
                 {artwork.materials && (
                   <p>
-                    <span className="text-muted-foreground">材料：</span>
+                    <span className="text-muted-foreground">{t('info.materials')}</span>
                     {artwork.materials}
                   </p>
                 )}
                 {artwork.dimensions && (
                   <p>
-                    <span className="text-muted-foreground">尺寸：</span>
+                    <span className="text-muted-foreground">{t('info.dimensions')}</span>
                     {artwork.dimensions}
                   </p>
                 )}
                 {artwork.duration && (
                   <p>
-                    <span className="text-muted-foreground">时长：</span>
+                    <span className="text-muted-foreground">{t('info.duration')}</span>
                     {artwork.duration}
                   </p>
                 )}
                 <p>
-                  <span className="text-muted-foreground">版本：</span>
-                  {artwork.is_unique ? '独版' : `${artwork.edition_total || 0} 版${artwork.ap_total ? ` + ${artwork.ap_total} AP` : ''}`}
+                  <span className="text-muted-foreground">{t('info.editions')}</span>
+                  {artwork.is_unique
+                    ? t('info.unique')
+                    : artwork.ap_total
+                      ? t('info.editionsWithAp', { total: artwork.edition_total || 0, ap: artwork.ap_total })
+                      : t('info.editionsFormat', { total: artwork.edition_total || 0 })}
                 </p>
               </div>
 
@@ -565,13 +573,13 @@ export default function ArtworkDetail() {
                   rel="noopener noreferrer"
                   className="inline-block mt-4 text-primary hover:underline text-sm"
                 >
-                  查看原网站 →
+                  {t('info.viewSource')}
                 </a>
               )}
 
               {artwork.notes && (
                 <div className="mt-4 p-3 bg-muted rounded-lg text-sm">
-                  <p className="text-muted-foreground mb-1">备注：</p>
+                  <p className="text-muted-foreground mb-1">{t('info.notes')}</p>
                   <p>{artwork.notes}</p>
                 </div>
               )}
@@ -584,36 +592,36 @@ export default function ArtworkDetail() {
       <div className="bg-card border border-border rounded-xl p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">
-            版本列表 ({editions.length})
+            {t('editionsList.title')} ({editions.length})
           </h2>
           <button
             onClick={() => setShowAddEdition(true)}
             className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
           >
-            + 添加版本
+            {t('editionsList.addEdition')}
           </button>
         </div>
 
         {/* 添加版本表单 */}
         {showAddEdition && (
           <div className="mb-4 p-4 bg-muted/50 rounded-lg border border-border">
-            <h3 className="font-medium mb-3">添加新版本</h3>
+            <h3 className="font-medium mb-3">{t('editionsList.addNew')}</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium mb-1">版本类型</label>
+                <label className="block text-sm font-medium mb-1">{t('editionsList.editionType')}</label>
                 <select
                   value={newEdition.edition_type}
                   onChange={e => setNewEdition({ ...newEdition, edition_type: e.target.value as 'numbered' | 'ap' | 'unique' })}
                   className="w-full px-3 py-2 border border-border rounded-lg bg-background focus:ring-2 focus:ring-ring outline-none"
                 >
-                  <option value="numbered">编号版</option>
-                  <option value="ap">AP</option>
-                  <option value="unique">独版</option>
+                  <option value="numbered">{t('editionsList.numbered')}</option>
+                  <option value="ap">{t('editionsList.ap')}</option>
+                  <option value="unique">{t('editionsList.unique')}</option>
                 </select>
               </div>
               {newEdition.edition_type !== 'unique' && (
                 <div>
-                  <label className="block text-sm font-medium mb-1">版号</label>
+                  <label className="block text-sm font-medium mb-1">{t('editionsList.editionNumber')}</label>
                   <input
                     type="number"
                     value={newEdition.edition_number}
@@ -624,35 +632,35 @@ export default function ArtworkDetail() {
                 </div>
               )}
               <div>
-                <label className="block text-sm font-medium mb-1">状态</label>
+                <label className="block text-sm font-medium mb-1">{t('editionsList.status')}</label>
                 <select
                   value={newEdition.status}
                   onChange={e => setNewEdition({ ...newEdition, status: e.target.value as EditionStatus })}
                   className="w-full px-3 py-2 border border-border rounded-lg bg-background focus:ring-2 focus:ring-ring outline-none"
                 >
-                  <option value="in_production">制作中</option>
-                  <option value="in_studio">在库</option>
-                  <option value="at_gallery">寄售</option>
-                  <option value="at_museum">美术馆</option>
-                  <option value="in_transit">运输中</option>
-                  <option value="sold">已售</option>
-                  <option value="gifted">赠送</option>
-                  <option value="lost">遗失</option>
-                  <option value="damaged">损坏</option>
+                  <option value="in_production">{tStatus('in_production')}</option>
+                  <option value="in_studio">{tStatus('in_studio')}</option>
+                  <option value="at_gallery">{tStatus('at_gallery')}</option>
+                  <option value="at_museum">{tStatus('at_museum')}</option>
+                  <option value="in_transit">{tStatus('in_transit')}</option>
+                  <option value="sold">{tStatus('sold')}</option>
+                  <option value="gifted">{tStatus('gifted')}</option>
+                  <option value="lost">{tStatus('lost')}</option>
+                  <option value="damaged">{tStatus('damaged')}</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">库存编号</label>
+                <label className="block text-sm font-medium mb-1">{t('editionsList.inventoryNumber')}</label>
                 <input
                   type="text"
                   value={newEdition.inventory_number}
                   onChange={e => setNewEdition({ ...newEdition, inventory_number: e.target.value })}
-                  placeholder="AAJ-2025-001"
+                  placeholder={t('editionsList.inventoryPlaceholder')}
                   className="w-full px-3 py-2 border border-border rounded-lg bg-background focus:ring-2 focus:ring-ring outline-none"
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium mb-1">备注</label>
+                <label className="block text-sm font-medium mb-1">{t('editionsList.notes')}</label>
                 <input
                   type="text"
                   value={newEdition.notes}
@@ -667,14 +675,14 @@ export default function ArtworkDetail() {
                 disabled={addingEdition}
                 className="px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
               >
-                取消
+                {tCommon('cancel')}
               </button>
               <button
                 onClick={handleAddEdition}
                 disabled={addingEdition}
                 className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
               >
-                {addingEdition ? '添加中...' : '添加'}
+                {addingEdition ? t('editionsList.adding') : tCommon('add')}
               </button>
             </div>
           </div>
@@ -682,7 +690,7 @@ export default function ArtworkDetail() {
 
         {editions.length === 0 && !showAddEdition ? (
           <div className="text-center text-muted-foreground py-8">
-            暂无版本数据，点击上方按钮添加
+            {t('editionsList.noEditions')}
           </div>
         ) : editions.length === 0 ? null : (
           <div className="space-y-3">
@@ -705,7 +713,7 @@ export default function ArtworkDetail() {
                         )}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {getStatusLabel(edition.status)}
+                        {tStatus(edition.status)}
                         {edition.location && (
                           <span> · {edition.location.name}</span>
                         )}

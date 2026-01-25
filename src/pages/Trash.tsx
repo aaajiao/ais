@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
 import { Image, RotateCcw, Trash2 } from 'lucide-react';
@@ -6,6 +7,7 @@ import { Image, RotateCcw, Trash2 } from 'lucide-react';
 type Artwork = Database['public']['Tables']['artworks']['Row'];
 
 export default function Trash() {
+  const { t, i18n } = useTranslation('trash');
   const [artworks, setArtworks] = useState<Artwork[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -29,8 +31,8 @@ export default function Trash() {
         if (fetchError) throw fetchError;
         setArtworks(data || []);
       } catch (err) {
-        console.error('获取回收站数据失败:', err);
-        setError(err instanceof Error ? err.message : '获取回收站数据失败');
+        console.error('Failed to fetch deleted artworks:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch deleted artworks');
       } finally {
         setLoading(false);
       }
@@ -55,8 +57,8 @@ export default function Trash() {
       // 从列表中移除
       setArtworks(prev => prev.filter(a => a.id !== artwork.id));
     } catch (err) {
-      console.error('恢复作品失败:', err);
-      setError(err instanceof Error ? err.message : '恢复作品失败');
+      console.error('Failed to restore artwork:', err);
+      setError(err instanceof Error ? err.message : 'Failed to restore artwork');
     } finally {
       setRestoring(null);
     }
@@ -108,8 +110,8 @@ export default function Trash() {
       setArtworks(prev => prev.filter(a => a.id !== artwork.id));
       setShowDeleteConfirm(null);
     } catch (err) {
-      console.error('永久删除失败:', err);
-      setError(err instanceof Error ? err.message : '永久删除失败');
+      console.error('Failed to permanently delete:', err);
+      setError(err instanceof Error ? err.message : 'Failed to permanently delete');
     } finally {
       setDeleting(null);
     }
@@ -123,17 +125,17 @@ export default function Trash() {
     const diffMs = now.getTime() - date.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    if (diffDays === 0) return '今天删除';
-    if (diffDays === 1) return '昨天删除';
-    if (diffDays < 7) return `${diffDays}天前删除`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)}周前删除`;
-    return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }) + '删除';
+    if (diffDays === 0) return t('deletedTime.today');
+    if (diffDays === 1) return t('deletedTime.yesterday');
+    if (diffDays < 7) return t('deletedTime.daysAgo', { count: diffDays });
+    if (diffDays < 30) return t('deletedTime.weeksAgo', { count: Math.floor(diffDays / 7) });
+    return date.toLocaleDateString(i18n.language === 'zh' ? 'zh-CN' : 'en-US', { month: 'short', day: 'numeric' });
   };
 
   if (loading) {
     return (
       <div className="p-6">
-        <h1 className="text-page-title mb-6 xl:mb-8">回收站</h1>
+        <h1 className="text-page-title mb-6 xl:mb-8">{t('title')}</h1>
         <div className="space-y-4">
           {[1, 2, 3].map(i => (
             <div key={i} className="bg-card border border-border rounded-xl p-4">
@@ -154,7 +156,7 @@ export default function Trash() {
   if (error) {
     return (
       <div className="p-6">
-        <h1 className="text-page-title mb-6 xl:mb-8">回收站</h1>
+        <h1 className="text-page-title mb-6 xl:mb-8">{t('title')}</h1>
         <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-destructive">
           {error}
         </div>
@@ -168,18 +170,18 @@ export default function Trash() {
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-card border border-border rounded-xl p-6 max-w-md mx-4">
-            <h3 className="text-lg font-semibold mb-2">永久删除</h3>
+            <h3 className="text-lg font-semibold mb-2">{t('deleteDialog.title')}</h3>
             <p className="text-muted-foreground mb-4">
-              确定要永久删除这个作品吗？这将同时删除所有关联的版本和历史记录。
+              {t('deleteDialog.message')}
             </p>
-            <p className="text-sm text-destructive mb-4">此操作不可撤销！</p>
+            <p className="text-sm text-destructive mb-4">{t('deleteDialog.warning')}</p>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(null)}
                 disabled={!!deleting}
                 className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
               >
-                取消
+                {t('deleteDialog.cancel')}
               </button>
               <button
                 onClick={() => {
@@ -189,20 +191,20 @@ export default function Trash() {
                 disabled={!!deleting}
                 className="flex-1 px-4 py-2 bg-destructive text-destructive-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
               >
-                {deleting ? '删除中...' : '永久删除'}
+                {deleting ? t('deleteDialog.deleting') : t('deleteDialog.confirm')}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      <h1 className="text-page-title mb-6 xl:mb-8">回收站</h1>
+      <h1 className="text-page-title mb-6 xl:mb-8">{t('title')}</h1>
 
       {artworks.length === 0 ? (
         <div className="bg-card border border-border rounded-xl p-8 text-center text-muted-foreground">
           <Trash2 className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <p>回收站是空的</p>
-          <p className="text-sm mt-2">删除的作品将在这里显示</p>
+          <p>{t('empty')}</p>
+          <p className="text-sm mt-2">{t('emptyDescription')}</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -250,7 +252,7 @@ export default function Trash() {
                     onClick={() => handleRestore(artwork)}
                     disabled={restoring === artwork.id}
                     className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors disabled:opacity-50"
-                    title="恢复"
+                    title={t('restore')}
                   >
                     <RotateCcw className={`w-5 h-5 ${restoring === artwork.id ? 'animate-spin' : ''}`} />
                   </button>
@@ -258,7 +260,7 @@ export default function Trash() {
                     onClick={() => setShowDeleteConfirm(artwork.id)}
                     disabled={!!deleting}
                     className="p-2 text-destructive hover:bg-destructive/10 rounded-lg transition-colors disabled:opacity-50"
-                    title="永久删除"
+                    title={t('deletePermanently')}
                   >
                     <Trash2 className="w-5 h-5" />
                   </button>

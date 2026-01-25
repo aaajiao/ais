@@ -2,6 +2,7 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import type { ConfirmCardData } from '@/components/chat/EditableConfirmCard';
 import CollapsibleChatHistory from '@/components/chat/CollapsibleChatHistory';
 import { saveChatHistory, loadChatHistory, clearChatHistory, getChatTimestamp } from '@/lib/chatStorage';
@@ -9,6 +10,7 @@ import { useAuthContext } from '@/contexts/AuthContext';
 import { MessageSquare, Trash2 } from 'lucide-react';
 
 export default function Chat() {
+  const { t, i18n } = useTranslation('chat');
   const location = useLocation();
   const inputRef = useRef<HTMLInputElement>(null);
   const historyLoadedRef = useRef(false);
@@ -135,10 +137,10 @@ export default function Chat() {
 
   // 快捷操作
   const quickActions = [
-    { label: '库存统计', prompt: '显示当前库存统计' },
-    { label: '寄售作品', prompt: '哪些作品在寄售中？' },
-    { label: '在库作品', prompt: '显示所有在库的版本' },
-    { label: '已售作品', prompt: '最近售出了哪些作品？' },
+    { labelKey: 'quickActions.inventoryStats', promptKey: 'quickPrompts.inventoryStats' },
+    { labelKey: 'quickActions.consignedWorks', promptKey: 'quickPrompts.consignedWorks' },
+    { labelKey: 'quickActions.inStudioEditions', promptKey: 'quickPrompts.inStudioEditions' },
+    { labelKey: 'quickActions.recentlySold', promptKey: 'quickPrompts.recentlySold' },
   ];
 
   const handleSubmit = useCallback(async (e?: React.FormEvent) => {
@@ -184,7 +186,7 @@ export default function Chat() {
       {hasHistory && (
         <div className="px-6 py-2 border-b border-border flex items-center justify-between text-xs text-muted-foreground">
           <span>
-            对话开始于 {chatTimestamp.toLocaleString('zh-CN', {
+            {t('chatStartedAt')} {chatTimestamp.toLocaleString(i18n.language === 'zh' ? 'zh-CN' : 'en-US', {
               month: 'short',
               day: 'numeric',
               hour: '2-digit',
@@ -196,7 +198,7 @@ export default function Chat() {
             className="flex items-center gap-1.5 hover:text-foreground transition-colors"
           >
             <Trash2 className="w-3.5 h-3.5" />
-            <span>清除对话</span>
+            <span>{t('clearChat')}</span>
           </button>
         </div>
       )}
@@ -206,20 +208,20 @@ export default function Chat() {
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center text-muted-foreground py-8">
             <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p className="font-medium">开始对话</p>
+            <p className="font-medium">{t('startConversation')}</p>
             <p className="text-sm mt-2 mb-6">
-              试试说：「Guard 有几个版本？」或「哪些作品在寄售？」
+              {t('tryAsking')}
             </p>
 
             {/* 快捷操作 */}
             <div className="flex flex-wrap justify-center gap-2">
               {quickActions.map((action) => (
                 <button
-                  key={action.label}
-                  onClick={() => handleQuickAction(action.prompt)}
+                  key={action.labelKey}
+                  onClick={() => handleQuickAction(t(action.promptKey))}
                   className="px-3 py-1.5 bg-card border border-border rounded-full text-sm hover:bg-accent transition-colors"
                 >
-                  {action.label}
+                  {t(action.labelKey)}
                 </button>
               ))}
             </div>
@@ -236,7 +238,7 @@ export default function Chat() {
       {/* 错误提示 */}
       {error && (
         <div className="mx-4 mb-2 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive text-sm">
-          出错了：{error.message}
+          {t('error', { message: error.message })}
         </div>
       )}
 
@@ -248,7 +250,7 @@ export default function Chat() {
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder={authLoading ? "正在验证登录..." : (!session?.access_token ? "请先登录" : "输入消息...")}
+            placeholder={authLoading ? t('placeholder.verifying') : (!session?.access_token ? t('placeholder.pleaseSignIn') : t('placeholder.typeMessage'))}
             disabled={isLoading || authLoading || !session?.access_token}
             className="flex-1 px-4 py-3 bg-card border border-border rounded-xl focus:ring-2 focus:ring-ring focus:border-transparent outline-none disabled:opacity-50"
           />
@@ -257,13 +259,13 @@ export default function Chat() {
             disabled={isLoading || authLoading || !session?.access_token || !inputValue.trim()}
             className="px-4 py-3 bg-primary text-primary-foreground rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
           >
-            {isLoading ? '...' : '发送'}
+            {isLoading ? '...' : t('send')}
           </button>
         </form>
 
         {/* 当前模型指示 */}
         <div className="mt-2 text-xs text-muted-foreground text-center" title={selectedModel}>
-          使用模型：{getModelDisplayName(selectedModel)}
+          {t('model')}: {getModelDisplayName(selectedModel)}
         </div>
       </div>
     </div>

@@ -1,0 +1,65 @@
+{
+  "title": "历史记录",
+  "noHistory": "暂无历史记录",
+  "count": "({{count}})",
+  "addNote": "+ 添加备注",
+  "notePlaceholder": "输入备注内容...",
+  "saving": "保存中...",
+  "save": "保存",
+  "addNoteFailed": "添加备注失败",
+  "showMore": "查看更多 ({{count}} 条)",
+  "collapse": "收起",
+  "times": "×{{count}}",
+  "actions": {
+    "created": "创建",
+    "status_change": "状态变更",
+    "location_change": "位置变更",
+    "sold": "售出",
+    "consigned": "寄售",
+    "returned": "返回",
+    "condition_update": "备注",
+    "file_added": "添加附件",
+    "file_deleted": "删除附件",
+    "number_assigned": "分配编号"
+  },
+  "descriptions": {
+    "statusChange": "状态从 \"{{from}}\" 变更为 \"{{to}}\"",
+    "locationChange": "位置从 \"{{from}}\" 变更为 \"{{to}}\"",
+    "sold": "已售出",
+    "soldWithPrice": "已售出 ({{currency}} {{price}})",
+    "soldBuyer": " - 买家: {{buyer}}",
+    "consignedTo": "寄售至 {{party}}",
+    "consignedStart": "开始寄售",
+    "returnedFrom": "从 {{location}} 返回",
+    "returned": "已返回",
+    "fileAdded": "添加了新附件",
+    "fileDeleted": "删除了附件",
+    "numberAssigned": "分配了库存编号",
+    "created": "版本创建",
+    "conditionUpdate": "品相状态更新",
+    "unknown": "未知"
+  },
+  "merged": {
+    "filesAdded": "添加了 {{count}} 个附件",
+    "filesDeleted": "删除了 {{count}} 个附件",
+    "notes": "{{count}} 条备注",
+    "records": "{{count}} 条记录"
+  },
+  "relativeTime": {
+    "today": "今天",
+    "yesterday": "昨天",
+    "daysAgo": "{{count}}天前",
+    "weeksAgo": "{{count}}周前",
+    "monthsAgo": "{{count}}个月前",
+    "yearsAgo": "{{count}}年前"
+  },
+  "details": {
+    "from": "从",
+    "to": "变更为",
+    "price": "价格",
+    "buyer": "买家",
+    "location": "位置",
+    "notes": "备注",
+    "operator": "操作者"
+  }
+}

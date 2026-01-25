@@ -1,10 +1,8 @@
 import { useState, useMemo, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import type { EditionStatus } from '@/lib/database.types';
-import {
-  StatusIndicator,
-  getStatusLabel,
-} from '@/components/ui/StatusIndicator';
+import { StatusIndicator } from '@/components/ui/StatusIndicator';
 import ListEndIndicator from '@/components/ui/ListEndIndicator';
 import { Image } from 'lucide-react';
 import { queryKeys } from '@/lib/queryKeys';
@@ -26,18 +24,20 @@ type FilterStatus =
 // 筛选按钮配置
 const filterButtons: {
   key: FilterStatus;
-  label: string;
+  labelKey: string;
   status?: EditionStatus;
 }[] = [
-  { key: 'all', label: '全部' },
-  { key: 'in_studio', label: '在库', status: 'in_studio' },
-  { key: 'at_gallery', label: '寄售', status: 'at_gallery' },
-  { key: 'at_museum', label: '美术馆', status: 'at_museum' },
-  { key: 'in_transit', label: '运输中', status: 'in_transit' },
-  { key: 'sold', label: '已售', status: 'sold' },
+  { key: 'all', labelKey: 'filters.all' },
+  { key: 'in_studio', labelKey: 'filters.inStudio', status: 'in_studio' },
+  { key: 'at_gallery', labelKey: 'filters.atGallery', status: 'at_gallery' },
+  { key: 'at_museum', labelKey: 'filters.atMuseum', status: 'at_museum' },
+  { key: 'in_transit', labelKey: 'filters.inTransit', status: 'in_transit' },
+  { key: 'sold', labelKey: 'filters.sold', status: 'sold' },
 ];
 
 export default function Editions() {
+  const { t } = useTranslation('editions');
+  const { t: tStatus } = useTranslation('status');
   const [searchParams, setSearchParams] = useSearchParams();
   const initialFilter =
     (searchParams.get('status') as FilterStatus) || 'all';
@@ -94,7 +94,7 @@ export default function Editions() {
 
   // 格式化版本号
   const formatEditionNumber = (edition: EditionWithDetails): string => {
-    if (edition.edition_type === 'unique') return '独版';
+    if (edition.edition_type === 'unique') return t('unique');
     if (edition.edition_type === 'ap') return `AP${edition.edition_number || ''}`;
     return `${edition.edition_number || '?'}/${edition.artwork?.edition_total || '?'}`;
   };
@@ -102,7 +102,7 @@ export default function Editions() {
   if (isLoading && items.length === 0) {
     return (
       <div className="p-6">
-        <h1 className="text-page-title mb-6 xl:mb-8">版本</h1>
+        <h1 className="text-page-title mb-6 xl:mb-8">{t('title')}</h1>
         {/* 骨架屏 */}
         <div className="flex gap-2 mb-6">
           {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -134,7 +134,7 @@ export default function Editions() {
   if (error) {
     return (
       <div className="p-6">
-        <h1 className="text-page-title mb-6 xl:mb-8">版本</h1>
+        <h1 className="text-page-title mb-6 xl:mb-8">{t('title')}</h1>
         <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-destructive">
           {error.message}
         </div>
@@ -144,7 +144,7 @@ export default function Editions() {
 
   return (
     <div className="p-6 flex flex-col h-[calc(100dvh-80px)] md:h-[calc(100dvh-73px)]">
-      <h1 className="text-page-title mb-6 xl:mb-8">版本</h1>
+      <h1 className="text-page-title mb-6 xl:mb-8">{t('title')}</h1>
 
       {/* 筛选标签 */}
       <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
@@ -159,7 +159,7 @@ export default function Editions() {
             }`}
           >
             {btn.status && <StatusIndicator status={btn.status} size="sm" />}
-            {btn.label}
+            {t(btn.labelKey)}
             {btn.key === 'all' && statusCounts && ` (${statusCounts.all})`}
           </button>
         ))}
@@ -169,7 +169,7 @@ export default function Editions() {
       <div className="mb-6">
         <input
           type="text"
-          placeholder="搜索版本（作品名、编号、位置）..."
+          placeholder={t('searchPlaceholder')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full px-4 py-3 bg-card border border-border rounded-xl focus:ring-2 focus:ring-ring focus:border-transparent outline-none"
@@ -185,8 +185,8 @@ export default function Editions() {
         {flattenedItems.length === 0 && !isLoading ? (
           <div className="bg-card border border-border rounded-xl p-8 text-center text-muted-foreground">
             {searchQuery || filter !== 'all'
-              ? '没有找到匹配的版本'
-              : '暂无版本数据'}
+              ? t('noMatch')
+              : t('noEditions')}
           </div>
         ) : (
           <div
@@ -261,7 +261,7 @@ export default function Editions() {
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <h3 className="font-medium truncate">
-                              {edition.artwork?.title_en || '未知作品'}
+                              {edition.artwork?.title_en || t('unknownArtwork')}
                               {edition.artwork?.title_cn && (
                                 <span className="text-muted-foreground ml-2">
                                   {edition.artwork.title_cn}
@@ -281,7 +281,7 @@ export default function Editions() {
                         </div>
 
                         <div className="flex items-center gap-2 mt-2 text-xs">
-                          <span>{getStatusLabel(edition.status)}</span>
+                          <span>{tStatus(edition.status)}</span>
                           {edition.location && (
                             <>
                               <span className="text-muted-foreground">·</span>

@@ -1,0 +1,61 @@
+{
+  "backToList": "← Back to Editions",
+  "deleteEdition": "Delete Edition",
+  "notFound": "Edition not found",
+  "unique": "Unique",
+  "editDialog": {
+    "title": "Edit Edition",
+    "editionType": "Edition Type",
+    "numbered": "Numbered",
+    "ap": "AP",
+    "unique": "Unique",
+    "apNumber": "AP Number",
+    "editionNumber": "Edition Number",
+    "numberPlaceholder": "e.g., 1",
+    "status": "Status",
+    "location": "Location",
+    "inventoryNumber": "Inventory Number",
+    "priceSection": {
+      "sold": "Sale Information",
+      "default": "Pricing"
+    },
+    "price": {
+      "sold": "Sale Price",
+      "default": "List Price"
+    },
+    "amount": "Amount",
+    "currency": "Currency",
+    "saleDate": "Sale Date",
+    "buyer": "Buyer",
+    "buyerPlaceholder": "Buyer name/institution",
+    "notes": "Notes",
+    "notesPlaceholder": "Optional notes"
+  },
+  "deleteDialog": {
+    "title": "Confirm Delete",
+    "message": "Are you sure you want to delete edition {{edition}} of \"{{title}}\"?",
+    "historyWarning": "This will also delete {{count}} history records",
+    "warning": "This action cannot be undone!",
+    "deleting": "Deleting..."
+  },
+  "info": {
+    "location": "Location:",
+    "soldPrice": "Sale Price:",
+    "listPrice": "List Price:",
+    "saleDate": "Sale Date:",
+    "buyer": "Buyer:",
+    "notes": "Notes:"
+  },
+  "attachments": {
+    "title": "Attachments",
+    "addLink": "+ Add Link"
+  },
+  "actions": {
+    "chat": "Chat Actions",
+    "edit": "Edit"
+  },
+  "close": "Close",
+  "saving": "Saving...",
+  "saveFailed": "Failed to save",
+  "deleteFailed": "Failed to delete edition"
+}

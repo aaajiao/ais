@@ -4,6 +4,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useFileUpload, type UploadingFile, type UploadedFile } from '@/hooks/useFileUpload';
 import { formatFileSize, detectFileType } from '@/lib/imageCompressor';
 import { getFileTypeIcon } from '@/lib/fileIcons';
@@ -30,6 +31,7 @@ export default function FileUpload({
   acceptedTypes = DEFAULT_ACCEPT,
   disabled = false,
 }: FileUploadProps) {
+  const { t } = useTranslation('common');
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -52,10 +54,10 @@ export default function FileUpload({
   const validateFile = useCallback((file: File): string | null => {
     const maxBytes = maxSizeMB * 1024 * 1024;
     if (file.size > maxBytes) {
-      return `文件过大 (最大 ${maxSizeMB}MB)`;
+      return t('upload.fileTooLarge', { maxSize: maxSizeMB });
     }
     return null;
-  }, [maxSizeMB]);
+  }, [maxSizeMB, t]);
 
   // 处理文件选择
   const handleFiles = useCallback(async (files: FileList | null) => {
@@ -125,11 +127,11 @@ export default function FileUpload({
   // 获取状态显示文本
   const getStatusText = (status: UploadingFile['status']): string => {
     switch (status) {
-      case 'pending': return '等待中';
-      case 'compressing': return '压缩中';
-      case 'uploading': return '上传中';
-      case 'complete': return '完成';
-      case 'error': return '失败';
+      case 'pending': return t('upload.pending');
+      case 'compressing': return t('upload.compressing');
+      case 'uploading': return t('upload.uploading');
+      case 'complete': return t('upload.complete');
+      case 'error': return t('upload.failed');
       default: return '';
     }
   };
@@ -205,15 +207,15 @@ export default function FileUpload({
         </div>
         <div className="text-sm text-muted-foreground">
           {isDragging ? (
-            <span className="text-primary font-medium">释放以上传文件</span>
+            <span className="text-primary font-medium">{t('upload.dropToUpload')}</span>
           ) : (
             <>
-              <span className="text-foreground font-medium">点击</span> 或 <span className="text-foreground font-medium">拖拽</span> 文件到此处
+              <span className="text-foreground font-medium">{t('upload.click')}</span> {t('upload.or')} <span className="text-foreground font-medium">{t('upload.drag')}</span> {t('upload.clickOrDrag')}
             </>
           )}
         </div>
         <div className="text-xs text-muted-foreground mt-1">
-          支持图片、PDF、视频、Markdown (最大 {maxSizeMB}MB)
+          {t('upload.supportedFormats', { maxSize: maxSizeMB })}
         </div>
       </div>
 
@@ -222,14 +224,14 @@ export default function FileUpload({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">
-              上传进度 ({uploadingFiles.filter(f => f.status === 'complete').length}/{uploadingFiles.length})
+              {t('upload.uploadProgress')} ({uploadingFiles.filter(f => f.status === 'complete').length}/{uploadingFiles.length})
             </span>
             {hasCompletedOrFailed && (
               <button
                 onClick={clearCompleted}
                 className="text-xs text-muted-foreground hover:text-foreground"
               >
-                清除已完成
+                {t('upload.clearCompleted')}
               </button>
             )}
           </div>
@@ -281,7 +283,7 @@ export default function FileUpload({
                   <button
                     onClick={() => cancelUpload(file.id)}
                     className="p-1 text-muted-foreground hover:text-foreground"
-                    title="取消"
+                    title={t('cancel')}
                   >
                     <X className="w-4 h-4" />
                   </button>

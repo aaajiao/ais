@@ -1,5 +1,6 @@
+import { useTranslation } from 'react-i18next';
 import { useEditionsByArtwork } from '@/hooks/queries/useEditions';
-import { StatusIndicator, getStatusLabel } from '@/components/ui/StatusIndicator';
+import { StatusIndicator } from '@/components/ui/StatusIndicator';
 
 interface EditionSelectorProps {
   artworkId: string;
@@ -18,6 +19,8 @@ export default function EditionSelector({
   selectedIds,
   onSelectionChange,
 }: EditionSelectorProps) {
+  const { t } = useTranslation('editions');
+  const { t: tStatus } = useTranslation('status');
   const { data: editions = [], isLoading } = useEditionsByArtwork(artworkId);
 
   // 格式化版本编号
@@ -25,7 +28,7 @@ export default function EditionSelector({
     edition_type: string;
     edition_number: number | null;
   }): string => {
-    if (edition.edition_type === 'unique') return '独版';
+    if (edition.edition_type === 'unique') return t('unique');
     if (edition.edition_type === 'ap') return `AP${edition.edition_number || ''}`;
     return `${edition.edition_number || '?'}/${editionTotal || '?'}`;
   };
@@ -61,7 +64,7 @@ export default function EditionSelector({
   if (editions.length === 0) {
     return (
       <div className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-lg">
-        此作品暂无版本数据
+        {t('selector.noEditions')}
       </div>
     );
   }
@@ -84,7 +87,7 @@ export default function EditionSelector({
             onChange={() => onModeChange('all')}
             className="w-4 h-4 accent-primary"
           />
-          <span>全部版本 ({editions.length})</span>
+          <span>{t('selector.allEditions', { count: editions.length })}</span>
         </label>
 
         <label
@@ -101,7 +104,7 @@ export default function EditionSelector({
             onChange={() => onModeChange('selected')}
             className="w-4 h-4 accent-primary"
           />
-          <span>选择特定版本</span>
+          <span>{t('selector.selectSpecific')}</span>
         </label>
       </div>
 
@@ -115,7 +118,7 @@ export default function EditionSelector({
               onClick={handleSelectAll}
               className="text-xs text-primary hover:underline"
             >
-              全选
+              {t('selector.selectAll')}
             </button>
             <span className="text-muted-foreground">|</span>
             <button
@@ -123,11 +126,11 @@ export default function EditionSelector({
               onClick={handleDeselectAll}
               className="text-xs text-primary hover:underline"
             >
-              取消全选
+              {t('selector.deselectAll')}
             </button>
             {selectedIds.length > 0 && (
               <span className="text-xs text-muted-foreground ml-auto">
-                已选 {selectedIds.length} 个
+                {t('selector.selected', { count: selectedIds.length })}
               </span>
             )}
           </div>
@@ -148,7 +151,7 @@ export default function EditionSelector({
                 <StatusIndicator status={edition.status} size="sm" />
                 <span className="font-medium">{formatEditionNumber(edition)}</span>
                 <span className="text-sm text-muted-foreground">
-                  {getStatusLabel(edition.status)}
+                  {tStatus(edition.status)}
                 </span>
                 {edition.location && (
                   <span className="text-sm text-muted-foreground ml-auto">

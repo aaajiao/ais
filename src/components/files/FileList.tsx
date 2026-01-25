@@ -4,6 +4,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { supabase, getSignedUrl, deleteFile, insertIntoTableNoReturn, type EditionHistoryInsert } from '@/lib/supabase';
 import { formatFileSize } from '@/lib/imageCompressor';
 import { getFileTypeIcon } from '@/lib/fileIcons';
@@ -39,6 +40,7 @@ export default function FileList({
   viewMode = 'list',
   isEditing = false,
 }: FileListProps) {
+  const { t, i18n } = useTranslation('common');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -106,14 +108,14 @@ export default function FileList({
       const historyData: EditionHistoryInsert = {
         edition_id: editionId,
         action: 'file_deleted',
-        notes: `删除文件: ${file.file_name || '未命名文件'}`,
+        notes: `Deleted file: ${file.file_name || 'Unnamed file'}`,
       };
       await insertIntoTableNoReturn('edition_history', historyData);
 
       onDelete?.(file.id);
     } catch (err) {
-      console.error('删除文件失败:', err);
-      alert('删除文件失败');
+      console.error('Failed to delete file:', err);
+      alert(t('files.deleteFailed'));
     } finally {
       setDeletingId(null);
     }
@@ -128,7 +130,8 @@ export default function FileList({
   // 格式化日期
   const formatDate = (dateStr: string): string => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('zh-CN', {
+    const locale = i18n.language === 'zh' ? 'zh-CN' : 'en-US';
+    return date.toLocaleDateString(locale, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -139,7 +142,7 @@ export default function FileList({
     return (
       <div className="text-center py-8 text-muted-foreground">
         <Inbox className="w-10 h-10 mx-auto mb-2" />
-        <div className="text-sm">暂无附件</div>
+        <div className="text-sm">{t('files.noAttachments')}</div>
       </div>
     );
   }
@@ -166,7 +169,7 @@ export default function FileList({
               {/* 文件信息 */}
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium truncate">
-                  {file.file_name || '未命名文件'}
+                  {file.file_name || t('files.unnamed')}
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   {file.file_size && (
@@ -177,7 +180,7 @@ export default function FileList({
                   {file.source_type === 'link' && (
                     <>
                       <span>·</span>
-                      <span className="text-blue-500">外部链接</span>
+                      <span className="text-blue-500">{t('files.externalLink')}</span>
                     </>
                   )}
                 </div>
@@ -193,7 +196,7 @@ export default function FileList({
                 <button
                   onClick={() => handleOpen(file)}
                   className="p-2 text-muted-foreground hover:text-foreground hover:bg-background rounded-lg transition-colors"
-                  title="打开"
+                  title={t('files.open')}
                 >
                   <Eye className="w-4 h-4" />
                 </button>
@@ -202,7 +205,7 @@ export default function FileList({
                   <button
                     onClick={() => handleDownload(file)}
                     className="p-2 text-muted-foreground hover:text-foreground hover:bg-background rounded-lg transition-colors"
-                    title="下载"
+                    title={t('files.download')}
                   >
                     <Download className="w-4 h-4" />
                   </button>
@@ -217,20 +220,20 @@ export default function FileList({
                           disabled={deletingId === file.id}
                           className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50"
                         >
-                          {deletingId === file.id ? '删除中...' : '确认'}
+                          {deletingId === file.id ? t('files.deleting') : t('confirm')}
                         </button>
                         <button
                           onClick={() => setConfirmDeleteId(null)}
                           className="px-2 py-1 text-xs bg-muted text-foreground rounded hover:bg-muted/80"
                         >
-                          取消
+                          {t('cancel')}
                         </button>
                       </div>
                     ) : (
                       <button
                         onClick={() => setConfirmDeleteId(file.id)}
                         className="p-2 text-muted-foreground hover:text-red-500 hover:bg-background rounded-lg transition-colors"
-                        title="删除"
+                        title={t('delete')}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -265,7 +268,7 @@ export default function FileList({
                 <button
                   onClick={() => handleOpen(file)}
                   className="p-2 bg-white/20 hover:bg-white/30 rounded-full text-white"
-                  title="打开"
+                  title={t('files.open')}
                 >
                   <Eye className="w-5 h-5" />
                 </button>
@@ -273,7 +276,7 @@ export default function FileList({
                   <button
                     onClick={() => setConfirmDeleteId(file.id)}
                     className="p-2 bg-white/20 hover:bg-red-500/50 rounded-full text-white"
-                    title="删除"
+                    title={t('delete')}
                   >
                     <Trash2 className="w-5 h-5" />
                   </button>
@@ -282,7 +285,7 @@ export default function FileList({
 
               {/* 文件名 */}
               <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs p-2 truncate">
-                {file.file_name || '未命名'}
+                {file.file_name || t('files.unnamed')}
               </div>
             </div>
           ))}
@@ -298,7 +301,7 @@ export default function FileList({
           <div className="relative max-w-4xl max-h-full" onClick={e => e.stopPropagation()}>
             <img
               src={previewUrl}
-              alt={previewFile.file_name || '预览'}
+              alt={previewFile.file_name || t('files.preview')}
               className="max-w-full max-h-[80vh] object-contain rounded-lg"
             />
             <button
@@ -323,16 +326,16 @@ export default function FileList({
       {confirmDeleteId && viewMode === 'grid' && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-card border border-border rounded-xl p-6 max-w-sm mx-4">
-            <h3 className="text-lg font-semibold mb-2">确认删除</h3>
+            <h3 className="text-lg font-semibold mb-2">{t('files.confirmDelete')}</h3>
             <p className="text-muted-foreground mb-4">
-              确定要删除这个文件吗？此操作无法撤销。
+              {t('files.confirmDeleteMessage')}
             </p>
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => setConfirmDeleteId(null)}
                 className="px-4 py-2 text-sm bg-muted text-foreground rounded-lg hover:bg-muted/80"
               >
-                取消
+                {t('cancel')}
               </button>
               <button
                 onClick={() => {
@@ -342,7 +345,7 @@ export default function FileList({
                 disabled={deletingId === confirmDeleteId}
                 className="px-4 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50"
               >
-                {deletingId === confirmDeleteId ? '删除中...' : '确认删除'}
+                {deletingId === confirmDeleteId ? t('files.deleting') : t('files.confirmDelete')}
               </button>
             </div>
           </div>

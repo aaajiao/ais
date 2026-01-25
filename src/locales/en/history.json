@@ -1,0 +1,65 @@
+{
+  "title": "History",
+  "noHistory": "No history yet",
+  "count": "({{count}})",
+  "addNote": "+ Add Note",
+  "notePlaceholder": "Enter note...",
+  "saving": "Saving...",
+  "save": "Save",
+  "addNoteFailed": "Failed to add note",
+  "showMore": "Show more ({{count}})",
+  "collapse": "Collapse",
+  "times": "×{{count}}",
+  "actions": {
+    "created": "Created",
+    "status_change": "Status Changed",
+    "location_change": "Location Changed",
+    "sold": "Sold",
+    "consigned": "Consigned",
+    "returned": "Returned",
+    "condition_update": "Note",
+    "file_added": "File Added",
+    "file_deleted": "File Deleted",
+    "number_assigned": "Number Assigned"
+  },
+  "descriptions": {
+    "statusChange": "Status changed from \"{{from}}\" to \"{{to}}\"",
+    "locationChange": "Location changed from \"{{from}}\" to \"{{to}}\"",
+    "sold": "Sold",
+    "soldWithPrice": "Sold ({{currency}} {{price}})",
+    "soldBuyer": " - Buyer: {{buyer}}",
+    "consignedTo": "Consigned to {{party}}",
+    "consignedStart": "Consignment started",
+    "returnedFrom": "Returned from {{location}}",
+    "returned": "Returned",
+    "fileAdded": "Added new attachment",
+    "fileDeleted": "Deleted attachment",
+    "numberAssigned": "Assigned inventory number",
+    "created": "Edition created",
+    "conditionUpdate": "Condition updated",
+    "unknown": "Unknown"
+  },
+  "merged": {
+    "filesAdded": "Added {{count}} attachments",
+    "filesDeleted": "Deleted {{count}} attachments",
+    "notes": "{{count}} notes",
+    "records": "{{count}} records"
+  },
+  "relativeTime": {
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "daysAgo": "{{count}} days ago",
+    "weeksAgo": "{{count}} weeks ago",
+    "monthsAgo": "{{count}} months ago",
+    "yearsAgo": "{{count}} years ago"
+  },
+  "details": {
+    "from": "from",
+    "to": "to",
+    "price": "Price",
+    "buyer": "Buyer",
+    "location": "Location",
+    "notes": "Notes",
+    "operator": "Operator"
+  }
+}

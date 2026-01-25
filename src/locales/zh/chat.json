@@ -1,0 +1,83 @@
+{
+  "title": "对话",
+  "chatStartedAt": "对话开始于",
+  "clearChat": "清除对话",
+  "startConversation": "开始对话",
+  "tryAsking": "试试说：「Guard 有几个版本？」或「哪些作品在寄售？」",
+  "quickActions": {
+    "inventoryStats": "库存统计",
+    "consignedWorks": "寄售作品",
+    "inStudioEditions": "在库作品",
+    "recentlySold": "已售作品"
+  },
+  "quickPrompts": {
+    "inventoryStats": "显示当前库存统计",
+    "consignedWorks": "哪些作品在寄售中？",
+    "inStudioEditions": "显示所有在库的版本",
+    "recentlySold": "最近售出了哪些作品？"
+  },
+  "error": "出错了：{{message}}",
+  "placeholder": {
+    "verifying": "正在验证登录...",
+    "pleaseSignIn": "请先登录",
+    "typeMessage": "输入消息..."
+  },
+  "send": "发送",
+  "model": "使用模型",
+  "tools": {
+    "search_artworks": "搜索作品",
+    "search_editions": "搜索版本",
+    "search_locations": "搜索位置",
+    "get_statistics": "获取统计",
+    "generate_update_confirmation": "生成确认",
+    "execute_edition_update": "执行更新"
+  },
+  "toolExecution": "正在{{action}}...",
+  "toolError": "工具执行失败",
+  "confirmed": "已确认更新",
+  "cancelled": "已取消操作",
+  "processing": "处理中...",
+  "results": {
+    "noArtworks": "未找到匹配的作品",
+    "foundArtworks": "找到 {{count}} 个作品：",
+    "moreArtworks": "还有 {{count}} 个...",
+    "noEditions": "未找到匹配的版本",
+    "foundEditions": "找到 {{count}} 个版本：",
+    "moreEditions": "还有 {{count}} 个...",
+    "noLocations": "未找到匹配的位置",
+    "foundLocations": "找到 {{count}} 个位置：",
+    "unknownArtwork": "未知作品"
+  },
+  "statistics": {
+    "title": "库存统计",
+    "totalArtworks": "作品总数",
+    "totalEditions": "版本总数"
+  },
+  "confirmCard": {
+    "title": "确认更新",
+    "edit": "编辑",
+    "artwork": "作品",
+    "status": "状态",
+    "price": "售价",
+    "buyer": "买家",
+    "date": "日期",
+    "location": "位置",
+    "notes": "备注",
+    "confirm": "确认",
+    "fullEdit": "详细编辑",
+    "editTitle": "编辑更新内容",
+    "done": "完成",
+    "doneEditing": "完成编辑",
+    "newStatus": "新状态",
+    "saleInfo": "销售信息",
+    "enterAmount": "输入金额",
+    "currency": "货币",
+    "buyerNameOptional": "买家名称（可选）",
+    "buyerName": "买家名称",
+    "saleDate": "销售日期",
+    "addNotes": "添加备注...",
+    "saveAndReturn": "保存并返回",
+    "discardChanges": "放弃修改",
+    "currentStatus": "当前状态"
+  }
+}

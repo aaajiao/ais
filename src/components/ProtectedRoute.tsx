@@ -1,4 +1,5 @@
 import { Navigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuthContext } from '@/contexts/AuthContext';
 
 interface ProtectedRouteProps {
@@ -6,6 +7,7 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
+  const { t } = useTranslation('common');
   const { isAuthenticated, loading } = useAuthContext();
   const location = useLocation();
 
@@ -15,7 +17,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
-          <p className="text-muted-foreground">正在验证身份...</p>
+          <p className="text-muted-foreground">{t('auth.verifying')}</p>
         </div>
       </div>
     );

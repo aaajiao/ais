@@ -1,60 +1,41 @@
+import { useTranslation } from 'react-i18next';
 import { type EditionStatus } from '@/lib/types';
 
 interface StatusConfig {
   color: string;
-  label: string;
-  labelEn: string;
   pulse?: boolean;
 }
 
 const STATUS_CONFIG: Record<EditionStatus, StatusConfig> = {
   in_production: {
     color: 'var(--status-production)',
-    label: '制作中',
-    labelEn: 'In Production',
     pulse: true
   },
   in_studio: {
     color: 'var(--status-available)',
-    label: '在库',
-    labelEn: 'In Studio'
   },
   at_gallery: {
     color: 'var(--status-consigned)',
-    label: '寄售',
-    labelEn: 'At Gallery',
     pulse: true
   },
   at_museum: {
     color: 'var(--status-transit)',
-    label: '美术馆',
-    labelEn: 'At Museum'
   },
   in_transit: {
     color: 'var(--status-transit)',
-    label: '运输中',
-    labelEn: 'In Transit',
     pulse: true
   },
   sold: {
     color: 'var(--status-sold)',
-    label: '已售',
-    labelEn: 'Sold'
   },
   gifted: {
     color: 'var(--status-consigned)',
-    label: '赠送',
-    labelEn: 'Gifted'
   },
   lost: {
     color: 'var(--status-inactive)',
-    label: '遗失',
-    labelEn: 'Lost'
   },
   damaged: {
     color: 'var(--status-inactive)',
-    label: '损坏',
-    labelEn: 'Damaged'
   },
 };
 
@@ -71,7 +52,9 @@ export function StatusIndicator({
   size = 'md',
   className = ''
 }: StatusIndicatorProps) {
+  const { t } = useTranslation('status');
   const config = STATUS_CONFIG[status];
+  const label = t(status);
 
   const dotSizes = {
     sm: 'w-2 h-2',
@@ -88,7 +71,7 @@ export function StatusIndicator({
   return (
     <span
       className={`inline-flex items-center gap-2 ${className}`}
-      title={`${config.label} / ${config.labelEn}`}
+      title={label}
     >
       <span
         className={`${dotSizes[size]} rounded-full flex-shrink-0 ${config.pulse ? 'status-pulse' : ''}`}
@@ -100,10 +83,10 @@ export function StatusIndicator({
       />
       {showLabel && (
         <span className={`${textSizes[size]} font-medium`} style={{ color: config.color }}>
-          {config.label}
+          {label}
         </span>
       )}
-      <span className="sr-only">{config.label}</span>
+      <span className="sr-only">{label}</span>
     </span>
   );
 }
@@ -112,9 +95,10 @@ export function StatusIndicator({
 export { STATUS_CONFIG };
 export type { StatusConfig };
 
-// 辅助函数：获取状态标签
+// 辅助函数：获取状态标签（需要在 React 组件中使用）
+// 注意：这个函数返回翻译 key，实际使用时需要配合 useTranslation
 export function getStatusLabel(status: EditionStatus): string {
-  return STATUS_CONFIG[status]?.label || status;
+  return status;
 }
 
 // 辅助函数：获取状态颜色

@@ -1,0 +1,45 @@
+{
+  "title": "导出 {{count}} 件作品",
+  "selectFormat": "选择格式",
+  "pdf": {
+    "name": "PDF",
+    "description": "带图，可打印"
+  },
+  "markdown": {
+    "name": "Markdown",
+    "description": "带图链接，可编辑"
+  },
+  "selectEditions": "选择版本",
+  "allEditions": "全部版本",
+  "selectedEditions": "选择特定版本",
+  "includeInfo": "包含信息",
+  "priceInfo": "价格信息",
+  "statusDetails": "版本状态详情（在库/寄售/已售）",
+  "locationInfo": "位置信息",
+  "backupHint": "完整数据备份请前往「设置」页面",
+  "exporting": "导出中...",
+  "export": "导出",
+  "exportFailed": "导出失败",
+  "loginRequired": "请先登录",
+  "format": "格式",
+  "options": {
+    "title": "包含信息",
+    "includePrice": "价格",
+    "includeStatus": "状态",
+    "includeLocation": "位置"
+  },
+  "editions": {
+    "title": "选择版本",
+    "all": "全部版本",
+    "selected": "已选 {{count}} 个"
+  },
+  "actions": {
+    "export": "导出",
+    "exporting": "导出中...",
+    "cancel": "取消"
+  },
+  "result": {
+    "success": "导出成功",
+    "failed": "导出失败：{{error}}"
+  }
+}

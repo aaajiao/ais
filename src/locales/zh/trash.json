@@ -1,0 +1,26 @@
+{
+  "title": "回收站",
+  "empty": "回收站是空的",
+  "emptyDescription": "删除的作品将在这里显示",
+  "restoreAll": "全部恢复",
+  "deleteAll": "全部删除",
+  "restore": "恢复",
+  "deletePermanently": "永久删除",
+  "deleteDialog": {
+    "title": "永久删除",
+    "message": "确定要永久删除这个作品吗？这将同时删除所有关联的版本和历史记录。",
+    "warning": "此操作不可撤销！",
+    "cancel": "取消",
+    "confirm": "永久删除",
+    "deleting": "删除中..."
+  },
+  "confirmDeleteAll": "确定要永久删除所有 {{count}} 个作品吗？此操作不可撤销。",
+  "deletedAt": "删除于",
+  "daysRemaining": "剩余 {{count}} 天",
+  "deletedTime": {
+    "today": "今天删除",
+    "yesterday": "昨天删除",
+    "daysAgo": "{{count}}天前删除",
+    "weeksAgo": "{{count}}周前删除"
+  }
+}

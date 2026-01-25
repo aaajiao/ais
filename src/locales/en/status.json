@@ -1,0 +1,11 @@
+{
+  "in_production": "In Production",
+  "in_studio": "In Studio",
+  "at_gallery": "At Gallery",
+  "at_museum": "At Museum",
+  "in_transit": "In Transit",
+  "sold": "Sold",
+  "gifted": "Gifted",
+  "lost": "Lost",
+  "damaged": "Damaged"
+}

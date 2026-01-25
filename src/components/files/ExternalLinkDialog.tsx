@@ -3,6 +3,7 @@
  */
 
 import { useState, useCallback, useEffect, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { insertIntoTable, insertIntoTableNoReturn, type EditionFilesInsert, type EditionHistoryInsert } from '@/lib/supabase';
 import { detectLinkType } from '@/lib/imageCompressor';
 import type { FileType, FileSourceType } from '@/lib/database.types';
@@ -41,15 +42,8 @@ const FILE_TYPE_ICONS: Record<FileType, ReactNode> = {
   other: <Paperclip className="w-4 h-4" />,
 };
 
-const FILE_TYPE_OPTIONS: { value: FileType; label: string }[] = [
-  { value: 'link', label: '链接' },
-  { value: 'video', label: '视频' },
-  { value: 'image', label: '图片' },
-  { value: 'pdf', label: 'PDF' },
-  { value: 'document', label: '文档' },
-  { value: 'markdown', label: 'Markdown' },
-  { value: 'spreadsheet', label: '表格' },
-  { value: 'other', label: '其他' },
+const FILE_TYPE_VALUES: FileType[] = [
+  'link', 'video', 'image', 'pdf', 'document', 'markdown', 'spreadsheet', 'other',
 ];
 
 export default function ExternalLinkDialog({
@@ -58,6 +52,7 @@ export default function ExternalLinkDialog({
   editionId,
   onLinkAdded,
 }: ExternalLinkDialogProps) {
+  const { t } = useTranslation('common');
   const [url, setUrl] = useState('');
   const [description, setDescription] = useState('');
   const [fileType, setFileType] = useState<FileType>('link');
@@ -102,12 +97,12 @@ export default function ExternalLinkDialog({
 
     const trimmedUrl = url.trim();
     if (!trimmedUrl) {
-      setError('请输入链接地址');
+      setError(t('externalLink.urlRequired'));
       return;
     }
 
     if (!validateUrl(trimmedUrl)) {
-      setError('请输入有效的链接地址');
+      setError(t('externalLink.urlInvalid'));
       return;
     }
 
@@ -139,15 +134,15 @@ export default function ExternalLinkDialog({
       const historyData: EditionHistoryInsert = {
         edition_id: editionId,
         action: 'file_added',
-        notes: `添加外部链接: ${fileName}`,
+        notes: `External link added: ${fileName}`,
       };
       await insertIntoTableNoReturn('edition_history', historyData);
 
       onLinkAdded?.(data as EditionFile);
       handleClose();
     } catch (err) {
-      console.error('添加链接失败:', err);
-      setError(err instanceof Error ? err.message : '添加链接失败');
+      console.error('Failed to add link:', err);
+      setError(err instanceof Error ? err.message : t('externalLink.addFailed'));
     } finally {
       setSaving(false);
     }
@@ -177,7 +172,7 @@ export default function ExternalLinkDialog({
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">添加外部链接</h3>
+          <h3 className="text-lg font-semibold">{t('externalLink.title')}</h3>
           <button
             onClick={handleClose}
             className="p-1 text-muted-foreground hover:text-foreground"
@@ -190,7 +185,7 @@ export default function ExternalLinkDialog({
           {/* URL 输入 */}
           <div>
             <label className="block text-sm font-medium mb-1">
-              链接地址 <span className="text-red-500">*</span>
+              {t('externalLink.url')} <span className="text-red-500">*</span>
             </label>
             <input
               type="url"
@@ -204,21 +199,21 @@ export default function ExternalLinkDialog({
 
           {/* 类型选择 */}
           <div>
-            <label className="block text-sm font-medium mb-1">链接类型</label>
+            <label className="block text-sm font-medium mb-1">{t('externalLink.linkType')}</label>
             <div className="flex flex-wrap gap-2">
-              {FILE_TYPE_OPTIONS.map(option => (
+              {FILE_TYPE_VALUES.map(type => (
                 <button
-                  key={option.value}
+                  key={type}
                   type="button"
-                  onClick={() => setFileType(option.value)}
+                  onClick={() => setFileType(type)}
                   className={`px-3 py-1.5 text-sm rounded-lg border transition-colors flex items-center gap-1.5 ${
-                    fileType === option.value
+                    fileType === type
                       ? 'bg-primary text-primary-foreground border-primary'
                       : 'bg-background border-border hover:border-primary/50'
                   }`}
                 >
-                  {FILE_TYPE_ICONS[option.value]}
-                  {option.label}
+                  {FILE_TYPE_ICONS[type]}
+                  {t(`externalLink.fileTypes.${type}`)}
                 </button>
               ))}
             </div>
@@ -226,12 +221,12 @@ export default function ExternalLinkDialog({
 
           {/* 描述 */}
           <div>
-            <label className="block text-sm font-medium mb-1">描述（可选）</label>
+            <label className="block text-sm font-medium mb-1">{t('externalLink.descriptionOptional')}</label>
             <input
               type="text"
               value={description}
               onChange={e => setDescription(e.target.value)}
-              placeholder="添加备注..."
+              placeholder={t('externalLink.addNotePlaceholder')}
               className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
             />
           </div>
@@ -250,14 +245,14 @@ export default function ExternalLinkDialog({
               onClick={handleClose}
               className="px-4 py-2 text-sm bg-muted text-foreground rounded-lg hover:bg-muted/80"
             >
-              取消
+              {t('cancel')}
             </button>
             <button
               type="submit"
               disabled={saving || !url.trim()}
               className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
             >
-              {saving ? '添加中...' : '添加链接'}
+              {saving ? t('externalLink.adding') : t('externalLink.addLink')}
             </button>
           </div>
         </form>

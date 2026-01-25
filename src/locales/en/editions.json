@@ -1,0 +1,31 @@
+{
+  "title": "Editions",
+  "searchPlaceholder": "Search editions (artwork, number, location)...",
+  "noEditions": "No editions yet",
+  "noMatch": "No matching editions found",
+  "filters": {
+    "all": "All",
+    "inStudio": "In Studio",
+    "atGallery": "Consigned",
+    "atMuseum": "Museum",
+    "inTransit": "In Transit",
+    "sold": "Sold"
+  },
+  "editionNumber": "Edition #",
+  "status": "Status",
+  "location": "Location",
+  "price": "Price",
+  "buyer": "Buyer",
+  "soldAt": "Sold Date",
+  "notes": "Notes",
+  "unique": "Unique",
+  "unknownArtwork": "Unknown Artwork",
+  "selector": {
+    "noEditions": "No editions for this artwork",
+    "allEditions": "All editions ({{count}})",
+    "selectSpecific": "Select specific editions",
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "selected": "{{count}} selected"
+  }
+}

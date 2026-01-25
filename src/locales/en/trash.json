@@ -1,0 +1,26 @@
+{
+  "title": "Trash",
+  "empty": "Trash is empty",
+  "emptyDescription": "Deleted artworks will appear here",
+  "restoreAll": "Restore All",
+  "deleteAll": "Delete All",
+  "restore": "Restore",
+  "deletePermanently": "Delete Permanently",
+  "deleteDialog": {
+    "title": "Permanent Delete",
+    "message": "Are you sure you want to permanently delete this artwork? This will also delete all associated editions and history.",
+    "warning": "This action cannot be undone!",
+    "cancel": "Cancel",
+    "confirm": "Delete Permanently",
+    "deleting": "Deleting..."
+  },
+  "confirmDeleteAll": "Permanently delete all {{count}} artworks? This cannot be undone.",
+  "deletedAt": "Deleted",
+  "daysRemaining": "{{count}} days remaining",
+  "deletedTime": {
+    "today": "Deleted today",
+    "yesterday": "Deleted yesterday",
+    "daysAgo": "Deleted {{count}} days ago",
+    "weeksAgo": "Deleted {{count}} weeks ago"
+  }
+}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
@@ -27,6 +28,7 @@ interface ModelsResponse {
 }
 
 export default function Settings() {
+  const { t } = useTranslation('settings');
   const { user, signOut } = useAuthContext();
   const [selectedModel, setSelectedModel] = useState<string>(() => {
     return localStorage.getItem('ai-model') || '';
@@ -112,24 +114,24 @@ export default function Settings() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('导出 JSON 失败:', err);
-      alert('导出失败: ' + (err instanceof Error ? err.message : '未知错误'));
+      console.error('Export JSON failed:', err);
+      alert(t('export.exportError') + ': ' + (err instanceof Error ? err.message : 'Unknown error'));
     } finally {
       setExporting(null);
     }
   };
 
-  // 导出 CSV（作品列表）
+  // 导出 CSV（作品列表）- CSV headers use English for data interoperability
   const handleExportArtworksCSV = async () => {
     setExporting('artworks-csv');
     try {
       const { data: artworks } = await supabase.from('artworks').select('*').returns<Artwork[]>();
       if (!artworks || artworks.length === 0) {
-        alert('没有作品数据可导出');
+        alert(t('export.noArtworks'));
         return;
       }
 
-      const headers = ['ID', '标题(英)', '标题(中)', '年份', '类型', '材料', '尺寸', '时长', '版数', 'AP数', '独版', '来源链接', '创建时间'];
+      const headers = ['ID', 'Title (EN)', 'Title (CN)', 'Year', 'Type', 'Materials', 'Dimensions', 'Duration', 'Edition Total', 'AP Total', 'Unique', 'Source URL', 'Created At'];
       const rows = artworks.map((a: Artwork) => [
         a.id,
         a.title_en,
@@ -141,7 +143,7 @@ export default function Settings() {
         a.duration || '',
         a.edition_total || '',
         a.ap_total || '',
-        a.is_unique ? '是' : '否',
+        a.is_unique ? 'Yes' : 'No',
         a.source_url || '',
         a.created_at,
       ]);
@@ -158,14 +160,14 @@ export default function Settings() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('导出 CSV 失败:', err);
-      alert('导出失败: ' + (err instanceof Error ? err.message : '未知错误'));
+      console.error('Export CSV failed:', err);
+      alert(t('export.exportError') + ': ' + (err instanceof Error ? err.message : 'Unknown error'));
     } finally {
       setExporting(null);
     }
   };
 
-  // 导出 CSV（版本列表）
+  // 导出 CSV（版本列表）- CSV headers use English for data interoperability
   const handleExportEditionsCSV = async () => {
     setExporting('editions-csv');
     try {
@@ -174,11 +176,11 @@ export default function Settings() {
         .select('*, artworks(title_en), locations(name)');
 
       if (!editions || editions.length === 0) {
-        alert('没有版本数据可导出');
+        alert(t('export.noEditions'));
         return;
       }
 
-      const headers = ['ID', '作品', '版号', '类型', '状态', '位置', '库存编号', '售价', '币种', '买家', '售出日期', '备注', '创建时间'];
+      const headers = ['ID', 'Artwork', 'Edition #', 'Type', 'Status', 'Location', 'Inventory #', 'Sale Price', 'Currency', 'Buyer', 'Sale Date', 'Notes', 'Created At'];
       const rows = editions.map((e: Record<string, unknown>) => [
         e.id,
         (e.artworks as { title_en: string } | null)?.title_en || '',
@@ -207,8 +209,8 @@ export default function Settings() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('导出 CSV 失败:', err);
-      alert('导出失败: ' + (err instanceof Error ? err.message : '未知错误'));
+      console.error('Export CSV failed:', err);
+      alert(t('export.exportError') + ': ' + (err instanceof Error ? err.message : 'Unknown error'));
     } finally {
       setExporting(null);
     }
@@ -226,7 +228,7 @@ export default function Settings() {
     if (loadingModels) {
       return (
         <div className="text-center py-8 text-muted-foreground">
-          加载可用模型中...
+          {t('ai.loadingModels')}
         </div>
       );
     }
@@ -234,13 +236,13 @@ export default function Settings() {
     if (modelsError) {
       return (
         <div className="text-center py-8">
-          <p className="text-destructive mb-2">加载模型失败</p>
+          <p className="text-destructive mb-2">{t('ai.loadError')}</p>
           <p className="text-sm text-muted-foreground">{modelsError}</p>
           <button
             onClick={() => window.location.reload()}
             className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90"
           >
-            重试
+            {t('ai.retry')}
           </button>
         </div>
       );
@@ -255,7 +257,7 @@ export default function Settings() {
     if (!hasModels) {
       return (
         <div className="text-center py-8 text-muted-foreground">
-          没有可用的模型。请检查 API 密钥配置。
+          {t('ai.noModels')}
         </div>
       );
     }
@@ -275,7 +277,7 @@ export default function Settings() {
               onValueChange={handleModelChange}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="选择 Claude 模型" />
+                <SelectValue placeholder={t('ai.selectClaude')} />
               </SelectTrigger>
               <SelectContent>
                 {models.anthropic.map(model => (
@@ -297,7 +299,7 @@ export default function Settings() {
               onValueChange={handleModelChange}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="选择 GPT 模型" />
+                <SelectValue placeholder={t('ai.selectGPT')} />
               </SelectTrigger>
               <SelectContent>
                 {models.openai.map(model => (
@@ -325,80 +327,80 @@ export default function Settings() {
 
   return (
     <div className="p-6">
-      <h1 className="text-page-title mb-6 xl:mb-8">设置</h1>
+      <h1 className="text-page-title mb-6 xl:mb-8">{t('title')}</h1>
 
       {/* AI 模型设置 */}
       <div className="bg-card border border-border rounded-xl p-6 mb-6">
-        <h2 className="text-lg font-semibold mb-4">AI 模型</h2>
+        <h2 className="text-lg font-semibold mb-4">{t('ai.title')}</h2>
 
         {renderModelSelector()}
 
         <p className="text-sm text-muted-foreground mt-4 p-3 bg-muted/50 rounded-lg flex items-start gap-2">
           <Lightbulb className="w-4 h-4 flex-shrink-0 mt-0.5" />
-          <span>模型列表从 API 动态加载，显示当前可用的所有模型</span>
+          <span>{t('ai.modelHint')}</span>
         </p>
       </div>
 
       {/* 数据导出 */}
       <div className="bg-card border border-border rounded-xl p-6 mb-6">
-        <h2 className="text-lg font-semibold mb-4">数据导出</h2>
+        <h2 className="text-lg font-semibold mb-4">{t('export.title')}</h2>
 
         <div className="space-y-4">
           {/* JSON 完整备份 */}
           <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
             <div>
-              <p className="font-medium">JSON 完整备份</p>
-              <p className="text-sm text-muted-foreground">导出所有数据（作品、版本、位置、历史记录）</p>
+              <p className="font-medium">{t('export.jsonBackup')}</p>
+              <p className="text-sm text-muted-foreground">{t('export.jsonDescription')}</p>
             </div>
             <button
               onClick={handleExportJSON}
               disabled={exporting !== null}
               className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
             >
-              {exporting === 'json' ? '导出中...' : '导出 JSON'}
+              {exporting === 'json' ? t('export.exporting') : t('export.exportJson')}
             </button>
           </div>
 
           {/* 作品 CSV */}
           <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
             <div>
-              <p className="font-medium">作品列表 CSV</p>
-              <p className="text-sm text-muted-foreground">导出作品基本信息，可用 Excel 打开</p>
+              <p className="font-medium">{t('export.artworksCsv')}</p>
+              <p className="text-sm text-muted-foreground">{t('export.artworksCsvDescription')}</p>
             </div>
             <button
               onClick={handleExportArtworksCSV}
               disabled={exporting !== null}
               className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
             >
-              {exporting === 'artworks-csv' ? '导出中...' : '导出 CSV'}
+              {exporting === 'artworks-csv' ? t('export.exporting') : t('export.exportCsv')}
             </button>
           </div>
 
           {/* 版本 CSV */}
           <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
             <div>
-              <p className="font-medium">版本列表 CSV</p>
-              <p className="text-sm text-muted-foreground">导出所有版本及状态信息</p>
+              <p className="font-medium">{t('export.editionsCsv')}</p>
+              <p className="text-sm text-muted-foreground">{t('export.editionsCsvDescription')}</p>
             </div>
             <button
               onClick={handleExportEditionsCSV}
               disabled={exporting !== null}
               className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
             >
-              {exporting === 'editions-csv' ? '导出中...' : '导出 CSV'}
+              {exporting === 'editions-csv' ? t('export.exporting') : t('export.exportCsv')}
             </button>
           </div>
         </div>
 
         <p className="text-sm text-muted-foreground mt-4 p-3 bg-muted/50 rounded-lg flex items-start gap-2">
           <Lightbulb className="w-4 h-4 flex-shrink-0 mt-0.5" />
-          <span>建议定期导出 JSON 备份，以防数据丢失</span>
+          <span>{t('export.exportHint')}</span>
         </p>
       </div>
 
       {/* 账户信息 */}
       <div className="bg-card border border-border rounded-xl p-6">
-        <h2 className="text-lg font-semibold mb-4">账户</h2>
+        <h2 className="text-lg font-semibold mb-4">{t('account.title')}</h2>
 
         {user ? (
           <div className="space-y-4">
@@ -424,12 +426,12 @@ export default function Settings() {
                 disabled={isSigningOut}
                 className="px-4 py-2 rounded-lg bg-destructive text-white hover:opacity-90 transition-opacity disabled:opacity-50"
               >
-                {isSigningOut ? '登出中...' : '登出'}
+                {isSigningOut ? t('account.signingOut') : t('account.signOut')}
               </button>
             </div>
           </div>
         ) : (
-          <p className="text-muted-foreground">未登录</p>
+          <p className="text-muted-foreground">{t('account.notLoggedIn')}</p>
         )}
       </div>
     </div>

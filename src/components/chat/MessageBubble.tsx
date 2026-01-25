@@ -1,7 +1,8 @@
 import { useState, useCallback, useMemo, memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { UIMessage } from 'ai';
 import EditableConfirmCard, { type ConfirmCardData } from './EditableConfirmCard';
-import { StatusIndicator, getStatusLabel } from '@/components/ui/StatusIndicator';
+import { StatusIndicator } from '@/components/ui/StatusIndicator';
 import type { EditionStatus } from '@/lib/database.types';
 import { Loader2, CheckCircle, XCircle, Undo2 } from 'lucide-react';
 
@@ -116,6 +117,7 @@ function ToolResult({
   toolPart: ToolPart;
   onConfirmUpdate?: (data: ConfirmCardData) => Promise<void>;
 }) {
+  const { t } = useTranslation('chat');
   const toolName = getToolName(toolPart);
   const { state, output, errorText } = toolPart;
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -150,7 +152,7 @@ function ToolResult({
     return (
       <div className="text-sm text-muted-foreground flex items-center gap-2">
         <Loader2 className="w-4 h-4 animate-spin" />
-        <span>正在{getToolLabel(toolName)}...</span>
+        <span>{t('toolExecution', { action: t(`tools.${toolName}`, { defaultValue: toolName }) })}</span>
       </div>
     );
   }
@@ -160,7 +162,7 @@ function ToolResult({
     return (
       <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg text-red-700 dark:text-red-300 text-sm flex items-center gap-2">
         <XCircle className="w-4 h-4 flex-shrink-0" />
-        <span>{errorText || '工具执行失败'}</span>
+        <span>{errorText || t('toolError')}</span>
       </div>
     );
   }
@@ -173,7 +175,7 @@ function ToolResult({
         return (
           <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg text-green-700 dark:text-green-300 text-sm flex items-center gap-2">
             <CheckCircle className="w-4 h-4 flex-shrink-0" />
-            <span>已确认更新</span>
+            <span>{t('confirmed')}</span>
           </div>
         );
       }
@@ -182,7 +184,7 @@ function ToolResult({
         return (
           <div className="p-3 bg-muted rounded-lg text-muted-foreground text-sm flex items-center gap-2">
             <Undo2 className="w-4 h-4 flex-shrink-0" />
-            <span>已取消操作</span>
+            <span>{t('cancelled')}</span>
           </div>
         );
       }
@@ -239,27 +241,17 @@ function ToolResult({
   return null;
 }
 
-function getToolLabel(toolName: string): string {
-  const labels: Record<string, string> = {
-    search_artworks: '搜索作品',
-    search_editions: '搜索版本',
-    search_locations: '搜索位置',
-    get_statistics: '获取统计',
-    generate_update_confirmation: '生成确认',
-    execute_edition_update: '执行更新',
-  };
-  return labels[toolName] || toolName;
-}
-
 // 作品搜索结果
 function ArtworkResults({ artworks }: { artworks: Record<string, unknown>[] }) {
+  const { t } = useTranslation('chat');
+
   if (artworks.length === 0) {
-    return <div className="text-sm text-muted-foreground">未找到匹配的作品</div>;
+    return <div className="text-sm text-muted-foreground">{t('results.noArtworks')}</div>;
   }
 
   return (
     <div className="space-y-2">
-      <div className="text-xs text-muted-foreground">找到 {artworks.length} 个作品：</div>
+      <div className="text-xs text-muted-foreground">{t('results.foundArtworks', { count: artworks.length })}</div>
       {artworks.slice(0, 5).map((artwork) => (
         <div key={String(artwork.id)} className="p-2 bg-muted/50 rounded-lg text-sm">
           <p className="font-medium">{String(artwork.title_en)}</p>
@@ -270,7 +262,7 @@ function ArtworkResults({ artworks }: { artworks: Record<string, unknown>[] }) {
         </div>
       ))}
       {artworks.length > 5 && (
-        <div className="text-xs text-muted-foreground">还有 {artworks.length - 5} 个...</div>
+        <div className="text-xs text-muted-foreground">{t('results.moreArtworks', { count: artworks.length - 5 })}</div>
       )}
     </div>
   );
@@ -278,13 +270,16 @@ function ArtworkResults({ artworks }: { artworks: Record<string, unknown>[] }) {
 
 // 版本搜索结果
 function EditionResults({ editions }: { editions: Record<string, unknown>[] }) {
+  const { t } = useTranslation('chat');
+  const { t: tStatus } = useTranslation('status');
+
   if (editions.length === 0) {
-    return <div className="text-sm text-muted-foreground">未找到匹配的版本</div>;
+    return <div className="text-sm text-muted-foreground">{t('results.noEditions')}</div>;
   }
 
   return (
     <div className="space-y-2">
-      <div className="text-xs text-muted-foreground">找到 {editions.length} 个版本：</div>
+      <div className="text-xs text-muted-foreground">{t('results.foundEditions', { count: editions.length })}</div>
       {editions.slice(0, 5).map((edition) => {
         const artwork = edition.artworks as Record<string, unknown> | undefined;
         const location = edition.locations as Record<string, unknown> | undefined;
@@ -294,20 +289,20 @@ function EditionResults({ editions }: { editions: Record<string, unknown>[] }) {
           <div key={String(edition.id)} className="p-2 bg-muted/50 rounded-lg text-sm">
             <p className="font-medium flex items-center gap-2">
               <span>
-                {artwork?.title_en ? String(artwork.title_en) : '未知作品'}{' '}
+                {artwork?.title_en ? String(artwork.title_en) : t('results.unknownArtwork')}{' '}
                 {String(edition.edition_number)}/{artwork?.edition_total ? String(artwork.edition_total) : '?'}
               </span>
               <StatusIndicator status={status} size="sm" />
             </p>
             <p className="text-xs text-muted-foreground">
-              {getStatusLabel(status)}
+              {tStatus(status)}
               {location && ` · ${String(location.name)}`}
             </p>
           </div>
         );
       })}
       {editions.length > 5 && (
-        <div className="text-xs text-muted-foreground">还有 {editions.length - 5} 个...</div>
+        <div className="text-xs text-muted-foreground">{t('results.moreEditions', { count: editions.length - 5 })}</div>
       )}
     </div>
   );
@@ -315,13 +310,15 @@ function EditionResults({ editions }: { editions: Record<string, unknown>[] }) {
 
 // 位置搜索结果
 function LocationResults({ locations }: { locations: Record<string, unknown>[] }) {
+  const { t } = useTranslation('chat');
+
   if (locations.length === 0) {
-    return <div className="text-sm text-muted-foreground">未找到匹配的位置</div>;
+    return <div className="text-sm text-muted-foreground">{t('results.noLocations')}</div>;
   }
 
   return (
     <div className="space-y-1">
-      <div className="text-xs text-muted-foreground">找到 {locations.length} 个位置：</div>
+      <div className="text-xs text-muted-foreground">{t('results.foundLocations', { count: locations.length })}</div>
       {locations.map((location) => (
         <div key={String(location.id)} className="text-sm flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-status-transit flex-shrink-0" />
@@ -334,14 +331,16 @@ function LocationResults({ locations }: { locations: Record<string, unknown>[] }
 
 // 统计结果
 function StatisticsResult({ data }: { data: Record<string, unknown> }) {
+  const { t } = useTranslation('chat');
+  const { t: tStatus } = useTranslation('status');
   const breakdown = data.status_breakdown as Record<string, number> | undefined;
 
   return (
     <div className="p-3 bg-muted/50 rounded-lg space-y-2">
-      <div className="text-sm font-medium uppercase tracking-wider">库存统计</div>
+      <div className="text-sm font-medium uppercase tracking-wider">{t('statistics.title')}</div>
       <div className="grid grid-cols-2 gap-2 text-sm">
-        <div>作品总数：<span className="font-mono font-medium">{String(data.total_artworks)}</span></div>
-        <div>版本总数：<span className="font-mono font-medium">{String(data.total_editions)}</span></div>
+        <div>{t('statistics.totalArtworks')}: <span className="font-mono font-medium">{String(data.total_artworks)}</span></div>
+        <div>{t('statistics.totalEditions')}: <span className="font-mono font-medium">{String(data.total_editions)}</span></div>
       </div>
       {breakdown && Object.keys(breakdown).length > 0 && (
         <div className="text-xs space-y-1.5 pt-2 border-t border-border">
@@ -349,7 +348,7 @@ function StatisticsResult({ data }: { data: Record<string, unknown> }) {
             <div key={status} className="flex items-center justify-between">
               <span className="flex items-center gap-2">
                 <StatusIndicator status={status as EditionStatus} size="sm" />
-                <span>{getStatusLabel(status as EditionStatus)}</span>
+                <span>{tStatus(status)}</span>
               </span>
               <span className="font-mono font-medium">{count}</span>
             </div>

@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { UIMessage } from 'ai';
 import MessageBubble from './MessageBubble';
@@ -21,6 +22,7 @@ export default function CollapsibleChatHistory({
   onConfirmUpdate,
   isLoading = false,
 }: CollapsibleChatHistoryProps) {
+  const { t } = useTranslation('common');
   const parentRef = useRef<HTMLDivElement>(null);
 
   // 按日期分组
@@ -87,9 +89,9 @@ export default function CollapsibleChatHistory({
       <div className="flex-1 flex items-center justify-center text-muted-foreground">
         <div className="text-center py-8">
           <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <p className="font-medium">开始对话</p>
+          <p className="font-medium">{t('chatHistory.startConversation')}</p>
           <p className="text-sm mt-2">
-            试试说：「Guard 有几个版本？」或「哪些作品在寄售？」
+            {t('chatHistory.tryAsking')}
           </p>
         </div>
       </div>
@@ -101,21 +103,21 @@ export default function CollapsibleChatHistory({
       {/* 工具栏 */}
       <div className="px-4 py-2 border-b border-border flex items-center justify-between text-xs flex-shrink-0">
         <span className="text-muted-foreground">
-          {messageGroups.length} 个日期 · {messages.length} 条消息
+          {t('chatHistory.dateCount', { dates: messageGroups.length, messages: messages.length })}
         </span>
         <div className="flex gap-2">
           <button
             onClick={expandAll}
             className="text-primary hover:underline"
           >
-            展开全部
+            {t('chatHistory.expandAll')}
           </button>
           <span className="text-muted-foreground">|</span>
           <button
             onClick={collapseAll}
             className="text-primary hover:underline"
           >
-            折叠全部
+            {t('chatHistory.collapseAll')}
           </button>
         </div>
       </div>
@@ -193,6 +195,7 @@ function DateGroupHeader({
   isExpanded: boolean;
   onToggle: () => void;
 }) {
+  const { t } = useTranslation('common');
   return (
     <button
       onClick={onToggle}
@@ -205,7 +208,7 @@ function DateGroupHeader({
         <span className="font-medium text-sm">{group.displayDate}</span>
       </div>
       <span className="text-xs text-muted-foreground">
-        {group.messages.length} 条消息
+        {t('chatHistory.messageCount', { count: group.messages.length })}
       </span>
     </button>
   );

@@ -1,0 +1,29 @@
+{
+  "title": "位置管理",
+  "subtitle": "管理作品存放的位置，共 {{count}} 个位置",
+  "searchPlaceholder": "搜索位置名称、别名、城市...",
+  "noLocations": "还没有位置",
+  "noLocationsHint": "添加工作室、画廊、美术馆等位置来管理作品存放",
+  "noMatch": "没有找到匹配的位置",
+  "addLocation": "添加位置",
+  "addFirstLocation": "添加第一个位置",
+  "selectLocation": "选择位置...",
+  "deleteSuccess": "位置 \"{{name}}\" 已删除",
+  "types": {
+    "studio": "工作室",
+    "gallery": "画廊",
+    "museum": "美术馆",
+    "other": "其他"
+  },
+  "fields": {
+    "name": "名称",
+    "type": "类型",
+    "city": "城市",
+    "country": "国家",
+    "address": "地址",
+    "contact": "联系方式",
+    "aliases": "别名",
+    "notes": "备注"
+  },
+  "editionsAtLocation": "{{count}} 个版本在此位置"
+}

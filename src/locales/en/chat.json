@@ -1,0 +1,83 @@
+{
+  "title": "Chat",
+  "chatStartedAt": "Chat started at",
+  "clearChat": "Clear chat",
+  "startConversation": "Start a conversation",
+  "tryAsking": "Try asking: \"How many editions of Guard?\" or \"Which works are consigned?\"",
+  "quickActions": {
+    "inventoryStats": "Inventory stats",
+    "consignedWorks": "Consigned works",
+    "inStudioEditions": "In-studio editions",
+    "recentlySold": "Recently sold"
+  },
+  "quickPrompts": {
+    "inventoryStats": "Show current inventory statistics",
+    "consignedWorks": "Which artworks are consigned?",
+    "inStudioEditions": "Show all in-studio editions",
+    "recentlySold": "Which artworks were recently sold?"
+  },
+  "error": "Error: {{message}}",
+  "placeholder": {
+    "verifying": "Verifying login...",
+    "pleaseSignIn": "Please sign in",
+    "typeMessage": "Type a message..."
+  },
+  "send": "Send",
+  "model": "Model",
+  "tools": {
+    "search_artworks": "Searching artworks",
+    "search_editions": "Searching editions",
+    "search_locations": "Searching locations",
+    "get_statistics": "Getting statistics",
+    "generate_update_confirmation": "Generating confirmation",
+    "execute_edition_update": "Executing update"
+  },
+  "toolExecution": "{{action}}...",
+  "toolError": "Tool execution failed",
+  "confirmed": "Update confirmed",
+  "cancelled": "Operation cancelled",
+  "processing": "Processing...",
+  "results": {
+    "noArtworks": "No matching artworks found",
+    "foundArtworks": "Found {{count}} artworks:",
+    "moreArtworks": "{{count}} more...",
+    "noEditions": "No matching editions found",
+    "foundEditions": "Found {{count}} editions:",
+    "moreEditions": "{{count}} more...",
+    "noLocations": "No matching locations found",
+    "foundLocations": "Found {{count}} locations:",
+    "unknownArtwork": "Unknown artwork"
+  },
+  "statistics": {
+    "title": "Inventory Statistics",
+    "totalArtworks": "Total Artworks",
+    "totalEditions": "Total Editions"
+  },
+  "confirmCard": {
+    "title": "Confirm Update",
+    "edit": "Edit",
+    "artwork": "Artwork",
+    "status": "Status",
+    "price": "Price",
+    "buyer": "Buyer",
+    "date": "Date",
+    "location": "Location",
+    "notes": "Notes",
+    "confirm": "Confirm",
+    "fullEdit": "Full Edit",
+    "editTitle": "Edit Update",
+    "done": "Done",
+    "doneEditing": "Done Editing",
+    "newStatus": "New Status",
+    "saleInfo": "Sale Info",
+    "enterAmount": "Enter amount",
+    "currency": "Currency",
+    "buyerNameOptional": "Buyer name (optional)",
+    "buyerName": "Buyer name",
+    "saleDate": "Sale date",
+    "addNotes": "Add notes...",
+    "saveAndReturn": "Save & Return",
+    "discardChanges": "Discard Changes",
+    "currentStatus": "Current status"
+  }
+}

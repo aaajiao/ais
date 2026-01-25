@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Loader2 } from 'lucide-react';
 
 interface ConfirmDialogProps {
@@ -17,14 +18,19 @@ export default function ConfirmDialog({
   isOpen,
   title,
   message,
-  confirmText = '确认',
-  cancelText = '取消',
+  confirmText,
+  cancelText,
   variant = 'default',
   onConfirm,
   onCancel,
   isLoading = false,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation('common');
   const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Use translation defaults if not provided
+  const finalConfirmText = confirmText ?? t('confirm');
+  const finalCancelText = cancelText ?? t('cancel');
 
   // 按 ESC 关闭
   useEffect(() => {
@@ -101,7 +107,7 @@ export default function ConfirmDialog({
             disabled={isLoading}
             className="px-4 py-2 text-sm rounded-lg border border-border hover:bg-muted transition-colors disabled:opacity-50"
           >
-            {cancelText}
+            {finalCancelText}
           </button>
           <button
             onClick={onConfirm}
@@ -111,10 +117,10 @@ export default function ConfirmDialog({
             {isLoading ? (
               <span className="flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                处理中...
+                {t('confirmDialog.processing')}
               </span>
             ) : (
-              confirmText
+              finalConfirmText
             )}
           </button>
         </div>

@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useInventoryNumber } from '@/hooks/useInventoryNumber';
 import { Check, X, AlertTriangle, Loader2 } from 'lucide-react';
 
@@ -24,6 +25,7 @@ export default function InventoryNumberInput({
   disabled = false,
   className = '',
 }: InventoryNumberInputProps) {
+  const { t } = useTranslation('common');
   const [isFocused, setIsFocused] = useState(false);
   const [showSuggestionPopup, setShowSuggestionPopup] = useState(false);
 
@@ -93,7 +95,7 @@ export default function InventoryNumberInput({
             setTimeout(() => setShowSuggestionPopup(false), 200);
           }}
           disabled={disabled || isLoading}
-          placeholder={isLoading ? '加载中...' : '输入库存编号...'}
+          placeholder={isLoading ? t('inventoryNumber.loading') : t('inventoryNumber.placeholder')}
           className={`
             w-full px-3 py-2 pr-10 bg-background border rounded-lg
             focus:outline-none focus:ring-2
@@ -126,7 +128,7 @@ export default function InventoryNumberInput({
             !validation.isUnique ? 'text-red-500' : 'text-yellow-500'
           }`}
         >
-          {validation.message || (!validation.isUnique ? '此编号已存在' : '')}
+          {validation.message || (!validation.isUnique ? t('inventoryNumber.duplicate') : '')}
         </div>
       )}
 
@@ -135,7 +137,7 @@ export default function InventoryNumberInput({
         <div className="absolute left-0 right-0 top-full mt-1 z-10">
           <div className="bg-card border border-border rounded-lg shadow-lg p-3">
             <div className="text-xs text-muted-foreground mb-2">
-              建议的下一个编号:
+              {t('inventoryNumber.suggestion')}
             </div>
             <button
               onClick={handleApplySuggestion}
@@ -146,8 +148,8 @@ export default function InventoryNumberInput({
               </div>
               {suggestion.pattern && (
                 <div className="text-xs text-muted-foreground mt-0.5">
-                  格式: {suggestion.pattern.pattern}
-                  {suggestion.existingCount > 0 && ` (已有 ${suggestion.existingCount} 个)`}
+                  {t('inventoryNumber.pattern', { pattern: suggestion.pattern.pattern })}
+                  {suggestion.existingCount > 0 && ` ${t('inventoryNumber.existingCount', { count: suggestion.existingCount })}`}
                 </div>
               )}
             </button>
@@ -163,7 +165,7 @@ export default function InventoryNumberInput({
             className="text-primary hover:underline"
             type="button"
           >
-            使用建议编号: {suggestion.nextNumber}
+            {t('inventoryNumber.useSuggestion', { number: suggestion.nextNumber })}
           </button>
         </div>
       )}

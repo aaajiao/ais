@@ -1,0 +1,38 @@
+{
+  "title": "Artworks",
+  "searchPlaceholder": "Search artworks...",
+  "noArtworks": "No artworks yet",
+  "noMatch": "No matching artworks found",
+  "addArtwork": "Add Artwork",
+  "filters": {
+    "all": "All",
+    "inStudio": "In Studio",
+    "atGallery": "Consigned",
+    "sold": "Sold",
+    "hasEditions": "Has editions",
+    "noEditions": "No editions"
+  },
+  "bulkActions": {
+    "manage": "Bulk Actions",
+    "selectAll": "Select All",
+    "deselectAll": "Deselect All",
+    "export": "Export",
+    "delete": "Delete",
+    "cancel": "Cancel"
+  },
+  "deleteDialog": {
+    "title": "Confirm Bulk Delete",
+    "message": "Delete {{count}} selected artworks?",
+    "editionsWarning": "{{count}} associated editions will also be hidden.",
+    "trashNote": "Artworks will be moved to trash and can be restored.",
+    "cancel": "Cancel",
+    "confirm": "Confirm Delete",
+    "deleting": "Deleting..."
+  },
+  "year": "Year",
+  "type": "Type",
+  "editions": "Editions",
+  "totalEditions": "{{count}} editions",
+  "noEditionsYet": "No editions",
+  "groupLabel": "{{month}} {{year}}"
+}

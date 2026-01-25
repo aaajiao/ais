@@ -1,0 +1,114 @@
+{
+  "title": "导入作品",
+  "viewArtworkList": "查看作品列表",
+  "fromMarkdown": "从 Markdown 导入",
+  "fromMarkdownDesc": "支持从 eventstructure.com 导出的 Markdown 文件导入作品信息。系统会自动通过链接或标题匹配已有作品，并显示变更对比。",
+  "thumbnailLocalization": "缩略图本地化",
+  "thumbnailLocalizationDesc": "将已有作品的外部图片链接迁移到本地存储，提高加载速度和稳定性。图片会自动压缩优化后上传到 Supabase Storage。",
+  "dropzone": {
+    "title": "拖放 Markdown 文件到此处",
+    "or": "或",
+    "browse": "浏览文件"
+  },
+  "preview": {
+    "title": "预览导入",
+    "artworksFound": "找到 {{count}} 个作品",
+    "newArtwork": "新作品",
+    "updateArtwork": "更新作品",
+    "willCreate": "将创建",
+    "willUpdate": "将更新"
+  },
+  "actions": {
+    "import": "导入",
+    "importing": "导入中...",
+    "cancel": "取消",
+    "clear": "清除"
+  },
+  "result": {
+    "success": "成功导入 {{count}} 个作品",
+    "failed": "导入失败：{{error}}"
+  },
+  "mdImport": {
+    "steps": {
+      "upload": "上传文件",
+      "preview": "预览变更",
+      "complete": "完成"
+    },
+    "upload": {
+      "click": "点击上传 Markdown 文件",
+      "parsing": "解析中...",
+      "supportedFormats": "支持 .md / .markdown / .txt 格式"
+    },
+    "errors": {
+      "noArtworks": "未能从文件中解析出任何作品。请确保 MD 文件格式正确（使用 ## 作为作品标题）",
+      "previewFailed": "预览请求失败",
+      "parseFailed": "解析失败",
+      "importFailed": "导入请求失败",
+      "selectAtLeastOne": "请至少选择一个作品进行导入"
+    },
+    "selection": {
+      "selected": "已选择 {{selected}} / {{total}} 个作品",
+      "existingCount": "另有 {{count}} 个已存在",
+      "selectAll": "全选",
+      "deselectAll": "全不选"
+    },
+    "new": {
+      "title": "新增作品",
+      "count": "新增作品 ({{count}})"
+    },
+    "updates": {
+      "title": "需要更新",
+      "count": "需要更新 ({{count}})"
+    },
+    "unchanged": {
+      "title": "无变更",
+      "count": "无变更 ({{count}})"
+    },
+    "fields": {
+      "year": "年份",
+      "type": "类型",
+      "dimensions": "尺寸",
+      "materials": "材料",
+      "duration": "时长",
+      "empty": "(空)"
+    },
+    "thumbnail": {
+      "select": "选择缩略图："
+    },
+    "noChanges": "所有作品已是最新，无需导入",
+    "reupload": "重新上传",
+    "confirmImport": "确认导入 ({{count}})",
+    "result": {
+      "complete": "导入完成",
+      "created": "新增",
+      "updated": "更新",
+      "failed": "失败",
+      "imageProcessing": "图片本地化处理",
+      "imageSuccess": "成功: {{count}}",
+      "imageFailed": "失败: {{count}}（保留原链接）",
+      "errorDetails": "错误详情："
+    },
+    "continueImport": "继续导入",
+    "parseWarning": "解析警告："
+  },
+  "help": {
+    "title": "MD 文件格式说明",
+    "supportedFormat": "支持的 Markdown 格式示例：",
+    "supportedFields": "支持的字段：",
+    "updateRules": "增量更新规则：",
+    "fieldMapping": {
+      "year": "年份 → year",
+      "type": "类型 → type",
+      "dimensions": "尺寸 → dimensions",
+      "materials": "材料 → materials",
+      "duration": "时长 → duration",
+      "link": "链接 → source_url"
+    },
+    "rules": {
+      "matchByLinkOrTitle": "通过「链接」或「标题」匹配已有作品",
+      "onlyUpdateWebFields": "只更新网站字段，保护管理字段",
+      "preserveEditions": "版本数据完全保留",
+      "thumbnailOnlyEmpty": "缩略图仅在为空时更新"
+    }
+  }
+}

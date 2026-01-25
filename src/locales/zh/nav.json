@@ -1,0 +1,14 @@
+{
+  "appTitle": "aaajiao 作品管理",
+  "home": "首页",
+  "artworks": "作品",
+  "editions": "版本",
+  "locations": "位置",
+  "import": "导入",
+  "trash": "回收站",
+  "settings": "设置",
+  "chat": "对话",
+  "signOut": "登出",
+  "switchToLight": "切换到亮色模式",
+  "switchToDark": "切换到深色模式"
+}

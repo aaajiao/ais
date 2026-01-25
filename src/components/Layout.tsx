@@ -1,8 +1,10 @@
 import { useState, useMemo } from 'react';
 import { NavLink, Outlet, useLocation, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useThemeContext } from '@/contexts/ThemeContext';
 import { MessageSquare, Sun, Moon, Home, Package, FileDown, MessageCircle } from 'lucide-react';
+import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher';
 import ChatSidebar from './ChatSidebar';
 
 // 页面宽度配置
@@ -48,6 +50,7 @@ function getPageWidthConfig(pathname: string): PageWidthConfig {
 }
 
 export default function Layout() {
+  const { t } = useTranslation('nav');
   const { user, signOut } = useAuthContext();
   const { resolvedTheme, toggleTheme } = useThemeContext();
   const location = useLocation();
@@ -71,7 +74,7 @@ export default function Layout() {
       {/* 桌面端顶部导航 */}
       <header className="hidden md:flex items-center justify-between px-6 py-4 border-b border-border">
         <div className="flex items-center gap-8">
-          <h1 className="text-xl font-bold tracking-tight">aaajiao 作品管理</h1>
+          <h1 className="text-xl font-bold tracking-tight">{t('appTitle')}</h1>
           <nav className="flex gap-6">
             <NavLink
               to="/"
@@ -80,7 +83,7 @@ export default function Layout() {
                 `nav-link ${isActive ? 'text-foreground active' : 'text-muted-foreground'}`
               }
             >
-              首页
+              {t('home')}
             </NavLink>
             <NavLink
               to="/artworks"
@@ -88,7 +91,7 @@ export default function Layout() {
                 `nav-link ${isActive ? 'text-foreground active' : 'text-muted-foreground'}`
               }
             >
-              作品
+              {t('artworks')}
             </NavLink>
             <NavLink
               to="/editions"
@@ -96,7 +99,7 @@ export default function Layout() {
                 `nav-link ${isActive ? 'text-foreground active' : 'text-muted-foreground'}`
               }
             >
-              版本
+              {t('editions')}
             </NavLink>
             <NavLink
               to="/locations"
@@ -104,7 +107,7 @@ export default function Layout() {
                 `nav-link ${isActive ? 'text-foreground active' : 'text-muted-foreground'}`
               }
             >
-              位置
+              {t('locations')}
             </NavLink>
             <NavLink
               to="/import"
@@ -112,7 +115,7 @@ export default function Layout() {
                 `nav-link ${isActive ? 'text-foreground active' : 'text-muted-foreground'}`
               }
             >
-              导入
+              {t('import')}
             </NavLink>
             <NavLink
               to="/trash"
@@ -120,7 +123,7 @@ export default function Layout() {
                 `nav-link ${isActive ? 'text-foreground active' : 'text-muted-foreground'}`
               }
             >
-              回收站
+              {t('trash')}
             </NavLink>
             <NavLink
               to="/settings"
@@ -128,7 +131,7 @@ export default function Layout() {
                 `nav-link ${isActive ? 'text-foreground active' : 'text-muted-foreground'}`
               }
             >
-              设置
+              {t('settings')}
             </NavLink>
           </nav>
         </div>
@@ -143,7 +146,7 @@ export default function Layout() {
             }`}
           >
             <MessageSquare className="w-4 h-4" />
-            <span className="text-xs uppercase tracking-wider font-medium">对话</span>
+            <span className="text-xs uppercase tracking-wider font-medium">{t('chat')}</span>
           </button>
           {/* 平板端对话链接 (md 到 lg 之间) */}
           <NavLink
@@ -151,13 +154,15 @@ export default function Layout() {
             className="hidden md:flex lg:hidden items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
           >
             <MessageSquare className="w-4 h-4" />
-            <span className="text-xs uppercase tracking-wider font-medium">对话</span>
+            <span className="text-xs uppercase tracking-wider font-medium">{t('chat')}</span>
           </NavLink>
+          {/* 语言切换 */}
+          <LanguageSwitcher />
           {/* 主题切换 */}
           <button
             onClick={toggleTheme}
             className="p-2 rounded-lg hover:bg-accent transition-colors"
-            title={resolvedTheme === 'dark' ? '切换到亮色模式' : '切换到深色模式'}
+            title={resolvedTheme === 'dark' ? t('switchToLight') : t('switchToDark')}
           >
             {resolvedTheme === 'dark' ? (
               <Sun className="w-5 h-5" />
@@ -181,7 +186,7 @@ export default function Layout() {
               onClick={handleSignOut}
               className="text-xs uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
             >
-              登出
+              {t('signOut')}
             </button>
           </div>
         </div>
@@ -210,7 +215,7 @@ export default function Layout() {
         <Link
           to="/chat"
           className="hidden md:flex lg:hidden fixed right-4 bottom-4 w-14 h-14 bg-primary text-primary-foreground rounded-full items-center justify-center shadow-lg z-40 hover:opacity-90 transition-opacity"
-          aria-label="打开对话"
+          aria-label={t('chat')}
         >
           <MessageSquare className="w-6 h-6" />
         </Link>
@@ -226,7 +231,7 @@ export default function Layout() {
           }
         >
           <Home className="w-5 h-5" />
-          <span className="text-xs mt-1 uppercase tracking-wider">首页</span>
+          <span className="text-xs mt-1 uppercase tracking-wider">{t('home')}</span>
         </NavLink>
         <NavLink
           to="/artworks"
@@ -235,7 +240,7 @@ export default function Layout() {
           }
         >
           <Package className="w-5 h-5" />
-          <span className="text-xs mt-1 uppercase tracking-wider">作品</span>
+          <span className="text-xs mt-1 uppercase tracking-wider">{t('artworks')}</span>
         </NavLink>
         <NavLink
           to="/import"
@@ -244,7 +249,7 @@ export default function Layout() {
           }
         >
           <FileDown className="w-5 h-5" />
-          <span className="text-xs mt-1 uppercase tracking-wider">导入</span>
+          <span className="text-xs mt-1 uppercase tracking-wider">{t('import')}</span>
         </NavLink>
         <NavLink
           to="/chat"
@@ -253,7 +258,7 @@ export default function Layout() {
           }
         >
           <MessageCircle className="w-5 h-5" />
-          <span className="text-xs mt-1 uppercase tracking-wider">对话</span>
+          <span className="text-xs mt-1 uppercase tracking-wider">{t('chat')}</span>
         </NavLink>
       </nav>
     </div>

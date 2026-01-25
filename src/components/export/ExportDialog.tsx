@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, FileText, FileType } from 'lucide-react';
 import type { ExportRequest, ExportOptions } from '@/lib/exporters';
 import { useAuthContext } from '@/contexts/AuthContext';
@@ -21,6 +22,8 @@ export default function ExportDialog({
   artworkCount,
   editionTotal,
 }: ExportDialogProps) {
+  const { t } = useTranslation('export');
+  const { t: tCommon } = useTranslation('common');
   const { session } = useAuthContext();
   const [format, setFormat] = useState<ExportFormat>('pdf');
   const [options, setOptions] = useState<ExportOptions>({
@@ -58,7 +61,7 @@ export default function ExportDialog({
 
     // 检查认证状态
     if (!session?.access_token) {
-      setError('请先登录');
+      setError(t('loginRequired'));
       setExporting(false);
       return;
     }
@@ -84,13 +87,13 @@ export default function ExportDialog({
       });
 
       if (!response.ok) {
-        let errorMessage = '导出失败';
+        let errorMessage = t('exportFailed');
         try {
           const errorData = await response.json();
           errorMessage = errorData.error || errorMessage;
         } catch {
           // 如果响应不是 JSON，使用默认错误信息
-          errorMessage = `导出失败 (${response.status})`;
+          errorMessage = `${t('exportFailed')} (${response.status})`;
         }
         throw new Error(errorMessage);
       }
@@ -116,7 +119,7 @@ export default function ExportDialog({
 
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '导出失败');
+      setError(err instanceof Error ? err.message : t('exportFailed'));
     } finally {
       setExporting(false);
     }
@@ -128,7 +131,7 @@ export default function ExportDialog({
         {/* 头部 */}
         <div className="flex items-center justify-between p-4 border-b border-border">
           <h2 className="text-lg font-semibold">
-            导出 {artworkCount} 件作品
+            {t('title', { count: artworkCount })}
           </h2>
           <button
             onClick={onClose}
@@ -142,7 +145,7 @@ export default function ExportDialog({
         <div className="p-4 space-y-6">
           {/* 格式选择 */}
           <div>
-            <label className="block text-sm font-medium mb-3">选择格式</label>
+            <label className="block text-sm font-medium mb-3">{t('selectFormat')}</label>
             <div className="space-y-2">
               <label
                 className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
@@ -161,9 +164,9 @@ export default function ExportDialog({
                 />
                 <FileType className="w-5 h-5 text-red-500" />
                 <div>
-                  <span className="font-medium">PDF</span>
+                  <span className="font-medium">{t('pdf.name')}</span>
                   <span className="text-sm text-muted-foreground ml-2">
-                    带图，可打印
+                    {t('pdf.description')}
                   </span>
                 </div>
               </label>
@@ -185,9 +188,9 @@ export default function ExportDialog({
                 />
                 <FileText className="w-5 h-5 text-blue-500" />
                 <div>
-                  <span className="font-medium">Markdown</span>
+                  <span className="font-medium">{t('markdown.name')}</span>
                   <span className="text-sm text-muted-foreground ml-2">
-                    带图链接，可编辑
+                    {t('markdown.description')}
                   </span>
                 </div>
               </label>
@@ -197,7 +200,7 @@ export default function ExportDialog({
           {/* 版本选择（仅单作品导出时显示） */}
           {isSingleArtwork && (
             <div>
-              <label className="block text-sm font-medium mb-3">选择版本</label>
+              <label className="block text-sm font-medium mb-3">{t('selectEditions')}</label>
               <EditionSelector
                 artworkId={artworkIds[0]}
                 editionTotal={editionTotal ?? null}
@@ -211,7 +214,7 @@ export default function ExportDialog({
 
           {/* 可选信息 */}
           <div>
-            <label className="block text-sm font-medium mb-3">包含信息</label>
+            <label className="block text-sm font-medium mb-3">{t('includeInfo')}</label>
             <div className="space-y-2">
               <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted cursor-pointer">
                 <input
@@ -222,7 +225,7 @@ export default function ExportDialog({
                   }
                   className="w-4 h-4 accent-primary"
                 />
-                <span>价格信息</span>
+                <span>{t('priceInfo')}</span>
               </label>
 
               <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted cursor-pointer">
@@ -234,7 +237,7 @@ export default function ExportDialog({
                   }
                   className="w-4 h-4 accent-primary"
                 />
-                <span>版本状态详情（在库/寄售/已售）</span>
+                <span>{t('statusDetails')}</span>
               </label>
 
               <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted cursor-pointer">
@@ -246,14 +249,14 @@ export default function ExportDialog({
                   }
                   className="w-4 h-4 accent-primary"
                 />
-                <span>位置信息</span>
+                <span>{t('locationInfo')}</span>
               </label>
             </div>
           </div>
 
           {/* 提示 */}
           <p className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-lg">
-            完整数据备份请前往「设置」页面
+            {t('backupHint')}
           </p>
 
           {/* 错误提示 */}
@@ -271,14 +274,14 @@ export default function ExportDialog({
             disabled={exporting}
             className="px-4 py-2 rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
           >
-            取消
+            {tCommon('cancel')}
           </button>
           <button
             onClick={handleExport}
             disabled={isExportDisabled}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
           >
-            {exporting ? '导出中...' : '导出'}
+            {exporting ? t('exporting') : t('export')}
           </button>
         </div>
       </div>

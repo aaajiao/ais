@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { parseAndValidateMDFile, type ParsedArtwork } from '@/lib/md-parser';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { Loader2, FileText, ImageIcon, CheckCircle } from 'lucide-react';
@@ -46,6 +47,7 @@ interface ExecuteResult {
 type ImportStep = 'upload' | 'preview' | 'result';
 
 export default function MDImport() {
+  const { t } = useTranslation('import');
   const { session } = useAuthContext();
   const [step, setStep] = useState<ImportStep>('upload');
   const [parsedArtworks, setParsedArtworks] = useState<ParsedArtwork[]>([]);
@@ -72,7 +74,7 @@ export default function MDImport() {
       const { artworks, warnings } = parseAndValidateMDFile(content);
 
       if (artworks.length === 0) {
-        setError('未能从文件中解析出任何作品。请确保 MD 文件格式正确（使用 ## 作为作品标题）');
+        setError(t('mdImport.errors.noArtworks'));
         return;
       }
 
@@ -106,7 +108,7 @@ export default function MDImport() {
       });
 
       if (!response.ok) {
-        throw new Error('预览请求失败');
+        throw new Error(t('mdImport.errors.previewFailed'));
       }
 
       const result = await response.json() as PreviewResult;
@@ -135,11 +137,11 @@ export default function MDImport() {
 
       setStep('preview');
     } catch (err) {
-      setError(err instanceof Error ? err.message : '解析失败');
+      setError(err instanceof Error ? err.message : t('mdImport.errors.parseFailed'));
     } finally {
       setLoading(false);
     }
-  }, [session?.access_token]);
+  }, [session?.access_token, t]);
 
   // 处理缩略图选择（使用 UID 作为 key）
   const handleThumbnailSelect = (uid: string, imageUrl: string) => {
@@ -194,7 +196,7 @@ export default function MDImport() {
       }
 
       if (artworksToImport.length === 0) {
-        setError('请至少选择一个作品进行导入');
+        setError(t('mdImport.errors.selectAtLeastOne'));
         setLoading(false);
         return;
       }
@@ -212,14 +214,14 @@ export default function MDImport() {
       });
 
       if (!response.ok) {
-        throw new Error('导入请求失败');
+        throw new Error(t('mdImport.errors.importFailed'));
       }
 
       const result: ExecuteResult = await response.json();
       setExecuteResult(result);
       setStep('result');
     } catch (err) {
-      setError(err instanceof Error ? err.message : '导入失败');
+      setError(err instanceof Error ? err.message : t('mdImport.errors.importFailed'));
     } finally {
       setLoading(false);
     }
@@ -252,9 +254,9 @@ export default function MDImport() {
         {hasChanges && (
           <div className="flex items-center justify-between bg-muted/30 rounded-lg p-3">
             <span className="text-sm text-muted-foreground">
-              已选择 {selectedArtworks.size} / {totalSelectable} 个作品
+              {t('mdImport.selection.selected', { selected: selectedArtworks.size, total: totalSelectable })}
               {previewResult.unchanged.length > 0 && (
-                <span className="ml-2 text-xs">（另有 {previewResult.unchanged.length} 个已存在）</span>
+                <span className="ml-2 text-xs">{t('mdImport.selection.existingCount', { count: previewResult.unchanged.length })}</span>
               )}
             </span>
             <div className="flex gap-2">
@@ -263,14 +265,14 @@ export default function MDImport() {
                 disabled={allSelected}
                 className="text-sm px-3 py-1 rounded-md hover:bg-muted disabled:opacity-50 transition-colors"
               >
-                全选
+                {t('mdImport.selection.selectAll')}
               </button>
               <button
                 onClick={() => handleSelectAll(false)}
                 disabled={selectedArtworks.size === 0}
                 className="text-sm px-3 py-1 rounded-md hover:bg-muted disabled:opacity-50 transition-colors"
               >
-                全不选
+                {t('mdImport.selection.deselectAll')}
               </button>
             </div>
           </div>
@@ -281,7 +283,7 @@ export default function MDImport() {
           <div>
             <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-green-500"></span>
-              新增作品 ({previewResult.new.length})
+              {t('mdImport.new.count', { count: previewResult.new.length })}
             </h3>
             <div className="space-y-3">
               {previewResult.new.map((item, i) => {
@@ -321,17 +323,17 @@ export default function MDImport() {
                             : item.artwork.title_en}
                         </p>
                     <div className="mt-2 text-sm text-muted-foreground space-y-1">
-                      {item.artwork.year && <p>年份: {item.artwork.year}</p>}
-                      {item.artwork.type && <p>类型: {item.artwork.type}</p>}
-                      {item.artwork.dimensions && <p>尺寸: {item.artwork.dimensions}</p>}
-                      {item.artwork.materials && <p>材料: {item.artwork.materials}</p>}
-                      {item.artwork.duration && <p>时长: {item.artwork.duration}</p>}
+                      {item.artwork.year && <p>{t('mdImport.fields.year')}: {item.artwork.year}</p>}
+                      {item.artwork.type && <p>{t('mdImport.fields.type')}: {item.artwork.type}</p>}
+                      {item.artwork.dimensions && <p>{t('mdImport.fields.dimensions')}: {item.artwork.dimensions}</p>}
+                      {item.artwork.materials && <p>{t('mdImport.fields.materials')}: {item.artwork.materials}</p>}
+                      {item.artwork.duration && <p>{t('mdImport.fields.duration')}: {item.artwork.duration}</p>}
                     </div>
 
                     {/* 缩略图选择 */}
                     {images.length > 0 && isSelected && (
                       <div className="mt-4">
-                        <p className="text-sm font-medium mb-2">选择缩略图：</p>
+                        <p className="text-sm font-medium mb-2">{t('mdImport.thumbnail.select')}</p>
                         <div className="flex gap-2 flex-wrap">
                           {images.map((img, imgIndex) => (
                             <button
@@ -370,7 +372,7 @@ export default function MDImport() {
           <div>
             <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
-              需要更新 ({previewResult.updates.length})
+              {t('mdImport.updates.count', { count: previewResult.updates.length })}
             </h3>
             <div className="space-y-3">
               {previewResult.updates.map((item, i) => {
@@ -407,7 +409,7 @@ export default function MDImport() {
                             {item.changes.map((change, ci) => (
                               <div key={ci} className="text-sm flex items-start gap-2">
                                 <span className="text-muted-foreground min-w-[60px]">{change.fieldLabel}:</span>
-                                <span className="line-through text-red-500">{change.oldValue || '(空)'}</span>
+                                <span className="line-through text-red-500">{change.oldValue || t('mdImport.fields.empty')}</span>
                                 <span className="text-muted-foreground">→</span>
                                 <span className="text-green-600">{change.newValue}</span>
                               </div>
@@ -428,7 +430,7 @@ export default function MDImport() {
           <div>
             <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-gray-400"></span>
-              无变更 ({previewResult.unchanged.length})
+              {t('mdImport.unchanged.count', { count: previewResult.unchanged.length })}
             </h3>
             <div className="bg-muted/50 rounded-xl p-4">
               <p className="text-sm text-muted-foreground">
@@ -441,7 +443,7 @@ export default function MDImport() {
         {/* 无任何变更的提示 */}
         {!hasChanges && (
           <div className="bg-muted/50 rounded-xl p-8 text-center">
-            <p className="text-muted-foreground">所有作品已是最新，无需导入</p>
+            <p className="text-muted-foreground">{t('mdImport.noChanges')}</p>
           </div>
         )}
       </div>
@@ -459,21 +461,21 @@ export default function MDImport() {
       <div className="space-y-6">
         <div className="text-center py-8">
           <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-500" />
-          <h2 className="text-xl font-semibold mb-2">导入完成</h2>
+          <h2 className="text-xl font-semibold mb-2">{t('mdImport.result.complete')}</h2>
         </div>
 
         <div className="grid grid-cols-3 gap-4 text-center">
           <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4">
             <p className="text-3xl font-bold text-green-600">{executeResult.created.length}</p>
-            <p className="text-sm text-muted-foreground">新增</p>
+            <p className="text-sm text-muted-foreground">{t('mdImport.result.created')}</p>
           </div>
           <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4">
             <p className="text-3xl font-bold text-yellow-600">{executeResult.updated.length}</p>
-            <p className="text-sm text-muted-foreground">更新</p>
+            <p className="text-sm text-muted-foreground">{t('mdImport.result.updated')}</p>
           </div>
           <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
             <p className="text-3xl font-bold text-red-600">{executeResult.errors.length}</p>
-            <p className="text-sm text-muted-foreground">失败</p>
+            <p className="text-sm text-muted-foreground">{t('mdImport.result.failed')}</p>
           </div>
         </div>
 
@@ -482,15 +484,15 @@ export default function MDImport() {
           <div className="bg-muted/50 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
               <ImageIcon className="w-4 h-4 text-muted-foreground" />
-              <span className="font-medium text-sm">图片本地化处理</span>
+              <span className="font-medium text-sm">{t('mdImport.result.imageProcessing')}</span>
             </div>
             <div className="flex gap-4 text-sm">
               <span className="text-green-600">
-                成功: {imageStats.processed}
+                {t('mdImport.result.imageSuccess', { count: imageStats.processed })}
               </span>
               {imageStats.failed > 0 && (
                 <span className="text-muted-foreground">
-                  失败: {imageStats.failed}（保留原链接）
+                  {t('mdImport.result.imageFailed', { count: imageStats.failed })}
                 </span>
               )}
             </div>
@@ -499,7 +501,7 @@ export default function MDImport() {
 
         {executeResult.errors.length > 0 && (
           <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4">
-            <p className="font-medium text-destructive mb-2">错误详情：</p>
+            <p className="font-medium text-destructive mb-2">{t('mdImport.result.errorDetails')}</p>
             <ul className="text-sm space-y-1">
               {executeResult.errors.map((err, i) => (
                 <li key={i} className="text-destructive">{err}</li>
@@ -519,21 +521,21 @@ export default function MDImport() {
           <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
             step === 'upload' ? 'bg-primary text-primary-foreground' : 'bg-muted'
           }`}>1</span>
-          上传文件
+          {t('mdImport.steps.upload')}
         </div>
         <div className="flex-1 h-px bg-border" />
         <div className={`flex items-center gap-2 ${step === 'preview' ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
           <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
             step === 'preview' ? 'bg-primary text-primary-foreground' : 'bg-muted'
           }`}>2</span>
-          预览变更
+          {t('mdImport.steps.preview')}
         </div>
         <div className="flex-1 h-px bg-border" />
         <div className={`flex items-center gap-2 ${step === 'result' ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
           <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
             step === 'result' ? 'bg-primary text-primary-foreground' : 'bg-muted'
           }`}>3</span>
-          完成
+          {t('mdImport.steps.complete')}
         </div>
       </div>
 
@@ -547,7 +549,7 @@ export default function MDImport() {
       {/* 解析警告 */}
       {parseWarnings.length > 0 && step === 'preview' && (
         <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4">
-          <p className="font-medium text-yellow-700 mb-2">解析警告：</p>
+          <p className="font-medium text-yellow-700 mb-2">{t('mdImport.parseWarning')}</p>
           <ul className="text-sm space-y-1">
             {parseWarnings.map((w, i) => (
               <li key={i} className="text-yellow-700">
@@ -573,14 +575,14 @@ export default function MDImport() {
             {loading ? (
               <>
                 <Loader2 className="w-12 h-12 mx-auto mb-4 text-muted-foreground animate-spin" />
-                <p className="font-medium">解析中...</p>
+                <p className="font-medium">{t('mdImport.upload.parsing')}</p>
               </>
             ) : (
               <>
                 <FileText className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="font-medium">点击上传 Markdown 文件</p>
+                <p className="font-medium">{t('mdImport.upload.click')}</p>
                 <p className="text-sm text-muted-foreground mt-2">
-                  支持 .md / .markdown / .txt 格式
+                  {t('mdImport.upload.supportedFormats')}
                 </p>
               </>
             )}
@@ -596,14 +598,14 @@ export default function MDImport() {
               onClick={handleReset}
               className="px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors"
             >
-              重新上传
+              {t('mdImport.reupload')}
             </button>
             <button
               onClick={handleExecuteImport}
               disabled={loading || selectedArtworks.size === 0}
               className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
             >
-              {loading ? '导入中...' : `确认导入 (${selectedArtworks.size})`}
+              {loading ? t('actions.importing') : t('mdImport.confirmImport', { count: selectedArtworks.size })}
             </button>
           </div>
         </>
@@ -617,7 +619,7 @@ export default function MDImport() {
               onClick={handleReset}
               className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
             >
-              继续导入
+              {t('mdImport.continueImport')}
             </button>
           </div>
         </>

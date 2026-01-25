@@ -3,6 +3,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useLocations, type Location, type LocationSearchResult } from '@/hooks/useLocations';
 import type { LocationType } from '@/lib/database.types';
 import { Home, Image, Building2, MapPin, X, ChevronUp, ChevronDown, Plus, Check } from 'lucide-react';
@@ -29,12 +30,15 @@ export default function LocationPicker({
   onChange,
   onCreateNew,
   disabled = false,
-  placeholder = '选择位置...',
+  placeholder,
   className = '',
 }: LocationPickerProps) {
+  const { t } = useTranslation('common');
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState(0);
+
+  const finalPlaceholder = placeholder ?? t('location.select');
 
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -151,7 +155,7 @@ export default function LocationPicker({
           onFocus={handleOpen}
           onKeyDown={handleKeyDown}
           disabled={disabled || isLoading}
-          placeholder={isLoading ? '加载中...' : placeholder}
+          placeholder={isLoading ? t('loading') : finalPlaceholder}
           className={`
             w-full px-3 py-2 pr-16 bg-background border border-border rounded-lg
             focus:outline-none focus:ring-2 focus:ring-primary/50
@@ -165,7 +169,7 @@ export default function LocationPicker({
             <button
               onClick={handleClear}
               className="p-1 text-muted-foreground hover:text-foreground"
-              title="清除"
+              title={t('location.clear')}
             >
               <X className="w-4 h-4" />
             </button>
@@ -201,13 +205,13 @@ export default function LocationPicker({
         >
           {searchResults.length === 0 && !searchQuery.trim() && (
             <div className="p-3 text-sm text-muted-foreground text-center">
-              暂无位置
+              {t('location.noLocations')}
             </div>
           )}
 
           {searchResults.length === 0 && searchQuery.trim() && (
             <div className="p-3 text-sm text-muted-foreground text-center">
-              未找到匹配的位置
+              {t('location.notFound')}
             </div>
           )}
 
@@ -246,7 +250,7 @@ export default function LocationPicker({
                     <>
                       <span>·</span>
                       <span className="text-primary">
-                        别名: {(location as LocationSearchResult).matchedAlias}
+                        {t('location.alias')}: {(location as LocationSearchResult).matchedAlias}
                       </span>
                     </>
                   )}
@@ -272,13 +276,13 @@ export default function LocationPicker({
               <Plus className="w-4 h-4 text-muted-foreground" />
               <div>
                 <div className="font-medium">
-                  添加新位置
+                  {t('location.addNew')}
                   {searchQuery.trim() && (
                     <span className="text-primary ml-1">"{searchQuery.trim()}"</span>
                   )}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  创建一个新的位置记录
+                  {t('location.createNew')}
                 </div>
               </div>
             </button>

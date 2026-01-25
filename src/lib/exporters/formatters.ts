@@ -30,33 +30,33 @@ export function generateArtworkMarkdown(
     lines.push('');
   }
 
-  // 基础信息
+  // 基础信息 - 使用英文标签
   if (artwork.year) {
-    lines.push(`**年份**: ${artwork.year}`);
+    lines.push(`**Year**: ${artwork.year}`);
   }
   if (artwork.type) {
-    lines.push(`**类型**: ${artwork.type}`);
+    lines.push(`**Type**: ${artwork.type}`);
   }
   if (artwork.materials) {
-    lines.push(`**材料**: ${artwork.materials}`);
+    lines.push(`**Materials**: ${artwork.materials}`);
   }
   if (artwork.dimensions) {
-    lines.push(`**尺寸**: ${artwork.dimensions}`);
+    lines.push(`**Dimensions**: ${artwork.dimensions}`);
   }
   if (artwork.duration) {
-    lines.push(`**时长**: ${artwork.duration}`);
+    lines.push(`**Duration**: ${artwork.duration}`);
   }
 
   // 版本信息
   const editionInfo = formatEditionInfo(artwork);
-  lines.push(`**版本**: ${editionInfo}`);
+  lines.push(`**Edition**: ${editionInfo}`);
 
   // 版本明细（如果有任何可选信息启用）
   if (options.includeStatus || options.includeLocation || options.includePrice) {
     if (editions.length > 0) {
       lines.push('');
-      lines.push('**版本明细**:');
-      const editionLines = formatEditionLines(editions, artwork, locations, options, 'zh');
+      lines.push('**Edition Details**:');
+      const editionLines = formatEditionLines(editions, artwork, locations, options, 'en');
       editionLines.forEach(line => {
         lines.push(`- ${line}`);
       });
@@ -64,16 +64,16 @@ export function generateArtworkMarkdown(
       // 无版本时的简化显示
       if (options.includePrice) {
         if (priceInfo) {
-          lines.push(`**价格**: ${formatPrice(priceInfo.price, priceInfo.currency)}`);
+          lines.push(`**Price**: ${formatPrice(priceInfo.price, priceInfo.currency)}`);
         } else {
-          lines.push(`**价格**: 询价`);
+          lines.push(`**Price**: Price on request`);
         }
       }
       if (options.includeStatus) {
-        lines.push(`**状态**: 无版本`);
+        lines.push(`**Status**: No editions`);
       }
       if (options.includeLocation) {
-        lines.push(`**位置**: -`);
+        lines.push(`**Location**: -`);
       }
     }
   }
@@ -82,7 +82,7 @@ export function generateArtworkMarkdown(
 
   // 来源链接
   if (artwork.source_url) {
-    lines.push(`[查看详情](${artwork.source_url})`);
+    lines.push(`[View Details](${artwork.source_url})`);
     lines.push('');
   }
 
@@ -103,7 +103,7 @@ export function generateFullMarkdown(
   // YAML Frontmatter
   const exportDate = new Date();
   lines.push('---');
-  lines.push('title: "aaajiao 作品资料"');
+  lines.push('title: "aaajiao Artworks"');
   lines.push(`exported_at: "${exportDate.toISOString()}"`);
   lines.push(`total_artworks: ${artworksData.length}`);
   lines.push(`include_price: ${options.includePrice}`);
@@ -113,9 +113,9 @@ export function generateFullMarkdown(
   lines.push('');
 
   // 文档头
-  lines.push('# aaajiao 作品资料');
+  lines.push('# aaajiao Artworks');
   lines.push('');
-  lines.push(`导出时间: ${exportDate.toLocaleDateString('zh-CN')}`);
+  lines.push(`Exported: ${exportDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`);
   lines.push('');
   lines.push('---');
   lines.push('');
@@ -176,7 +176,7 @@ export function preparePDFData(
 
   // 版本明细（如果有任何可选信息启用且有版本）
   if ((options.includeStatus || options.includeLocation || options.includePrice) && editions.length > 0) {
-    pdfData.editionLines = formatEditionLines(editions, artwork, locations, options, 'zh');
+    pdfData.editionLines = formatEditionLines(editions, artwork, locations, options, 'en');
   } else {
     // 无版本时的简化显示（保持旧格式向后兼容）
     // 可选：价格
@@ -184,16 +184,16 @@ export function preparePDFData(
       if (priceInfo) {
         pdfData.price = formatPrice(priceInfo.price, priceInfo.currency);
       } else {
-        pdfData.price = '询价';
+        pdfData.price = 'Price on request';
       }
     }
 
-    // 可选：状态 (使用中文，因为有字体支持)
+    // 可选：状态
     if (options.includeStatus) {
       if (stats.total > 0) {
-        pdfData.status = formatStatusStats(stats, 'zh');
+        pdfData.status = formatStatusStats(stats, 'en');
       } else {
-        pdfData.status = '无版本';
+        pdfData.status = 'No editions';
       }
     }
 

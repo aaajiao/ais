@@ -1,0 +1,14 @@
+{
+  "title": "Home",
+  "quickActions": "Quick Actions",
+  "recentUpdates": "Recent Updates",
+  "noUpdates": "No updates yet",
+  "viewAll": "View all",
+  "stats": {
+    "totalArtworks": "Total Artworks",
+    "totalEditions": "Total Editions",
+    "inStudio": "In Studio",
+    "consigned": "Consigned",
+    "sold": "Sold"
+  }
+}

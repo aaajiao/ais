@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { queryKeys } from '@/lib/queryKeys';
@@ -18,8 +19,21 @@ import HistoryTimeline, { type EditionHistory as TimelineEditionHistory } from '
 import InventoryNumberInput from '@/components/editions/InventoryNumberInput';
 import LocationPicker from '@/components/editions/LocationPicker';
 import CreateLocationDialog from '@/components/editions/CreateLocationDialog';
-import { StatusIndicator, STATUS_CONFIG } from '@/components/ui/StatusIndicator';
+import { StatusIndicator } from '@/components/ui/StatusIndicator';
 import { Image, MessageSquare, Pencil } from 'lucide-react';
+
+// 状态选项 - 使用 EditionStatus 类型
+const STATUS_OPTIONS: EditionStatus[] = [
+  'in_production',
+  'in_studio',
+  'at_gallery',
+  'at_museum',
+  'in_transit',
+  'sold',
+  'gifted',
+  'lost',
+  'damaged',
+];
 
 type Location = Database['public']['Tables']['locations']['Row'];
 type EditionHistory = Database['public']['Tables']['edition_history']['Row'];
@@ -40,6 +54,9 @@ interface EditionFormData {
 }
 
 export default function EditionDetail() {
+  const { t, i18n } = useTranslation('editionDetail');
+  const { t: tStatus } = useTranslation('status');
+  const { t: tCommon } = useTranslation('common');
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -80,7 +97,7 @@ export default function EditionDetail() {
   // 格式化版本号
   const formatEditionNumber = (): string => {
     if (!edition) return '';
-    if (edition.edition_type === 'unique') return '独版';
+    if (edition.edition_type === 'unique') return t('unique');
     if (edition.edition_type === 'ap') return `AP${edition.edition_number || ''}`;
     return `${edition.edition_number || '?'}/${edition.artwork?.edition_total || '?'}`;
   };
@@ -88,7 +105,8 @@ export default function EditionDetail() {
   // 格式化日期
   const formatDate = (dateString: string | null): string => {
     if (!dateString) return '-';
-    return new Date(dateString).toLocaleDateString('zh-CN', {
+    const locale = i18n.language === 'zh' ? 'zh-CN' : 'en-US';
+    return new Date(dateString).toLocaleDateString(locale, {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -228,8 +246,8 @@ export default function EditionDetail() {
       setIsEditing(false);
       setFormData(null);
     } catch (err) {
-      console.error('保存失败:', err);
-      setError(err instanceof Error ? err.message : '保存失败');
+      console.error('Save failed:', err);
+      setError(err instanceof Error ? err.message : t('saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -267,8 +285,8 @@ export default function EditionDetail() {
 
       navigate(`/artworks/${edition.artwork_id}`, { replace: true });
     } catch (err) {
-      console.error('删除版本失败:', err);
-      setError(err instanceof Error ? err.message : '删除版本失败');
+      console.error('Delete edition failed:', err);
+      setError(err instanceof Error ? err.message : t('deleteFailed'));
       setShowDeleteConfirm(false);
     } finally {
       setDeleting(false);
@@ -299,10 +317,10 @@ export default function EditionDetail() {
     return (
       <div className="p-6">
         <Link to="/editions" className="text-primary hover:underline mb-6 inline-block">
-          ← 返回版本列表
+          {t('backToList')}
         </Link>
         <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-destructive">
-          {editionError instanceof Error ? editionError.message : '版本不存在'}
+          {editionError instanceof Error ? editionError.message : t('notFound')}
         </div>
       </div>
     );
@@ -314,20 +332,20 @@ export default function EditionDetail() {
       {isEditing && formData && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-card border border-border rounded-xl p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold mb-4">编辑版本</h3>
+            <h3 className="text-lg font-semibold mb-4">{t('editDialog.title')}</h3>
 
             <div className="space-y-4">
               {/* 版本类型 */}
               <div>
-                <label className="block text-sm font-medium mb-1">版本类型</label>
+                <label className="block text-sm font-medium mb-1">{t('editDialog.editionType')}</label>
                 <select
                   value={formData.edition_type}
                   onChange={(e) => setFormData({ ...formData, edition_type: e.target.value as 'numbered' | 'ap' | 'unique' })}
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 >
-                  <option value="numbered">编号版</option>
-                  <option value="ap">AP 版</option>
-                  <option value="unique">独版</option>
+                  <option value="numbered">{t('editDialog.numbered')}</option>
+                  <option value="ap">{t('editDialog.ap')}</option>
+                  <option value="unique">{t('editDialog.unique')}</option>
                 </select>
               </div>
 
@@ -335,7 +353,7 @@ export default function EditionDetail() {
               {formData.edition_type !== 'unique' && (
                 <div>
                   <label className="block text-sm font-medium mb-1">
-                    {formData.edition_type === 'ap' ? 'AP 编号' : '版本编号'}
+                    {formData.edition_type === 'ap' ? t('editDialog.apNumber') : t('editDialog.editionNumber')}
                   </label>
                   <input
                     type="number"
@@ -343,22 +361,22 @@ export default function EditionDetail() {
                     value={formData.edition_number || ''}
                     onChange={(e) => setFormData({ ...formData, edition_number: e.target.value ? parseInt(e.target.value) : null })}
                     className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder={formData.edition_type === 'ap' ? '如：1' : '如：1'}
+                    placeholder={t('editDialog.numberPlaceholder')}
                   />
                 </div>
               )}
 
               {/* 状态 */}
               <div>
-                <label className="block text-sm font-medium mb-1">状态</label>
+                <label className="block text-sm font-medium mb-1">{t('editDialog.status')}</label>
                 <select
                   value={formData.status}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value as EditionStatus })}
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 >
-                  {Object.entries(STATUS_CONFIG).map(([value, config]) => (
-                    <option key={value} value={value}>
-                      {config.label}
+                  {STATUS_OPTIONS.map((status) => (
+                    <option key={status} value={status}>
+                      {tStatus(status)}
                     </option>
                   ))}
                 </select>
@@ -366,7 +384,7 @@ export default function EditionDetail() {
 
               {/* 位置选择 - 新增 */}
               <div>
-                <label className="block text-sm font-medium mb-1">位置</label>
+                <label className="block text-sm font-medium mb-1">{t('editDialog.location')}</label>
                 <LocationPicker
                   value={formData.location_id}
                   onChange={(locationId) => setFormData({ ...formData, location_id: locationId })}
@@ -379,7 +397,7 @@ export default function EditionDetail() {
 
               {/* 库存编号 - 使用智能输入组件 */}
               <div>
-                <label className="block text-sm font-medium mb-1">库存编号</label>
+                <label className="block text-sm font-medium mb-1">{t('editDialog.inventoryNumber')}</label>
                 <InventoryNumberInput
                   value={formData.inventory_number}
                   onChange={(value) => setFormData({ ...formData, inventory_number: value })}
@@ -391,14 +409,14 @@ export default function EditionDetail() {
               {/* 价格信息（所有状态都可编辑） */}
               <div className="border-t border-border pt-4 mt-4">
                 <p className="text-sm font-medium text-muted-foreground mb-3">
-                  {formData.status === 'sold' ? '销售信息' : '定价'}
+                  {formData.status === 'sold' ? t('editDialog.priceSection.sold') : t('editDialog.priceSection.default')}
                 </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium mb-1">
-                    {formData.status === 'sold' ? '成交价' : '定价'}
+                    {formData.status === 'sold' ? t('editDialog.price.sold') : t('editDialog.price.default')}
                   </label>
                   <input
                     type="number"
@@ -406,11 +424,11 @@ export default function EditionDetail() {
                     value={formData.sale_price || ''}
                     onChange={(e) => setFormData({ ...formData, sale_price: e.target.value ? parseFloat(e.target.value) : null })}
                     className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="金额"
+                    placeholder={t('editDialog.amount')}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">币种</label>
+                  <label className="block text-sm font-medium mb-1">{t('editDialog.currency')}</label>
                   <select
                     value={formData.sale_currency}
                     onChange={(e) => setFormData({ ...formData, sale_currency: e.target.value as CurrencyType })}
@@ -431,7 +449,7 @@ export default function EditionDetail() {
               {formData.status === 'sold' && (
                 <>
                   <div>
-                    <label className="block text-sm font-medium mb-1">售出日期</label>
+                    <label className="block text-sm font-medium mb-1">{t('editDialog.saleDate')}</label>
                     <input
                       type="date"
                       value={formData.sale_date}
@@ -441,13 +459,13 @@ export default function EditionDetail() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium mb-1">买家</label>
+                    <label className="block text-sm font-medium mb-1">{t('editDialog.buyer')}</label>
                     <input
                       type="text"
                       value={formData.buyer_name}
                       onChange={(e) => setFormData({ ...formData, buyer_name: e.target.value })}
                       className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                      placeholder="买家姓名/机构"
+                      placeholder={t('editDialog.buyerPlaceholder')}
                     />
                   </div>
                 </>
@@ -455,13 +473,13 @@ export default function EditionDetail() {
 
               {/* 备注 */}
               <div>
-                <label className="block text-sm font-medium mb-1">备注</label>
+                <label className="block text-sm font-medium mb-1">{t('editDialog.notes')}</label>
                 <textarea
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   rows={3}
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                  placeholder="可选备注信息"
+                  placeholder={t('editDialog.notesPlaceholder')}
                 />
               </div>
             </div>
@@ -472,14 +490,14 @@ export default function EditionDetail() {
                 disabled={saving}
                 className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
               >
-                取消
+                {tCommon('cancel')}
               </button>
               <button
                 onClick={saveEditing}
                 disabled={saving}
                 className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
               >
-                {saving ? '保存中...' : '保存'}
+                {saving ? t('saving') : tCommon('save')}
               </button>
             </div>
           </div>
@@ -490,30 +508,30 @@ export default function EditionDetail() {
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-card border border-border rounded-xl p-6 max-w-md mx-4">
-            <h3 className="text-lg font-semibold mb-2">确认删除</h3>
+            <h3 className="text-lg font-semibold mb-2">{t('deleteDialog.title')}</h3>
             <p className="text-muted-foreground mb-4">
-              确定要删除「{edition?.artwork?.title_en}」的版本 {formatEditionNumber()} 吗？
+              {t('deleteDialog.message', { title: edition?.artwork?.title_en, edition: formatEditionNumber() })}
               {history.length > 0 && (
                 <span className="block text-yellow-600 mt-2">
-                  将同时删除 {history.length} 条历史记录
+                  {t('deleteDialog.historyWarning', { count: history.length })}
                 </span>
               )}
             </p>
-            <p className="text-sm text-destructive mb-4">此操作不可撤销！</p>
+            <p className="text-sm text-destructive mb-4">{t('deleteDialog.warning')}</p>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
                 disabled={deleting}
                 className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
               >
-                取消
+                {tCommon('cancel')}
               </button>
               <button
                 onClick={handleDelete}
                 disabled={deleting}
                 className="flex-1 px-4 py-2 bg-destructive text-destructive-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
               >
-                {deleting ? '删除中...' : '确认删除'}
+                {deleting ? t('deleteDialog.deleting') : tCommon('confirm')}
               </button>
             </div>
           </div>
@@ -540,20 +558,20 @@ export default function EditionDetail() {
       {error && (
         <div className="mb-4 bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-destructive">
           {error}
-          <button onClick={() => setError(null)} className="ml-2 underline">关闭</button>
+          <button onClick={() => setError(null)} className="ml-2 underline">{t('close')}</button>
         </div>
       )}
 
       {/* 返回链接 */}
       <div className="flex items-center justify-between mb-6">
         <Link to="/editions" className="text-primary hover:underline">
-          ← 返回版本列表
+          {t('backToList')}
         </Link>
         <button
           onClick={() => setShowDeleteConfirm(true)}
           className="px-4 py-2 text-sm text-destructive border border-destructive/30 rounded-lg hover:bg-destructive/10 transition-colors"
         >
-          删除版本
+          {t('deleteEdition')}
         </button>
       </div>
 
@@ -607,7 +625,7 @@ export default function EditionDetail() {
             <div className="space-y-2 text-sm">
               {edition.location && (
                 <p>
-                  <span className="text-muted-foreground">位置：</span>
+                  <span className="text-muted-foreground">{t('info.location')}</span>
                   {edition.location.name}
                 </p>
               )}
@@ -615,7 +633,7 @@ export default function EditionDetail() {
               {edition.sale_price && (
                 <p>
                   <span className="text-muted-foreground">
-                    {edition.status === 'sold' ? '成交价：' : '定价：'}
+                    {edition.status === 'sold' ? t('info.soldPrice') : t('info.listPrice')}
                   </span>
                   {formatPrice(edition.sale_price, edition.sale_currency)}
                 </p>
@@ -625,13 +643,13 @@ export default function EditionDetail() {
                 <>
                   {edition.sale_date && (
                     <p>
-                      <span className="text-muted-foreground">售出日期：</span>
+                      <span className="text-muted-foreground">{t('info.saleDate')}</span>
                       {formatDate(edition.sale_date)}
                     </p>
                   )}
                   {edition.buyer_name && (
                     <p>
-                      <span className="text-muted-foreground">买家：</span>
+                      <span className="text-muted-foreground">{t('info.buyer')}</span>
                       {edition.buyer_name}
                     </p>
                   )}
@@ -641,7 +659,7 @@ export default function EditionDetail() {
 
             {edition.notes && (
               <div className="mt-4 p-3 bg-muted rounded-lg text-sm">
-                <p className="text-muted-foreground mb-1">备注：</p>
+                <p className="text-muted-foreground mb-1">{t('info.notes')}</p>
                 <p>{edition.notes}</p>
               </div>
             )}
@@ -653,14 +671,14 @@ export default function EditionDetail() {
       <div className="bg-card border border-border rounded-xl p-6 mb-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">
-            附件 ({files.length})
+            {t('attachments.title')} ({files.length})
           </h2>
           <div className="flex gap-2">
             <button
               onClick={() => setShowLinkDialog(true)}
               className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
             >
-              + 添加链接
+              {t('attachments.addLink')}
             </button>
           </div>
         </div>
@@ -669,7 +687,7 @@ export default function EditionDetail() {
         <FileUpload
           editionId={id!}
           onUploadComplete={handleFileUploaded}
-          onError={(uploadError) => console.error('上传失败:', uploadError)}
+          onError={(uploadError) => console.error('Upload failed:', uploadError)}
         />
 
         {/* 文件列表 */}
@@ -703,14 +721,14 @@ export default function EditionDetail() {
           className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
         >
           <MessageSquare className="w-4 h-4" />
-          <span>对话操作</span>
+          <span>{t('actions.chat')}</span>
         </button>
         <button
           onClick={startEditing}
           className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-muted text-muted-foreground rounded-lg hover:bg-accent transition-colors"
         >
           <Pencil className="w-4 h-4" />
-          <span>编辑</span>
+          <span>{t('actions.edit')}</span>
         </button>
       </div>
     </div>

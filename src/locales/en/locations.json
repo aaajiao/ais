@@ -1,0 +1,29 @@
+{
+  "title": "Locations",
+  "subtitle": "Manage artwork storage locations. {{count}} locations total",
+  "searchPlaceholder": "Search by name, alias, city...",
+  "noLocations": "No locations yet",
+  "noLocationsHint": "Add studios, galleries, museums to manage artwork storage",
+  "noMatch": "No matching locations found",
+  "addLocation": "Add Location",
+  "addFirstLocation": "Add your first location",
+  "selectLocation": "Select location...",
+  "deleteSuccess": "Location \"{{name}}\" deleted",
+  "types": {
+    "studio": "Studio",
+    "gallery": "Gallery",
+    "museum": "Museum",
+    "other": "Other"
+  },
+  "fields": {
+    "name": "Name",
+    "type": "Type",
+    "city": "City",
+    "country": "Country",
+    "address": "Address",
+    "contact": "Contact",
+    "aliases": "Aliases",
+    "notes": "Notes"
+  },
+  "editionsAtLocation": "{{count}} editions at this location"
+}

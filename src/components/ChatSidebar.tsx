@@ -1,6 +1,7 @@
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import MessageBubble from '@/components/chat/MessageBubble';
 import { saveChatHistory, loadChatHistory, clearChatHistory, getChatTimestamp } from '@/lib/chatStorage';
@@ -15,6 +16,7 @@ interface ChatSidebarProps {
 }
 
 export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
+  const { t, i18n } = useTranslation('common');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const historyLoadedRef = useRef(false);
   const [inputValue, setInputValue] = useState('');
@@ -119,12 +121,12 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
         {/* 头部 */}
         <div className="flex items-center justify-between p-4 border-b border-border flex-shrink-0">
           <div className="flex items-center gap-2">
-            <h2 className="font-semibold">AI 对话</h2>
+            <h2 className="font-semibold">{t('chatSidebar.title')}</h2>
             {messages.length > 0 && (
               <button
                 onClick={handleClearChat}
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                title="清除对话"
+                title={t('chatSidebar.clearChat')}
               >
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -133,7 +135,7 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
           <button
             onClick={onToggle}
             className="p-1 hover:bg-accent rounded transition-colors"
-            title="关闭对话面板"
+            title={t('chatSidebar.closePanel')}
           >
             <X className="w-4 h-4" />
           </button>
@@ -144,7 +146,7 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
           <div className="px-4 py-2 text-xs text-muted-foreground border-b border-border flex items-center justify-between">
             {chatTimestamp && (
               <span>
-                开始于 {chatTimestamp.toLocaleString('zh-CN', {
+                {t('chatSidebar.startedAt')} {chatTimestamp.toLocaleString(i18n.language === 'zh' ? 'zh-CN' : 'en-US', {
                   month: 'short',
                   day: 'numeric',
                   hour: '2-digit',
@@ -157,7 +159,7 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
                 to="/chat"
                 className="text-primary hover:underline"
               >
-                查看全部 ({messages.length})
+                {t('chatSidebar.viewAll', { count: messages.length })}
               </Link>
             )}
           </div>
@@ -169,10 +171,10 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
             <div className="text-center text-muted-foreground py-8">
               <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
               <p className="text-sm">
-                通过对话管理作品和版本
+                {t('chatSidebar.emptyTitle')}
               </p>
               <p className="text-xs mt-2 text-muted-foreground/70">
-                例如：「Guard 1/3 卖了，5万美金」
+                {t('chatSidebar.emptyExample')}
               </p>
             </div>
           ) : (
@@ -204,7 +206,7 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder={!session?.access_token ? "请先登录" : "输入消息..."}
+              placeholder={!session?.access_token ? t('chatSidebar.pleaseSignIn') : t('chatSidebar.inputPlaceholder')}
               disabled={isLoading || !session?.access_token}
               className="flex-1 px-3 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent outline-none text-sm disabled:opacity-50"
             />
@@ -224,7 +226,7 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
         <button
           onClick={onToggle}
           className="hidden lg:flex fixed right-4 bottom-4 w-12 h-12 bg-primary text-primary-foreground rounded-full items-center justify-center shadow-lg hover:opacity-90 transition-opacity z-40"
-          title="打开对话面板"
+          title={t('chatSidebar.openPanel')}
         >
           <MessageSquare className="w-5 h-5" />
         </button>

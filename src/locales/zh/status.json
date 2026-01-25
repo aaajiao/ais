@@ -1,0 +1,11 @@
+{
+  "in_production": "制作中",
+  "in_studio": "在库",
+  "at_gallery": "寄售",
+  "at_museum": "美术馆",
+  "in_transit": "运输中",
+  "sold": "已售",
+  "gifted": "赠送",
+  "lost": "遗失",
+  "damaged": "损坏"
+}

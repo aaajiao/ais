@@ -1,0 +1,35 @@
+{
+  "title": "设置",
+  "ai": {
+    "title": "AI 模型",
+    "loadingModels": "加载可用模型中...",
+    "loadError": "加载模型失败",
+    "noModels": "没有可用的模型。请检查 API 密钥配置。",
+    "retry": "重试",
+    "selectClaude": "选择 Claude 模型",
+    "selectGPT": "选择 GPT 模型",
+    "modelHint": "模型列表从 API 动态加载，显示当前可用的所有模型"
+  },
+  "export": {
+    "title": "数据导出",
+    "jsonBackup": "JSON 完整备份",
+    "jsonDescription": "导出所有数据（作品、版本、位置、历史记录）",
+    "artworksCsv": "作品列表 CSV",
+    "artworksCsvDescription": "导出作品基本信息，可用 Excel 打开",
+    "editionsCsv": "版本列表 CSV",
+    "editionsCsvDescription": "导出所有版本及状态信息",
+    "exportJson": "导出 JSON",
+    "exportCsv": "导出 CSV",
+    "exporting": "导出中...",
+    "noArtworks": "没有作品数据可导出",
+    "noEditions": "没有版本数据可导出",
+    "exportError": "导出失败",
+    "exportHint": "建议定期导出 JSON 备份，以防数据丢失"
+  },
+  "account": {
+    "title": "账户",
+    "notLoggedIn": "未登录",
+    "signOut": "登出",
+    "signingOut": "登出中..."
+  }
+}

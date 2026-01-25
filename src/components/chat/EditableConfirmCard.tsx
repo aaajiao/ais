@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { EditionStatus, Currency } from '@/lib/types';
-import { STATUS_CONFIG } from '@/lib/types';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
 import { Check, Pencil, ClipboardList } from 'lucide-react';
 
@@ -50,17 +50,17 @@ const CURRENCY_OPTIONS: { value: Currency; label: string }[] = [
   { value: 'JPY', label: 'JPY ¥' },
 ];
 
-// 状态选项
-const STATUS_OPTIONS: { value: EditionStatus; label: string }[] = [
-  { value: 'in_production', label: '制作中' },
-  { value: 'in_studio', label: '在库' },
-  { value: 'at_gallery', label: '寄售' },
-  { value: 'at_museum', label: '美术馆' },
-  { value: 'in_transit', label: '运输中' },
-  { value: 'sold', label: '已售' },
-  { value: 'gifted', label: '赠送' },
-  { value: 'lost', label: '遗失' },
-  { value: 'damaged', label: '损坏' },
+// 状态选项值（标签从 i18n 获取）
+const STATUS_VALUES: EditionStatus[] = [
+  'in_production',
+  'in_studio',
+  'at_gallery',
+  'at_museum',
+  'in_transit',
+  'sold',
+  'gifted',
+  'lost',
+  'damaged',
 ];
 
 export default function EditableConfirmCard({
@@ -69,6 +69,9 @@ export default function EditableConfirmCard({
   onCancel,
   isSubmitting = false,
 }: EditableConfirmCardProps) {
+  const { t } = useTranslation('chat');
+  const { t: tStatus } = useTranslation('status');
+  const { t: tCommon } = useTranslation('common');
   const [editMode, setEditMode] = useState<EditMode>('view');
   const [editedData, setEditedData] = useState<ConfirmCardData>(data);
 
@@ -110,7 +113,6 @@ export default function EditableConfirmCard({
   }, [editedData, onConfirm]);
 
   const { current, updates } = editedData;
-  const currentStatusConfig = STATUS_CONFIG[current.status];
 
   // 查看模式
   if (editMode === 'view') {
@@ -120,21 +122,21 @@ export default function EditableConfirmCard({
         <div className="flex items-center justify-between">
           <div className="font-medium flex items-center gap-2">
             <ClipboardList className="w-4 h-4" />
-            <span>确认更新</span>
+            <span>{t('confirmCard.title')}</span>
           </div>
           <button
             onClick={handleInlineEdit}
             className="text-xs text-primary hover:underline"
             disabled={isSubmitting}
           >
-            编辑
+            {t('confirmCard.edit')}
           </button>
         </div>
 
         {/* 作品信息 */}
         <div className="text-sm space-y-2">
           <p>
-            <span className="text-muted-foreground">作品：</span>
+            <span className="text-muted-foreground">{t('confirmCard.artwork')}:</span>
             <span className="font-medium">{current.artwork_title}</span>
             <span className="text-muted-foreground ml-1">
               ({current.edition_number}/{current.edition_total})
@@ -144,7 +146,7 @@ export default function EditableConfirmCard({
           {/* 状态变更 */}
           {updates.status && (
             <p className="flex items-center gap-2">
-              <span className="text-muted-foreground">状态：</span>
+              <span className="text-muted-foreground">{t('confirmCard.status')}:</span>
               <StatusIndicator status={current.status} size="md" />
               <span className="text-muted-foreground">→</span>
               <StatusIndicator status={updates.status} size="lg" />
@@ -154,7 +156,7 @@ export default function EditableConfirmCard({
           {/* 销售价格 */}
           {updates.sale_price !== undefined && (
             <p>
-              <span className="text-muted-foreground">售价：</span>
+              <span className="text-muted-foreground">{t('confirmCard.price')}:</span>
               <span className="font-medium">
                 {updates.sale_currency || 'USD'} {updates.sale_price.toLocaleString()}
               </span>
@@ -164,7 +166,7 @@ export default function EditableConfirmCard({
           {/* 买家 */}
           {updates.buyer_name && (
             <p>
-              <span className="text-muted-foreground">买家：</span>
+              <span className="text-muted-foreground">{t('confirmCard.buyer')}:</span>
               <span className="font-medium">{updates.buyer_name}</span>
             </p>
           )}
@@ -172,7 +174,7 @@ export default function EditableConfirmCard({
           {/* 日期 */}
           {updates.sold_at && (
             <p>
-              <span className="text-muted-foreground">日期：</span>
+              <span className="text-muted-foreground">{t('confirmCard.date')}:</span>
               <span>{updates.sold_at}</span>
             </p>
           )}
@@ -180,7 +182,7 @@ export default function EditableConfirmCard({
           {/* 位置 */}
           {updates.location_name && (
             <p>
-              <span className="text-muted-foreground">位置：</span>
+              <span className="text-muted-foreground">{t('confirmCard.location')}:</span>
               <span>{updates.location_name}</span>
             </p>
           )}
@@ -188,7 +190,7 @@ export default function EditableConfirmCard({
           {/* 备注 */}
           {updates.notes && (
             <p>
-              <span className="text-muted-foreground">备注：</span>
+              <span className="text-muted-foreground">{t('confirmCard.notes')}:</span>
               <span className="text-sm">{updates.notes}</span>
             </p>
           )}
@@ -206,21 +208,21 @@ export default function EditableConfirmCard({
             disabled={isSubmitting}
             className="flex-1 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm hover:opacity-90 disabled:opacity-50"
           >
-            {isSubmitting ? '处理中...' : <><Check className="w-4 h-4 inline mr-1" />确认</>}
+            {isSubmitting ? t('processing') : <><Check className="w-4 h-4 inline mr-1" />{t('confirmCard.confirm')}</>}
           </button>
           <button
             onClick={handleFullEdit}
             disabled={isSubmitting}
             className="px-3 py-2 bg-muted text-foreground rounded-lg text-sm hover:bg-accent disabled:opacity-50"
           >
-            详细编辑
+            {t('confirmCard.fullEdit')}
           </button>
           <button
             onClick={onCancel}
             disabled={isSubmitting}
             className="px-3 py-2 text-muted-foreground rounded-lg text-sm hover:bg-muted disabled:opacity-50"
           >
-            取消
+            {tCommon('cancel')}
           </button>
         </div>
       </div>
@@ -235,20 +237,20 @@ export default function EditableConfirmCard({
         <div className="flex items-center justify-between">
           <div className="font-medium flex items-center gap-2">
             <Pencil className="w-4 h-4" />
-            <span>编辑更新内容</span>
+            <span>{t('confirmCard.editTitle')}</span>
           </div>
           <div className="flex gap-2">
             <button
               onClick={handleSaveEdit}
               className="text-xs text-primary hover:underline"
             >
-              完成
+              {t('confirmCard.done')}
             </button>
             <button
               onClick={handleCancelEdit}
               className="text-xs text-muted-foreground hover:underline"
             >
-              取消
+              {tCommon('cancel')}
             </button>
           </div>
         </div>
@@ -265,14 +267,14 @@ export default function EditableConfirmCard({
         <div className="space-y-3">
           {/* 状态 */}
           <div>
-            <label className="text-xs text-muted-foreground block mb-1">状态</label>
+            <label className="text-xs text-muted-foreground block mb-1">{t('confirmCard.status')}</label>
             <select
               value={updates.status || current.status}
               onChange={(e) => updateField('status', e.target.value as EditionStatus)}
               className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
             >
-              {STATUS_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              {STATUS_VALUES.map(status => (
+                <option key={status} value={status}>{tStatus(status)}</option>
               ))}
             </select>
           </div>
@@ -281,17 +283,17 @@ export default function EditableConfirmCard({
           {(updates.status === 'sold' || current.status === 'sold') && (
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-xs text-muted-foreground block mb-1">售价</label>
+                <label className="text-xs text-muted-foreground block mb-1">{t('confirmCard.price')}</label>
                 <input
                   type="number"
                   value={updates.sale_price || ''}
                   onChange={(e) => updateField('sale_price', e.target.value ? Number(e.target.value) : undefined)}
-                  placeholder="输入金额"
+                  placeholder={t('confirmCard.enterAmount')}
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
                 />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground block mb-1">货币</label>
+                <label className="text-xs text-muted-foreground block mb-1">{t('confirmCard.currency')}</label>
                 <select
                   value={updates.sale_currency || 'USD'}
                   onChange={(e) => updateField('sale_currency', e.target.value as Currency)}
@@ -308,12 +310,12 @@ export default function EditableConfirmCard({
           {/* 买家 */}
           {(updates.status === 'sold' || current.status === 'sold') && (
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">买家</label>
+              <label className="text-xs text-muted-foreground block mb-1">{t('confirmCard.buyer')}</label>
               <input
                 type="text"
                 value={updates.buyer_name || ''}
                 onChange={(e) => updateField('buyer_name', e.target.value || undefined)}
-                placeholder="买家名称（可选）"
+                placeholder={t('confirmCard.buyerNameOptional')}
                 className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
               />
             </div>
@@ -326,7 +328,7 @@ export default function EditableConfirmCard({
             onClick={handleSaveEdit}
             className="flex-1 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm hover:opacity-90"
           >
-            完成编辑
+            {t('confirmCard.doneEditing')}
           </button>
         </div>
       </div>
@@ -339,14 +341,14 @@ export default function EditableConfirmCard({
       {/* 标题 */}
       <div className="flex items-center justify-between">
         <div className="font-medium flex items-center gap-2">
-          <span>📝</span>
-          <span>详细编辑</span>
+          <Pencil className="w-4 h-4" />
+          <span>{t('confirmCard.fullEdit')}</span>
         </div>
         <button
           onClick={handleCancelEdit}
           className="text-xs text-muted-foreground hover:underline"
         >
-          取消
+          {tCommon('cancel')}
         </button>
       </div>
 
@@ -354,7 +356,7 @@ export default function EditableConfirmCard({
       <div className="text-sm p-3 bg-muted/30 rounded-lg">
         <p className="font-medium">{current.artwork_title}</p>
         <p className="text-muted-foreground">
-          版本 {current.edition_number}/{current.edition_total} · 当前状态: {currentStatusConfig?.label}
+          {current.edition_number}/{current.edition_total} · {t('confirmCard.currentStatus')}: {tStatus(current.status)}
         </p>
       </div>
 
@@ -362,22 +364,22 @@ export default function EditableConfirmCard({
       <div className="space-y-4">
         {/* 状态 */}
         <div>
-          <label className="text-sm font-medium block mb-2">新状态</label>
+          <label className="text-sm font-medium block mb-2">{t('confirmCard.newStatus')}</label>
           <div className="grid grid-cols-3 gap-2">
-            {STATUS_OPTIONS.map(opt => {
-              const isSelected = (updates.status || current.status) === opt.value;
+            {STATUS_VALUES.map(status => {
+              const isSelected = (updates.status || current.status) === status;
               return (
                 <button
-                  key={opt.value}
-                  onClick={() => updateField('status', opt.value)}
+                  key={status}
+                  onClick={() => updateField('status', status)}
                   className={`p-2 rounded-lg text-sm border transition-colors flex items-center gap-2 ${
                     isSelected
                       ? 'border-primary bg-primary/10'
                       : 'border-border hover:bg-muted'
                   }`}
                 >
-                  <StatusIndicator status={opt.value} size="sm" />
-                  {opt.label}
+                  <StatusIndicator status={status} size="sm" />
+                  {tStatus(status)}
                 </button>
               );
             })}
@@ -387,21 +389,21 @@ export default function EditableConfirmCard({
         {/* 销售信息 */}
         {(updates.status === 'sold' || (!updates.status && current.status === 'sold')) && (
           <div className="p-3 bg-muted/30 rounded-lg space-y-3">
-            <p className="text-sm font-medium">销售信息</p>
+            <p className="text-sm font-medium">{t('confirmCard.saleInfo')}</p>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-muted-foreground block mb-1">售价</label>
+                <label className="text-xs text-muted-foreground block mb-1">{t('confirmCard.price')}</label>
                 <input
                   type="number"
                   value={updates.sale_price || ''}
                   onChange={(e) => updateField('sale_price', e.target.value ? Number(e.target.value) : undefined)}
-                  placeholder="输入金额"
+                  placeholder={t('confirmCard.enterAmount')}
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
                 />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground block mb-1">货币</label>
+                <label className="text-xs text-muted-foreground block mb-1">{t('confirmCard.currency')}</label>
                 <select
                   value={updates.sale_currency || 'USD'}
                   onChange={(e) => updateField('sale_currency', e.target.value as Currency)}
@@ -415,18 +417,18 @@ export default function EditableConfirmCard({
             </div>
 
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">买家</label>
+              <label className="text-xs text-muted-foreground block mb-1">{t('confirmCard.buyer')}</label>
               <input
                 type="text"
                 value={updates.buyer_name || ''}
                 onChange={(e) => updateField('buyer_name', e.target.value || undefined)}
-                placeholder="买家名称"
+                placeholder={t('confirmCard.buyerName')}
                 className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
               />
             </div>
 
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">销售日期</label>
+              <label className="text-xs text-muted-foreground block mb-1">{t('confirmCard.saleDate')}</label>
               <input
                 type="date"
                 value={updates.sold_at || ''}
@@ -439,11 +441,11 @@ export default function EditableConfirmCard({
 
         {/* 备注 */}
         <div>
-          <label className="text-xs text-muted-foreground block mb-1">备注</label>
+          <label className="text-xs text-muted-foreground block mb-1">{t('confirmCard.notes')}</label>
           <textarea
             value={updates.notes || ''}
             onChange={(e) => updateField('notes', e.target.value || undefined)}
-            placeholder="添加备注..."
+            placeholder={t('confirmCard.addNotes')}
             rows={2}
             className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm resize-none"
           />
@@ -458,13 +460,13 @@ export default function EditableConfirmCard({
           }}
           className="flex-1 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm hover:opacity-90"
         >
-          保存并返回
+          {t('confirmCard.saveAndReturn')}
         </button>
         <button
           onClick={handleCancelEdit}
           className="px-3 py-2 text-muted-foreground rounded-lg text-sm hover:bg-muted"
         >
-          放弃修改
+          {t('confirmCard.discardChanges')}
         </button>
       </div>
     </div>
