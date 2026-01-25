@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, FileText, FileType } from 'lucide-react';
 import type { ExportRequest, ExportOptions } from '@/lib/exporters';
 import { useAuthContext } from '@/contexts/AuthContext';
+import EditionSelector from './EditionSelector';
 
 interface ExportDialogProps {
   isOpen: boolean;
   onClose: () => void;
   artworkIds: string[];
   artworkCount: number;
+  editionTotal?: number | null;  // 作品的版数（用于格式化版本编号）
 }
 
 type ExportFormat = 'pdf' | 'md';
@@ -17,6 +19,7 @@ export default function ExportDialog({
   onClose,
   artworkIds,
   artworkCount,
+  editionTotal,
 }: ExportDialogProps) {
   const { session } = useAuthContext();
   const [format, setFormat] = useState<ExportFormat>('pdf');
@@ -27,6 +30,25 @@ export default function ExportDialog({
   });
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // 版本选择状态（仅单作品导出时使用）
+  const [editionMode, setEditionMode] = useState<'all' | 'selected'>('all');
+  const [selectedEditionIds, setSelectedEditionIds] = useState<string[]>([]);
+
+  // 是否为单作品导出
+  const isSingleArtwork = artworkCount === 1;
+
+  // 对话框关闭时重置版本选择状态
+  useEffect(() => {
+    if (!isOpen) {
+      setEditionMode('all');
+      setSelectedEditionIds([]);
+    }
+  }, [isOpen]);
+
+  // 导出按钮是否禁用
+  const isExportDisabled =
+    exporting || (isSingleArtwork && editionMode === 'selected' && selectedEditionIds.length === 0);
 
   if (!isOpen) return null;
 
@@ -45,6 +67,9 @@ export default function ExportDialog({
       const request: ExportRequest = {
         scope: artworkCount === 1 ? 'single' : 'selected',
         artworkIds,
+        // 仅在单作品且选择特定版本时传递 editionIds
+        editionIds:
+          isSingleArtwork && editionMode === 'selected' ? selectedEditionIds : undefined,
         format,
         options,
       };
@@ -169,6 +194,21 @@ export default function ExportDialog({
             </div>
           </div>
 
+          {/* 版本选择（仅单作品导出时显示） */}
+          {isSingleArtwork && (
+            <div>
+              <label className="block text-sm font-medium mb-3">选择版本</label>
+              <EditionSelector
+                artworkId={artworkIds[0]}
+                editionTotal={editionTotal ?? null}
+                mode={editionMode}
+                onModeChange={setEditionMode}
+                selectedIds={selectedEditionIds}
+                onSelectionChange={setSelectedEditionIds}
+              />
+            </div>
+          )}
+
           {/* 可选信息 */}
           <div>
             <label className="block text-sm font-medium mb-3">包含信息</label>
@@ -235,7 +275,7 @@ export default function ExportDialog({
           </button>
           <button
             onClick={handleExport}
-            disabled={exporting}
+            disabled={isExportDisabled}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
           >
             {exporting ? '导出中...' : '导出'}

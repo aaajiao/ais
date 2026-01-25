@@ -23,7 +23,8 @@ export type SupabaseClient = ReturnType<typeof getSupabaseClient>;
 // 获取作品导出数据
 export async function fetchArtworkExportData(
   supabase: SupabaseClient,
-  artworkIds?: string[]
+  artworkIds?: string[],
+  editionIds?: string[]  // 可选：指定导出的版本 ID
 ): Promise<ArtworkExportData[]> {
   // 获取作品（排除已删除的）
   let artworksQuery = supabase.from('artworks').select('*').is('deleted_at', null);
@@ -44,11 +45,18 @@ export async function fetchArtworkExportData(
 
   const artworkIdList = artworks.map((a: Artwork) => a.id);
 
-  // 获取版本
-  const { data: editionsData, error: editionsError } = await supabase
+  // 获取版本（支持可选的版本 ID 过滤）
+  let editionsQuery = supabase
     .from('editions')
     .select('*')
     .in('artwork_id', artworkIdList);
+
+  // 如果指定了版本 ID，则过滤
+  if (editionIds && editionIds.length > 0) {
+    editionsQuery = editionsQuery.in('id', editionIds);
+  }
+
+  const { data: editionsData, error: editionsError } = await editionsQuery;
 
   if (editionsError) {
     throw new Error(`Failed to fetch editions: ${editionsError.message}`);

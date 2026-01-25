@@ -6,6 +6,7 @@ import type { Artwork, Edition, Location, EditionStatus } from '../types.js';
 export interface ExportRequest {
   scope: 'single' | 'selected' | 'all';
   artworkIds?: string[];
+  editionIds?: string[];  // 可选：指定导出的版本 ID（仅单作品导出时有效）
   format: 'pdf' | 'md';
   options: ExportOptions;
 }

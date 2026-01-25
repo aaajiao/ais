@@ -259,6 +259,7 @@ export default function ArtworkDetail() {
           onClose={() => setShowExportDialog(false)}
           artworkIds={[id]}
           artworkCount={1}
+          editionTotal={artwork?.edition_total}
         />
       )}
 

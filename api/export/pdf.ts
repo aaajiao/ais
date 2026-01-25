@@ -461,8 +461,8 @@ export async function handlePDFExport(request: ExportRequest): Promise<{
     artworkIds = request.artworkIds;
   }
 
-  // 获取数据
-  const artworksData = await fetchArtworkExportData(supabase, artworkIds);
+  // 获取数据（支持版本过滤）
+  const artworksData = await fetchArtworkExportData(supabase, artworkIds, request.editionIds);
 
   if (artworksData.length === 0) {
     throw new Error('No artworks found');
