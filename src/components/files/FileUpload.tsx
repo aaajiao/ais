@@ -5,8 +5,9 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useFileUpload, type UploadingFile, type UploadedFile } from '@/hooks/useFileUpload';
-import { formatFileSize, getFileTypeIcon, detectFileType } from '@/lib/imageCompressor';
-import { X, Check } from 'lucide-react';
+import { formatFileSize, detectFileType } from '@/lib/imageCompressor';
+import { getFileTypeIcon } from '@/lib/fileIcons';
+import { X, Check, Paperclip, Download } from 'lucide-react';
 
 interface FileUploadProps {
   editionId: string;
@@ -195,8 +196,12 @@ export default function FileUpload({
           disabled={disabled}
         />
 
-        <div className="text-4xl mb-2">
-          {isDragging ? '📥' : '📎'}
+        <div className="mb-2 text-muted-foreground">
+          {isDragging ? (
+            <Download className="w-10 h-10 mx-auto" />
+          ) : (
+            <Paperclip className="w-10 h-10 mx-auto" />
+          )}
         </div>
         <div className="text-sm text-muted-foreground">
           {isDragging ? (
@@ -236,7 +241,7 @@ export default function FileUpload({
                 className="flex items-center gap-3 p-2 bg-muted/50 rounded-lg"
               >
                 {/* 文件类型图标 */}
-                <span className="text-lg">
+                <span className="text-muted-foreground">
                   {getFileTypeIcon(detectFileType(file.file))}
                 </span>
 

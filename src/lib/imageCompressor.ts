@@ -163,24 +163,13 @@ export function formatFileSize(bytes: number): string {
 
 /**
  * 根据文件类型获取图标
+ * @deprecated 使用 src/lib/fileIcons.tsx 中的 getFileTypeIcon 代替
  */
 export function getFileTypeIcon(fileType: string): string {
-  switch (fileType) {
-    case 'image':
-      return '🖼';
-    case 'pdf':
-      return '📄';
-    case 'video':
-      return '🎬';
-    case 'document':
-      return '📝';
-    case 'spreadsheet':
-      return '📊';
-    case 'link':
-      return '🔗';
-    default:
-      return '📎';
-  }
+  // 保留向后兼容，返回空字符串
+  // 新代码应使用 src/lib/fileIcons.tsx
+  void fileType;
+  return '';
 }
 
 /**

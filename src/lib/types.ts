@@ -165,14 +165,14 @@ export interface EditionHistory {
 }
 
 // 状态显示配置
-export const STATUS_CONFIG: Record<EditionStatus, { label: string; emoji: string; color: string }> = {
-  in_production: { label: '制作中', emoji: '🔨', color: 'text-yellow-500' },
-  in_studio: { label: '工作室', emoji: '🏠', color: 'text-green-500' },
-  at_gallery: { label: '画廊', emoji: '🖼️', color: 'text-yellow-500' },
-  at_museum: { label: '美术馆', emoji: '🏛️', color: 'text-blue-500' },
-  in_transit: { label: '在途', emoji: '🚚', color: 'text-orange-500' },
-  sold: { label: '已售', emoji: '✅', color: 'text-red-500' },
-  gifted: { label: '赠送', emoji: '🎁', color: 'text-purple-500' },
-  lost: { label: '遗失', emoji: '❌', color: 'text-gray-500' },
-  damaged: { label: '损坏', emoji: '⚠️', color: 'text-red-500' },
+export const STATUS_CONFIG: Record<EditionStatus, { label: string; color: string }> = {
+  in_production: { label: '制作中', color: 'text-yellow-500' },
+  in_studio: { label: '工作室', color: 'text-green-500' },
+  at_gallery: { label: '画廊', color: 'text-yellow-500' },
+  at_museum: { label: '美术馆', color: 'text-blue-500' },
+  in_transit: { label: '在途', color: 'text-orange-500' },
+  sold: { label: '已售', color: 'text-red-500' },
+  gifted: { label: '赠送', color: 'text-purple-500' },
+  lost: { label: '遗失', color: 'text-gray-500' },
+  damaged: { label: '损坏', color: 'text-red-500' },
 };

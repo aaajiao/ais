@@ -5,9 +5,10 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { supabase, getSignedUrl, deleteFile } from '@/lib/supabase';
-import { getFileTypeIcon, formatFileSize } from '@/lib/imageCompressor';
+import { formatFileSize } from '@/lib/imageCompressor';
+import { getFileTypeIcon } from '@/lib/fileIcons';
 import type { FileType } from '@/lib/database.types';
-import { Trash2, Eye, X, Image as ImageIcon } from 'lucide-react';
+import { Trash2, Eye, X, Image as ImageIcon, Download, Inbox } from 'lucide-react';
 
 export interface EditionFile {
   id: string;
@@ -131,7 +132,7 @@ export default function FileList({
   if (files.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
-        <div className="text-4xl mb-2">📭</div>
+        <Inbox className="w-10 h-10 mx-auto mb-2" />
         <div className="text-sm">暂无附件</div>
       </div>
     );
@@ -151,8 +152,8 @@ export default function FileList({
               {file.file_type === 'image' ? (
                 <ImageThumbnail file={file} size={48} />
               ) : (
-                <span className="text-2xl flex-shrink-0 w-12 h-12 flex items-center justify-center">
-                  {getFileTypeIcon(file.file_type)}
+                <span className="flex-shrink-0 w-12 h-12 flex items-center justify-center text-muted-foreground">
+                  {getFileTypeIcon(file.file_type, 'w-6 h-6')}
                 </span>
               )}
 
@@ -188,7 +189,7 @@ export default function FileList({
                   className="p-2 text-muted-foreground hover:text-foreground hover:bg-background rounded-lg transition-colors"
                   title="打开"
                 >
-                  👁
+                  <Eye className="w-4 h-4" />
                 </button>
 
                 {file.source_type === 'upload' && (
@@ -197,7 +198,7 @@ export default function FileList({
                     className="p-2 text-muted-foreground hover:text-foreground hover:bg-background rounded-lg transition-colors"
                     title="下载"
                   >
-                    📥
+                    <Download className="w-4 h-4" />
                   </button>
                 )}
 
@@ -248,8 +249,8 @@ export default function FileList({
               {file.file_type === 'image' && file.source_type === 'upload' ? (
                 <ImagePreview file={file} />
               ) : (
-                <div className="absolute inset-0 flex items-center justify-center text-5xl">
-                  {getFileTypeIcon(file.file_type)}
+                <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+                  {getFileTypeIcon(file.file_type, 'w-12 h-12')}
                 </div>
               )}
 

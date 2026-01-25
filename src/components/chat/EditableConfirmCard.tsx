@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
 import type { EditionStatus, Currency } from '@/lib/types';
 import { STATUS_CONFIG } from '@/lib/types';
-import { Check, Pencil } from 'lucide-react';
+import { StatusIndicator } from '@/components/ui/StatusIndicator';
+import { Check, Pencil, ClipboardList } from 'lucide-react';
 
 // 确认卡片数据类型
 export interface ConfirmCardData {
@@ -110,7 +111,6 @@ export default function EditableConfirmCard({
 
   const { current, updates } = editedData;
   const currentStatusConfig = STATUS_CONFIG[current.status];
-  const newStatusConfig = updates.status ? STATUS_CONFIG[updates.status] : null;
 
   // 查看模式
   if (editMode === 'view') {
@@ -119,7 +119,7 @@ export default function EditableConfirmCard({
         {/* 标题 */}
         <div className="flex items-center justify-between">
           <div className="font-medium flex items-center gap-2">
-            <span>📋</span>
+            <ClipboardList className="w-4 h-4" />
             <span>确认更新</span>
           </div>
           <button
@@ -145,13 +145,9 @@ export default function EditableConfirmCard({
           {updates.status && (
             <p className="flex items-center gap-2">
               <span className="text-muted-foreground">状态：</span>
-              <span className={currentStatusConfig?.color}>
-                {currentStatusConfig?.emoji} {currentStatusConfig?.label}
-              </span>
+              <StatusIndicator status={current.status} size="md" />
               <span className="text-muted-foreground">→</span>
-              <span className={`font-medium ${newStatusConfig?.color}`}>
-                {newStatusConfig?.emoji} {newStatusConfig?.label}
-              </span>
+              <StatusIndicator status={updates.status} size="lg" />
             </p>
           )}
 
@@ -369,19 +365,18 @@ export default function EditableConfirmCard({
           <label className="text-sm font-medium block mb-2">新状态</label>
           <div className="grid grid-cols-3 gap-2">
             {STATUS_OPTIONS.map(opt => {
-              const config = STATUS_CONFIG[opt.value];
               const isSelected = (updates.status || current.status) === opt.value;
               return (
                 <button
                   key={opt.value}
                   onClick={() => updateField('status', opt.value)}
-                  className={`p-2 rounded-lg text-sm border transition-colors ${
+                  className={`p-2 rounded-lg text-sm border transition-colors flex items-center gap-2 ${
                     isSelected
                       ? 'border-primary bg-primary/10'
                       : 'border-border hover:bg-muted'
                   }`}
                 >
-                  <span className="mr-1">{config?.emoji}</span>
+                  <StatusIndicator status={opt.value} size="sm" />
                   {opt.label}
                 </button>
               );
