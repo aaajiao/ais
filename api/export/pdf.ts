@@ -7,6 +7,49 @@ import { fileURLToPath } from 'url';
 import type { ExportRequest, ArtworkExportData } from '../../src/lib/exporters/index';
 import { preparePDFData, type PDFArtworkData } from '../../src/lib/exporters/formatters';
 import { getSupabaseClient, fetchArtworkExportData } from './shared';
+import { verifyAuth, unauthorizedResponse } from '../lib/auth';
+
+// Vercel 配置：使用 Node.js runtime（需要文件系统访问）
+export const config = {
+  runtime: 'nodejs',
+  maxDuration: 30,
+};
+
+// Vercel API Handler
+export default async function handler(req: Request): Promise<Response> {
+  // 只允许 POST 请求
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // 认证检查
+  const authResult = await verifyAuth(req);
+  if (!authResult.success) {
+    return unauthorizedResponse(authResult.error || 'Unauthorized');
+  }
+
+  try {
+    const requestData: ExportRequest = await req.json();
+    const { buffer, filename } = await handlePDFExport(requestData);
+
+    return new Response(buffer, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+      },
+    });
+  } catch (error) {
+    console.error('PDF Export Error:', error);
+    return new Response(JSON.stringify({ error: (error as Error).message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+}
 
 // 获取当前目录
 const __filename = fileURLToPath(import.meta.url);

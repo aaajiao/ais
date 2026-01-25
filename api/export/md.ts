@@ -3,8 +3,45 @@
 import type { ExportRequest } from '../../src/lib/exporters/index';
 import { generateFullMarkdown } from '../../src/lib/exporters/formatters';
 import { getSupabaseClient, fetchArtworkExportData } from './shared';
+import { verifyAuth, unauthorizedResponse } from '../lib/auth';
 
-// 处理导出请求
+// Vercel API Handler
+export default async function handler(req: Request): Promise<Response> {
+  // 只允许 POST 请求
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // 认证检查
+  const authResult = await verifyAuth(req);
+  if (!authResult.success) {
+    return unauthorizedResponse(authResult.error || 'Unauthorized');
+  }
+
+  try {
+    const requestData: ExportRequest = await req.json();
+    const { content, filename } = await handleMarkdownExport(requestData);
+
+    return new Response(content, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/markdown; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+      },
+    });
+  } catch (error) {
+    console.error('Export Error:', error);
+    return new Response(JSON.stringify({ error: (error as Error).message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+}
+
+// 处理导出请求（内部函数）
 export async function handleMarkdownExport(request: ExportRequest): Promise<{
   content: string;
   filename: string;

@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { verifyAuth, unauthorizedResponse } from '../lib/auth';
 
 // 请求体类型
 interface ImportArtwork {
@@ -65,17 +66,18 @@ const FIELD_LABELS: Record<string, string> = {
   thumbnail_url: '缩略图',
 };
 
-// Vercel Edge Function
-export const config = {
-  runtime: 'edge',
-};
-
 export default async function handler(req: Request) {
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
       headers: { 'Content-Type': 'application/json' },
     });
+  }
+
+  // 认证检查
+  const authResult = await verifyAuth(req);
+  if (!authResult.success) {
+    return unauthorizedResponse(authResult.error || 'Unauthorized');
   }
 
   // 使用 service key 绕过 RLS，支持新的 secret key 格式

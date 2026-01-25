@@ -3,6 +3,7 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
 import { createClient } from '@supabase/supabase-js';
+import { verifyAuth, unauthorizedResponse } from './lib/auth';
 
 // 延迟创建 provider 实例的函数
 function getAnthropicProvider() {
@@ -43,6 +44,16 @@ function getModel(modelKey: string) {
   };
 
   return modelMap[modelKey] || modelMap['claude-sonnet-4.5'];
+}
+
+/**
+ * SQL 注入防护：转义 ILIKE 搜索中的特殊字符
+ */
+function sanitizeSearchTerm(term: string): string {
+  return term
+    .replace(/\\/g, '\\\\')
+    .replace(/%/g, '\\%')
+    .replace(/_/g, '\\_');
 }
 
 // 系统提示词
@@ -96,21 +107,21 @@ function getTools() {
         type: z.string().optional().describe('作品类型'),
       }),
       execute: async ({ query, year, type }) => {
-        console.log('[search_artworks] Input:', { query, year, type });
         let queryBuilder = supabase.from('artworks').select('*');
 
         if (query) {
-          queryBuilder = queryBuilder.or(`title_en.ilike.%${query}%,title_cn.ilike.%${query}%`);
+          const sanitized = sanitizeSearchTerm(query);
+          queryBuilder = queryBuilder.or(`title_en.ilike.%${sanitized}%,title_cn.ilike.%${sanitized}%`);
         }
         if (year) {
           queryBuilder = queryBuilder.eq('year', year);
         }
         if (type) {
-          queryBuilder = queryBuilder.ilike('type', `%${type}%`);
+          const sanitized = sanitizeSearchTerm(type);
+          queryBuilder = queryBuilder.ilike('type', `%${sanitized}%`);
         }
 
         const { data, error } = await queryBuilder.limit(10);
-        console.log('[search_artworks] Result:', { error, dataCount: data?.length });
 
         if (error) {
           return { error: error.message };
@@ -143,10 +154,11 @@ function getTools() {
         // 先搜索作品
         let artworkIds: string[] = [];
         if (artwork_title) {
+          const sanitized = sanitizeSearchTerm(artwork_title);
           const { data: artworks } = await supabase
             .from('artworks')
             .select('id')
-            .or(`title_en.ilike.%${artwork_title}%,title_cn.ilike.%${artwork_title}%`);
+            .or(`title_en.ilike.%${sanitized}%,title_cn.ilike.%${sanitized}%`);
           artworkIds = artworks?.map(a => a.id) || [];
         }
 
@@ -406,10 +418,11 @@ function getTools() {
         query: z.string().describe('搜索关键词'),
       }),
       execute: async ({ query }) => {
+        const sanitized = sanitizeSearchTerm(query);
         const { data, error } = await supabase
           .from('locations')
           .select('*')
-          .or(`name.ilike.%${query}%,aliases.cs.{${query}},city.ilike.%${query}%`)
+          .or(`name.ilike.%${sanitized}%,city.ilike.%${sanitized}%`)
           .limit(10);
 
         if (error) {
@@ -436,10 +449,11 @@ function getTools() {
         let finalArtworkIds = artwork_ids || [];
 
         if (artwork_title && finalArtworkIds.length === 0) {
+          const sanitized = sanitizeSearchTerm(artwork_title);
           const { data: artworks, error } = await supabase
             .from('artworks')
             .select('id, title_en')
-            .or(`title_en.ilike.%${artwork_title}%,title_cn.ilike.%${artwork_title}%`)
+            .or(`title_en.ilike.%${sanitized}%,title_cn.ilike.%${sanitized}%`)
             .limit(5);
 
           if (error) {
@@ -503,14 +517,21 @@ export default async function handler(req: Request) {
   }
 
   try {
+    // 1. 验证身份认证
+    const auth = await verifyAuth(req);
+    if (!auth.success) {
+      return unauthorizedResponse(auth.error || 'Unauthorized');
+    }
+
     const body = await req.json();
-    console.log('Request body:', JSON.stringify(body, null, 2));
+    const { messages: uiMessages, model = 'claude-sonnet-4.5' } = body;
 
-    const { messages: uiMessages, model = 'claude-sonnet-3.5' } = body;
-
-    console.log('Using model:', model);
-    console.log('Messages count:', uiMessages?.length);
-    console.log('ANTHROPIC_API_KEY exists:', !!process.env.ANTHROPIC_API_KEY);
+    // 2. 安全日志（不记录敏感消息内容）
+    console.log('[chat] Request', {
+      userId: auth.userId,
+      model,
+      messageCount: uiMessages?.length,
+    });
 
     // 获取模型（延迟初始化）
     const selectedModel = getModel(model);
@@ -520,7 +541,6 @@ export default async function handler(req: Request) {
 
     // 使用官方的 convertToModelMessages 转换 UIMessage 到 CoreMessage
     const modelMessages = await convertToModelMessages(uiMessages as UIMessage[]);
-    console.log('Converted messages:', JSON.stringify(modelMessages, null, 2));
 
     const result = streamText({
       model: selectedModel,
@@ -532,10 +552,9 @@ export default async function handler(req: Request) {
 
     return result.toUIMessageStreamResponse();
   } catch (error) {
-    console.error('Chat API error:', error);
-    console.error('Error stack:', (error as Error).stack);
+    console.error('[chat] Error:', (error as Error).message);
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: (error as Error).message }),
+      JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
