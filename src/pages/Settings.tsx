@@ -1,7 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 type Artwork = Database['public']['Tables']['artworks']['Row'];
 
@@ -202,6 +211,13 @@ export default function Settings() {
     }
   };
 
+  // 获取选中模型的信息
+  const selectedModelInfo = useMemo(() => {
+    if (!models || !selectedModel) return null;
+    const allModels = [...models.anthropic, ...models.openai];
+    return allModels.find(m => m.id === selectedModel);
+  }, [models, selectedModel]);
+
   // 渲染模型选择器
   const renderModelSelector = () => {
     if (loadingModels) {
@@ -231,81 +247,73 @@ export default function Settings() {
       return null;
     }
 
+    const hasModels = models.anthropic.length > 0 || models.openai.length > 0;
+
+    if (!hasModels) {
+      return (
+        <div className="text-center py-8 text-muted-foreground">
+          没有可用的模型。请检查 API 密钥配置。
+        </div>
+      );
+    }
+
+    // 判断当前选中的是哪个 provider
+    const isAnthropicSelected = models.anthropic.some(m => m.id === selectedModel);
+    const isOpenAISelected = models.openai.some(m => m.id === selectedModel);
+
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Anthropic Claude */}
         {models.anthropic.length > 0 && (
-          <div>
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">Anthropic Claude</h3>
-            <div className="space-y-2">
-              {models.anthropic.map(model => (
-                <label
-                  key={model.id}
-                  className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
-                    selectedModel === model.id
-                      ? 'bg-primary/10 border border-primary/30'
-                      : 'hover:bg-muted'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="model"
-                    value={model.id}
-                    checked={selectedModel === model.id}
-                    onChange={() => handleModelChange(model.id)}
-                    className="w-4 h-4 accent-primary"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <span className="font-medium">{model.name}</span>
-                    {model.description && (
-                      <span className="text-sm text-muted-foreground ml-2">({model.description})</span>
-                    )}
-                    <p className="text-xs text-muted-foreground truncate">{model.id}</p>
-                  </div>
-                </label>
-              ))}
-            </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground">Anthropic Claude</label>
+            <Select
+              value={isAnthropicSelected ? selectedModel : ''}
+              onValueChange={handleModelChange}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="选择 Claude 模型" />
+              </SelectTrigger>
+              <SelectContent>
+                {models.anthropic.map(model => (
+                  <SelectItem key={model.id} value={model.id}>
+                    {model.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         )}
 
         {/* OpenAI GPT */}
         {models.openai.length > 0 && (
-          <div>
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">OpenAI GPT</h3>
-            <div className="space-y-2">
-              {models.openai.map(model => (
-                <label
-                  key={model.id}
-                  className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
-                    selectedModel === model.id
-                      ? 'bg-primary/10 border border-primary/30'
-                      : 'hover:bg-muted'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="model"
-                    value={model.id}
-                    checked={selectedModel === model.id}
-                    onChange={() => handleModelChange(model.id)}
-                    className="w-4 h-4 accent-primary"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <span className="font-medium">{model.name}</span>
-                    {model.description && (
-                      <span className="text-sm text-muted-foreground ml-2">({model.description})</span>
-                    )}
-                    <p className="text-xs text-muted-foreground truncate">{model.id}</p>
-                  </div>
-                </label>
-              ))}
-            </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground">OpenAI GPT</label>
+            <Select
+              value={isOpenAISelected ? selectedModel : ''}
+              onValueChange={handleModelChange}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="选择 GPT 模型" />
+              </SelectTrigger>
+              <SelectContent>
+                {models.openai.map(model => (
+                  <SelectItem key={model.id} value={model.id}>
+                    {model.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         )}
 
-        {models.anthropic.length === 0 && models.openai.length === 0 && (
-          <div className="text-center py-8 text-muted-foreground">
-            没有可用的模型。请检查 API 密钥配置。
+        {/* 显示选中模型的描述和 ID */}
+        {selectedModelInfo && (
+          <div className="text-sm text-muted-foreground space-y-1 p-3 bg-muted/50 rounded-lg">
+            {selectedModelInfo.description && (
+              <p>{selectedModelInfo.description}</p>
+            )}
+            <p className="text-xs font-mono">{selectedModel}</p>
           </div>
         )}
       </div>

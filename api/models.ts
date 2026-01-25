@@ -118,6 +118,32 @@ async function fetchAnthropicModels(): Promise<ModelInfo[]> {
   }
 }
 
+// 过滤掉带日期后缀的重复模型和不常用变体，只保留主要版本
+function isMainModel(modelId: string): boolean {
+  const lower = modelId.toLowerCase();
+
+  // 排除带日期后缀的版本（如 gpt-4o-2024-08-06）
+  const datePattern = /-\d{4}-\d{2}-\d{2}$/;
+  const previewPattern = /-preview$/;
+  const latestPattern = /-latest$/;
+
+  if (datePattern.test(modelId)) return false;
+  if (previewPattern.test(modelId)) return false;
+  if (latestPattern.test(modelId)) return false;
+
+  // 排除 codex 变体（用于代码补全，非对话）
+  if (lower.includes('-codex')) return false;
+
+  // 排除 GPT-3.5 老版本号
+  if (lower.includes('3.5-turbo-0125')) return false;
+  if (lower.includes('3.5-turbo-1106')) return false;
+
+  // 排除 GPT-4 老版本号
+  if (lower.includes('4-0613')) return false;
+
+  return true;
+}
+
 async function fetchOpenAIModels(): Promise<ModelInfo[]> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -140,7 +166,7 @@ async function fetchOpenAIModels(): Promise<ModelInfo[]> {
     const data: OpenAIModelsResponse = await response.json();
 
     return data.data
-      .filter(model => isChatModel(model.id, OPENAI_CHAT_PREFIXES))
+      .filter(model => isChatModel(model.id, OPENAI_CHAT_PREFIXES) && isMainModel(model.id))
       .map(model => ({
         id: model.id,
         name: formatOpenAIModelName(model.id),

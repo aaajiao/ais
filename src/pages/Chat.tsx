@@ -19,14 +19,47 @@ export default function Chat() {
     return localStorage.getItem('ai-model') || 'claude-sonnet-4-5-20250929';
   });
 
-  // 获取模型显示名称
+  // 获取模型显示名称（包含版本号）
   const getModelDisplayName = (modelId: string) => {
-    // 提取模型名称的核心部分
-    if (modelId.includes('sonnet')) return 'Claude Sonnet';
-    if (modelId.includes('opus')) return 'Claude Opus';
-    if (modelId.includes('haiku')) return 'Claude Haiku';
-    if (modelId.startsWith('gpt-')) return modelId.replace(/-/g, ' ').replace(/gpt (\d)/gi, 'GPT-$1');
-    if (modelId.startsWith('o1') || modelId.startsWith('o3') || modelId.startsWith('o4')) return modelId.toUpperCase();
+    // Claude 模型：提取版本号
+    // claude-sonnet-4-5-20250929 → Claude Sonnet 4.5
+    // claude-opus-4-5-20251101 → Claude Opus 4.5
+    // claude-3-5-haiku-20241022 → Claude 3.5 Haiku
+    // claude-3-5-sonnet-20241022 → Claude 3.5 Sonnet
+
+    // 新格式：claude-{tier}-{major}-{minor}-{date}
+    const newFormatMatch = modelId.match(/^claude-(opus|sonnet|haiku)-(\d+)-(\d+)/i);
+    if (newFormatMatch) {
+      const [, tier, major, minor] = newFormatMatch;
+      const tierName = tier.charAt(0).toUpperCase() + tier.slice(1);
+      return `Claude ${tierName} ${major}.${minor}`;
+    }
+
+    // 旧格式：claude-{major}-{minor}-{tier}-{date}
+    const oldFormatMatch = modelId.match(/^claude-(\d+)-(\d+)-(opus|sonnet|haiku)/i);
+    if (oldFormatMatch) {
+      const [, major, minor, tier] = oldFormatMatch;
+      const tierName = tier.charAt(0).toUpperCase() + tier.slice(1);
+      return `Claude ${major}.${minor} ${tierName}`;
+    }
+
+    // OpenAI GPT 模型
+    if (modelId.startsWith('gpt-')) {
+      // gpt-4o-2024-08-06 → GPT-4o
+      // gpt-4.1-2025-04-14 → GPT-4.1
+      // gpt-4o-mini → GPT-4o-mini
+      const match = modelId.match(/^gpt-(\d+\.?\d*[a-z]*(?:-mini)?)/i);
+      if (match) return `GPT-${match[1]}`;
+    }
+
+    // O 系列推理模型（o1, o3, o4）
+    if (/^o[134]/i.test(modelId)) {
+      // o1-2024-12-17 → O1
+      // o3-mini → O3-mini
+      const match = modelId.match(/^(o[134](?:-mini|-pro)?)/i);
+      if (match) return match[1].toUpperCase();
+    }
+
     return modelId;
   };
 
