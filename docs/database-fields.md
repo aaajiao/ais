@@ -30,22 +30,39 @@
 
 示例：一件作品在 "Berlin Warehouse"（location_id），具体放在 "二楼，架子3"（storage_detail）。
 
-## 借展/寄售信息
+## 借出/展览信息
 
-| 字段 | 类型 | UI 位置 | 显示条件 |
-|------|------|---------|----------|
-| `consignment_start` | DATE | 借展信息区块 | 状态为 at_gallery/at_museum/in_transit |
-| `loan_end` | DATE | 借展信息区块 | 状态为 at_gallery/at_museum/in_transit |
-| `loan_institution` | TEXT | **未使用** | 见下方说明 |
+两种不同场景使用独立的日期字段：
 
-### 设计决策：不使用 `loan_institution`
+### 借出信息（at_gallery 状态）
 
-`loan_institution` 字段与 `location_id` 存在语义重叠：
+用于作品借给画廊或藏家的场景。
 
-- 当状态为 `at_gallery` 时，`location_id` 已经指向借展机构
-- 再填写 `loan_institution` 会造成重复
+| 字段 | 类型 | UI 标签 | 说明 |
+|------|------|---------|------|
+| `consignment_start` | DATE | 借出日期 | 作品借出的日期 |
+| `consignment_end` | DATE | 预计归还 | 预计归还的日期 |
 
-因此，借展机构直接通过 `location_id`（位置选择器）指定，`loan_institution` 字段不在 UI 中暴露。
+### 展览信息（at_museum 状态）
+
+用于作品参加展览的场景。
+
+| 字段 | 类型 | UI 标签 | 说明 |
+|------|------|---------|------|
+| `loan_start` | DATE | 展期开始 | 展览开始日期 |
+| `loan_end` | DATE | 展期结束 | 展览结束日期 |
+
+### 弃用字段
+
+| 字段 | 说明 |
+|------|------|
+| `loan_institution` | **已弃用**，借展机构通过 `location_id` 指定 |
+
+### 设计说明
+
+- **at_gallery（借展中）**：借给画廊或藏家，关注"什么时候借出"和"什么时候还"
+- **at_museum（展览中）**：参加展览，关注"展览什么时候开始"和"什么时候结束"
+- **in_transit（运输中）**：不显示日期字段
 
 ## 销售信息
 
@@ -106,14 +123,16 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 
 3. **备注**（始终显示）
 
-4. **借展/寄售信息**（条件显示）
-   - 仅当状态为 at_gallery/at_museum/in_transit 时显示
-   - 开始日期、结束日期
+4. **借出信息**（仅 at_gallery 状态显示）
+   - 借出日期、预计归还
 
-5. **文档信息**（始终显示）
+5. **展览信息**（仅 at_museum 状态显示）
+   - 展期开始、展期结束
+
+6. **文档信息**（始终显示）
    - 证书编号
 
-6. **状态与存储**（可折叠）
+7. **状态与存储**（可折叠）
    - 作品状态、状态备注、存储位置
 
 ## 时间戳

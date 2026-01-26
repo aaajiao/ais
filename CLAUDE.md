@@ -172,7 +172,8 @@ AI can modify these edition fields (with confirmation):
 - Status, location, sale info (price, currency, buyer, date)
 - **condition** / **condition_notes** - Edition condition
 - **storage_detail** - Storage location details
-- **consignment_start** / **loan_end** - Loan/consignment dates
+- **consignment_start** / **consignment_end** - Loan dates (at_gallery status)
+- **loan_start** / **loan_end** - Exhibition dates (at_museum status)
 
 AI cannot modify (use UI instead):
 - Artwork metadata (title, year, materials, dimensions)

@@ -53,8 +53,11 @@ interface EditionFormData {
   sale_date: string;
   buyer_name: string;
   notes: string;
-  // 借展相关
+  // 借出信息 (at_gallery 状态)
   consignment_start: string;
+  consignment_end: string;
+  // 展览信息 (at_museum 状态)
+  loan_start: string;
   loan_end: string;
   certificate_number: string;
   // 状态相关
@@ -215,8 +218,11 @@ export default function EditionDetail() {
       sale_date: edition.sale_date || '',
       buyer_name: edition.buyer_name || '',
       notes: edition.notes || '',
-      // 借展相关
+      // 借出信息 (at_gallery 状态)
       consignment_start: edition.consignment_start || '',
+      consignment_end: edition.consignment_end || '',
+      // 展览信息 (at_museum 状态)
+      loan_start: edition.loan_start || '',
       loan_end: edition.loan_end || '',
       certificate_number: edition.certificate_number || '',
       // 状态相关
@@ -250,8 +256,11 @@ export default function EditionDetail() {
         sale_date: formData.sale_date || null,
         buyer_name: formData.buyer_name || null,
         notes: formData.notes || null,
-        // 借展相关
+        // 借出信息 (at_gallery 状态)
         consignment_start: formData.consignment_start || null,
+        consignment_end: formData.consignment_end || null,
+        // 展览信息 (at_museum 状态)
+        loan_start: formData.loan_start || null,
         loan_end: formData.loan_end || null,
         certificate_number: formData.certificate_number || null,
         // 状态相关
@@ -510,16 +519,16 @@ export default function EditionDetail() {
                 />
               </div>
 
-              {/* 借展信息 - 仅当状态为 at_gallery/at_museum/in_transit 时显示 */}
-              {['at_gallery', 'at_museum', 'in_transit'].includes(formData.status) && (
+              {/* 借出信息 - 仅当状态为 at_gallery 时显示 */}
+              {formData.status === 'at_gallery' && (
                 <div className="border-t border-border pt-4 mt-4">
                   <p className="text-sm font-medium text-muted-foreground mb-3">
-                    {t('editDialog.consignmentSection')}
+                    {t('editDialog.loanSection')}
                   </p>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-sm font-medium mb-1">{t('editDialog.consignmentStart')}</label>
+                      <label className="block text-sm font-medium mb-1">{t('editDialog.loanStart')}</label>
                       <input
                         type="date"
                         value={formData.consignment_start}
@@ -528,7 +537,37 @@ export default function EditionDetail() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">{t('editDialog.loanEnd')}</label>
+                      <label className="block text-sm font-medium mb-1">{t('editDialog.loanExpectedReturn')}</label>
+                      <input
+                        type="date"
+                        value={formData.consignment_end}
+                        onChange={(e) => setFormData({ ...formData, consignment_end: e.target.value })}
+                        className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 展览信息 - 仅当状态为 at_museum 时显示 */}
+              {formData.status === 'at_museum' && (
+                <div className="border-t border-border pt-4 mt-4">
+                  <p className="text-sm font-medium text-muted-foreground mb-3">
+                    {t('editDialog.exhibitionSection')}
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">{t('editDialog.exhibitionStart')}</label>
+                      <input
+                        type="date"
+                        value={formData.loan_start}
+                        onChange={(e) => setFormData({ ...formData, loan_start: e.target.value })}
+                        className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">{t('editDialog.exhibitionEnd')}</label>
                       <input
                         type="date"
                         value={formData.loan_end}
@@ -805,18 +844,35 @@ export default function EditionDetail() {
                   )}
                 </>
               )}
-              {/* 借展信息（仅相关状态显示） */}
-              {['at_gallery', 'at_museum', 'in_transit'].includes(edition.status) && (
+              {/* 借出信息（仅 at_gallery 状态显示） */}
+              {edition.status === 'at_gallery' && (
                 <>
                   {edition.consignment_start && (
                     <p>
-                      <span className="text-muted-foreground">{t('info.consignmentStart')}</span>
+                      <span className="text-muted-foreground">{t('info.loanStart')}</span>
                       {formatDate(edition.consignment_start)}
+                    </p>
+                  )}
+                  {edition.consignment_end && (
+                    <p>
+                      <span className="text-muted-foreground">{t('info.loanExpectedReturn')}</span>
+                      {formatDate(edition.consignment_end)}
+                    </p>
+                  )}
+                </>
+              )}
+              {/* 展览信息（仅 at_museum 状态显示） */}
+              {edition.status === 'at_museum' && (
+                <>
+                  {edition.loan_start && (
+                    <p>
+                      <span className="text-muted-foreground">{t('info.exhibitionStart')}</span>
+                      {formatDate(edition.loan_start)}
                     </p>
                   )}
                   {edition.loan_end && (
                     <p>
-                      <span className="text-muted-foreground">{t('info.loanEnd')}</span>
+                      <span className="text-muted-foreground">{t('info.exhibitionEnd')}</span>
                       {formatDate(edition.loan_end)}
                     </p>
                   )}

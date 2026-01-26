@@ -123,9 +123,13 @@ CREATE TABLE editions (
   sale_currency currency_type,
   sale_date DATE,
   buyer_name TEXT,
+  -- 借出信息 (at_gallery 状态)
   consignment_start DATE,
-  loan_institution TEXT,
+  consignment_end DATE,
+  -- 展览信息 (at_museum 状态)
+  loan_start DATE,
   loan_end DATE,
+  loan_institution TEXT,  -- 已弃用，位置信息使用 location_id
   certificate_number TEXT,
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),

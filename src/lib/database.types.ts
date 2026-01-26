@@ -220,9 +220,13 @@ export interface Database {
           sale_currency: CurrencyType | null;
           sale_date: string | null;
           buyer_name: string | null;
+          // 借出信息 (at_gallery 状态)
           consignment_start: string | null;
-          loan_institution: string | null;
+          consignment_end: string | null;
+          // 展览信息 (at_museum 状态)
+          loan_start: string | null;
           loan_end: string | null;
+          loan_institution: string | null;  // 已弃用
           certificate_number: string | null;
           notes: string | null;
           created_at: string;
@@ -244,8 +248,10 @@ export interface Database {
           sale_date?: string | null;
           buyer_name?: string | null;
           consignment_start?: string | null;
-          loan_institution?: string | null;
+          consignment_end?: string | null;
+          loan_start?: string | null;
           loan_end?: string | null;
+          loan_institution?: string | null;
           certificate_number?: string | null;
           notes?: string | null;
           created_at?: string;
@@ -267,8 +273,10 @@ export interface Database {
           sale_date?: string | null;
           buyer_name?: string | null;
           consignment_start?: string | null;
-          loan_institution?: string | null;
+          consignment_end?: string | null;
+          loan_start?: string | null;
           loan_end?: string | null;
+          loan_institution?: string | null;
           certificate_number?: string | null;
           notes?: string | null;
           created_at?: string;

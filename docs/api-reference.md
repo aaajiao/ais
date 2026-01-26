@@ -176,8 +176,10 @@ AI: [调用 search_artworks { query: "Guard" }]
 | `condition` | enum | 品相：`excellent` / `good` / `fair` / `poor` / `damaged` |
 | `condition_notes` | string | 品相备注 |
 | `storage_detail` | string | 存储位置详情 |
-| `consignment_start` | string | 借展/寄售开始日期 |
-| `loan_end` | string | 借展结束日期 |
+| `consignment_start` | string | 借出日期（at_gallery 状态） |
+| `consignment_end` | string | 预计归还日期（at_gallery 状态） |
+| `loan_start` | string | 展期开始日期（at_museum 状态） |
+| `loan_end` | string | 展期结束日期（at_museum 状态） |
 
 **返回**
 
