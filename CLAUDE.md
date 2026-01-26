@@ -277,95 +277,27 @@ This project uses **Brutalist Minimalism** design style.
 - **Colors**: OKLCH color space, eye-friendly off-white/off-black
 - **Status**: Use `StatusIndicator` component with low-saturation semantic colors
 - **Layout**: Unified page width management via `Layout.tsx`
-- **Responsive**: Mobile-first, touch targets ≥ 44px (Apple HIG compliant)
-- **Typography**: Centralized in `index.css` via Tailwind v4 `@theme` custom utilities
+- **Responsive**: Two-tier system with `lg` (1024px) as key breakpoint
+- **Touch targets**: ≥ 44px on mobile (Apple HIG compliant)
 
-### Responsive Breakpoints
+### Responsive Breakpoints (Quick Reference)
 
-The app uses a two-tier responsive system based on `lg` (1024px) breakpoint:
+| Device | Width | Navigation |
+|--------|-------|------------|
+| iPhone + iPad Portrait | < 1024px | Bottom tab bar + Top toolbar |
+| iPad Landscape + Desktop | ≥ 1024px | Top navigation + Chat sidebar |
 
-| Device | Width | Navigation Mode |
-|--------|-------|-----------------|
-| iPhone + iPad Portrait | < 1024px | Mobile: Bottom tab bar + Top toolbar |
-| iPad Landscape + Desktop | ≥ 1024px | Desktop: Top navigation + Chat sidebar |
-
-**Key breakpoint: `lg` (1024px)**
-- Below `lg`: Mobile UI with bottom navigation
-- At/above `lg`: Desktop UI with top navigation
-
-### Mobile Navigation (< 1024px)
-
-**Top Toolbar** (`lg:hidden`):
-- Left: App title
-- Right: Language switcher, Theme toggle
-
-**Bottom Tab Bar** (`lg:hidden`):
-- Home (`/`) - Home icon
-- Artworks (`/artworks`) - Package icon
-- Settings (`/settings`) - Settings icon
-- Chat (`/chat`) - MessageCircle icon
-
-Active tabs use filled icons for visual feedback.
-
-### Desktop Navigation (≥ 1024px)
-
-**Top Navigation Bar** (`hidden lg:flex`):
-- 8 links: Home, Artworks, Editions, Locations, Links, Import, Trash, Settings
-- Right side: Chat toggle, Language, Theme, User info, Sign out
-
-**Chat Sidebar**:
-- Collapsible right sidebar
-- Toggle via Chat button in header
-
-### Dashboard Quick Actions
-
-Responsive grid for common actions:
-- Mobile: 2x2 grid (4 items: Artworks, Editions, Locations, Links)
-- Desktop: 1x5 grid (5 items: + Chat)
-
-The Chat action is hidden on mobile (`hidden lg:flex`) since it's already in the bottom tab bar.
-
-### Typography System
-
-Custom typography classes defined in `src/index.css`:
-
-| Class | Usage | base | xl (1280px+) |
-|-------|-------|------|--------------|
-| `text-page-title` | Page titles | 28px | 40px |
-| `text-section-title` | Section headings | 18px | 26px |
-| `.nav-link` | Navigation links | 14px | 21px |
-
-To adjust global typography, modify CSS variables in `index.css` only.
+**Mobile bottom tabs**: Home, Artworks, Settings, Chat
+**Desktop top nav**: Home, Artworks, Editions, Locations, Links, Import, Trash, Settings
 
 ### Key Components
 
-- `src/components/ui/button.tsx` - Button component with Apple HIG compliant sizing
-- `src/components/ui/icon-button.tsx` - Icon button with required `label` for accessibility
-- `src/components/ui/toggle-chip.tsx` - Toggle chip for filters and selectable options
+- `src/components/Layout.tsx` - Navigation and page width management
+- `src/components/ui/button.tsx` - Button with Apple HIG sizing (44px mobile)
 - `src/components/ui/StatusIndicator.tsx` - Edition status indicator
-- `src/components/Layout.tsx` - Unified layout and page width management
-- `src/index.css` - CSS variables, typography system, and global styles
+- `src/index.css` - CSS variables and typography system
 
-### Button System (Apple HIG Compliant)
-
-All buttons use `Button` or `IconButton` components with responsive sizing:
-
-| Size | Mobile | Desktop | Usage |
-|------|--------|---------|-------|
-| `mini` | 28px | 24px | Inline tags |
-| `small`/`sm` | 36px | 32px | Secondary actions |
-| `default` | **44px** | **36px** | Primary actions |
-| `large`/`lg` | 52px | 44px | CTAs |
-
-```tsx
-import { Button } from '@/components/ui/button';
-import { IconButton } from '@/components/ui/icon-button';
-
-<Button variant="primary">Save</Button>
-<IconButton label="Delete" variant="ghost"><Trash2 /></IconButton>
-```
-
-See `docs/style-guide.md` for detailed specifications.
+**See `docs/style-guide.md` for complete UI/UX specifications.**
 
 ## MD Import Logic
 
