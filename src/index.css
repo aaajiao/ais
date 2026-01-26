@@ -56,6 +56,7 @@
   /* 状态色 - 低饱和度护眼版 */
   --status-available: oklch(0.52 0.12 145);
   --status-consigned: oklch(0.60 0.12 85);
+  --status-museum: oklch(0.52 0.12 310);
   --status-sold: oklch(0.52 0.14 25);
   --status-transit: oklch(0.52 0.12 250);
   --status-inactive: oklch(0.55 0.02 265);
@@ -123,6 +124,7 @@
   /* 状态色 - 深色下提高亮度保持可见 */
   --status-available: oklch(0.58 0.14 145);
   --status-consigned: oklch(0.66 0.14 85);
+  --status-museum: oklch(0.58 0.14 310);
   --status-sold: oklch(0.58 0.16 25);
   --status-transit: oklch(0.58 0.14 250);
   --status-inactive: oklch(0.55 0.02 265);
@@ -297,6 +299,7 @@ h1, h2, h3, .font-display {
   /* 状态色映射到 Tailwind */
   --color-status-available: var(--status-available);
   --color-status-consigned: var(--status-consigned);
+  --color-status-museum: var(--status-museum);
   --color-status-sold: var(--status-sold);
   --color-status-transit: var(--status-transit);
   --color-status-inactive: var(--status-inactive);

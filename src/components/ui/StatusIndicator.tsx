@@ -19,7 +19,7 @@ const STATUS_CONFIG: Record<EditionStatus, StatusConfig> = {
     pulse: true
   },
   at_museum: {
-    color: 'var(--status-transit)',
+    color: 'var(--status-museum)',
   },
   in_transit: {
     color: 'var(--status-transit)',

@@ -145,7 +145,7 @@ export default function Dashboard() {
         >
           <div
             className="text-3xl font-mono font-bold"
-            style={{ color: 'var(--status-transit)' }}
+            style={{ color: 'var(--status-museum)' }}
           >
             {displayStats.atMuseum}
           </div>
