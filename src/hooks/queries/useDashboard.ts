@@ -18,6 +18,7 @@ export interface DashboardStats {
   totalEditions: number;
   inStudio: number;
   atGallery: number;
+  atMuseum: number;
   sold: number;
 }
 
@@ -46,6 +47,7 @@ async function fetchDashboardStats(): Promise<DashboardStats> {
   const editions = editionsResult.data || [];
   const inStudio = editions.filter((e) => e.status === 'in_studio').length;
   const atGallery = editions.filter((e) => e.status === 'at_gallery').length;
+  const atMuseum = editions.filter((e) => e.status === 'at_museum').length;
   const sold = editions.filter((e) => e.status === 'sold').length;
 
   return {
@@ -53,6 +55,7 @@ async function fetchDashboardStats(): Promise<DashboardStats> {
     totalEditions: editions.length,
     inStudio,
     atGallery,
+    atMuseum,
     sold,
   };
 }

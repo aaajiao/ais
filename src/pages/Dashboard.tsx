@@ -81,6 +81,7 @@ export default function Dashboard() {
     totalEditions: 0,
     inStudio: 0,
     atGallery: 0,
+    atMuseum: 0,
     sold: 0,
   };
 
@@ -89,7 +90,7 @@ export default function Dashboard() {
       <h1 className="text-page-title mb-6 xl:mb-8">{t('title')}</h1>
 
       {/* 统计卡片 - 不对称网格 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-6 mb-8">
         {/* 主卡片 - 总作品数 */}
         <Link
           to="/artworks"
@@ -120,7 +121,7 @@ export default function Dashboard() {
           </div>
         </Link>
 
-        {/* 寄售 */}
+        {/* 外借中 */}
         <Link
           to="/editions?status=at_gallery"
           className="bg-card border border-border rounded-xl p-4 card-interactive animate-enter animate-enter-2"
@@ -137,10 +138,27 @@ export default function Dashboard() {
           </div>
         </Link>
 
+        {/* 展览中 */}
+        <Link
+          to="/editions?status=at_museum"
+          className="bg-card border border-border rounded-xl p-4 card-interactive animate-enter animate-enter-3"
+        >
+          <div
+            className="text-3xl font-mono font-bold"
+            style={{ color: 'var(--status-transit)' }}
+          >
+            {displayStats.atMuseum}
+          </div>
+          <div className="text-muted-foreground text-sm flex items-center gap-2 mt-1">
+            <StatusIndicator status="at_museum" size="sm" />
+            <span>{tStatus('at_museum')}</span>
+          </div>
+        </Link>
+
         {/* 已售 */}
         <Link
           to="/editions?status=sold"
-          className="bg-card border border-border rounded-xl p-4 card-interactive animate-enter animate-enter-3"
+          className="bg-card border border-border rounded-xl p-4 card-interactive animate-enter animate-enter-4"
         >
           <div
             className="text-3xl font-mono font-bold"
