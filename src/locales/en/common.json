@@ -152,6 +152,8 @@
   "auth": {
     "verifying": "Verifying identity..."
   },
+  "newVersionAvailable": "New version available",
+  "reloadNow": "Reload now",
   "thumbnailMigration": {
     "description": "Check and migrate artwork thumbnails from external links to local storage",
     "checkButton": "Check artworks to migrate",

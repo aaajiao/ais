@@ -31,17 +31,11 @@
 - **Supabase**: 已有账户，需创建新项目
 - **运行时**: Bun（开发和测试）
 - **AI 模型**: Claude + OpenAI（用户可切换）
-  - **Anthropic Claude 系列**:
-    - Claude Opus 4.5（最强大）
-    - Claude Sonnet 4.5（推荐，平衡）
-    - Claude Haiku 4.5（快速低成本）
-  - **OpenAI GPT 系列**:
-    - GPT-5.2（最新旗舰）
-    - GPT-5.1
-    - GPT-4.1（编码优化）
-    - o3-mini（推理模型）
+  - 模型列表从 `/api/models` 动态获取
+  - 支持 Anthropic Claude 系列（Opus、Sonnet、Haiku）
+  - 支持 OpenAI GPT 系列（GPT-4o、O1/O3/O4）
   - 用户可在设置页面选择默认模型
-  - 也可在对话时手动切换
+  - 模型选择保存在 localStorage
 
 ---
 
@@ -274,93 +268,42 @@ ANTHROPIC_API_KEY=sk-ant-xxx  # Claude API Key
 OPENAI_API_KEY=sk-xxx         # OpenAI API Key
 ```
 
-### 模型配置（用户可切换）
+### 模型配置（动态获取）
+
+模型列表通过 `/api/models` API 动态获取，而非硬编码。
+
+**API 端点**: `GET /api/models`
+
+**实现方式**:
 ```typescript
-// lib/models.ts
-import { anthropic } from "@ai-sdk/anthropic";
-import { openai } from "@ai-sdk/openai";
-
-// 可用模型列表
-export const availableModels = {
-  // ========== Anthropic Claude 系列 ==========
-  "claude-opus-4.5": {
-    provider: anthropic("claude-opus-4-5-20251101"),
-    name: "Claude Opus 4.5",
-    description: "最强大，复杂推理和代理任务",
-    cost: "$15/$75 per M tokens",
-    category: "anthropic",
-  },
-  "claude-sonnet-4.5": {
-    provider: anthropic("claude-sonnet-4-5-20250514"),
-    name: "Claude Sonnet 4.5",
-    description: "平衡性能和成本（推荐）",
-    cost: "$3/$15 per M tokens",
-    category: "anthropic",
-  },
-  "claude-haiku-4.5": {
-    provider: anthropic("claude-haiku-4-5-20251015"),
-    name: "Claude Haiku 4.5",
-    description: "快速低成本，适合简单任务",
-    cost: "$1/$5 per M tokens",
-    category: "anthropic",
-  },
-
-  // ========== OpenAI GPT 系列 ==========
-  "gpt-5.2": {
-    provider: openai("gpt-5.2"),
-    name: "GPT-5.2",
-    description: "最新旗舰，专业知识工作最强",
-    cost: "按量计费",
-    category: "openai",
-  },
-  "gpt-5.1": {
-    provider: openai("gpt-5.1"),
-    name: "GPT-5.1",
-    description: "GPT-5 系列旗舰",
-    cost: "按量计费",
-    category: "openai",
-  },
-  "gpt-4.1": {
-    provider: openai("gpt-4.1"),
-    name: "GPT-4.1",
-    description: "编码任务优化，指令遵循强",
-    cost: "按量计费",
-    category: "openai",
-  },
-  "o3-mini": {
-    provider: openai("o3-mini"),
-    name: "o3-mini",
-    description: "推理模型，深度思考",
-    cost: "按量计费",
-    category: "openai",
-  },
-};
-
-// 默认模型（可在设置中修改）
-export const DEFAULT_MODEL = "claude-sonnet-4.5";
+// api/models.ts
+// 从 Anthropic 和 OpenAI API 动态获取可用模型列表
+// 自动过滤：只显示聊天模型，排除嵌入、音频、图像等模型
+// 默认模型：claude-sonnet-* 系列
 ```
+
+**过滤规则**:
+- Anthropic: `claude-*` 前缀的模型
+- OpenAI: `gpt-*`, `o1*`, `o3*`, `o4*` 前缀的模型
+- 排除: embed, whisper, tts, dall-e, audio, moderation 等
+
+**模型描述**:
+| 模型类型 | 描述 |
+|---------|------|
+| claude-*-opus | 最强大，适合复杂任务 |
+| claude-*-sonnet | 推荐，平衡性能和成本 |
+| claude-*-haiku | 快速低成本 |
+| gpt-4o | 多模态，高性能 |
+| gpt-4o-mini | 快速低成本 |
+| o1/o3/o4 | 推理模型 |
 
 ### 设置页面 UI
-```
-┌─────────────────────────────────────────────────────┐
-│  设置 > AI 模型                                      │
-├─────────────────────────────────────────────────────┤
-│                                                      │
-│  Anthropic Claude:                                   │
-│  ● Claude Sonnet 4.5 (推荐，平衡性能和成本)          │
-│  ○ Claude Opus 4.5 (最强大，成本较高)                │
-│  ○ Claude Haiku 4.5 (快速低成本)                    │
-│                                                      │
-│  OpenAI GPT:                                         │
-│  ○ GPT-5.2 (最新旗舰)                               │
-│  ○ GPT-5.1                                          │
-│  ○ GPT-4.1 (编码优化)                               │
-│  ○ o3-mini (推理模型)                               │
-│                                                      │
-│  💡 对话时可说 "用 Opus" 或 "用 GPT" 临时切换        │
-│                                                      │
-└─────────────────────────────────────────────────────┘
-```
+
+用户在设置页面选择默认 AI 模型：
+- Anthropic Claude 下拉选择器
+- OpenAI GPT 下拉选择器
+- 显示当前选中模型的描述和 ID
+- 模型选择保存在 localStorage (`ai-model`)
 
 ### 验证方式
 1. "Guard 有几个版本？" → 返回正确数据
@@ -468,9 +411,9 @@ src/
 - [x] 导出功能
   - [x] PDF 导出（带嵌入图片、中英双语支持）
   - [x] Markdown 导出（带图片链接、完整中英文）
-  - [ ] Excel 导出 - 延后
-  - [ ] CSV 导出 - 延后
-  - [ ] JSON 完整备份 - 延后（设置页面已有）
+  - [ ] Excel 导出 - 延后（可选）
+  - [x] CSV 导出 ✅（设置页面：作品 CSV + 版本 CSV）
+  - [x] JSON 完整备份 ✅（设置页面）
 - [x] 导出对话框 UI（ExportDialog.tsx）
 
 ### 已完成的 MD 导入功能
@@ -530,7 +473,8 @@ src/
 - [x] PDF 导出是否包含嵌入图片 ✅
 - [x] PDF 是否支持中英双语 ✅（使用 Noto Sans SC 字体）
 - [x] Markdown 导出是否完整 ✅
-- [ ] Excel/CSV 导出 - 延后
+- [x] CSV 导出 ✅（设置页面已实现：作品 CSV + 版本 CSV）
+- [ ] Excel 导出 - 延后（可选）
 - [x] JSON 导出是否包含完整数据结构（设置页面已有备份功能）
 
 ### 已完成的导出功能
@@ -675,49 +619,125 @@ src/components/export/
 
 ---
 
-## 阶段 8: 画廊门户 + PWA + 部署 ⏳ 待开始
+## 阶段 8: 画廊门户 + PWA + 部署 ⏳ 部分完成
 
 **目标**: 画廊只读门户 + 离线支持 + 上线
 
-### 任务清单
-- [ ] 画廊链接管理（GalleryLinkManager.tsx）
-  - 生成链接
-  - 重置/禁用链接
-- [ ] 画廊门户页面（GalleryPortal.tsx）
-  - 只读展示寄售作品
-  - 无需登录
+### 已完成任务
+- [x] 画廊链接管理（Links.tsx）
+  - 创建/删除链接
+  - 重置 token
+  - 启用/禁用链接
+  - 价格可见性控制
+  - 访问统计（次数、最后访问时间）
+- [x] 画廊门户页面（PublicView.tsx）
+  - 无需登录访问 `/view/:token`
+  - 显示位置下的所有版本
+  - 支持价格显示/隐藏
+  - 显示作品缩略图、标题、年份、类型、材料、尺寸、版本信息、状态
 - [x] 主题切换（深色/亮色）- 已在设置页实现
 - [x] 国际化支持（中文/英文）- 已完成
-- [ ] PWA 配置
-  - manifest.json
-  - Service Worker
-  - 应用图标
-- [ ] 离线缓存（IndexedDB）
-- [ ] 离线操作同步队列
-- [ ] 网络状态指示器
-- [ ] Vercel 部署
-- [ ] 域名配置
+- [x] Vercel 部署配置（vercel.json）
+- [x] PWA 配置 ✅ (2026-01-26)
+  - vite-plugin-pwa 集成
+  - Web App Manifest（名称、图标、颜色）
+  - Service Worker（autoUpdate 策略）
+  - 应用图标（从 jiaofolder.icns 生成）
+  - ReloadPrompt 组件（版本更新提示）
+  - 主题色动态切换（深色/亮色）
+
+### 待完成任务
+- [ ] 离线缓存（IndexedDB）- 缓存 API 响应数据
+- [ ] 离线操作同步队列 - 离线时记录写操作，恢复后同步
+- [ ] 网络状态指示器 - UI 显示当前在线/离线状态
+- [ ] 域名配置（可选）
+
+### PWA 实现详情 (2026-01-26)
+
+#### 技术选型
+- **工具**: vite-plugin-pwa v1.2.0
+- **策略**: generateSW（自动生成 Service Worker）
+- **更新方式**: autoUpdate（静默更新）
+
+#### 新增/修改文件
+```
+public/icons/
+├── pwa-192x192.png           # Android 主屏幕图标
+├── pwa-512x512.png           # Android 启动画面
+├── maskable-icon-512x512.png # Android 自适应图标
+├── apple-touch-icon-180x180.png # iOS 主屏幕图标
+└── favicon.png               # 浏览器标签页图标
+
+src/components/pwa/
+└── ReloadPrompt.tsx          # 版本更新提示组件
+
+vite.config.ts                # VitePWA 插件配置
+index.html                    # PWA meta 标签
+tsconfig.app.json             # 添加 pwa/client 类型
+public/theme-init.js          # 主题色动态更新
+```
+
+#### Workbox 缓存策略
+| 资源 | 策略 | 缓存时间 |
+|------|------|----------|
+| 静态资源 | precache | 永久 |
+| Google Fonts | CacheFirst | 1 年 |
+| Supabase 图片 | CacheFirst | 30 天 |
+
+#### 验证方式
+```bash
+bun run build && bun run preview
+# Chrome DevTools → Application → Manifest/Service Workers
+```
+
+### Public Links 功能详情
+
+**路由**:
+- `/links` - 管理公开链接（需登录）
+- `/view/:token` - 公开查看页面（无需登录）
+
+**相关文件**:
+```
+api/
+├── links/index.ts       # 链接 CRUD API
+└── view/[token].ts      # 公开查看 API
+
+src/
+├── pages/
+│   ├── Links.tsx        # 链接管理页面
+│   └── PublicView.tsx   # 公开查看页面
+└── hooks/
+    └── useLinks.ts      # 链接数据钩子
+```
+
+**功能特性**:
+- 为任意位置创建公开链接
+- Token 可重置（使旧链接失效）
+- 访问统计：记录访问次数和最后访问时间
+- 价格可见性：可控制是否在公开页面显示价格
 
 ### 验证方式
-1. 生成画廊链接 → 访问正常
-2. 画廊只能看到自己的寄售作品
-3. 深色/亮色切换正常
-4. 添加到主屏幕正常
-5. 离线时能查看缓存数据
-6. 恢复网络后自动同步
+1. ✅ 生成画廊链接 → 访问正常
+2. ✅ 公开页面显示位置下的所有版本
+3. ✅ 深色/亮色切换正常
+4. ✅ 价格显示/隐藏控制正常
+5. ✅ 添加到主屏幕（PWA manifest + Service Worker）
+6. ❌ 离线时能查看缓存数据（IndexedDB 待实现）
+7. ❌ 恢复网络后自动同步（待实现）
 
 ### 交付物
-- 画廊门户功能
-- 完整 PWA 支持
-- 生产环境部署
+- ✅ 画廊门户功能
+- ✅ PWA 基础支持（manifest、SW、可安装）
+- ❌ 完整离线支持（IndexedDB 待实现）
+- ✅ 生产环境部署配置
 
 ### 对比检查（v3.md 第 4-5 节）
-- [ ] 画廊门户是否符合方案 5.4（链接格式、显示内容）
-- [ ] gallery_links 表是否正确（方案 6.2）
-- [ ] PWA manifest 是否完整（方案 4.9）
-- [ ] Service Worker 是否实现离线缓存
-- [ ] IndexedDB 离线数据结构是否正确
-- [ ] 网络状态指示器是否实现（方案 4.9）
+- [x] 画廊门户是否符合方案 5.4（链接格式、显示内容）
+- [x] gallery_links 表是否正确（方案 6.2）
+- [x] PWA manifest 是否完整（方案 4.9）✅
+- [x] Service Worker 是否注册并运行 ✅
+- [ ] IndexedDB 离线数据结构是否正确（待实现）
+- [ ] 网络状态指示器是否实现（方案 4.9）（待实现）
 
 ---
 
@@ -726,39 +746,88 @@ src/components/export/
 ```
 aaajiao-inventory/
 ├── api/
-│   ├── chat.ts              # AI 对话 API
-│   ├── auth/callback.ts     # OAuth 回调
-│   ├── gallery/[token].ts   # 画廊门户 API
-│   ├── import/md.ts         # MD 导入
-│   └── export/              # 各格式导出
+│   ├── chat.ts              # AI 对话 API（工具调用、流式响应）
+│   ├── models.ts            # 动态模型列表 API
+│   ├── links/index.ts       # 公开链接 CRUD API
+│   ├── view/[token].ts      # 公开查看 API（无需认证）
+│   ├── import/
+│   │   ├── md.ts            # MD 导入
+│   │   ├── migrate-thumbnails.ts
+│   │   └── process-image.ts
+│   ├── export/
+│   │   ├── pdf.ts           # PDF 导出（中文支持）
+│   │   ├── md.ts            # Markdown 导出
+│   │   └── shared.ts        # 共享工具
+│   └── lib/
+│       ├── auth.ts          # 认证工具
+│       ├── artwork-extractor.ts  # LLM 网页解析
+│       └── image-downloader.ts   # 图片 URL 选择
 ├── src/
+│   ├── pages/
+│   │   ├── Dashboard.tsx    # 首页仪表盘
+│   │   ├── Artworks.tsx     # 作品列表
+│   │   ├── ArtworkDetail.tsx
+│   │   ├── Editions.tsx     # 版本列表
+│   │   ├── EditionDetail.tsx
+│   │   ├── Chat.tsx         # AI 对话页面
+│   │   ├── Import.tsx       # 导入页面
+│   │   ├── Locations.tsx    # 位置管理
+│   │   ├── Links.tsx        # 公开链接管理
+│   │   ├── PublicView.tsx   # 公开查看页面
+│   │   ├── Trash.tsx        # 回收站
+│   │   ├── Settings.tsx     # 设置（模型、导出、账户）
+│   │   └── Login.tsx
 │   ├── components/
-│   │   ├── chat/ChatPanel.tsx
-│   │   ├── chat/EditableConfirmCard.tsx
-│   │   ├── artworks/ArtworkList.tsx
-│   │   ├── editions/EditionDetail.tsx
-│   │   └── files/FileUpload.tsx
+│   │   ├── Layout.tsx       # 导航和页面布局
+│   │   ├── ChatSidebar.tsx  # 桌面端对话侧边栏
+│   │   ├── chat/            # 对话组件
+│   │   ├── editions/        # 版本管理组件
+│   │   ├── files/           # 文件上传组件
+│   │   ├── export/          # 导出组件
+│   │   ├── import/          # 导入组件
+│   │   ├── locations/       # 位置组件
+│   │   └── ui/              # shadcn/ui 组件
+│   ├── hooks/
+│   │   ├── queries/         # React Query 钩子
+│   │   ├── useAuth.ts
+│   │   ├── useLinks.ts      # 公开链接管理
+│   │   ├── useLocations.ts
+│   │   ├── useFileUpload.ts
+│   │   └── useInfiniteVirtualList.ts
+│   ├── contexts/
+│   │   ├── AuthContext.tsx
+│   │   └── ThemeContext.tsx
 │   ├── lib/
 │   │   ├── supabase.ts
-│   │   ├── models.ts
-│   │   └── md-parser.ts
-│   └── hooks/
-│       ├── useAuth.ts
-│       └── useNetworkStatus.ts
+│   │   ├── queryClient.ts   # React Query 配置
+│   │   ├── queryKeys.ts     # 查询键管理
+│   │   ├── types.ts
+│   │   └── database.types.ts
+│   └── locales/             # i18n 翻译文件
+│       ├── zh/
+│       └── en/
 └── supabase/
     └── migrations/          # SQL 迁移脚本
 ```
 
 ---
 
-## 建议的开发顺序
+## 项目完成状态总结
 
-1. **阶段 1-2**: 基础设施（必须先完成）
-2. **阶段 3**: 认证系统（保护后续功能）
-3. **阶段 4**: UI 展示（有数据可看）
-4. **阶段 5**: AI 核心（主要交互方式）
-5. **阶段 6**: 完善功能
-6. **阶段 7**: 导入导出
-7. **阶段 8**: 上线
+| 阶段 | 状态 | 说明 |
+|------|------|------|
+| 阶段 1: 项目初始化 | ✅ 完成 | Vite + React + TypeScript + TailwindCSS |
+| 阶段 2: Supabase 数据层 | ✅ 完成 | 8 个核心表、Storage、RLS |
+| 阶段 3: 用户认证 | ✅ 完成 | Google OAuth + 邮箱白名单 |
+| 阶段 4: 作品与版本 CRUD | ✅ 完成 | 列表、详情、搜索、筛选、虚拟滚动 |
+| 阶段 5: AI 对话核心 | ✅ 完成 | 多模型、工具调用、确认卡片 |
+| 阶段 6: 版本管理完善 | ✅ 完成 | 附件、历史、编号、位置 |
+| 阶段 7: 数据导入导出 | ✅ 完成 | MD/URL 导入、PDF/MD/CSV/JSON 导出 |
+| 阶段 8: 画廊门户 + PWA | ⏳ 部分完成 | 画廊门户 ✅、PWA 基础 ✅、离线缓存 ❌ |
 
-每个阶段完成后建议进行一次用户测试，收集反馈后再进入下一阶段。
+**待完成功能**:
+- 离线缓存（IndexedDB）- 缓存 API 响应数据
+- 离线操作同步队列 - 离线时记录写操作
+- 网络状态指示器 - UI 显示在线/离线状态
+
+**最后更新**: 2026-01-26

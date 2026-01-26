@@ -408,6 +408,7 @@ export default function Settings() {
                   src={user.user_metadata.avatar_url}
                   alt="Avatar"
                   className="w-12 h-12 rounded-full"
+                  referrerPolicy="no-referrer"
                 />
               )}
               <div>

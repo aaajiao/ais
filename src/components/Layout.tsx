@@ -190,6 +190,7 @@ export default function Layout() {
                 src={user.user_metadata.avatar_url}
                 alt="Avatar"
                 className="w-8 h-8 rounded-full"
+                referrerPolicy="no-referrer"
               />
             )}
             <span className="text-sm text-muted-foreground hidden xl:inline">

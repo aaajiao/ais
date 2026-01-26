@@ -35,6 +35,7 @@ bun run lint
 - **Backend**: Vercel Functions (serverless)
 - **Database**: Supabase (PostgreSQL + Storage + Auth)
 - **AI**: Vercel AI SDK with Claude (Anthropic) and GPT (OpenAI)
+- **PWA**: vite-plugin-pwa (manifest, service worker, offline caching)
 
 ## Project Structure
 

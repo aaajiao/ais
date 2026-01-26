@@ -6,6 +6,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import PageLoader from './components/ui/PageLoader';
+import { ReloadPrompt } from './components/pwa/ReloadPrompt';
 
 // 首屏页面同步加载
 import Login from './pages/Login';
@@ -28,6 +29,7 @@ function App() {
   return (
     <ThemeProvider>
       <Toaster position="top-center" richColors />
+      <ReloadPrompt />
       <BrowserRouter>
         <AuthProvider>
           <Routes>

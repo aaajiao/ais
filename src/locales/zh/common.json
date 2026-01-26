@@ -152,6 +152,8 @@
   "auth": {
     "verifying": "正在验证身份..."
   },
+  "newVersionAvailable": "有新版本可用",
+  "reloadNow": "立即更新",
   "thumbnailMigration": {
     "description": "检查并迁移使用外部链接的作品缩略图到本地存储",
     "checkButton": "检查需要迁移的作品",
