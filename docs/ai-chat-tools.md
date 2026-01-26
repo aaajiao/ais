@@ -1,0 +1,127 @@
+# AI 聊天工具
+
+聊天界面 (`/chat`) 提供自然语言访问系统功能，系统提示词使用中文。
+
+---
+
+## 功能概览
+
+- 查询作品和版本
+- 更新版本状态
+- 记录销售（价格/买家）
+- 管理位置
+- 导出数据
+- **从 URL 导入作品**（如 "导入 https://eventstructure.com/Guard-I"）
+
+---
+
+## 搜索工具
+
+| 工具 | 参数 |
+|------|------|
+| `search_artworks` | query (title), year, type, **materials**, **is_unique** |
+| `search_editions` | artwork_title, edition_number, status, location, **edition_type**, **condition**, **inventory_number**, **buyer_name**, **price_min/max**, **sold_after/before** |
+| `search_locations` | query, **type**, **country** |
+| `search_history` | edition_id, artwork_title, action, after, before, related_party |
+
+### 示例查询
+
+- "找所有用磁铁的作品" → materials 搜索 + AI 查询扩展
+- "所有 AP 版本" → edition_type 过滤
+- "品相为差的版本" → condition 过滤
+- "某某买的作品" → buyer_name 搜索
+- "售价超过 10000 的版本" → price_min 搜索
+- "这个版本什么时候卖的" → search_history
+- "去年的销售记录" → search_history + 日期范围
+
+---
+
+## AI 查询扩展
+
+数据库中 `materials`、`type` 字段存储英文。用户使用中文搜索时：
+
+1. `expandSearchQuery()` 使用 `generateText` + `Output.object()` 翻译和扩展查询
+2. 使用可配置的"搜索翻译模型"（设置 > AI 模型 > 高级选项）
+3. 默认使用 Claude 3.5 Haiku（快速、低成本）
+4. 生成多个搜索变体，包括翻译、单复数形式和同义词
+
+**示例**："磁铁" → `["magnet", "magnets", "magnetic"]`
+
+**关键文件**：
+- `api/lib/search-utils.ts` - `expandSearchQuery()` 和 `expandEnglishPluralForms()` 函数
+- 模型通过 `localStorage.getItem('search-expansion-model')` 配置
+
+---
+
+## 修改能力
+
+### AI 可修改的字段（需确认）
+
+- 状态、位置、销售信息（价格、货币、买家、日期）
+- **condition** / **condition_notes** - 版本品相
+- **storage_detail** - 存储位置详情
+- **consignment_start** / **consignment_end** - 借展日期（at_gallery 状态）
+- **loan_start** / **loan_end** - 展览日期（at_museum 状态）
+
+### AI 不可修改（请使用 UI）
+
+- 作品元数据（标题、年份、材料、尺寸）
+- 位置记录
+- 库存编号
+- 证书编号
+
+---
+
+## URL 导入功能
+
+在聊天中输入 "导入 URL" 可直接从网页导入作品。系统流程：
+
+1. 获取 URL 的 HTML 内容
+2. 使用 LLM 通过 `generateObject` 提取作品信息
+3. 从页面提取最佳缩略图 URL
+4. 通过 `source_url` 匹配检查重复
+5. 创建或更新作品记录
+
+**关键文件**：
+- `api/lib/artwork-extractor.ts` - LLM 提取 + Zod schema（支持 Anthropic + OpenAI）
+- `api/lib/image-downloader.ts` - 图片 URL 选择（`selectBestImage`）
+- `api/tools/import-from-url.ts` - `import_artwork_from_url` 工具
+
+---
+
+## 后台任务模型配置
+
+设置 > AI 模型 > 高级选项
+
+| 任务 | 存储键 | 默认值 | 推荐 |
+|------|--------|--------|------|
+| URL 导入 | `extraction-model` | 主聊天模型 | Sonnet/GPT-4o |
+| 搜索翻译 | `search-expansion-model` | Haiku | Haiku（快速） |
+
+---
+
+## 添加新 AI 工具
+
+1. 在 `api/tools/` 创建工具文件（如 `api/tools/my-tool.ts`）
+2. 使用 `ai` 包的 `tool()` 和 Zod schema 定义工具
+3. 导出工厂函数：`createMyTool(ctx: ToolContext)`
+4. 在 `api/tools/index.ts` 注册
+
+**示例**：
+
+```typescript
+// api/tools/my-tool.ts
+import { tool } from 'ai';
+import { z } from 'zod';
+import type { ToolContext } from './types.js';
+
+export function createMyTool(ctx: ToolContext) {
+  return tool({
+    description: '工具描述',
+    inputSchema: z.object({ ... }),
+    execute: async (params) => {
+      // 使用 ctx.supabase 进行数据库查询
+    },
+  });
+}
+```

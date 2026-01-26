@@ -1,118 +1,52 @@
 # CLAUDE.md - aaajiao Inventory System
 
-## Project Overview
-
-An artwork inventory management system for artist aaajiao, built with React, TypeScript, and AI integration. Tracks artwork editions through their lifecycle with natural language chat interface.
+艺术家 aaajiao 的作品库存管理系统，使用 React + TypeScript + AI 构建，通过自然语言聊天界面追踪作品版本生命周期。
 
 ## Quick Start
 
 ```bash
-# Install dependencies
-bun install
-
-# Start development (recommended - full Vercel environment)
-bun start             # Frontend + API on port 3000
-
-# Alternative: run separately
-bun run dev           # Frontend only (Vite on port 5173)
-bun run dev:api       # API only (server.ts on port 3000)
-
-# Build for production
-bun run build
-
-# Lint
-bun run lint
-
-# Run tests
-bun test              # Watch mode
-bun test:run          # Single run
-bun test:ui           # Visual UI
+bun install           # 安装依赖
+bun start             # 启动开发（推荐，端口 3000）
+bun run build         # 构建生产版本
+bun run lint          # 代码检查
+bun test              # 运行测试
 ```
-
-**Note**: Local development uses `vercel-dev.json` to override production SPA rewrites config for Vite 7 compatibility.
 
 ## Tech Stack
 
 - **Frontend**: React 19 + TypeScript 5.9 + Vite 7 + TailwindCSS 4
-- **UI**: shadcn/ui (Radix UI primitives) + Lucide icons
-- **i18n**: react-i18next + i18next-browser-languagedetector (Chinese/English)
-- **Data Fetching**: TanStack React Query (caching, infinite queries) + TanStack Virtual (virtual scrolling)
-- **Backend**: Vercel Functions (serverless)
-- **Database**: Supabase (PostgreSQL + Storage + Auth)
-- **AI**: Vercel AI SDK with Claude (Anthropic) and GPT (OpenAI)
-- **PWA**: vite-plugin-pwa (manifest, service worker, offline caching)
-- **Offline**: React Query persist to IndexedDB via `@tanstack/react-query-persist-client` + `idb-keyval`
-- **Testing**: Vitest + React Testing Library + happy-dom
+- **UI**: shadcn/ui + Lucide icons + react-i18next
+- **Data**: TanStack React Query + Virtual + IndexedDB 离线缓存
+- **Backend**: Vercel Functions + Supabase (PostgreSQL)
+- **AI**: Vercel AI SDK + Claude/GPT
 
 ## Project Structure
 
 ```
-./
-├── api/                    # Serverless API handlers
-│   ├── chat.ts            # AI chat entry point (~80 lines)
-│   ├── __tests__/         # API unit tests
-│   ├── lib/               # Shared API utilities
-│   │   ├── artwork-extractor.ts  # LLM-based HTML parsing
-│   │   ├── image-downloader.ts   # Image URL selection
-│   │   ├── model-provider.ts     # AI model provider setup
-│   │   ├── search-utils.ts       # Search utilities (sanitize, expand)
-│   │   └── system-prompt.ts      # AI system prompt
-│   ├── tools/             # AI chat tools (modular)
-│   │   ├── index.ts              # Tool registry
-│   │   ├── types.ts              # ToolContext type
-│   │   ├── search-artworks.ts    # Search artworks tool
-│   │   ├── search-editions.ts    # Search editions tool
-│   │   ├── search-locations.ts   # Search locations tool
-│   │   ├── search-history.ts     # Search history tool
-│   │   ├── get-statistics.ts     # Statistics tool
-│   │   ├── update-confirmation.ts # Update confirmation card
-│   │   ├── execute-update.ts     # Execute edition update
-│   │   ├── export-artworks.ts    # Export to PDF/MD
-│   │   └── import-from-url.ts    # Import from URL
-│   ├── export/            # PDF/Markdown export
-│   └── import/            # Markdown import
-├── src/
-│   ├── components/        # UI components by feature
-│   │   ├── artworks/      # Artwork list/form/detail
-│   │   ├── editions/      # Edition management
-│   │   ├── chat/          # AI chat interface
-│   │   └── ui/            # shadcn/ui components
-│   ├── locales/           # i18n translations (zh/en)
-│   ├── pages/             # Route pages
-│   ├── contexts/          # AuthContext, ThemeContext
-│   ├── hooks/             # useAuth, useFileUpload, etc.
-│   ├── lib/               # Utils, types, Supabase client
-│   └── test/              # Test setup
-├── supabase/              # Supabase config
-├── public/                # Static assets
-├── docs/                  # Documentation files
-└── .claude/               # Claude Code config & skills
-    └── skills/            # Installed skills
+api/                    # Serverless API
+├── chat.ts            # AI 聊天入口
+├── lib/               # 工具函数
+└── tools/             # AI 工具（模块化）
+src/
+├── components/        # UI 组件（按功能）
+├── hooks/queries/     # React Query hooks
+├── lib/               # 工具、类型、Supabase
+├── locales/           # i18n 翻译
+└── pages/             # 路由页面
+docs/                   # 详细文档
 ```
 
 ## Key Files
 
-- `src/lib/database.types.ts` - Auto-generated Supabase types
-- `src/lib/types.ts` - App-specific TypeScript types
-- `src/lib/queryClient.ts` - React Query client configuration (with offline-first mode)
-- `src/lib/indexedDBPersister.ts` - IndexedDB persister for React Query cache
-- `src/lib/queryKeys.ts` - Query key factory for cache management
-- `src/lib/cacheInvalidation.ts` - Centralized cache invalidation helpers
-- `src/lib/formatters.ts` - Display formatting utilities (edition number, price, date)
-- `src/lib/inventoryNumber.ts` - Inventory number pattern analysis and suggestion
-- `src/lib/md-parser.ts` - Markdown file parser for artwork import
-- `src/hooks/queries/` - React Query hooks (useArtworks, useEditions, useDashboard)
-- `src/hooks/useInfiniteVirtualList.ts` - Virtual scrolling + infinite loading hook
-- `api/chat.ts` - AI chat handler entry point
-- `api/lib/model-provider.ts` - AI model provider setup (Anthropic/OpenAI)
-- `api/lib/search-utils.ts` - SQL sanitization and search query expansion
-- `api/lib/system-prompt.ts` - AI system prompt (Chinese)
-- `api/tools/index.ts` - AI tool registry (creates all tools)
-- `src/lib/supabase.ts` - Supabase client initialization
+| 文件 | 用途 |
+|------|------|
+| `src/lib/types.ts` | 应用类型定义 |
+| `src/lib/queryClient.ts` | React Query 配置（离线优先） |
+| `src/lib/queryKeys.ts` | 查询键工厂 |
+| `api/tools/index.ts` | AI 工具注册 |
+| `api/lib/system-prompt.ts` | AI 系统提示词（中文） |
 
 ## Environment Variables
-
-Required in `.env.local`:
 
 ```
 VITE_SUPABASE_URL=https://xxx.supabase.co
@@ -123,430 +57,63 @@ OPENAI_API_KEY=sk-xxx
 ALLOWED_EMAILS=email1@example.com,email2@example.com
 ```
 
-## Database Schema
+## Database
 
-Core tables in Supabase:
-- `artworks` - Artwork metadata (title, year, dimensions, medium, deleted_at for soft delete)
-- `editions` - Individual editions with status tracking
-- `edition_files` - File attachments (images, PDFs)
-- `edition_history` - Audit trail of status changes
-- `locations` - Storage/gallery locations
-- `users` - User accounts with roles (admin/editor)
-- `gallery_links` - Public share links for locations
+核心表：`artworks`、`editions`、`edition_files`、`edition_history`、`locations`、`users`、`gallery_links`
 
-### Soft Delete
-
-Artworks use soft delete mechanism (`deleted_at` field):
-- Deletion sets `deleted_at` timestamp instead of hard delete
-- All queries must add `.is('deleted_at', null)` filter
-- Trash page (`/trash`) allows restore or permanent deletion
+**Soft Delete**: `artworks` 使用 `deleted_at` 字段，所有查询必须添加 `.is('deleted_at', null)`
 
 ## Edition Status Flow
 
-Editions track through these states:
-- `in_production` → `in_studio` → `at_gallery` / `at_museum` / `in_transit`
-- Terminal states: `sold`, `gifted`, `lost`, `damaged`
-
-## Edition History
-
-The `edition_history` table provides a complete audit trail. Supported action types:
-
-| Action | Description | Auto-merge |
-|--------|-------------|------------|
-| `created` | Edition created | No |
-| `status_change` | Status updated (auto-triggered) | No |
-| `location_change` | Location updated (auto-triggered) | No |
-| `sold` | Marked as sold with price/buyer | No |
-| `consigned` | Sent to gallery/museum | No |
-| `returned` | Returned from consignment | No |
-| `condition_update` | Notes/condition updated | Yes (same day) |
-| `file_added` | Attachment uploaded | Yes (same day) |
-| `file_deleted` | Attachment removed | Yes (same day) |
-| `number_assigned` | Inventory number assigned | No |
-
-**Auto-merge**: Low-importance actions (`file_added`, `file_deleted`, `condition_update`) from the same day are collapsed in the timeline UI and can be expanded to view details.
-
-## AI Chat Tools
-
-The chat interface (`/chat`) provides natural language access to:
-- Query artworks and editions
-- Update edition status
-- Record sales with price/buyer
-- Manage locations
-- Export data
-- **Import artworks from URL** (e.g., "导入 https://eventstructure.com/Guard-I")
-
-System prompt is in Chinese for the target user.
-
-### Search Capabilities
-
-| Tool | Parameters |
-|------|------------|
-| `search_artworks` | query (title), year, type, **materials**, **is_unique** |
-| `search_editions` | artwork_title, edition_number, status, location, **edition_type**, **condition**, **inventory_number**, **buyer_name**, **price_min/max**, **sold_after/before** |
-| `search_locations` | query, **type**, **country** |
-| `search_history` | edition_id, artwork_title, action, after, before, related_party |
-
-Example queries:
-- "找所有用磁铁的作品" → materials search with AI query expansion
-- "所有 AP 版本" → edition_type filter
-- "品相为差的版本" → condition filter
-- "某某买的作品" → buyer_name search
-- "售价超过 10000 的版本" → price_min search
-- "这个版本什么时候卖的" → search_history
-- "去年的销售记录" → search_history with date range
-
-### AI-Powered Query Expansion
-
-Database stores English text in `materials`, `type` fields. When users search in Chinese:
-
-1. `expandSearchQuery()` uses `generateText` + `Output.object()` to translate and expand queries
-2. Uses configurable "Search Translation Model" (Settings > AI Model > Advanced Options)
-3. Defaults to Claude 3.5 Haiku (fast, low-cost)
-4. Generates multiple search variants including translations, singular/plural forms, and synonyms
-
-Example: "磁铁" → `["magnet", "magnets", "magnetic"]`
-
-**Key files:**
-- `api/lib/search-utils.ts` - `expandSearchQuery()` and `expandEnglishPluralForms()` functions
-- Model configured via `localStorage.getItem('search-expansion-model')`
-
-### Modification Capabilities
-
-AI can modify these edition fields (with confirmation):
-- Status, location, sale info (price, currency, buyer, date)
-- **condition** / **condition_notes** - Edition condition
-- **storage_detail** - Storage location details
-- **consignment_start** / **consignment_end** - Loan dates (at_gallery status)
-- **loan_start** / **loan_end** - Exhibition dates (at_museum status)
-
-AI cannot modify (use UI instead):
-- Artwork metadata (title, year, materials, dimensions)
-- Location records
-- Inventory numbers
-- Certificate numbers
-
-### URL Import Feature
-
-Import artworks directly from web pages by typing "导入 URL" in chat. The system:
-1. Fetches HTML content from the URL
-2. Uses LLM to extract artwork info via `generateObject`
-3. Extracts the best thumbnail image URL from the page
-4. Checks for duplicates via `source_url` matching
-5. Creates or updates the artwork record
-
-**Key files:**
-- `api/lib/artwork-extractor.ts` - LLM extraction with Zod schema (supports Anthropic + OpenAI)
-- `api/lib/image-downloader.ts` - Image URL selection (`selectBestImage`)
-- `api/tools/import-from-url.ts` - `import_artwork_from_url` tool
-
-**Background Task Models (Settings > AI Model > Advanced Options):**
-Two configurable models for background tasks:
-
-| Task | Storage Key | Default | Recommended |
-|------|-------------|---------|-------------|
-| URL Import | `extraction-model` | Main chat model | Sonnet/GPT-4o |
-| Search Translation | `search-expansion-model` | Haiku | Haiku (fast) |
-
-## Public Links Feature
-
-Create shareable links for locations to display artworks publicly without login.
-
-**Routes:**
-- `/links` - Manage public links (requires auth)
-- `/view/:token` - Public view page (no auth required)
-
-**Key files:**
-- `api/links/index.ts` - Links CRUD API
-- `api/view/[token].ts` - Public view API (fetches editions by location)
-- `src/pages/Links.tsx` - Links management page
-- `src/pages/PublicView.tsx` - Public display page
-- `src/hooks/useLinks.ts` - Links data hook
-
-**Features:**
-- Create link for any location
-- Toggle price visibility
-- Enable/disable links
-- Reset token (invalidates old URL)
-- Track access count and last accessed time
-- Display: thumbnail, title (EN/CN), year, type, materials, dimensions, edition info, status, price, source URL
+```
+in_production → in_studio → at_gallery / at_museum / in_transit
+                         → sold / gifted / lost / damaged (终态)
+```
 
 ## Code Conventions
 
-- **TypeScript**: Strict mode enabled, no unused variables
-- **Imports**: Use `@/` path alias for src directory
-- **Components**: Feature-based organization in `/components`
-- **State**: React contexts for global state (auth, theme); React Query for server state
-- **Data Fetching**: Use React Query hooks in `src/hooks/queries/`; query keys in `queryKeys.ts`
-- **Validation**: Zod schemas for API inputs
-- **Styling**: TailwindCSS utilities, shadcn/ui components
-
-## Performance Patterns
-
-### Virtual Scrolling + Infinite Loading
-
-List pages (Artworks, Editions) use `useInfiniteVirtualList` hook combining:
-- **TanStack React Query** `useInfiniteQuery` for cursor-based pagination
-- **TanStack Virtual** `useVirtualizer` for rendering only visible items
-
-Key requirements:
-- Container must have explicit height (e.g., `h-[calc(100dvh-80px)]`)
-- Inner container uses `virtualizer.getTotalSize()` for height
-- Items positioned absolutely with `transform: translateY()`
-
-### Route Lazy Loading
-
-Non-critical pages use `React.lazy()` for code splitting:
-- Chat, Import, Settings loaded on demand
-- Reduces initial bundle size
-
-### Query Caching & Offline Support
-
-React Query provides:
-- 5-minute stale time (data considered fresh)
-- 24-hour garbage collection (matches IndexedDB persistence)
-- Automatic background refetching
-- Query key invalidation on mutations
-- **Offline-first mode** (`networkMode: 'offlineFirst'`)
-- **IndexedDB persistence** via `PersistQueryClientProvider`
-
-**Key files:**
-- `src/lib/queryClient.ts` - Query client with offline-first config
-- `src/lib/indexedDBPersister.ts` - IndexedDB persister
-- `src/hooks/useNetworkStatus.ts` - Network status hook
-- `src/components/ui/NetworkIndicator.tsx` - Offline banner
-
-**Design decision:** Read-only offline mode. Users can browse cached data offline but editing requires network connection. This simplifies the mental model and avoids sync conflicts.
+- **TypeScript**: 严格模式，无未使用变量
+- **Imports**: 使用 `@/` 路径别名
+- **State**: React Query 管理服务端状态，Context 管理全局状态
+- **Styling**: TailwindCSS + shadcn/ui 组件
+- **Icons**: Lucide React，不用 emoji
 
 ## Common Tasks
 
-### Add a new page
-1. Create page component in `src/pages/`
-2. Add route in `src/App.tsx`
-3. Add navigation link in `src/components/layout/Sidebar.tsx`
+### 添加新页面
+1. 在 `src/pages/` 创建页面
+2. 在 `src/App.tsx` 添加路由
+3. 在 `src/components/layout/Sidebar.tsx` 添加导航
 
-### Add a new AI tool
-1. Create tool file in `api/tools/` (e.g., `api/tools/my-tool.ts`)
-2. Define tool with `tool()` from `ai` package and Zod schema
-3. Export a factory function: `createMyTool(ctx: ToolContext)`
-4. Register in `api/tools/index.ts`
+### 添加新 AI 工具
+见 [docs/ai-chat-tools.md](docs/ai-chat-tools.md#添加新-ai-工具)
 
-Example:
-```typescript
-// api/tools/my-tool.ts
-import { tool } from 'ai';
-import { z } from 'zod';
-import type { ToolContext } from './types.js';
-
-export function createMyTool(ctx: ToolContext) {
-  return tool({
-    description: 'Tool description',
-    inputSchema: z.object({ ... }),
-    execute: async (params) => {
-      // Use ctx.supabase for database queries
-    },
-  });
-}
-```
-
-### Update database types
-After schema changes in Supabase:
+### 更新数据库类型
 ```bash
-bunx supabase gen types typescript --project-id <project-id> > src/lib/database.types.ts
+bunx supabase gen types typescript --project-id <id> > src/lib/database.types.ts
 ```
 
-## Deployment
+## Documentation
 
-- **Platform**: Vercel
-- **API Routes**: `/api/*` handled by Vercel Functions
-- **SPA Routing**: All other routes serve `index.html`
-
-## Local Development
-
-First-time setup requires linking Vercel project and pulling environment variables:
-
-```bash
-vercel link          # Link to Vercel project
-vercel env pull      # Pull env vars to .env.local
-```
-
-See `docs/local-dev.md` for detailed development instructions.
+| 文档 | 内容 |
+|------|------|
+| [docs/local-dev.md](docs/local-dev.md) | 本地开发详细指南 |
+| [docs/style-guide.md](docs/style-guide.md) | UI/UX 风格规范（Brutalist Minimalism） |
+| [docs/ai-chat-tools.md](docs/ai-chat-tools.md) | AI 聊天工具详解 |
+| [docs/edition-history.md](docs/edition-history.md) | 版本历史说明 |
+| [docs/performance-patterns.md](docs/performance-patterns.md) | 性能优化模式 |
+| [docs/i18n.md](docs/i18n.md) | 国际化指南 |
+| [docs/testing.md](docs/testing.md) | 测试指南 |
+| [docs/md-import.md](docs/md-import.md) | Markdown 导入逻辑 |
+| [docs/public-links.md](docs/public-links.md) | 公开链接功能 |
+| [docs/database-fields.md](docs/database-fields.md) | 数据库字段说明 |
+| [docs/api-reference.md](docs/api-reference.md) | API 参考 |
 
 ## Claude Code Skills
 
-This project has the following skills installed (in `.claude/skills/`):
-
-- **react-best-practices** - Vercel's official React/Next.js performance optimization rules (57 rules)
-- **postgres-best-practices** - Supabase's official PostgreSQL best practices
-- **context7** - Fetch latest library documentation via Context7 API
-- **ai-sdk** - Vercel AI SDK docs and best practices for building AI features (generateText, streamText, tool calling, etc.)
-- **frontend-design** - Anthropic's official frontend design skill for creating distinctive interfaces
-
-Skills are automatically applied when working with relevant code.
-
-## UI/UX Style Guide
-
-This project uses **Brutalist Minimalism** design style.
-
-### Core Principles
-
-- **Icons**: Use Lucide React, no emoji
-- **Colors**: OKLCH color space, eye-friendly off-white/off-black
-- **Status**: Use `StatusIndicator` component with low-saturation semantic colors
-- **Layout**: Unified page width management via `Layout.tsx`
-- **Responsive**: Two-tier system with `lg` (1024px) as key breakpoint
-- **Touch targets**: ≥ 44px on mobile (Apple HIG compliant)
-
-### Responsive Breakpoints (Quick Reference)
-
-| Device | Width | Navigation |
-|--------|-------|------------|
-| iPhone + iPad Portrait | < 1024px | Bottom tab bar + Top toolbar |
-| iPad Landscape + Desktop | ≥ 1024px | Top navigation + Chat sidebar |
-
-**Mobile bottom tabs**: Home, Artworks, Settings, Chat
-**Desktop top nav**: Home, Artworks, Editions, Locations, Links, Import, Trash, Settings
-
-### Key Components
-
-- `src/components/Layout.tsx` - Navigation and page width management
-- `src/components/ui/button.tsx` - Button with Apple HIG sizing (44px mobile)
-- `src/components/ui/StatusIndicator.tsx` - Edition status indicator
-- `src/index.css` - CSS variables and typography system
-
-**See `docs/style-guide.md` for complete UI/UX specifications.**
-
-## MD Import Logic
-
-Matching rules when importing artworks (`api/import/md.ts`):
-
-1. **First match by `source_url`** (excluding soft-deleted)
-2. **Then match by `title_en`** (only when exactly one match)
-   - If both have `source_url` but different, treat as **different artworks** (same series, different versions)
-3. **Match found** → Update existing artwork
-4. **No match** → Create new artwork
-
-This ensures artworks with same title but different URLs (e.g., different versions of `Guard, I…`) are correctly identified as separate works.
-
-## Internationalization (i18n)
-
-The app supports Chinese (default) and English via `react-i18next`.
-
-### Structure
-
-```
-src/locales/
-├── index.ts          # i18n configuration
-├── zh/               # Chinese translations
-│   ├── common.json   # Shared UI strings
-│   ├── nav.json      # Navigation
-│   ├── status.json   # Edition statuses
-│   ├── dashboard.json
-│   ├── artworks.json
-│   ├── artworkDetail.json
-│   ├── editions.json
-│   ├── editionDetail.json
-│   ├── locations.json
-│   ├── chat.json
-│   ├── settings.json
-│   ├── import.json
-│   ├── export.json
-│   ├── trash.json
-│   ├── history.json
-│   ├── links.json
-│   └── publicView.json
-└── en/               # English translations (same structure)
-```
-
-### Usage
-
-```tsx
-import { useTranslation } from 'react-i18next';
-
-function MyComponent() {
-  const { t } = useTranslation('namespace'); // e.g., 'common', 'artworks'
-  return <p>{t('key.nested')}</p>;
-}
-
-// With interpolation
-t('selected', { count: 5 }) // "已选择 5 项" / "5 selected"
-```
-
-### Adding Translations
-
-1. Add key to both `zh/*.json` and `en/*.json`
-2. Use `useTranslation('namespace')` in component
-3. Replace hardcoded text with `t('key')`
-
-### Language Switching
-
-- `LanguageSwitcher` component in Settings page
-- Language preference stored in `localStorage` (`i18nextLng`)
-- Auto-detects browser language on first visit
-
-## Testing
-
-The project uses **Vitest** for unit testing with React Testing Library and happy-dom.
-
-### Test Commands
-
-```bash
-bun test              # Run tests in watch mode
-bun test:run          # Run tests once
-bun test:ui           # Open visual test UI
-```
-
-### Test Structure
-
-```
-api/__tests__/
-├── search-utils.test.ts      # SQL sanitization, plural expansion
-├── image-downloader.test.ts  # Image selection logic
-└── artwork-extractor.test.ts # HTML parsing, image extraction
-
-src/lib/
-├── formatters.test.ts        # Edition number, price, date formatting
-├── inventoryNumber.test.ts   # Pattern analysis, number suggestion
-└── md-parser.test.ts         # Markdown parsing for import
-```
-
-### Test Coverage (164 tests)
-
-| Module | Tests | Coverage |
-|--------|-------|----------|
-| `search-utils` | 26 | SQL injection prevention, English plural expansion |
-| `image-downloader` | 13 | CDN priority, size-based selection |
-| `artwork-extractor` | 31 | HTML image extraction, HTML cleaning |
-| `formatters` | 24 | Edition number, price, date display |
-| `inventoryNumber` | 37 | Pattern detection, number generation, validation |
-| `md-parser` | 33 | Title parsing, field extraction, image extraction |
-
-### Writing Tests
-
-Tests are colocated with source files or in `__tests__` directories:
-- API tests: `api/__tests__/*.test.ts`
-- Library tests: `src/lib/*.test.ts`
-
-Example test:
-```typescript
-import { describe, it, expect } from 'vitest';
-import { formatPrice } from './formatters';
-
-describe('formatPrice', () => {
-  it('should format USD price', () => {
-    expect(formatPrice(1000, 'USD')).toBe('$1,000');
-  });
-});
-```
-
-### Test Configuration
-
-- `vitest.config.ts` - Test runner configuration
-- `src/test/setup.ts` - Test environment setup (jest-dom matchers)
-
-## Notes
-
-- UI supports full Chinese/English internationalization
-- Images are compressed before upload
-- File storage uses Supabase Storage buckets
-- Auth restricts access via email allowlist
+已安装技能（`.claude/skills/`）：
+- **react-best-practices** - React/Next.js 性能优化
+- **postgres-best-practices** - PostgreSQL 最佳实践
+- **context7** - 获取最新库文档
+- **ai-sdk** - Vercel AI SDK 文档
+- **frontend-design** - 前端设计技能

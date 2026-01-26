@@ -9,9 +9,11 @@ export function ReloadPrompt() {
   } = useRegisterSW({
     onRegisteredSW(_swUrl, r) {
       // Check for updates every hour
-      r && setInterval(() => {
-        r.update()
-      }, 60 * 60 * 1000)
+      if (r) {
+        setInterval(() => {
+          r.update()
+        }, 60 * 60 * 1000)
+      }
     }
   })
 
