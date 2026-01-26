@@ -277,8 +277,53 @@ This project uses **Brutalist Minimalism** design style.
 - **Colors**: OKLCH color space, eye-friendly off-white/off-black
 - **Status**: Use `StatusIndicator` component with low-saturation semantic colors
 - **Layout**: Unified page width management via `Layout.tsx`
-- **Responsive**: Mobile-first, touch targets ≥ 44px
+- **Responsive**: Mobile-first, touch targets ≥ 44px (Apple HIG compliant)
 - **Typography**: Centralized in `index.css` via Tailwind v4 `@theme` custom utilities
+
+### Responsive Breakpoints
+
+The app uses a two-tier responsive system based on `lg` (1024px) breakpoint:
+
+| Device | Width | Navigation Mode |
+|--------|-------|-----------------|
+| iPhone + iPad Portrait | < 1024px | Mobile: Bottom tab bar + Top toolbar |
+| iPad Landscape + Desktop | ≥ 1024px | Desktop: Top navigation + Chat sidebar |
+
+**Key breakpoint: `lg` (1024px)**
+- Below `lg`: Mobile UI with bottom navigation
+- At/above `lg`: Desktop UI with top navigation
+
+### Mobile Navigation (< 1024px)
+
+**Top Toolbar** (`lg:hidden`):
+- Left: App title
+- Right: Language switcher, Theme toggle
+
+**Bottom Tab Bar** (`lg:hidden`):
+- Home (`/`) - Home icon
+- Artworks (`/artworks`) - Package icon
+- Settings (`/settings`) - Settings icon
+- Chat (`/chat`) - MessageCircle icon
+
+Active tabs use filled icons for visual feedback.
+
+### Desktop Navigation (≥ 1024px)
+
+**Top Navigation Bar** (`hidden lg:flex`):
+- 8 links: Home, Artworks, Editions, Locations, Links, Import, Trash, Settings
+- Right side: Chat toggle, Language, Theme, User info, Sign out
+
+**Chat Sidebar**:
+- Collapsible right sidebar
+- Toggle via Chat button in header
+
+### Dashboard Quick Actions
+
+Responsive grid for common actions:
+- Mobile: 2x2 grid (4 items: Artworks, Editions, Locations, Links)
+- Desktop: 1x5 grid (5 items: + Chat)
+
+The Chat action is hidden on mobile (`hidden lg:flex`) since it's already in the bottom tab bar.
 
 ### Typography System
 

@@ -1,11 +1,11 @@
 import { useState, useMemo } from 'react';
-import { NavLink, Outlet, useLocation, Link } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useThemeContext } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
-import { MessageSquare, Sun, Moon, Home, Package, FileDown, MessageCircle } from 'lucide-react';
+import { MessageSquare, Sun, Moon, Home, Package, MessageCircle, Settings } from 'lucide-react';
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher';
 import ChatSidebar from './ChatSidebar';
 
@@ -74,8 +74,24 @@ export default function Layout() {
 
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">
-      {/* 桌面端顶部导航 */}
-      <header className="hidden md:flex items-center justify-between px-6 py-4 border-b border-border">
+      {/* 移动端顶部工具栏 (iPhone + iPad 竖屏) */}
+      <header className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-border">
+        <h1 className="text-lg font-bold tracking-tight">{t('appTitle')}</h1>
+        <div className="flex items-center gap-2">
+          <LanguageSwitcher />
+          <IconButton
+            variant="ghost"
+            size="sm"
+            label={resolvedTheme === 'dark' ? t('switchToLight') : t('switchToDark')}
+            onClick={toggleTheme}
+          >
+            {resolvedTheme === 'dark' ? <Sun /> : <Moon />}
+          </IconButton>
+        </div>
+      </header>
+
+      {/* 桌面端顶部导航 (iPad 横屏 + 桌面) */}
+      <header className="hidden lg:flex items-center justify-between px-6 py-4 border-b border-border">
         <div className="flex items-center gap-8">
           <h1 className="text-xl font-bold tracking-tight">{t('appTitle')}</h1>
           <nav className="flex gap-6">
@@ -152,21 +168,9 @@ export default function Layout() {
             variant={chatSidebarOpen ? 'default' : 'secondary'}
             size="small"
             onClick={() => setChatSidebarOpen(!chatSidebarOpen)}
-            className="hidden lg:flex"
           >
             <MessageSquare />
             <span className="text-xs uppercase tracking-wider font-medium">{t('chat')}</span>
-          </Button>
-          {/* 平板端对话链接 (md 到 lg 之间) */}
-          <Button
-            asChild
-            size="small"
-            className="hidden md:flex lg:hidden"
-          >
-            <NavLink to="/chat">
-              <MessageSquare />
-              <span className="text-xs uppercase tracking-wider font-medium">{t('chat')}</span>
-            </NavLink>
           </Button>
           {/* 语言切换 */}
           <LanguageSwitcher />
@@ -206,7 +210,7 @@ export default function Layout() {
       {/* 主内容区 + 侧边栏 */}
       <div className="flex-1 flex overflow-hidden">
         {/* 主内容区 */}
-        <main className="flex-1 overflow-y-auto pb-20 md:pb-0 relative">
+        <main className="flex-1 overflow-y-auto pb-20 lg:pb-0 relative">
           <div className={`${pageWidthConfig.maxWidth} ${pageWidthConfig.centered ? 'mx-auto' : ''}`}>
             <Outlet />
           </div>
@@ -221,19 +225,8 @@ export default function Layout() {
         )}
       </div>
 
-      {/* iPad 竖屏浮动对话按钮 (md 到 lg 之间，非 chat 页面) */}
-      {showChatSidebar && (
-        <Link
-          to="/chat"
-          className="hidden md:flex lg:hidden fixed right-4 bottom-4 w-14 h-14 bg-primary text-primary-foreground rounded-full items-center justify-center shadow-lg z-40 hover:opacity-90 transition-opacity"
-          aria-label={t('chat')}
-        >
-          <MessageSquare className="w-6 h-6" />
-        </Link>
-      )}
-
-      {/* 移动端底部导航 */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border flex justify-around py-2 z-50">
+      {/* 移动端底部导航 (iPhone + iPad 竖屏) */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border flex justify-around py-2 z-50">
         <NavLink
           to="/"
           end
@@ -241,7 +234,7 @@ export default function Layout() {
             `flex flex-col items-center py-2 px-4 min-w-[60px] ${isActive ? 'text-foreground' : 'text-muted-foreground'}`
           }
         >
-          <Home className="w-5 h-5" />
+          <Home className="w-5 h-5" fill={location.pathname === '/' ? 'currentColor' : 'none'} />
           <span className="text-xs mt-1 uppercase tracking-wider">{t('home')}</span>
         </NavLink>
         <NavLink
@@ -250,17 +243,17 @@ export default function Layout() {
             `flex flex-col items-center py-2 px-4 min-w-[60px] ${isActive ? 'text-foreground' : 'text-muted-foreground'}`
           }
         >
-          <Package className="w-5 h-5" />
+          <Package className="w-5 h-5" fill={location.pathname.startsWith('/artworks') ? 'currentColor' : 'none'} />
           <span className="text-xs mt-1 uppercase tracking-wider">{t('artworks')}</span>
         </NavLink>
         <NavLink
-          to="/import"
+          to="/settings"
           className={({ isActive }) =>
             `flex flex-col items-center py-2 px-4 min-w-[60px] ${isActive ? 'text-foreground' : 'text-muted-foreground'}`
           }
         >
-          <FileDown className="w-5 h-5" />
-          <span className="text-xs mt-1 uppercase tracking-wider">{t('import')}</span>
+          <Settings className="w-5 h-5" fill={location.pathname === '/settings' ? 'currentColor' : 'none'} />
+          <span className="text-xs mt-1 uppercase tracking-wider">{t('settings')}</span>
         </NavLink>
         <NavLink
           to="/chat"
@@ -268,7 +261,7 @@ export default function Layout() {
             `flex flex-col items-center py-2 px-4 min-w-[60px] ${isActive ? 'text-foreground' : 'text-muted-foreground'}`
           }
         >
-          <MessageCircle className="w-5 h-5" />
+          <MessageCircle className="w-5 h-5" fill={location.pathname === '/chat' ? 'currentColor' : 'none'} />
           <span className="text-xs mt-1 uppercase tracking-wider">{t('chat')}</span>
         </NavLink>
       </nav>

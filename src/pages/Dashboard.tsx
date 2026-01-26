@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
-import { Search, Package, FileDown, MessageSquare, MapPin } from 'lucide-react';
+import { Package, Layers, MapPin, Link as LinkIcon, MessageSquare } from 'lucide-react';
 import { useDashboardStats, useRecentUpdates } from '@/hooks/queries/useDashboard';
 
 export default function Dashboard() {
@@ -160,34 +160,20 @@ export default function Dashboard() {
         <h2 className="text-section-title uppercase text-muted-foreground mb-4 xl:mb-5">
           {t('quickActions')}
         </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <Link
             to="/artworks"
             className="bg-card border border-border rounded-xl p-4 flex flex-col items-center justify-center gap-2 card-interactive"
           >
-            <Search className="w-6 h-6 xl:w-7 xl:h-7" />
-            <span className="text-xs uppercase tracking-wider">{tCommon('search')}</span>
+            <Package className="w-6 h-6 xl:w-7 xl:h-7" />
+            <span className="text-xs uppercase tracking-wider">{tNav('artworks')}</span>
           </Link>
           <Link
             to="/editions"
             className="bg-card border border-border rounded-xl p-4 flex flex-col items-center justify-center gap-2 card-interactive"
           >
-            <Package className="w-6 h-6 xl:w-7 xl:h-7" />
+            <Layers className="w-6 h-6 xl:w-7 xl:h-7" />
             <span className="text-xs uppercase tracking-wider">{tNav('editions')}</span>
-          </Link>
-          <Link
-            to="/import"
-            className="bg-card border border-border rounded-xl p-4 flex flex-col items-center justify-center gap-2 card-interactive"
-          >
-            <FileDown className="w-6 h-6 xl:w-7 xl:h-7" />
-            <span className="text-xs uppercase tracking-wider">{tNav('import')}</span>
-          </Link>
-          <Link
-            to="/chat"
-            className="bg-card border border-border rounded-xl p-4 flex flex-col items-center justify-center gap-2 card-interactive"
-          >
-            <MessageSquare className="w-6 h-6 xl:w-7 xl:h-7" />
-            <span className="text-xs uppercase tracking-wider">{tNav('chat')}</span>
           </Link>
           <Link
             to="/locations"
@@ -195,6 +181,20 @@ export default function Dashboard() {
           >
             <MapPin className="w-6 h-6 xl:w-7 xl:h-7" />
             <span className="text-xs uppercase tracking-wider">{tNav('locations')}</span>
+          </Link>
+          <Link
+            to="/links"
+            className="bg-card border border-border rounded-xl p-4 flex flex-col items-center justify-center gap-2 card-interactive"
+          >
+            <LinkIcon className="w-6 h-6 xl:w-7 xl:h-7" />
+            <span className="text-xs uppercase tracking-wider">{tNav('links')}</span>
+          </Link>
+          <Link
+            to="/chat"
+            className="hidden lg:flex bg-card border border-border rounded-xl p-4 flex-col items-center justify-center gap-2 card-interactive"
+          >
+            <MessageSquare className="w-6 h-6 xl:w-7 xl:h-7" />
+            <span className="text-xs uppercase tracking-wider">{tNav('chat')}</span>
           </Link>
         </div>
       </div>
