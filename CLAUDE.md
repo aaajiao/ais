@@ -148,6 +148,38 @@ The chat interface (`/chat`) provides natural language access to:
 
 System prompt is in Chinese for the target user.
 
+### Search Capabilities
+
+| Tool | Parameters |
+|------|------------|
+| `search_artworks` | query (title), year, type, **materials**, **is_unique** |
+| `search_editions` | artwork_title, edition_number, status, location, **edition_type**, **condition**, **inventory_number**, **buyer_name**, **price_min/max**, **sold_after/before** |
+| `search_locations` | query, **type**, **country** |
+| `search_history` | edition_id, artwork_title, action, after, before, related_party |
+
+Example queries:
+- "找所有用磁铁的作品" → materials search
+- "所有 AP 版本" → edition_type filter
+- "品相为差的版本" → condition filter
+- "某某买的作品" → buyer_name search
+- "售价超过 10000 的版本" → price_min search
+- "这个版本什么时候卖的" → search_history
+- "去年的销售记录" → search_history with date range
+
+### Modification Capabilities
+
+AI can modify these edition fields (with confirmation):
+- Status, location, sale info (price, currency, buyer, date)
+- **condition** / **condition_notes** - Edition condition
+- **storage_detail** - Storage location details
+- **consignment_start** / **loan_end** - Loan/consignment dates
+
+AI cannot modify (use UI instead):
+- Artwork metadata (title, year, materials, dimensions)
+- Location records
+- Inventory numbers
+- Certificate numbers
+
 ### URL Import Feature
 
 Import artworks directly from web pages by typing "导入 URL" in chat. The system:

@@ -50,6 +50,8 @@ AI 助手可以调用以下工具完成任务。
 | `query` | string | 否 | 搜索关键词（匹配中英文标题） |
 | `year` | string | 否 | 年份 |
 | `type` | string | 否 | 作品类型 |
+| `materials` | string | 否 | 材料关键词 |
+| `is_unique` | boolean | 否 | 是否独版作品 |
 
 **返回**
 
@@ -81,6 +83,14 @@ AI: [调用 search_artworks { query: "Guard" }]
 | `edition_number` | number | 否 | 版本号 |
 | `status` | string | 否 | 状态（见下方状态列表） |
 | `location` | string | 否 | 位置名称或城市 |
+| `edition_type` | enum | 否 | 版本类型：`numbered` / `ap` / `unique` |
+| `condition` | enum | 否 | 品相：`excellent` / `good` / `fair` / `poor` / `damaged` |
+| `inventory_number` | string | 否 | 库存编号 |
+| `buyer_name` | string | 否 | 买家名称 |
+| `price_min` | number | 否 | 最低价格 |
+| `price_max` | number | 否 | 最高价格 |
+| `sold_after` | string | 否 | 售出日期起始 (YYYY-MM-DD) |
+| `sold_before` | string | 否 | 售出日期结束 (YYYY-MM-DD) |
 
 **版本状态**
 
@@ -163,6 +173,11 @@ AI: [调用 search_artworks { query: "Guard" }]
 | `buyer_name` | string | 买家名称 |
 | `sold_at` | string | 销售日期 |
 | `notes` | string | 备注 |
+| `condition` | enum | 品相：`excellent` / `good` / `fair` / `poor` / `damaged` |
+| `condition_notes` | string | 品相备注 |
+| `storage_detail` | string | 存储位置详情 |
+| `consignment_start` | string | 借展/寄售开始日期 |
+| `loan_end` | string | 借展结束日期 |
 
 **返回**
 
@@ -212,6 +227,7 @@ AI: [调用 search_artworks { query: "Guard" }]
 更新会自动记录到 `edition_history` 表：
 - 状态变更 → `status_change` / `sold` / `consigned` / `returned`
 - 位置变更 → `location_change`
+- 品相变更 → `condition_update`
 
 ---
 
@@ -223,7 +239,9 @@ AI: [调用 search_artworks { query: "Guard" }]
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `query` | string | 是 | 搜索关键词（匹配名称或城市） |
+| `query` | string | 否 | 搜索关键词（匹配名称或城市） |
+| `type` | enum | 否 | 位置类型：`studio` / `gallery` / `museum` / `other` |
+| `country` | string | 否 | 国家 |
 
 **返回**
 
@@ -231,6 +249,57 @@ AI: [调用 search_artworks { query: "Guard" }]
 {
   locations: Location[];
 }
+```
+
+---
+
+### search_history
+
+查询版本变更历史。
+
+**参数**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `edition_id` | string | 否 | 版本 ID |
+| `artwork_title` | string | 否 | 作品标题 |
+| `action` | enum | 否 | 操作类型（见下方） |
+| `after` | string | 否 | 起始日期 (YYYY-MM-DD) |
+| `before` | string | 否 | 结束日期 (YYYY-MM-DD) |
+| `related_party` | string | 否 | 相关方（买家/机构） |
+
+**操作类型**
+
+| 类型 | 说明 |
+|------|------|
+| `created` | 版本创建 |
+| `status_change` | 状态变更 |
+| `location_change` | 位置变更 |
+| `sold` | 已售 |
+| `consigned` | 寄售/外借 |
+| `returned` | 归还 |
+| `condition_update` | 品相更新 |
+| `file_added` | 文件添加 |
+| `file_deleted` | 文件删除 |
+| `number_assigned` | 库存编号分配 |
+
+**返回**
+
+```typescript
+{
+  history: EditionHistory[];  // 包含关联的 edition 和 artwork 信息
+  message?: string;
+}
+```
+
+**示例**
+
+```
+用户: 这个版本什么时候卖的？
+AI: [调用 search_history { edition_id: "...", action: "sold" }]
+
+用户: 去年的销售记录
+AI: [调用 search_history { action: "sold", after: "2025-01-01", before: "2025-12-31" }]
 ```
 
 ---

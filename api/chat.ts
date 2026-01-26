@@ -107,7 +107,26 @@ const systemPrompt = `你是 aaajiao 艺术作品库存管理系统的 AI 助手
 当用户说类似 "xxx 卖了" 或 "xxx 已售" 时，你需要：
 1. 搜索对应的版本
 2. 生成更新确认卡片，包含状态变更为 sold
-3. 如果用户提供了价格信息，也一并记录`;
+3. 如果用户提供了价格信息，也一并记录
+
+搜索能力：
+- 可以按材料搜索作品（如「找所有用磁铁的作品」）
+- 可以按版本类型筛选（如「所有 AP 版本」）
+- 可以按品相筛选（如「品相为差的版本」）
+- 可以按买家搜索（如「某某买的作品」）
+- 可以按价格范围搜索（如「售价超过 10000 的版本」）
+- 可以查询历史记录（如「这个版本什么时候卖的」「去年的销售记录」）
+
+修改能力：
+- 可以更新版本品相（condition）和品相备注
+- 可以更新存储位置详情（storage_detail）
+- 可以设置借展日期（consignment_start, loan_end）
+
+不支持的操作（请用户通过界面操作）：
+- 修改作品基本信息（标题、年份、材料等）
+- 创建或修改位置
+- 分配库存编号
+- 修改证书编号`;
 
 // 定义工具 - 使用函数形式以便延迟获取 supabase
 function getTools(extractionModel?: string) {
@@ -116,13 +135,15 @@ function getTools(extractionModel?: string) {
   return {
     // 搜索作品
     search_artworks: tool({
-      description: '搜索艺术作品，可以按标题、年份、类型搜索',
+      description: '搜索艺术作品，可以按标题、年份、类型、材料搜索',
       inputSchema: z.object({
         query: z.string().optional().describe('搜索关键词（标题）'),
         year: z.string().optional().describe('年份'),
         type: z.string().optional().describe('作品类型'),
+        materials: z.string().optional().describe('材料关键词'),
+        is_unique: z.boolean().optional().describe('是否独版作品'),
       }),
-      execute: async ({ query, year, type }) => {
+      execute: async ({ query, year, type, materials, is_unique }) => {
         // 排除已删除的作品
         let queryBuilder = supabase.from('artworks').select('*').is('deleted_at', null);
 
@@ -136,6 +157,13 @@ function getTools(extractionModel?: string) {
         if (type) {
           const sanitized = sanitizeSearchTerm(type);
           queryBuilder = queryBuilder.ilike('type', `%${sanitized}%`);
+        }
+        if (materials) {
+          const sanitized = sanitizeSearchTerm(materials);
+          queryBuilder = queryBuilder.ilike('materials', `%${sanitized}%`);
+        }
+        if (is_unique !== undefined) {
+          queryBuilder = queryBuilder.eq('is_unique', is_unique);
         }
 
         const { data, error } = await queryBuilder.limit(10);
@@ -160,14 +188,22 @@ function getTools(extractionModel?: string) {
 
     // 搜索版本
     search_editions: tool({
-      description: '搜索版本，可以按作品名称、状态、位置搜索',
+      description: '搜索版本，可以按作品名称、状态、位置、版本类型、品相、买家、价格等搜索',
       inputSchema: z.object({
         artwork_title: z.string().optional().describe('作品标题'),
         edition_number: z.number().optional().describe('版本号'),
         status: z.string().optional().describe('状态'),
         location: z.string().optional().describe('位置'),
+        edition_type: z.enum(['numbered', 'ap', 'unique']).optional().describe('版本类型'),
+        condition: z.enum(['excellent', 'good', 'fair', 'poor', 'damaged']).optional().describe('品相'),
+        inventory_number: z.string().optional().describe('库存编号'),
+        buyer_name: z.string().optional().describe('买家名称'),
+        price_min: z.number().optional().describe('最低价格'),
+        price_max: z.number().optional().describe('最高价格'),
+        sold_after: z.string().optional().describe('售出日期起始 (YYYY-MM-DD)'),
+        sold_before: z.string().optional().describe('售出日期结束 (YYYY-MM-DD)'),
       }),
-      execute: async ({ artwork_title, edition_number, status, location }) => {
+      execute: async ({ artwork_title, edition_number, status, location, edition_type, condition, inventory_number, buyer_name, price_min, price_max, sold_after, sold_before }) => {
         // 先搜索作品（排除已删除的）
         let artworkIds: string[] = [];
         if (artwork_title) {
@@ -197,6 +233,32 @@ function getTools(extractionModel?: string) {
         }
         if (status) {
           queryBuilder = queryBuilder.eq('status', status);
+        }
+        if (edition_type) {
+          queryBuilder = queryBuilder.eq('edition_type', edition_type);
+        }
+        if (condition) {
+          queryBuilder = queryBuilder.eq('condition', condition);
+        }
+        if (inventory_number) {
+          const sanitized = sanitizeSearchTerm(inventory_number);
+          queryBuilder = queryBuilder.ilike('inventory_number', `%${sanitized}%`);
+        }
+        if (buyer_name) {
+          const sanitized = sanitizeSearchTerm(buyer_name);
+          queryBuilder = queryBuilder.ilike('buyer_name', `%${sanitized}%`);
+        }
+        if (price_min !== undefined) {
+          queryBuilder = queryBuilder.gte('sale_price', price_min);
+        }
+        if (price_max !== undefined) {
+          queryBuilder = queryBuilder.lte('sale_price', price_max);
+        }
+        if (sold_after) {
+          queryBuilder = queryBuilder.gte('sale_date', sold_after);
+        }
+        if (sold_before) {
+          queryBuilder = queryBuilder.lte('sale_date', sold_before);
         }
 
         const { data, error } = await queryBuilder.limit(20);
@@ -304,6 +366,11 @@ function getTools(extractionModel?: string) {
           buyer_name: z.string().optional().describe('买家名称'),
           sold_at: z.string().optional().describe('销售日期'),
           notes: z.string().optional().describe('备注'),
+          condition: z.enum(['excellent', 'good', 'fair', 'poor', 'damaged']).optional().describe('品相'),
+          condition_notes: z.string().optional().describe('品相备注'),
+          storage_detail: z.string().optional().describe('存储位置详情'),
+          consignment_start: z.string().optional().describe('借展/寄售开始日期'),
+          loan_end: z.string().optional().describe('借展结束日期'),
         }).describe('要更新的字段'),
         reason: z.string().describe('更新原因/说明'),
       }),
@@ -354,6 +421,11 @@ function getTools(extractionModel?: string) {
           buyer_name: z.string().optional(),
           sold_at: z.string().optional(),
           notes: z.string().optional(),
+          condition: z.enum(['excellent', 'good', 'fair', 'poor', 'damaged']).optional(),
+          condition_notes: z.string().optional(),
+          storage_detail: z.string().optional(),
+          consignment_start: z.string().optional(),
+          loan_end: z.string().optional(),
         }).describe('要更新的字段'),
         confirmed: z.boolean().describe('用户是否已确认'),
       }),
@@ -380,6 +452,11 @@ function getTools(extractionModel?: string) {
         if (updates.buyer_name) updateData.buyer_name = updates.buyer_name;
         if (updates.sold_at) updateData.sale_date = updates.sold_at; // 字段映射
         if (updates.notes) updateData.notes = updates.notes;
+        if (updates.condition) updateData.condition = updates.condition;
+        if (updates.condition_notes) updateData.condition_notes = updates.condition_notes;
+        if (updates.storage_detail) updateData.storage_detail = updates.storage_detail;
+        if (updates.consignment_start) updateData.consignment_start = updates.consignment_start;
+        if (updates.loan_end) updateData.loan_end = updates.loan_end;
 
         // 执行更新
         const { data, error } = await supabase
@@ -424,6 +501,15 @@ function getTools(extractionModel?: string) {
           });
         }
 
+        // 品相变更记录
+        if (updates.condition && updates.condition !== originalEdition?.condition) {
+          await supabase.from('edition_history').insert({
+            edition_id,
+            action: 'condition_update',
+            notes: `品相从 ${originalEdition?.condition || '未设置'} 更新为 ${updates.condition}。通过 AI 助手更新。`,
+          });
+        }
+
         return {
           success: true,
           message: '更新成功',
@@ -434,23 +520,130 @@ function getTools(extractionModel?: string) {
 
     // 搜索位置
     search_locations: tool({
-      description: '搜索位置/画廊',
+      description: '搜索位置/画廊，可以按名称、城市、类型、国家搜索',
       inputSchema: z.object({
-        query: z.string().describe('搜索关键词'),
+        query: z.string().optional().describe('搜索关键词（名称或城市）'),
+        type: z.enum(['studio', 'gallery', 'museum', 'other']).optional().describe('位置类型'),
+        country: z.string().optional().describe('国家'),
       }),
-      execute: async ({ query }) => {
-        const sanitized = sanitizeSearchTerm(query);
-        const { data, error } = await supabase
-          .from('locations')
-          .select('*')
-          .or(`name.ilike.%${sanitized}%,city.ilike.%${sanitized}%`)
-          .limit(10);
+      execute: async ({ query, type, country }) => {
+        let queryBuilder = supabase.from('locations').select('*');
+
+        if (query) {
+          const sanitized = sanitizeSearchTerm(query);
+          queryBuilder = queryBuilder.or(`name.ilike.%${sanitized}%,city.ilike.%${sanitized}%`);
+        }
+        if (type) {
+          queryBuilder = queryBuilder.eq('type', type);
+        }
+        if (country) {
+          const sanitized = sanitizeSearchTerm(country);
+          queryBuilder = queryBuilder.ilike('country', `%${sanitized}%`);
+        }
+
+        const { data, error } = await queryBuilder.limit(10);
 
         if (error) {
           return { error: error.message };
         }
 
         return { locations: data || [] };
+      },
+    }),
+
+    // 搜索历史记录
+    search_history: tool({
+      description: '查询版本变更历史，可用于了解销售记录、状态变更等',
+      inputSchema: z.object({
+        edition_id: z.string().optional().describe('版本 ID'),
+        artwork_title: z.string().optional().describe('作品标题'),
+        action: z.enum([
+          'created', 'status_change', 'location_change',
+          'sold', 'consigned', 'returned', 'condition_update',
+          'file_added', 'file_deleted', 'number_assigned'
+        ]).optional().describe('操作类型'),
+        after: z.string().optional().describe('起始日期 (YYYY-MM-DD)'),
+        before: z.string().optional().describe('结束日期 (YYYY-MM-DD)'),
+        related_party: z.string().optional().describe('相关方（买家/机构）'),
+      }),
+      execute: async ({ edition_id, artwork_title, action, after, before, related_party }) => {
+        let queryBuilder = supabase
+          .from('edition_history')
+          .select(`
+            *,
+            editions (
+              id,
+              edition_number,
+              edition_type,
+              artworks (id, title_en, title_cn)
+            )
+          `)
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (edition_id) {
+          queryBuilder = queryBuilder.eq('edition_id', edition_id);
+        }
+
+        // 如果按作品标题搜索，先找到对应的版本 ID
+        if (artwork_title) {
+          const sanitized = sanitizeSearchTerm(artwork_title);
+          const { data: artworks } = await supabase
+            .from('artworks')
+            .select('id')
+            .is('deleted_at', null)
+            .or(`title_en.ilike.%${sanitized}%,title_cn.ilike.%${sanitized}%`);
+
+          if (artworks && artworks.length > 0) {
+            const { data: editions } = await supabase
+              .from('editions')
+              .select('id')
+              .in('artwork_id', artworks.map(a => a.id));
+
+            if (editions && editions.length > 0) {
+              queryBuilder = queryBuilder.in('edition_id', editions.map(e => e.id));
+            } else {
+              return {
+                history: [],
+                message: `没有找到作品「${artwork_title}」的版本历史记录`,
+              };
+            }
+          } else {
+            return {
+              history: [],
+              message: `没有找到名为「${artwork_title}」的作品`,
+            };
+          }
+        }
+
+        if (action) {
+          queryBuilder = queryBuilder.eq('action', action);
+        }
+        if (after) {
+          queryBuilder = queryBuilder.gte('created_at', after);
+        }
+        if (before) {
+          queryBuilder = queryBuilder.lte('created_at', before + 'T23:59:59');
+        }
+        if (related_party) {
+          const sanitized = sanitizeSearchTerm(related_party);
+          queryBuilder = queryBuilder.ilike('related_party', `%${sanitized}%`);
+        }
+
+        const { data, error } = await queryBuilder;
+
+        if (error) {
+          return { error: error.message };
+        }
+
+        if (!data || data.length === 0) {
+          return {
+            history: [],
+            message: '没有找到匹配的历史记录',
+          };
+        }
+
+        return { history: data };
       },
     }),
 
