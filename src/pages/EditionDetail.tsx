@@ -4,77 +4,35 @@ import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { queryKeys } from '@/lib/queryKeys';
-import { invalidateOnEditionEdit, invalidateOnEditionDelete } from '@/lib/cacheInvalidation';
+import { invalidateOnEditionDelete } from '@/lib/cacheInvalidation';
 import {
   useEditionDetail,
   useEditionHistory,
   useEditionFiles,
 } from '@/hooks/queries/useEditions';
-import type { Database, EditionStatus, CurrencyType, ConditionType } from '@/lib/database.types';
+import type { Database } from '@/lib/database.types';
 
-// 新增组件导入
+// 组件导入
 import FileUpload from '@/components/files/FileUpload';
 import FileList, { type EditionFile as FileListEditionFile } from '@/components/files/FileList';
 import ExternalLinkDialog from '@/components/files/ExternalLinkDialog';
 import HistoryTimeline, { type EditionHistory as TimelineEditionHistory } from '@/components/editions/HistoryTimeline';
-import InventoryNumberInput from '@/components/editions/InventoryNumberInput';
-import LocationPicker from '@/components/editions/LocationPicker';
-import CreateLocationDialog from '@/components/editions/CreateLocationDialog';
+import EditionEditDialog from '@/components/editions/EditionEditDialog';
+import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
 import { Button } from '@/components/ui/button';
 import { Image, MessageSquare, Pencil, ChevronDown, ChevronUp } from 'lucide-react';
 
-// 状态选项 - 使用 EditionStatus 类型
-const STATUS_OPTIONS: EditionStatus[] = [
-  'in_production',
-  'in_studio',
-  'at_gallery',
-  'at_museum',
-  'in_transit',
-  'sold',
-  'gifted',
-  'lost',
-  'damaged',
-];
-
-type Location = Database['public']['Tables']['locations']['Row'];
 type EditionHistory = Database['public']['Tables']['edition_history']['Row'];
 type EditionFile = Database['public']['Tables']['edition_files']['Row'];
 
-// 编辑表单类型
-interface EditionFormData {
-  edition_type: 'numbered' | 'ap' | 'unique';
-  edition_number: number | null;
-  status: EditionStatus;
-  inventory_number: string;
-  location_id: string | null;
-  sale_price: number | null;
-  sale_currency: CurrencyType;
-  sale_date: string;
-  buyer_name: string;
-  notes: string;
-  // 借出信息 (at_gallery 状态)
-  consignment_start: string;
-  consignment_end: string;
-  // 展览信息 (at_museum 状态)
-  loan_start: string;
-  loan_end: string;
-  certificate_number: string;
-  // 状态相关
-  condition: ConditionType;
-  condition_notes: string;
-  storage_detail: string;
-}
-
 export default function EditionDetail() {
   const { t, i18n } = useTranslation('editionDetail');
-  const { t: tStatus } = useTranslation('status');
-  const { t: tCommon } = useTranslation('common');
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  // React Query hooks - parallel queries
+  // React Query hooks
   const {
     data: edition,
     isLoading: editionLoading,
@@ -93,19 +51,12 @@ export default function EditionDetail() {
 
   const loading = editionLoading || historyLoading || filesLoading;
 
+  // 对话框状态
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // 编辑状态
-  const [isEditing, setIsEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [formData, setFormData] = useState<EditionFormData | null>(null);
-
-  // 新增状态
-  const [showLinkDialog, setShowLinkDialog] = useState(false);
-  const [showCreateLocation, setShowCreateLocation] = useState(false);
-  const [createLocationInitialName, setCreateLocationInitialName] = useState('');
   const [locationExpanded, setLocationExpanded] = useState(false);
 
   // 格式化版本号
@@ -143,7 +94,6 @@ export default function EditionDetail() {
 
   // 处理文件上传完成
   const handleFileUploaded = useCallback((file: FileListEditionFile) => {
-    // Invalidate files cache
     if (id) {
       queryClient.setQueryData<EditionFile[]>(
         queryKeys.editions.files(id),
@@ -183,14 +133,6 @@ export default function EditionDetail() {
     }
   }, [id, queryClient]);
 
-  // 处理位置创建
-  const handleLocationCreated = useCallback((location: Location) => {
-    if (formData) {
-      setFormData({ ...formData, location_id: location.id });
-    }
-    setShowCreateLocation(false);
-  }, [formData]);
-
   // 处理对话操作
   const handleChatAction = () => {
     navigate('/chat', {
@@ -202,91 +144,6 @@ export default function EditionDetail() {
         }
       }
     });
-  };
-
-  // 开始编辑
-  const startEditing = () => {
-    if (!edition) return;
-    setFormData({
-      edition_type: edition.edition_type as 'numbered' | 'ap' | 'unique',
-      edition_number: edition.edition_number,
-      status: edition.status,
-      inventory_number: edition.inventory_number || '',
-      location_id: edition.location_id,
-      sale_price: edition.sale_price,
-      sale_currency: edition.sale_currency || 'USD',
-      sale_date: edition.sale_date || '',
-      buyer_name: edition.buyer_name || '',
-      notes: edition.notes || '',
-      // 借出信息 (at_gallery 状态)
-      consignment_start: edition.consignment_start || '',
-      consignment_end: edition.consignment_end || '',
-      // 展览信息 (at_museum 状态)
-      loan_start: edition.loan_start || '',
-      loan_end: edition.loan_end || '',
-      certificate_number: edition.certificate_number || '',
-      // 状态相关
-      condition: edition.condition || 'excellent',
-      condition_notes: edition.condition_notes || '',
-      storage_detail: edition.storage_detail || '',
-    });
-    setIsEditing(true);
-  };
-
-  // 取消编辑
-  const cancelEditing = () => {
-    setIsEditing(false);
-    setFormData(null);
-  };
-
-  // 保存编辑
-  const saveEditing = async () => {
-    if (!id || !formData || !edition) return;
-
-    try {
-      setSaving(true);
-      const updateData = {
-        edition_type: formData.edition_type,
-        edition_number: formData.edition_type === 'unique' ? null : formData.edition_number,
-        status: formData.status,
-        inventory_number: formData.inventory_number || null,
-        location_id: formData.location_id,
-        sale_price: formData.sale_price || null,
-        sale_currency: formData.sale_currency || null,
-        sale_date: formData.sale_date || null,
-        buyer_name: formData.buyer_name || null,
-        notes: formData.notes || null,
-        // 借出信息 (at_gallery 状态)
-        consignment_start: formData.consignment_start || null,
-        consignment_end: formData.consignment_end || null,
-        // 展览信息 (at_museum 状态)
-        loan_start: formData.loan_start || null,
-        loan_end: formData.loan_end || null,
-        certificate_number: formData.certificate_number || null,
-        // 状态相关
-        condition: formData.condition,
-        condition_notes: formData.condition_notes || null,
-        storage_detail: formData.storage_detail || null,
-        updated_at: new Date().toISOString(),
-      };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: updateError } = await (supabase as any)
-        .from('editions')
-        .update(updateData)
-        .eq('id', id);
-
-      if (updateError) throw updateError;
-
-      // Invalidate and refetch
-      await invalidateOnEditionEdit(queryClient, id, edition.artwork_id);
-      setIsEditing(false);
-      setFormData(null);
-    } catch (err) {
-      console.error('Save failed:', err);
-      setError(err instanceof Error ? err.message : t('saveFailed'));
-    } finally {
-      setSaving(false);
-    }
   };
 
   // 删除版本
@@ -329,10 +186,10 @@ export default function EditionDetail() {
     }
   };
 
+  // 加载状态
   if (loading) {
     return (
       <div className="p-6">
-        {/* 骨架屏 */}
         <div className="h-8 w-24 bg-muted rounded mb-6 animate-pulse" />
         <div className="bg-card border border-border rounded-xl p-6 mb-6">
           <div className="flex flex-col md:flex-row gap-6">
@@ -349,6 +206,7 @@ export default function EditionDetail() {
     );
   }
 
+  // 错误状态
   if (editionError || !edition) {
     return (
       <div className="p-6">
@@ -364,337 +222,25 @@ export default function EditionDetail() {
 
   return (
     <div className="p-6 pb-40 md:pb-6">
-      {/* 编辑弹窗 */}
-      {isEditing && formData && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card border border-border rounded-xl p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold mb-4">{t('editDialog.title')}</h3>
-
-            <div className="space-y-4">
-              {/* 版本类型 */}
-              <div>
-                <label className="block text-sm font-medium mb-1">{t('editDialog.editionType')}</label>
-                <select
-                  value={formData.edition_type}
-                  onChange={(e) => setFormData({ ...formData, edition_type: e.target.value as 'numbered' | 'ap' | 'unique' })}
-                  className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="numbered">{t('editDialog.numbered')}</option>
-                  <option value="ap">{t('editDialog.ap')}</option>
-                  <option value="unique">{t('editDialog.unique')}</option>
-                </select>
-              </div>
-
-              {/* 版本号（非独版时显示） */}
-              {formData.edition_type !== 'unique' && (
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    {formData.edition_type === 'ap' ? t('editDialog.apNumber') : t('editDialog.editionNumber')}
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={formData.edition_number || ''}
-                    onChange={(e) => setFormData({ ...formData, edition_number: e.target.value ? parseInt(e.target.value) : null })}
-                    className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder={t('editDialog.numberPlaceholder')}
-                  />
-                </div>
-              )}
-
-              {/* 状态 */}
-              <div>
-                <label className="block text-sm font-medium mb-1">{t('editDialog.status')}</label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as EditionStatus })}
-                  className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  {STATUS_OPTIONS.map((status) => (
-                    <option key={status} value={status}>
-                      {tStatus(status)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* 位置选择 - 新增 */}
-              <div>
-                <label className="block text-sm font-medium mb-1">{t('editDialog.location')}</label>
-                <LocationPicker
-                  value={formData.location_id}
-                  onChange={(locationId) => setFormData({ ...formData, location_id: locationId })}
-                  onCreateNew={(initialName) => {
-                    setCreateLocationInitialName(initialName);
-                    setShowCreateLocation(true);
-                  }}
-                />
-              </div>
-
-              {/* 库存编号 - 使用智能输入组件 */}
-              <div>
-                <label className="block text-sm font-medium mb-1">{t('editDialog.inventoryNumber')}</label>
-                <InventoryNumberInput
-                  value={formData.inventory_number}
-                  onChange={(value) => setFormData({ ...formData, inventory_number: value })}
-                  editionId={id}
-                  showSuggestion={true}
-                />
-              </div>
-
-              {/* 价格信息（所有状态都可编辑） */}
-              <div className="border-t border-border pt-4 mt-4">
-                <p className="text-sm font-medium text-muted-foreground mb-3">
-                  {formData.status === 'sold' ? t('editDialog.priceSection.sold') : t('editDialog.priceSection.default')}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    {formData.status === 'sold' ? t('editDialog.price.sold') : t('editDialog.price.default')}
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.sale_price || ''}
-                    onChange={(e) => setFormData({ ...formData, sale_price: e.target.value ? parseFloat(e.target.value) : null })}
-                    className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder={t('editDialog.amount')}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">{t('editDialog.currency')}</label>
-                  <select
-                    value={formData.sale_currency}
-                    onChange={(e) => setFormData({ ...formData, sale_currency: e.target.value as CurrencyType })}
-                    className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    <option value="USD">USD ($)</option>
-                    <option value="EUR">EUR (€)</option>
-                    <option value="GBP">GBP (£)</option>
-                    <option value="CNY">CNY (¥)</option>
-                    <option value="JPY">JPY (¥)</option>
-                    <option value="CHF">CHF (Fr)</option>
-                    <option value="HKD">HKD ($)</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* 销售详情（仅已售状态显示） */}
-              {formData.status === 'sold' && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">{t('editDialog.saleDate')}</label>
-                    <input
-                      type="date"
-                      value={formData.sale_date}
-                      onChange={(e) => setFormData({ ...formData, sale_date: e.target.value })}
-                      className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-1">{t('editDialog.buyer')}</label>
-                    <input
-                      type="text"
-                      value={formData.buyer_name}
-                      onChange={(e) => setFormData({ ...formData, buyer_name: e.target.value })}
-                      className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                      placeholder={t('editDialog.buyerPlaceholder')}
-                    />
-                  </div>
-                </>
-              )}
-
-              {/* 备注 */}
-              <div>
-                <label className="block text-sm font-medium mb-1">{t('editDialog.notes')}</label>
-                <textarea
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  rows={3}
-                  className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                  placeholder={t('editDialog.notesPlaceholder')}
-                />
-              </div>
-
-              {/* 借出信息 - 仅当状态为 at_gallery 时显示 */}
-              {formData.status === 'at_gallery' && (
-                <div className="border-t border-border pt-4 mt-4">
-                  <p className="text-sm font-medium text-muted-foreground mb-3">
-                    {t('editDialog.loanSection')}
-                  </p>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">{t('editDialog.loanStart')}</label>
-                      <input
-                        type="date"
-                        value={formData.consignment_start}
-                        onChange={(e) => setFormData({ ...formData, consignment_start: e.target.value })}
-                        className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">{t('editDialog.loanExpectedReturn')}</label>
-                      <input
-                        type="date"
-                        value={formData.consignment_end}
-                        onChange={(e) => setFormData({ ...formData, consignment_end: e.target.value })}
-                        className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 展览信息 - 仅当状态为 at_museum 时显示 */}
-              {formData.status === 'at_museum' && (
-                <div className="border-t border-border pt-4 mt-4">
-                  <p className="text-sm font-medium text-muted-foreground mb-3">
-                    {t('editDialog.exhibitionSection')}
-                  </p>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">{t('editDialog.exhibitionStart')}</label>
-                      <input
-                        type="date"
-                        value={formData.loan_start}
-                        onChange={(e) => setFormData({ ...formData, loan_start: e.target.value })}
-                        className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">{t('editDialog.exhibitionEnd')}</label>
-                      <input
-                        type="date"
-                        value={formData.loan_end}
-                        onChange={(e) => setFormData({ ...formData, loan_end: e.target.value })}
-                        className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 文档信息 - 始终显示 */}
-              <div className="border-t border-border pt-4 mt-4">
-                <p className="text-sm font-medium text-muted-foreground mb-3">
-                  {t('editDialog.documentationSection')}
-                </p>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">{t('editDialog.certificateNumber')}</label>
-                  <input
-                    type="text"
-                    value={formData.certificate_number}
-                    onChange={(e) => setFormData({ ...formData, certificate_number: e.target.value })}
-                    className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder={t('editDialog.certificatePlaceholder')}
-                  />
-                </div>
-              </div>
-
-              {/* 状态与存储 - 可折叠 */}
-              <details className="border-t border-border pt-4 mt-4">
-                <summary className="text-sm font-medium text-muted-foreground cursor-pointer hover:text-foreground">
-                  {t('editDialog.conditionSection')}
-                </summary>
-                <div className="mt-3 space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">{t('editDialog.condition')}</label>
-                    <select
-                      value={formData.condition}
-                      onChange={(e) => setFormData({ ...formData, condition: e.target.value as ConditionType })}
-                      className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    >
-                      <option value="excellent">{t('editDialog.conditionOptions.excellent')}</option>
-                      <option value="good">{t('editDialog.conditionOptions.good')}</option>
-                      <option value="fair">{t('editDialog.conditionOptions.fair')}</option>
-                      <option value="poor">{t('editDialog.conditionOptions.poor')}</option>
-                      <option value="damaged">{t('editDialog.conditionOptions.damaged')}</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">{t('editDialog.conditionNotes')}</label>
-                    <textarea
-                      value={formData.condition_notes}
-                      onChange={(e) => setFormData({ ...formData, condition_notes: e.target.value })}
-                      rows={2}
-                      className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                      placeholder={t('editDialog.conditionNotesPlaceholder')}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">{t('editDialog.storageDetail')}</label>
-                    <input
-                      type="text"
-                      value={formData.storage_detail}
-                      onChange={(e) => setFormData({ ...formData, storage_detail: e.target.value })}
-                      className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                      placeholder={t('editDialog.storagePlaceholder')}
-                    />
-                  </div>
-                </div>
-              </details>
-            </div>
-
-            <div className="flex gap-3 mt-6 justify-end">
-              <Button
-                variant="outline"
-                onClick={cancelEditing}
-                disabled={saving}
-              >
-                {tCommon('cancel')}
-              </Button>
-              <Button
-                onClick={saveEditing}
-                disabled={saving}
-              >
-                {saving ? t('saving') : tCommon('save')}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 编辑对话框 */}
+      <EditionEditDialog
+        isOpen={showEditDialog}
+        edition={edition}
+        onClose={() => setShowEditDialog(false)}
+        onSaved={() => setShowEditDialog(false)}
+      />
 
       {/* 删除确认对话框 */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-card border border-border rounded-xl p-6 max-w-md mx-4">
-            <h3 className="text-lg font-semibold mb-2">{t('deleteDialog.title')}</h3>
-            <p className="text-muted-foreground mb-4">
-              {t('deleteDialog.message', { title: edition?.artwork?.title_en, edition: formatEditionNumber() })}
-              {history.length > 0 && (
-                <span className="block text-yellow-600 mt-2">
-                  {t('deleteDialog.historyWarning', { count: history.length })}
-                </span>
-              )}
-            </p>
-            <p className="text-sm text-destructive mb-4">{t('deleteDialog.warning')}</p>
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                onClick={() => setShowDeleteConfirm(false)}
-                disabled={deleting}
-                className="flex-1"
-              >
-                {tCommon('cancel')}
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleDelete}
-                disabled={deleting}
-                className="flex-1"
-              >
-                {deleting ? t('deleteDialog.deleting') : tCommon('confirm')}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmDialog
+        isOpen={showDeleteConfirm}
+        title={t('deleteDialog.title')}
+        message={t('deleteDialog.message', { title: edition?.artwork?.title_en, edition: formatEditionNumber() })}
+        warning={t('deleteDialog.warning')}
+        warningItems={history.length > 0 ? [t('deleteDialog.historyWarning', { count: history.length })] : undefined}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDelete}
+        isDeleting={deleting}
+      />
 
       {/* 外部链接对话框 */}
       <ExternalLinkDialog
@@ -702,14 +248,6 @@ export default function EditionDetail() {
         onClose={() => setShowLinkDialog(false)}
         editionId={id!}
         onLinkAdded={handleLinkAdded}
-      />
-
-      {/* 创建位置对话框 */}
-      <CreateLocationDialog
-        isOpen={showCreateLocation}
-        onClose={() => setShowCreateLocation(false)}
-        onSaved={handleLocationCreated}
-        initialName={createLocationInitialName}
       />
 
       {/* 错误提示 */}
@@ -818,7 +356,8 @@ export default function EditionDetail() {
                   </div>
                 );
               })()}
-              {/* 价格信息（所有状态都显示） */}
+
+              {/* 价格信息 */}
               {edition.sale_price && (
                 <p>
                   <span className="text-muted-foreground">
@@ -827,6 +366,7 @@ export default function EditionDetail() {
                   {formatPrice(edition.sale_price, edition.sale_currency)}
                 </p>
               )}
+
               {/* 销售详情（仅已售状态显示） */}
               {edition.status === 'sold' && (
                 <>
@@ -844,6 +384,7 @@ export default function EditionDetail() {
                   )}
                 </>
               )}
+
               {/* 借出信息（仅 at_gallery 状态显示） */}
               {edition.status === 'at_gallery' && (
                 <>
@@ -861,6 +402,7 @@ export default function EditionDetail() {
                   )}
                 </>
               )}
+
               {/* 展览信息（仅 at_museum 状态显示） */}
               {edition.status === 'at_museum' && (
                 <>
@@ -878,6 +420,7 @@ export default function EditionDetail() {
                   )}
                 </>
               )}
+
               {/* 证书编号 */}
               {edition.certificate_number && (
                 <p>
@@ -885,6 +428,7 @@ export default function EditionDetail() {
                   #{edition.certificate_number}
                 </p>
               )}
+
               {/* 存储位置 */}
               {edition.storage_detail && (
                 <p>
@@ -892,6 +436,7 @@ export default function EditionDetail() {
                   {edition.storage_detail}
                 </p>
               )}
+
               {/* 作品状态（非 excellent 时显示） */}
               {edition.condition && edition.condition !== 'excellent' && (
                 <p>
@@ -911,7 +456,7 @@ export default function EditionDetail() {
         </div>
       </div>
 
-      {/* 附件列表 - 重新设计 */}
+      {/* 附件列表 */}
       <div className="bg-card border border-border rounded-xl p-6 mb-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">
@@ -926,14 +471,12 @@ export default function EditionDetail() {
           </Button>
         </div>
 
-        {/* 文件上传组件 */}
         <FileUpload
           editionId={id!}
           onUploadComplete={handleFileUploaded}
           onError={(uploadError) => console.error('Upload failed:', uploadError)}
         />
 
-        {/* 文件列表 */}
         {files.length > 0 && (
           <div className="mt-4">
             <FileList
@@ -947,7 +490,7 @@ export default function EditionDetail() {
         )}
       </div>
 
-      {/* 历史记录 - 使用新组件 */}
+      {/* 历史记录 */}
       <div className="bg-card border border-border rounded-xl p-6">
         <HistoryTimeline
           history={history as TimelineEditionHistory[]}
@@ -968,7 +511,7 @@ export default function EditionDetail() {
         </Button>
         <Button
           variant="secondary"
-          onClick={startEditing}
+          onClick={() => setShowEditDialog(true)}
           className="flex-1 md:flex-none"
         >
           <Pencil />
