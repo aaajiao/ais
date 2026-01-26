@@ -10,7 +10,7 @@ import {
   useEditionHistory,
   useEditionFiles,
 } from '@/hooks/queries/useEditions';
-import type { Database, EditionStatus, CurrencyType } from '@/lib/database.types';
+import type { Database, EditionStatus, CurrencyType, ConditionType } from '@/lib/database.types';
 
 // 新增组件导入
 import FileUpload from '@/components/files/FileUpload';
@@ -53,6 +53,14 @@ interface EditionFormData {
   sale_date: string;
   buyer_name: string;
   notes: string;
+  // 借展相关
+  consignment_start: string;
+  loan_end: string;
+  certificate_number: string;
+  // 状态相关
+  condition: ConditionType;
+  condition_notes: string;
+  storage_detail: string;
 }
 
 export default function EditionDetail() {
@@ -207,6 +215,14 @@ export default function EditionDetail() {
       sale_date: edition.sale_date || '',
       buyer_name: edition.buyer_name || '',
       notes: edition.notes || '',
+      // 借展相关
+      consignment_start: edition.consignment_start || '',
+      loan_end: edition.loan_end || '',
+      certificate_number: edition.certificate_number || '',
+      // 状态相关
+      condition: edition.condition || 'excellent',
+      condition_notes: edition.condition_notes || '',
+      storage_detail: edition.storage_detail || '',
     });
     setIsEditing(true);
   };
@@ -234,6 +250,14 @@ export default function EditionDetail() {
         sale_date: formData.sale_date || null,
         buyer_name: formData.buyer_name || null,
         notes: formData.notes || null,
+        // 借展相关
+        consignment_start: formData.consignment_start || null,
+        loan_end: formData.loan_end || null,
+        certificate_number: formData.certificate_number || null,
+        // 状态相关
+        condition: formData.condition,
+        condition_notes: formData.condition_notes || null,
+        storage_detail: formData.storage_detail || null,
         updated_at: new Date().toISOString(),
       };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -485,6 +509,97 @@ export default function EditionDetail() {
                   placeholder={t('editDialog.notesPlaceholder')}
                 />
               </div>
+
+              {/* 借展信息 - 仅当状态为 at_gallery/at_museum/in_transit 时显示 */}
+              {['at_gallery', 'at_museum', 'in_transit'].includes(formData.status) && (
+                <div className="border-t border-border pt-4 mt-4">
+                  <p className="text-sm font-medium text-muted-foreground mb-3">
+                    {t('editDialog.consignmentSection')}
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">{t('editDialog.consignmentStart')}</label>
+                      <input
+                        type="date"
+                        value={formData.consignment_start}
+                        onChange={(e) => setFormData({ ...formData, consignment_start: e.target.value })}
+                        className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">{t('editDialog.loanEnd')}</label>
+                      <input
+                        type="date"
+                        value={formData.loan_end}
+                        onChange={(e) => setFormData({ ...formData, loan_end: e.target.value })}
+                        className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 文档信息 - 始终显示 */}
+              <div className="border-t border-border pt-4 mt-4">
+                <p className="text-sm font-medium text-muted-foreground mb-3">
+                  {t('editDialog.documentationSection')}
+                </p>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">{t('editDialog.certificateNumber')}</label>
+                  <input
+                    type="text"
+                    value={formData.certificate_number}
+                    onChange={(e) => setFormData({ ...formData, certificate_number: e.target.value })}
+                    className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder={t('editDialog.certificatePlaceholder')}
+                  />
+                </div>
+              </div>
+
+              {/* 状态与存储 - 可折叠 */}
+              <details className="border-t border-border pt-4 mt-4">
+                <summary className="text-sm font-medium text-muted-foreground cursor-pointer hover:text-foreground">
+                  {t('editDialog.conditionSection')}
+                </summary>
+                <div className="mt-3 space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">{t('editDialog.condition')}</label>
+                    <select
+                      value={formData.condition}
+                      onChange={(e) => setFormData({ ...formData, condition: e.target.value as ConditionType })}
+                      className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      <option value="excellent">{t('editDialog.conditionOptions.excellent')}</option>
+                      <option value="good">{t('editDialog.conditionOptions.good')}</option>
+                      <option value="fair">{t('editDialog.conditionOptions.fair')}</option>
+                      <option value="poor">{t('editDialog.conditionOptions.poor')}</option>
+                      <option value="damaged">{t('editDialog.conditionOptions.damaged')}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">{t('editDialog.conditionNotes')}</label>
+                    <textarea
+                      value={formData.condition_notes}
+                      onChange={(e) => setFormData({ ...formData, condition_notes: e.target.value })}
+                      rows={2}
+                      className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                      placeholder={t('editDialog.conditionNotesPlaceholder')}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">{t('editDialog.storageDetail')}</label>
+                    <input
+                      type="text"
+                      value={formData.storage_detail}
+                      onChange={(e) => setFormData({ ...formData, storage_detail: e.target.value })}
+                      className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      placeholder={t('editDialog.storagePlaceholder')}
+                    />
+                  </div>
+                </div>
+              </details>
             </div>
 
             <div className="flex gap-3 mt-6 justify-end">
@@ -689,6 +804,44 @@ export default function EditionDetail() {
                     </p>
                   )}
                 </>
+              )}
+              {/* 借展信息（仅相关状态显示） */}
+              {['at_gallery', 'at_museum', 'in_transit'].includes(edition.status) && (
+                <>
+                  {edition.consignment_start && (
+                    <p>
+                      <span className="text-muted-foreground">{t('info.consignmentStart')}</span>
+                      {formatDate(edition.consignment_start)}
+                    </p>
+                  )}
+                  {edition.loan_end && (
+                    <p>
+                      <span className="text-muted-foreground">{t('info.loanEnd')}</span>
+                      {formatDate(edition.loan_end)}
+                    </p>
+                  )}
+                </>
+              )}
+              {/* 证书编号 */}
+              {edition.certificate_number && (
+                <p>
+                  <span className="text-muted-foreground">{t('info.certificate')}</span>
+                  #{edition.certificate_number}
+                </p>
+              )}
+              {/* 存储位置 */}
+              {edition.storage_detail && (
+                <p>
+                  <span className="text-muted-foreground">{t('info.storageDetail')}</span>
+                  {edition.storage_detail}
+                </p>
+              )}
+              {/* 作品状态（非 excellent 时显示） */}
+              {edition.condition && edition.condition !== 'excellent' && (
+                <p>
+                  <span className="text-muted-foreground">{t('info.condition')}</span>
+                  {t(`info.conditionValues.${edition.condition}`)}
+                </p>
               )}
             </div>
 

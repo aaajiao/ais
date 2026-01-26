@@ -29,7 +29,28 @@
     "buyer": "买家",
     "buyerPlaceholder": "买家姓名/机构",
     "notes": "备注",
-    "notesPlaceholder": "可选备注信息"
+    "notesPlaceholder": "可选备注信息",
+    "consignmentSection": "借展/寄售信息",
+    "loanInstitution": "借展机构",
+    "loanInstitutionPlaceholder": "画廊或美术馆名称",
+    "consignmentStart": "开始日期",
+    "loanEnd": "结束日期",
+    "documentationSection": "文档信息",
+    "certificateNumber": "证书编号",
+    "certificatePlaceholder": "如：COA-2025-001",
+    "conditionSection": "状态与存储",
+    "condition": "作品状态",
+    "conditionOptions": {
+      "excellent": "优秀",
+      "good": "良好",
+      "fair": "一般",
+      "poor": "较差",
+      "damaged": "损坏"
+    },
+    "conditionNotes": "状态备注",
+    "conditionNotesPlaceholder": "描述作品当前状态...",
+    "storageDetail": "存储位置",
+    "storagePlaceholder": "如：仓库A，架子3"
   },
   "deleteDialog": {
     "title": "确认删除",
@@ -47,7 +68,20 @@
     "listPrice": "定价：",
     "saleDate": "售出日期：",
     "buyer": "买家：",
-    "notes": "备注："
+    "notes": "备注：",
+    "loanInstitution": "借展机构：",
+    "consignmentStart": "开始日期：",
+    "loanEnd": "结束日期：",
+    "certificate": "证书编号：",
+    "storageDetail": "存储位置：",
+    "condition": "状态：",
+    "conditionValues": {
+      "excellent": "优秀",
+      "good": "良好",
+      "fair": "一般",
+      "poor": "较差",
+      "damaged": "损坏"
+    }
   },
   "attachments": {
     "title": "附件",

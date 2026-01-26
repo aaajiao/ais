@@ -29,7 +29,28 @@
     "buyer": "Buyer",
     "buyerPlaceholder": "Buyer name/institution",
     "notes": "Notes",
-    "notesPlaceholder": "Optional notes"
+    "notesPlaceholder": "Optional notes",
+    "consignmentSection": "Consignment/Loan Info",
+    "loanInstitution": "Institution",
+    "loanInstitutionPlaceholder": "Gallery or museum name",
+    "consignmentStart": "Start Date",
+    "loanEnd": "End Date",
+    "documentationSection": "Documentation",
+    "certificateNumber": "Certificate Number",
+    "certificatePlaceholder": "e.g., COA-2025-001",
+    "conditionSection": "Condition & Storage",
+    "condition": "Condition",
+    "conditionOptions": {
+      "excellent": "Excellent",
+      "good": "Good",
+      "fair": "Fair",
+      "poor": "Poor",
+      "damaged": "Damaged"
+    },
+    "conditionNotes": "Condition Notes",
+    "conditionNotesPlaceholder": "Describe current condition...",
+    "storageDetail": "Storage Location",
+    "storagePlaceholder": "e.g., Warehouse A, Shelf 3"
   },
   "deleteDialog": {
     "title": "Confirm Delete",
@@ -47,7 +68,20 @@
     "listPrice": "List Price:",
     "saleDate": "Sale Date:",
     "buyer": "Buyer:",
-    "notes": "Notes:"
+    "notes": "Notes:",
+    "loanInstitution": "Institution:",
+    "consignmentStart": "Start Date:",
+    "loanEnd": "End Date:",
+    "certificate": "Certificate:",
+    "storageDetail": "Storage:",
+    "condition": "Condition:",
+    "conditionValues": {
+      "excellent": "Excellent",
+      "good": "Good",
+      "fair": "Fair",
+      "poor": "Poor",
+      "damaged": "Damaged"
+    }
   },
   "attachments": {
     "title": "Attachments",
