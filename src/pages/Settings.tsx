@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Lightbulb } from 'lucide-react';
+import { Lightbulb, ChevronDown, ChevronRight } from 'lucide-react';
 
 type Artwork = Database['public']['Tables']['artworks']['Row'];
 
@@ -34,11 +34,19 @@ export default function Settings() {
   const [selectedModel, setSelectedModel] = useState<string>(() => {
     return localStorage.getItem('ai-model') || '';
   });
+  // 导入提取模型：空字符串表示"使用聊天模型"
+  const [extractionModel, setExtractionModel] = useState<string>(() => {
+    return localStorage.getItem('extraction-model') || '';
+  });
   const [models, setModels] = useState<ModelsResponse | null>(null);
   const [loadingModels, setLoadingModels] = useState(true);
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [exporting, setExporting] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(() => {
+    // 如果已经配置了独立的提取模型，默认展开高级选项
+    return localStorage.getItem('extraction-model') !== null && localStorage.getItem('extraction-model') !== '';
+  });
   const hasInitializedModels = useRef(false);
 
   // 从 API 加载可用模型列表
@@ -76,6 +84,16 @@ export default function Settings() {
   const handleModelChange = (modelId: string) => {
     setSelectedModel(modelId);
     localStorage.setItem('ai-model', modelId);
+  };
+
+  // 处理提取模型变更
+  const handleExtractionModelChange = (modelId: string) => {
+    setExtractionModel(modelId);
+    if (modelId === '') {
+      localStorage.removeItem('extraction-model');
+    } else {
+      localStorage.setItem('extraction-model', modelId);
+    }
   };
 
   const handleSignOut = async () => {
@@ -224,6 +242,13 @@ export default function Settings() {
     return allModels.find(m => m.id === selectedModel);
   }, [models, selectedModel]);
 
+  // 获取提取模型的信息
+  const extractionModelInfo = useMemo(() => {
+    if (!models || !extractionModel) return null;
+    const allModels = [...models.anthropic, ...models.openai];
+    return allModels.find(m => m.id === extractionModel);
+  }, [models, extractionModel]);
+
   // 渲染模型选择器
   const renderModelSelector = () => {
     if (loadingModels) {
@@ -340,6 +365,120 @@ export default function Settings() {
           <Lightbulb className="w-4 h-4 flex-shrink-0 mt-0.5" />
           <span>{t('ai.modelHint')}</span>
         </p>
+
+        {/* 高级选项 */}
+        {models && (models.anthropic.length > 0 || models.openai.length > 0) && (
+          <div className="mt-6 pt-6 border-t border-border">
+            <button
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {showAdvanced ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              <span>{t('ai.advancedOptions')}</span>
+            </button>
+
+            {showAdvanced && (
+              <div className="mt-4 space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  {t('ai.advancedDescription')}
+                </p>
+
+                {/* 后台任务模型选择 */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium">{t('ai.backgroundModel')}</label>
+                    {extractionModel !== '' && (
+                      <button
+                        onClick={() => handleExtractionModelChange('')}
+                        className="text-xs text-primary hover:underline"
+                      >
+                        {t('ai.resetToDefault')}
+                      </button>
+                    )}
+                  </div>
+
+                  {extractionModel === '' ? (
+                    <p className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-lg">
+                      {t('ai.usingMainModel')}
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Anthropic Claude */}
+                      {models.anthropic.length > 0 && (
+                        <div className="space-y-2">
+                          <label className="text-xs text-muted-foreground">Anthropic Claude</label>
+                          <Select
+                            value={models.anthropic.some(m => m.id === extractionModel) ? extractionModel : ''}
+                            onValueChange={handleExtractionModelChange}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder={t('ai.selectClaude')} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {models.anthropic.map(model => (
+                                <SelectItem key={model.id} value={model.id}>
+                                  {model.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {/* OpenAI GPT */}
+                      {models.openai.length > 0 && (
+                        <div className="space-y-2">
+                          <label className="text-xs text-muted-foreground">OpenAI GPT</label>
+                          <Select
+                            value={models.openai.some(m => m.id === extractionModel) ? extractionModel : ''}
+                            onValueChange={handleExtractionModelChange}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder={t('ai.selectGPT')} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {models.openai.map(model => (
+                                <SelectItem key={model.id} value={model.id}>
+                                  {model.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {/* 显示选中模型的描述 */}
+                      {extractionModelInfo && (
+                        <div className="text-sm text-muted-foreground space-y-1 p-3 bg-muted/50 rounded-lg">
+                          {extractionModelInfo.description && (
+                            <p>{extractionModelInfo.description}</p>
+                          )}
+                          <p className="text-xs font-mono">{extractionModel}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 选择其他模型按钮 */}
+                  {extractionModel === '' && (
+                    <Button
+                      variant="outline"
+                      size="small"
+                      onClick={() => handleExtractionModelChange(selectedModel)}
+                    >
+                      {t('ai.selectDifferentModel')}
+                    </Button>
+                  )}
+                </div>
+
+                <p className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-lg flex items-start gap-2">
+                  <Lightbulb className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>{t('ai.backgroundModelHint')}</span>
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 数据导出 */}

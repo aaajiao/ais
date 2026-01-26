@@ -110,7 +110,7 @@ const systemPrompt = `你是 aaajiao 艺术作品库存管理系统的 AI 助手
 3. 如果用户提供了价格信息，也一并记录`;
 
 // 定义工具 - 使用函数形式以便延迟获取 supabase
-function getTools() {
+function getTools(extractionModel?: string) {
   const supabase = getSupabase();
 
   return {
@@ -534,10 +534,10 @@ function getTools() {
         url: z.string().url().describe('作品页面的完整 URL'),
       }),
       execute: async ({ url }) => {
-        console.log('[import_artwork_from_url] Starting import:', url);
+        console.log('[import_artwork_from_url] Starting import:', url, 'model:', extractionModel || 'default');
 
-        // 1. 抓取并解析网页
-        const extractResult = await extractArtworkFromUrl(url);
+        // 1. 抓取并解析网页（使用配置的提取模型）
+        const extractResult = await extractArtworkFromUrl(url, extractionModel);
 
         if (!extractResult.success || !extractResult.artwork) {
           return {
@@ -673,20 +673,21 @@ export default async function handler(req: Request) {
     }
 
     const body = await req.json();
-    const { messages: uiMessages, model = 'claude-sonnet-4.5' } = body;
+    const { messages: uiMessages, model = 'claude-sonnet-4.5', extractionModel } = body;
 
     // 2. 安全日志（不记录敏感消息内容）
     console.log('[chat] Request', {
       userId: auth.userId,
       model,
+      extractionModel: extractionModel || 'default',
       messageCount: uiMessages?.length,
     });
 
     // 获取模型（延迟初始化）
     const selectedModel = getModel(model);
 
-    // 获取工具（延迟初始化）
-    const tools = getTools();
+    // 获取工具（延迟初始化，传入提取模型）
+    const tools = getTools(extractionModel);
 
     // 使用官方的 convertToModelMessages 转换 UIMessage 到 CoreMessage
     const modelMessages = await convertToModelMessages(uiMessages as UIMessage[]);

@@ -28,6 +28,11 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
     return localStorage.getItem('ai-model') || 'claude-sonnet-4.5';
   });
 
+  // 获取提取模型（空字符串表示使用聊天模型）
+  const [extractionModel] = useState(() => {
+    return localStorage.getItem('extraction-model') || '';
+  });
+
   // 创建带认证的 fetch 函数
   const authenticatedFetch = useCallback(async (url: RequestInfo | URL, options?: RequestInit) => {
     return fetch(url, {
@@ -47,9 +52,11 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
         fetch: authenticatedFetch,
         body: {
           model: selectedModel,
+          // 传递提取模型：空字符串时使用聊天模型
+          extractionModel: extractionModel || selectedModel,
         },
       }),
-    [selectedModel, authenticatedFetch]
+    [selectedModel, extractionModel, authenticatedFetch]
   );
 
   const {

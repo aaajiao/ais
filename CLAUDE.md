@@ -151,17 +151,22 @@ System prompt is in Chinese for the target user.
 
 Import artworks directly from web pages by typing "导入 URL" in chat. The system:
 1. Fetches HTML content from the URL
-2. Uses LLM (Claude Sonnet 4.5) to extract artwork info via `generateObject`
+2. Uses LLM to extract artwork info via `generateObject`
 3. Extracts the best thumbnail image URL from the page
 4. Checks for duplicates via `source_url` matching
 5. Creates or updates the artwork record
 
 **Key files:**
-- `api/lib/artwork-extractor.ts` - LLM extraction with Zod schema
+- `api/lib/artwork-extractor.ts` - LLM extraction with Zod schema (supports Anthropic + OpenAI)
 - `api/lib/image-downloader.ts` - Image URL selection (`selectBestImage`)
 - `api/chat.ts` - `import_artwork_from_url` tool definition
 
-**Note:** The URL import always uses Claude Sonnet 4.5 regardless of user's chat model selection.
+**Configurable Extraction Model:**
+- Users can configure a separate AI model for background tasks (like URL import) in Settings > "AI Model" > "Advanced Options"
+- Default: Uses the same model as chat (main model)
+- Supports both Anthropic (Claude) and OpenAI (GPT) models
+- Claude Sonnet recommended for structured data extraction; GPT-4o also works well
+- Storage: `localStorage.getItem('extraction-model')` (empty = use main model)
 
 ## Public Links Feature
 

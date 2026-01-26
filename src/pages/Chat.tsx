@@ -32,6 +32,11 @@ export default function Chat() {
     return localStorage.getItem('ai-model') || 'claude-sonnet-4-5-20250929';
   });
 
+  // 获取提取模型（空字符串表示使用聊天模型）
+  const [extractionModel] = useState(() => {
+    return localStorage.getItem('extraction-model') || '';
+  });
+
   // 获取模型显示名称（包含版本号）
   const getModelDisplayName = (modelId: string) => {
     // Claude 模型：提取版本号
@@ -95,9 +100,11 @@ export default function Chat() {
         fetch: authenticatedFetch,
         body: {
           model: selectedModel,
+          // 传递提取模型：空字符串时使用聊天模型
+          extractionModel: extractionModel || selectedModel,
         },
       }),
-    [selectedModel, authenticatedFetch]
+    [selectedModel, extractionModel, authenticatedFetch]
   );
 
   const {

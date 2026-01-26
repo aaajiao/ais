@@ -4,7 +4,38 @@
 
 import { generateObject } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
+import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
+
+// 默认提取模型
+const DEFAULT_EXTRACTION_MODEL = 'claude-sonnet-4-5-20250929';
+
+/**
+ * 根据模型 ID 获取对应的 provider 实例
+ */
+function getModel(modelId?: string) {
+  const id = modelId || DEFAULT_EXTRACTION_MODEL;
+
+  if (id.startsWith('claude-')) {
+    const anthropic = createAnthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+      baseURL: 'https://api.anthropic.com/v1',
+    });
+    return anthropic(id);
+  } else if (id.startsWith('gpt-') || id.startsWith('o1') || id.startsWith('o3') || id.startsWith('o4')) {
+    const openai = createOpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+    return openai(id);
+  }
+
+  // 默认使用 Anthropic
+  const anthropic = createAnthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY,
+    baseURL: 'https://api.anthropic.com/v1',
+  });
+  return anthropic(id);
+}
 
 // 作品信息 Schema
 export const artworkSchema = z.object({
@@ -129,8 +160,10 @@ async function fetchPage(url: string): Promise<string> {
 
 /**
  * 使用 LLM 从 HTML 提取作品信息
+ * @param url - 要提取的网页 URL
+ * @param modelId - 可选的模型 ID，支持 Anthropic (claude-*) 和 OpenAI (gpt-*, o1, o3, o4) 模型
  */
-export async function extractArtworkFromUrl(url: string): Promise<ExtractionResult> {
+export async function extractArtworkFromUrl(url: string, modelId?: string): Promise<ExtractionResult> {
   try {
     // 1. 抓取页面
     const html = await fetchPage(url);
@@ -142,13 +175,8 @@ export async function extractArtworkFromUrl(url: string): Promise<ExtractionResu
     const cleanedHtml = cleanHtml(html);
 
     // 4. 使用 LLM 提取结构化数据
-    const anthropic = createAnthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-      baseURL: 'https://api.anthropic.com/v1',
-    });
-
     const { object } = await generateObject({
-      model: anthropic('claude-sonnet-4-5-20250929'),
+      model: getModel(modelId),
       schema: artworkSchema,
       system: `你是一个艺术作品信息提取专家。从给定的网页 HTML 内容中提取作品信息。
 

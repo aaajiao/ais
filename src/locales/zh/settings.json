@@ -8,7 +8,14 @@
     "retry": "重试",
     "selectClaude": "选择 Claude 模型",
     "selectGPT": "选择 GPT 模型",
-    "modelHint": "模型列表从 API 动态加载，显示当前可用的所有模型"
+    "modelHint": "选择用于对话的 AI 模型。模型列表从 API 动态加载。",
+    "advancedOptions": "高级选项",
+    "advancedDescription": "后台任务（如从网页导入作品）可以使用不同的模型，以平衡成本和效果。",
+    "backgroundModel": "后台任务模型",
+    "usingMainModel": "当前使用主模型处理后台任务",
+    "selectDifferentModel": "选择其他模型",
+    "resetToDefault": "恢复默认",
+    "backgroundModelHint": "Claude Sonnet 推荐用于结构化数据提取，GPT-4o 也表现良好。较小模型可降低成本但可能影响准确性。"
   },
   "export": {
     "title": "数据导出",
