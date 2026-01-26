@@ -5,6 +5,7 @@
   "noMatch": "没有找到匹配的作品",
   "addArtwork": "添加作品",
   "filters": {
+    "label": "筛选作品",
     "all": "全部",
     "inStudio": "在库",
     "atGallery": "寄售",

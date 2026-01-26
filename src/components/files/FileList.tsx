@@ -9,6 +9,8 @@ import { supabase, getSignedUrl, deleteFile, insertIntoTableNoReturn, type Editi
 import { formatFileSize } from '@/lib/imageCompressor';
 import { getFileTypeIcon } from '@/lib/fileIcons';
 import type { FileType } from '@/lib/database.types';
+import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { Trash2, Eye, X, Image as ImageIcon, Download, Inbox } from 'lucide-react';
 
 export interface EditionFile {
@@ -193,50 +195,56 @@ export default function FileList({
 
               {/* 操作按钮 */}
               <div className="flex items-center gap-1">
-                <button
+                <IconButton
+                  variant="ghost"
+                  size="sm"
+                  label={t('files.open')}
                   onClick={() => handleOpen(file)}
-                  className="p-2 text-muted-foreground hover:text-foreground hover:bg-background rounded-lg transition-colors"
-                  title={t('files.open')}
                 >
-                  <Eye className="w-4 h-4" />
-                </button>
+                  <Eye />
+                </IconButton>
 
                 {file.source_type === 'upload' && (
-                  <button
+                  <IconButton
+                    variant="ghost"
+                    size="sm"
+                    label={t('files.download')}
                     onClick={() => handleDownload(file)}
-                    className="p-2 text-muted-foreground hover:text-foreground hover:bg-background rounded-lg transition-colors"
-                    title={t('files.download')}
                   >
-                    <Download className="w-4 h-4" />
-                  </button>
+                    <Download />
+                  </IconButton>
                 )}
 
                 {isEditing && (
                   <>
                     {confirmDeleteId === file.id ? (
                       <div className="flex items-center gap-1">
-                        <button
+                        <Button
+                          variant="destructive"
+                          size="mini"
                           onClick={() => handleDelete(file)}
                           disabled={deletingId === file.id}
-                          className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50"
                         >
                           {deletingId === file.id ? t('files.deleting') : t('confirm')}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="mini"
                           onClick={() => setConfirmDeleteId(null)}
-                          className="px-2 py-1 text-xs bg-muted text-foreground rounded hover:bg-muted/80"
                         >
                           {t('cancel')}
-                        </button>
+                        </Button>
                       </div>
                     ) : (
-                      <button
+                      <IconButton
+                        variant="ghost"
+                        size="sm"
+                        label={t('delete')}
                         onClick={() => setConfirmDeleteId(file.id)}
-                        className="p-2 text-muted-foreground hover:text-red-500 hover:bg-background rounded-lg transition-colors"
-                        title={t('delete')}
+                        className="hover:text-destructive"
                       >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                        <Trash2 />
+                      </IconButton>
                     )}
                   </>
                 )}
@@ -304,12 +312,15 @@ export default function FileList({
               alt={previewFile.file_name || t('files.preview')}
               className="max-w-full max-h-[80vh] object-contain rounded-lg"
             />
-            <button
+            <IconButton
+              variant="secondary"
+              size="sm"
+              label={t('close')}
               onClick={closePreview}
-              className="absolute -top-3 -right-3 w-8 h-8 bg-white text-black rounded-full flex items-center justify-center hover:bg-gray-200"
+              className="absolute -top-3 -right-3 rounded-full bg-white text-black hover:bg-gray-200"
             >
-              <X className="w-4 h-4" />
-            </button>
+              <X />
+            </IconButton>
             <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-sm p-3 rounded-b-lg">
               {previewFile.file_name}
               {previewFile.file_size && (
@@ -331,22 +342,24 @@ export default function FileList({
               {t('files.confirmDeleteMessage')}
             </p>
             <div className="flex gap-3 justify-end">
-              <button
+              <Button
+                variant="secondary"
+                size="small"
                 onClick={() => setConfirmDeleteId(null)}
-                className="px-4 py-2 text-sm bg-muted text-foreground rounded-lg hover:bg-muted/80"
               >
                 {t('cancel')}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="destructive"
+                size="small"
                 onClick={() => {
                   const file = files.find(f => f.id === confirmDeleteId);
                   if (file) handleDelete(file);
                 }}
                 disabled={deletingId === confirmDeleteId}
-                className="px-4 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50"
               >
                 {deletingId === confirmDeleteId ? t('files.deleting') : t('files.confirmDelete')}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

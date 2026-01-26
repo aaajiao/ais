@@ -9,6 +9,7 @@ import { useEditionsByArtwork } from '@/hooks/queries/useEditions';
 import type { EditionStatus } from '@/lib/database.types';
 import ExportDialog from '@/components/export/ExportDialog';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
+import { Button } from '@/components/ui/button';
 import { Image } from 'lucide-react';
 
 // 编辑表单数据类型
@@ -290,20 +291,22 @@ export default function ArtworkDetail() {
             </p>
             <p className="text-sm text-muted-foreground mb-4">{t('deleteDialog.trashHint')}</p>
             <div className="flex gap-3">
-              <button
+              <Button
+                variant="outline"
                 onClick={() => setShowDeleteConfirm(false)}
                 disabled={deleting}
-                className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
+                className="flex-1"
               >
                 {tCommon('cancel')}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="destructive"
                 onClick={handleDelete}
                 disabled={deleting}
-                className="flex-1 px-4 py-2 bg-destructive text-destructive-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+                className="flex-1"
               >
                 {deleting ? t('deleteDialog.deleting') : tCommon('confirm')}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -314,29 +317,32 @@ export default function ArtworkDetail() {
         <Link to="/artworks" className="text-primary hover:underline">
           {t('backToList')}
         </Link>
-        <div className="flex gap-2">
+        <div className="flex gap-3">
           {!isEditing && (
             <>
-              <button
+              <Button
+                variant="outline"
+                size="small"
                 onClick={() => setShowExportDialog(true)}
-                className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
               >
                 {t('export')}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
+                size="small"
                 onClick={startEditing}
-                className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
               >
                 {t('editArtwork')}
-              </button>
+              </Button>
             </>
           )}
-          <button
+          <Button
+            variant="destructive-outline"
+            size="small"
             onClick={() => setShowDeleteConfirm(true)}
-            className="px-4 py-2 text-sm text-destructive border border-destructive/30 rounded-lg hover:bg-destructive/10 transition-colors"
           >
             {t('deleteArtwork')}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -479,21 +485,20 @@ export default function ArtworkDetail() {
               />
             </div>
 
-            <div className="flex gap-3 pt-4 border-t border-border">
-              <button
+            <div className="flex gap-3 pt-4 border-t border-border justify-end">
+              <Button
+                variant="outline"
                 onClick={cancelEditing}
                 disabled={saving}
-                className="px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
               >
                 {tCommon('cancel')}
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={saveEditing}
                 disabled={saving || !formData.title_en.trim()}
-                className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
               >
                 {saving ? t('saving') : tCommon('save')}
-              </button>
+              </Button>
             </div>
           </div>
         ) : (
@@ -594,12 +599,12 @@ export default function ArtworkDetail() {
           <h2 className="text-lg font-semibold">
             {t('editionsList.title')} ({editions.length})
           </h2>
-          <button
+          <Button
+            size="small"
             onClick={() => setShowAddEdition(true)}
-            className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
           >
             {t('editionsList.addEdition')}
-          </button>
+          </Button>
         </div>
 
         {/* 添加版本表单 */}
@@ -669,21 +674,20 @@ export default function ArtworkDetail() {
                 />
               </div>
             </div>
-            <div className="flex gap-2 mt-4">
-              <button
+            <div className="flex gap-3 mt-4 justify-end">
+              <Button
+                variant="outline"
                 onClick={() => setShowAddEdition(false)}
                 disabled={addingEdition}
-                className="px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
               >
                 {tCommon('cancel')}
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleAddEdition}
                 disabled={addingEdition}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
               >
                 {addingEdition ? t('editionsList.adding') : tCommon('add')}
-              </button>
+              </Button>
             </div>
           </div>
         )}

@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { Button } from '@/components/ui/button';
 import { Languages } from 'lucide-react';
 
 export function LanguageSwitcher() {
@@ -10,13 +11,14 @@ export function LanguageSwitcher() {
   };
 
   return (
-    <button
+    <Button
+      variant="ghost"
+      size="small"
       onClick={toggleLanguage}
-      className="p-2 rounded-lg hover:bg-accent transition-colors flex items-center gap-1"
       title={i18n.language === 'zh' ? 'Switch to English' : '切换到中文'}
     >
-      <Languages className="w-5 h-5" />
+      <Languages />
       <span className="text-xs font-medium uppercase">{i18n.language}</span>
-    </button>
+    </Button>
   );
 }

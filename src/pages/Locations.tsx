@@ -11,6 +11,8 @@ import LocationDialog from '@/components/editions/LocationDialog';
 import LocationItem from '@/components/locations/LocationItem';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { Home, Image, Building2, MapPin, X, Plus } from 'lucide-react';
 
 // 位置类型图标组件
@@ -144,13 +146,10 @@ export default function Locations() {
             {t('subtitle', { count: totalLocations })}
           </p>
         </div>
-        <button
-          onClick={handleCreate}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 flex items-center gap-2"
-        >
-          <Plus className="w-5 h-5" />
+        <Button onClick={handleCreate}>
+          <Plus />
           {t('addLocation')}
-        </button>
+        </Button>
       </div>
 
       {/* 统计卡片 */}
@@ -188,12 +187,15 @@ export default function Locations() {
             className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
           {searchQuery && (
-            <button
+            <IconButton
+              variant="ghost"
+              size="mini"
+              label={t('clearSearch')}
               onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="absolute right-3 top-1/2 -translate-y-1/2"
             >
-              <X className="w-4 h-4" />
-            </button>
+              <X />
+            </IconButton>
           )}
         </div>
       </div>
@@ -213,12 +215,9 @@ export default function Locations() {
           <p className="text-muted-foreground mb-4">
             {t('noLocationsHint')}
           </p>
-          <button
-            onClick={handleCreate}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
-          >
+          <Button onClick={handleCreate}>
             {t('addFirstLocation')}
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="space-y-6">

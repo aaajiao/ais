@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { parseAndValidateMDFile, type ParsedArtwork } from '@/lib/md-parser';
 import { useAuthContext } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
 import { Loader2, FileText, ImageIcon, CheckCircle } from 'lucide-react';
 
 interface PreviewResult {
@@ -260,20 +261,22 @@ export default function MDImport() {
               )}
             </span>
             <div className="flex gap-2">
-              <button
+              <Button
+                variant="ghost"
+                size="mini"
                 onClick={() => handleSelectAll(true)}
                 disabled={allSelected}
-                className="text-sm px-3 py-1 rounded-md hover:bg-muted disabled:opacity-50 transition-colors"
               >
                 {t('mdImport.selection.selectAll')}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
+                size="mini"
                 onClick={() => handleSelectAll(false)}
                 disabled={selectedArtworks.size === 0}
-                className="text-sm px-3 py-1 rounded-md hover:bg-muted disabled:opacity-50 transition-colors"
               >
                 {t('mdImport.selection.deselectAll')}
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -594,19 +597,19 @@ export default function MDImport() {
         <>
           {renderPreview()}
           <div className="flex gap-3 pt-4 border-t border-border">
-            <button
+            <Button
+              variant="outline"
               onClick={handleReset}
-              className="px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors"
             >
               {t('mdImport.reupload')}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={handleExecuteImport}
               disabled={loading || selectedArtworks.size === 0}
-              className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
+              className="flex-1"
             >
               {loading ? t('actions.importing') : t('mdImport.confirmImport', { count: selectedArtworks.size })}
-            </button>
+            </Button>
           </div>
         </>
       )}
@@ -615,12 +618,12 @@ export default function MDImport() {
         <>
           {renderResult()}
           <div className="flex gap-3 pt-4 border-t border-border">
-            <button
+            <Button
               onClick={handleReset}
-              className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
+              className="flex-1"
             >
               {t('mdImport.continueImport')}
-            </button>
+            </Button>
           </div>
         </>
       )}

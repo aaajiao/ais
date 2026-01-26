@@ -4,6 +4,7 @@
   "noEditions": "暂无版本数据",
   "noMatch": "没有找到匹配的版本",
   "filters": {
+    "label": "筛选版本",
     "all": "全部",
     "inStudio": "在库",
     "atGallery": "寄售",

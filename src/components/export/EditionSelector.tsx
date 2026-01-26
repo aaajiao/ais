@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useEditionsByArtwork } from '@/hooks/queries/useEditions';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
+import { Button } from '@/components/ui/button';
 
 interface EditionSelectorProps {
   artworkId: string;
@@ -113,21 +114,23 @@ export default function EditionSelector({
         <div className="border border-border rounded-lg overflow-hidden">
           {/* 快捷操作 */}
           <div className="flex gap-2 p-2 bg-muted/50 border-b border-border">
-            <button
+            <Button
               type="button"
+              variant="link"
+              size="mini"
               onClick={handleSelectAll}
-              className="text-xs text-primary hover:underline"
             >
               {t('selector.selectAll')}
-            </button>
+            </Button>
             <span className="text-muted-foreground">|</span>
-            <button
+            <Button
               type="button"
+              variant="link"
+              size="mini"
               onClick={handleDeselectAll}
-              className="text-xs text-primary hover:underline"
             >
               {t('selector.deselectAll')}
-            </button>
+            </Button>
             {selectedIds.length > 0 && (
               <span className="text-xs text-muted-foreground ml-auto">
                 {t('selector.selected', { count: selectedIds.length })}

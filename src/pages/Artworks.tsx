@@ -5,6 +5,8 @@ import { supabase } from '@/lib/supabase';
 import ExportDialog from '@/components/export/ExportDialog';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
 import ListEndIndicator from '@/components/ui/ListEndIndicator';
+import { Button } from '@/components/ui/button';
+import { ToggleChip } from '@/components/ui/toggle-chip';
 import { Image, Check } from 'lucide-react';
 import { queryKeys } from '@/lib/queryKeys';
 import {
@@ -219,20 +221,22 @@ export default function Artworks() {
               {t('deleteDialog.trashNote')}
             </p>
             <div className="flex gap-3">
-              <button
+              <Button
+                variant="outline"
                 onClick={() => setShowDeleteConfirm(false)}
                 disabled={deleting}
-                className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
+                className="flex-1"
               >
                 {t('deleteDialog.cancel')}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="destructive"
                 onClick={handleBatchDelete}
                 disabled={deleting}
-                className="flex-1 px-4 py-2 bg-destructive text-destructive-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+                className="flex-1"
               >
                 {deleting ? t('deleteDialog.deleting') : t('deleteDialog.confirm')}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -244,91 +248,80 @@ export default function Artworks() {
         <div className="flex gap-2">
           {selectMode ? (
             <>
-              <button
+              <Button
+                variant="outline"
+                size="small"
                 onClick={handleSelectAll}
-                className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
               >
                 {selectedIds.size === items.length ? t('bulkActions.deselectAll') : t('bulkActions.selectAll')}
-              </button>
+              </Button>
               {selectedIds.size > 0 && (
                 <>
-                  <button
+                  <Button
+                    variant="outline"
+                    size="small"
                     onClick={() => setShowExportDialog(true)}
-                    className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
                   >
                     {t('bulkActions.export')} ({selectedIds.size})
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="destructive-outline"
+                    size="small"
                     onClick={() => setShowDeleteConfirm(true)}
-                    className="px-3 py-1.5 text-sm text-destructive border border-destructive/30 rounded-lg hover:bg-destructive/10 transition-colors"
                   >
                     {t('bulkActions.delete')} ({selectedIds.size})
-                  </button>
+                  </Button>
                 </>
               )}
-              <button
+              <Button
+                variant="outline"
+                size="small"
                 onClick={toggleSelectMode}
-                className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
               >
                 {t('bulkActions.cancel')}
-              </button>
+              </Button>
             </>
           ) : (
-            <button
+            <Button
+              variant="outline"
+              size="small"
               onClick={toggleSelectMode}
-              className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
             >
               {t('bulkActions.manage')}
-            </button>
+            </Button>
           )}
         </div>
       </div>
 
       {/* 筛选标签 */}
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-        <button
+      <div className="flex gap-2 mb-6 overflow-x-auto pb-2" role="listbox" aria-label={t('filters.label')}>
+        <ToggleChip
+          selected={filter === 'all'}
           onClick={() => setFilter('all')}
-          className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-            filter === 'all'
-              ? 'bg-foreground text-background'
-              : 'bg-muted text-muted-foreground hover:bg-accent'
-          }`}
         >
           {t('filters.all')} ({totalCount ?? '...'})
-        </button>
-        <button
+        </ToggleChip>
+        <ToggleChip
+          selected={filter === 'in_studio'}
           onClick={() => setFilter('in_studio')}
-          className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-1.5 ${
-            filter === 'in_studio'
-              ? 'bg-foreground text-background'
-              : 'bg-muted text-muted-foreground hover:bg-accent'
-          }`}
         >
           <StatusIndicator status="in_studio" size="sm" />
           {t('filters.inStudio')}
-        </button>
-        <button
+        </ToggleChip>
+        <ToggleChip
+          selected={filter === 'at_gallery'}
           onClick={() => setFilter('at_gallery')}
-          className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-1.5 ${
-            filter === 'at_gallery'
-              ? 'bg-foreground text-background'
-              : 'bg-muted text-muted-foreground hover:bg-accent'
-          }`}
         >
           <StatusIndicator status="at_gallery" size="sm" />
           {t('filters.atGallery')}
-        </button>
-        <button
+        </ToggleChip>
+        <ToggleChip
+          selected={filter === 'sold'}
           onClick={() => setFilter('sold')}
-          className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-1.5 ${
-            filter === 'sold'
-              ? 'bg-foreground text-background'
-              : 'bg-muted text-muted-foreground hover:bg-accent'
-          }`}
         >
           <StatusIndicator status="sold" size="sm" />
           {t('filters.sold')}
-        </button>
+        </ToggleChip>
       </div>
 
       {/* 搜索框 */}

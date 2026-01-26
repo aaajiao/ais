@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 
 interface ConfirmDialogProps {
@@ -75,11 +76,6 @@ export default function ConfirmDialog({
 
   if (!isOpen) return null;
 
-  const confirmButtonClass =
-    variant === 'danger'
-      ? 'bg-red-500 hover:bg-red-600 text-white'
-      : 'bg-primary hover:opacity-90 text-primary-foreground';
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* 遮罩 */}
@@ -102,17 +98,19 @@ export default function ConfirmDialog({
 
         {/* 操作按钮 */}
         <div className="px-6 py-4 bg-muted/30 flex justify-end gap-3">
-          <button
+          <Button
+            variant="outline"
+            size="small"
             onClick={onCancel}
             disabled={isLoading}
-            className="px-4 py-2 text-sm rounded-lg border border-border hover:bg-muted transition-colors disabled:opacity-50"
           >
             {finalCancelText}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant={variant === 'danger' ? 'destructive' : 'default'}
+            size="small"
             onClick={onConfirm}
             disabled={isLoading}
-            className={`px-4 py-2 text-sm rounded-lg transition-colors disabled:opacity-50 ${confirmButtonClass}`}
           >
             {isLoading ? (
               <span className="flex items-center gap-2">
@@ -122,7 +120,7 @@ export default function ConfirmDialog({
             ) : (
               finalConfirmText
             )}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

@@ -166,13 +166,16 @@ getStatusLabel('at_gallery') // → "寄售中"
 | lg (1024px) | iPad 横屏 | 侧边对话面板 |
 | xl (1280px) | Desktop | 完整布局 |
 
-### 触摸目标
+### 触摸目标（Apple HIG 规范）
 
-移动端按钮最小尺寸 44x44px：
+遵循 Apple Human Interface Guidelines，所有可交互元素的触控目标最小为 **44×44pt**：
 
-```tsx
-<button className="min-h-[44px] min-w-[44px]">
-```
+| 设备 | 最小尺寸 | 说明 |
+|------|---------|------|
+| 移动端 (base) | 44px | iOS/Android 标准触控目标 |
+| 桌面端 (md+) | 36px | 鼠标交互可缩小 |
+
+按钮组件已内置响应式尺寸切换，无需手动设置。
 
 ### 排版工具类
 
@@ -252,28 +255,115 @@ getStatusLabel('at_gallery') // → "寄售中"
 </div>
 ```
 
-### 按钮
+### 按钮系统
 
-**主要按钮**：
+使用 `Button` 和 `IconButton` 组件，符合 Apple HIG 44pt 触控目标规范。
+
+#### Button 组件
+
 ```tsx
-<button className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90">
-  保存
-</button>
+import { Button } from '@/components/ui/button';
+
+// 主要按钮（默认）
+<Button>保存</Button>
+<Button variant="primary">确认</Button>
+
+// 次要按钮
+<Button variant="secondary">取消</Button>
+<Button variant="outline">编辑</Button>
+<Button variant="ghost">更多</Button>
+
+// 危险按钮
+<Button variant="destructive">删除</Button>
+<Button variant="destructive-outline">移除</Button>
+
+// 链接样式
+<Button variant="link">查看详情</Button>
 ```
 
-**次要按钮**：
+#### 按钮尺寸
+
+| 尺寸 | 移动端高度 | 桌面端高度 | 使用场景 |
+|------|-----------|-----------|---------|
+| `mini` | 28px | 24px | 内联标签、密集列表 |
+| `small` / `sm` | 36px | 32px | 次要操作、工具栏 |
+| `medium` / `default` | **44px** | **36px** | 默认，大部分按钮 |
+| `large` / `lg` | 52px | 44px | 主要 CTA |
+
 ```tsx
-<button className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted/80">
-  取消
-</button>
+<Button size="small">次要操作</Button>
+<Button size="large">立即开始</Button>
 ```
 
-**危险按钮**：
+#### IconButton 组件
+
+图标按钮必须提供 `label` 属性以保证无障碍：
+
 ```tsx
-<button className="px-4 py-2 bg-destructive text-destructive-foreground rounded-lg">
-  删除
-</button>
+import { IconButton } from '@/components/ui/icon-button';
+import { Trash2, Pencil, X } from 'lucide-react';
+
+<IconButton label="删除" variant="ghost" size="sm">
+  <Trash2 />
+</IconButton>
+
+<IconButton label="编辑" variant="outline">
+  <Pencil />
+</IconButton>
+
+<IconButton label="关闭" size="lg">
+  <X />
+</IconButton>
 ```
+
+| 尺寸 | 移动端 | 桌面端 | 图标大小 |
+|------|-------|-------|---------|
+| `mini` | 32px | 28px | 14px |
+| `sm` | 40px | 36px | 16px |
+| `default` | **44px** | **40px** | 18px |
+| `lg` | 52px | 44px | 20px |
+
+#### 按钮位置规范
+
+遵循 Apple HIG 按钮位置约定：
+- **Cancel / 次要操作**: 左侧 (leading edge)
+- **Primary / 危险操作**: 右侧 (trailing edge)
+
+```tsx
+<div className="flex gap-3 justify-end">
+  <Button variant="outline">取消</Button>
+  <Button>确认</Button>
+</div>
+```
+
+### ToggleChip 组件
+
+用于筛选标签、多选选项等可切换芯片场景：
+
+```tsx
+import { ToggleChip } from '@/components/ui/toggle-chip';
+
+// 筛选标签
+<div className="flex gap-2" role="listbox">
+  <ToggleChip selected={filter === 'all'} onClick={() => setFilter('all')}>
+    全部
+  </ToggleChip>
+  <ToggleChip selected={filter === 'active'} onClick={() => setFilter('active')}>
+    进行中
+  </ToggleChip>
+</div>
+
+// 类型选择（primary 变体）
+<ToggleChip variant="primary" size="small" selected={type === 'image'}>
+  <ImageIcon /> 图片
+</ToggleChip>
+```
+
+| 变体 | 说明 |
+|------|------|
+| `default` | 选中时反色（bg-foreground） |
+| `primary` | 选中时使用主色 |
+| `outline` | 选中时边框高亮 |
 
 ### 输入框
 
@@ -320,7 +410,9 @@ src/
 1. **不使用 emoji** - 所有图标使用 Lucide React
 2. **使用 CSS 变量** - 颜色通过 `var(--xxx)` 引用
 3. **响应式优先** - 从移动端开始设计
-4. **触摸友好** - 按钮 ≥ 44px
+4. **触控友好** - 使用 Button/IconButton 组件确保 ≥ 44px 触控目标
 5. **护眼配色** - 避免纯黑纯白
 6. **统一布局** - 页面宽度由 Layout 管理
 7. **语义化状态** - 使用 StatusIndicator 组件
+8. **无障碍** - IconButton 必须提供 `label`，ToggleChip 使用 `role="option"`
+9. **按钮位置** - Cancel 在左，Primary 在右（Apple HIG 规范）

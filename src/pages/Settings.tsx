@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import { Lightbulb } from 'lucide-react';
 
 type Artwork = Database['public']['Tables']['artworks']['Row'];
@@ -238,12 +239,12 @@ export default function Settings() {
         <div className="text-center py-8">
           <p className="text-destructive mb-2">{t('ai.loadError')}</p>
           <p className="text-sm text-muted-foreground">{modelsError}</p>
-          <button
+          <Button
             onClick={() => window.location.reload()}
-            className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90"
+            className="mt-4"
           >
             {t('ai.retry')}
-          </button>
+          </Button>
         </div>
       );
     }
@@ -352,13 +353,12 @@ export default function Settings() {
               <p className="font-medium">{t('export.jsonBackup')}</p>
               <p className="text-sm text-muted-foreground">{t('export.jsonDescription')}</p>
             </div>
-            <button
+            <Button
               onClick={handleExportJSON}
               disabled={exporting !== null}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
             >
               {exporting === 'json' ? t('export.exporting') : t('export.exportJson')}
-            </button>
+            </Button>
           </div>
 
           {/* 作品 CSV */}
@@ -367,13 +367,12 @@ export default function Settings() {
               <p className="font-medium">{t('export.artworksCsv')}</p>
               <p className="text-sm text-muted-foreground">{t('export.artworksCsvDescription')}</p>
             </div>
-            <button
+            <Button
               onClick={handleExportArtworksCSV}
               disabled={exporting !== null}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
             >
               {exporting === 'artworks-csv' ? t('export.exporting') : t('export.exportCsv')}
-            </button>
+            </Button>
           </div>
 
           {/* 版本 CSV */}
@@ -382,13 +381,12 @@ export default function Settings() {
               <p className="font-medium">{t('export.editionsCsv')}</p>
               <p className="text-sm text-muted-foreground">{t('export.editionsCsvDescription')}</p>
             </div>
-            <button
+            <Button
               onClick={handleExportEditionsCSV}
               disabled={exporting !== null}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
             >
               {exporting === 'editions-csv' ? t('export.exporting') : t('export.exportCsv')}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -421,13 +419,13 @@ export default function Settings() {
             </div>
 
             <div className="pt-4 border-t border-border">
-              <button
+              <Button
+                variant="destructive"
                 onClick={handleSignOut}
                 disabled={isSigningOut}
-                className="px-4 py-2 rounded-lg bg-destructive text-white hover:opacity-90 transition-opacity disabled:opacity-50"
               >
                 {isSigningOut ? t('account.signingOut') : t('account.signOut')}
-              </button>
+              </Button>
             </div>
           </div>
         ) : (

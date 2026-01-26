@@ -3,6 +3,8 @@ import { NavLink, Outlet, useLocation, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useThemeContext } from '@/contexts/ThemeContext';
+import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { MessageSquare, Sun, Moon, Home, Package, FileDown, MessageCircle } from 'lucide-react';
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher';
 import ChatSidebar from './ChatSidebar';
@@ -146,39 +148,37 @@ export default function Layout() {
         </div>
         <div className="flex items-center gap-4">
           {/* 桌面端对话按钮：切换侧边栏 */}
-          <button
+          <Button
+            variant={chatSidebarOpen ? 'default' : 'secondary'}
+            size="small"
             onClick={() => setChatSidebarOpen(!chatSidebarOpen)}
-            className={`hidden lg:flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-              chatSidebarOpen
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-accent'
-            }`}
+            className="hidden lg:flex"
           >
-            <MessageSquare className="w-4 h-4" />
+            <MessageSquare />
             <span className="text-xs uppercase tracking-wider font-medium">{t('chat')}</span>
-          </button>
+          </Button>
           {/* 平板端对话链接 (md 到 lg 之间) */}
-          <NavLink
-            to="/chat"
-            className="hidden md:flex lg:hidden items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
+          <Button
+            asChild
+            size="small"
+            className="hidden md:flex lg:hidden"
           >
-            <MessageSquare className="w-4 h-4" />
-            <span className="text-xs uppercase tracking-wider font-medium">{t('chat')}</span>
-          </NavLink>
+            <NavLink to="/chat">
+              <MessageSquare />
+              <span className="text-xs uppercase tracking-wider font-medium">{t('chat')}</span>
+            </NavLink>
+          </Button>
           {/* 语言切换 */}
           <LanguageSwitcher />
           {/* 主题切换 */}
-          <button
+          <IconButton
+            variant="ghost"
+            size="sm"
+            label={resolvedTheme === 'dark' ? t('switchToLight') : t('switchToDark')}
             onClick={toggleTheme}
-            className="p-2 rounded-lg hover:bg-accent transition-colors"
-            title={resolvedTheme === 'dark' ? t('switchToLight') : t('switchToDark')}
           >
-            {resolvedTheme === 'dark' ? (
-              <Sun className="w-5 h-5" />
-            ) : (
-              <Moon className="w-5 h-5" />
-            )}
-          </button>
+            {resolvedTheme === 'dark' ? <Sun /> : <Moon />}
+          </IconButton>
           {/* 用户信息和登出 */}
           <div className="flex items-center gap-3">
             {user?.user_metadata?.avatar_url && (
@@ -191,12 +191,14 @@ export default function Layout() {
             <span className="text-sm text-muted-foreground hidden xl:inline">
               {user?.email}
             </span>
-            <button
+            <Button
+              variant="ghost"
+              size="mini"
               onClick={handleSignOut}
-              className="text-xs uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+              className="text-xs uppercase tracking-wider"
             >
               {t('signOut')}
-            </button>
+            </Button>
           </div>
         </div>
       </header>

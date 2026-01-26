@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { EditionStatus, Currency } from '@/lib/types';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
+import { Button } from '@/components/ui/button';
 import { Check, Pencil, ClipboardList } from 'lucide-react';
 
 // 确认卡片数据类型
@@ -203,27 +204,30 @@ export default function EditableConfirmCard({
 
         {/* 操作按钮 */}
         <div className="flex gap-2 pt-2">
-          <button
+          <Button
+            size="small"
             onClick={handleConfirm}
             disabled={isSubmitting}
-            className="flex-1 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm hover:opacity-90 disabled:opacity-50"
+            className="flex-1"
           >
-            {isSubmitting ? t('processing') : <><Check className="w-4 h-4 inline mr-1" />{t('confirmCard.confirm')}</>}
-          </button>
-          <button
+            {isSubmitting ? t('processing') : <><Check className="w-4 h-4 mr-1" />{t('confirmCard.confirm')}</>}
+          </Button>
+          <Button
+            variant="secondary"
+            size="small"
             onClick={handleFullEdit}
             disabled={isSubmitting}
-            className="px-3 py-2 bg-muted text-foreground rounded-lg text-sm hover:bg-accent disabled:opacity-50"
           >
             {t('confirmCard.fullEdit')}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="ghost"
+            size="small"
             onClick={onCancel}
             disabled={isSubmitting}
-            className="px-3 py-2 text-muted-foreground rounded-lg text-sm hover:bg-muted disabled:opacity-50"
           >
             {tCommon('cancel')}
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -324,12 +328,13 @@ export default function EditableConfirmCard({
 
         {/* 操作按钮 */}
         <div className="flex gap-2 pt-2">
-          <button
+          <Button
+            size="small"
             onClick={handleSaveEdit}
-            className="flex-1 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm hover:opacity-90"
+            className="flex-1"
           >
             {t('confirmCard.doneEditing')}
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -454,20 +459,22 @@ export default function EditableConfirmCard({
 
       {/* 操作按钮 */}
       <div className="flex gap-2 pt-2 border-t border-border">
-        <button
+        <Button
+          size="small"
           onClick={() => {
             setEditMode('view');
           }}
-          className="flex-1 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm hover:opacity-90"
+          className="flex-1"
         >
           {t('confirmCard.saveAndReturn')}
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="ghost"
+          size="small"
           onClick={handleCancelEdit}
-          className="px-3 py-2 text-muted-foreground rounded-lg text-sm hover:bg-muted"
         >
           {t('confirmCard.discardChanges')}
-        </button>
+        </Button>
       </div>
     </div>
   );

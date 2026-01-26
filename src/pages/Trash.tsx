@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
+import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { Image, RotateCcw, Trash2 } from 'lucide-react';
 
 type Artwork = Database['public']['Tables']['artworks']['Row'];
@@ -176,23 +178,25 @@ export default function Trash() {
             </p>
             <p className="text-sm text-destructive mb-4">{t('deleteDialog.warning')}</p>
             <div className="flex gap-3">
-              <button
+              <Button
+                variant="outline"
                 onClick={() => setShowDeleteConfirm(null)}
                 disabled={!!deleting}
-                className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
+                className="flex-1"
               >
                 {t('deleteDialog.cancel')}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="destructive"
                 onClick={() => {
                   const artwork = artworks.find(a => a.id === showDeleteConfirm);
                   if (artwork) handlePermanentDelete(artwork);
                 }}
                 disabled={!!deleting}
-                className="flex-1 px-4 py-2 bg-destructive text-destructive-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+                className="flex-1"
               >
                 {deleting ? t('deleteDialog.deleting') : t('deleteDialog.confirm')}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -248,22 +252,26 @@ export default function Trash() {
 
                 {/* 操作按钮 */}
                 <div className="flex gap-2 items-start">
-                  <button
+                  <IconButton
+                    variant="ghost"
+                    size="sm"
+                    label={t('restore')}
                     onClick={() => handleRestore(artwork)}
                     disabled={restoring === artwork.id}
-                    className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors disabled:opacity-50"
-                    title={t('restore')}
+                    className="text-primary hover:bg-primary/10"
                   >
-                    <RotateCcw className={`w-5 h-5 ${restoring === artwork.id ? 'animate-spin' : ''}`} />
-                  </button>
-                  <button
+                    <RotateCcw className={restoring === artwork.id ? 'animate-spin' : ''} />
+                  </IconButton>
+                  <IconButton
+                    variant="ghost"
+                    size="sm"
+                    label={t('deletePermanently')}
                     onClick={() => setShowDeleteConfirm(artwork.id)}
                     disabled={!!deleting}
-                    className="p-2 text-destructive hover:bg-destructive/10 rounded-lg transition-colors disabled:opacity-50"
-                    title={t('deletePermanently')}
+                    className="text-destructive hover:bg-destructive/10"
                   >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
+                    <Trash2 />
+                  </IconButton>
                 </div>
               </div>
             </div>

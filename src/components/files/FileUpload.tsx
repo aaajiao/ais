@@ -8,6 +8,8 @@ import { useTranslation } from 'react-i18next';
 import { useFileUpload, type UploadingFile, type UploadedFile } from '@/hooks/useFileUpload';
 import { formatFileSize, detectFileType } from '@/lib/imageCompressor';
 import { getFileTypeIcon } from '@/lib/fileIcons';
+import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { X, Check, Paperclip, Download } from 'lucide-react';
 
 interface FileUploadProps {
@@ -227,12 +229,13 @@ export default function FileUpload({
               {t('upload.uploadProgress')} ({uploadingFiles.filter(f => f.status === 'complete').length}/{uploadingFiles.length})
             </span>
             {hasCompletedOrFailed && (
-              <button
+              <Button
+                variant="ghost"
+                size="mini"
                 onClick={clearCompleted}
-                className="text-xs text-muted-foreground hover:text-foreground"
               >
                 {t('upload.clearCompleted')}
-              </button>
+              </Button>
             )}
           </div>
 
@@ -280,13 +283,14 @@ export default function FileUpload({
 
                 {/* 操作按钮 */}
                 {file.status === 'pending' && (
-                  <button
+                  <IconButton
+                    variant="ghost"
+                    size="mini"
+                    label={t('cancel')}
                     onClick={() => cancelUpload(file.id)}
-                    className="p-1 text-muted-foreground hover:text-foreground"
-                    title={t('cancel')}
                   >
-                    <X className="w-4 h-4" />
-                  </button>
+                    <X />
+                  </IconButton>
                 )}
 
                 {file.status === 'complete' && (

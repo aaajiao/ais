@@ -7,6 +7,8 @@ import { useState, useCallback, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Location } from '@/hooks/useLocations';
 import type { LocationType } from '@/lib/database.types';
+import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { Home, Image, Building2, MapPin, Pencil, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface LocationItemProps {
@@ -93,20 +95,23 @@ export default function LocationItem({
           className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-2"
           onClick={e => e.stopPropagation()}
         >
-          <button
+          <IconButton
+            variant="ghost"
+            size="sm"
+            label={t('location.editLocation')}
             onClick={() => onEdit(location)}
-            className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
-            title={t('location.editLocation')}
           >
-            <Pencil className="w-4 h-4" />
-          </button>
-          <button
+            <Pencil />
+          </IconButton>
+          <IconButton
+            variant="ghost"
+            size="sm"
+            label={t('location.deleteLocation')}
             onClick={() => setShowDeleteConfirm(true)}
-            className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
-            title={t('location.deleteLocation')}
+            className="hover:text-destructive hover:bg-destructive/10"
           >
-            <Trash2 className="w-4 h-4" />
-          </button>
+            <Trash2 />
+          </IconButton>
         </div>
       </div>
 
@@ -153,23 +158,23 @@ export default function LocationItem({
             )}
 
             <div className="flex gap-3 justify-end">
-              <button
+              <Button
+                variant="secondary"
                 onClick={() => {
                   setShowDeleteConfirm(false);
                   setDeleteError(null);
                 }}
                 disabled={deleting}
-                className="px-4 py-2 text-sm bg-muted text-foreground rounded-lg hover:bg-muted/80 disabled:opacity-50"
               >
                 {t('cancel')}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="destructive"
                 onClick={handleDelete}
                 disabled={deleting}
-                className="px-4 py-2 text-sm bg-destructive text-destructive-foreground rounded-lg hover:bg-destructive/90 disabled:opacity-50"
               >
                 {deleting ? t('location.deleting') : t('delete')}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthContext } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
 import { Loader2, ImageIcon, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 
 interface MigrateResult {
@@ -111,12 +112,9 @@ export default function ThumbnailMigration() {
           <p className="text-muted-foreground mb-4">
             {t('thumbnailMigration.description')}
           </p>
-          <button
-            onClick={handlePreview}
-            className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
-          >
+          <Button onClick={handlePreview}>
             {t('thumbnailMigration.checkButton')}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -135,12 +133,13 @@ export default function ThumbnailMigration() {
             <div className="text-center py-8">
               <CheckCircle className="w-12 h-12 mx-auto mb-4 text-green-500" />
               <p className="text-muted-foreground">{t('thumbnailMigration.noMigrationNeeded')}</p>
-              <button
+              <Button
+                variant="outline"
                 onClick={handleReset}
-                className="mt-4 px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors"
+                className="mt-4"
               >
                 {t('thumbnailMigration.close')}
-              </button>
+              </Button>
             </div>
           ) : (
             <>
@@ -176,18 +175,18 @@ export default function ThumbnailMigration() {
               </div>
 
               <div className="flex gap-3 pt-2">
-                <button
+                <Button
+                  variant="outline"
                   onClick={handleReset}
-                  className="px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors"
                 >
                   {t('cancel')}
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={handleMigrate}
-                  className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
+                  className="flex-1"
                 >
                   {t('thumbnailMigration.startMigrate', { count: previewData.total })}
-                </button>
+                </Button>
               </div>
             </>
           )}
@@ -250,12 +249,12 @@ export default function ThumbnailMigration() {
             </div>
           )}
 
-          <button
+          <Button
             onClick={handleReset}
-            className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
+            className="w-full"
           >
             {t('thumbnailMigration.done')}
-          </button>
+          </Button>
         </div>
       )}
     </div>

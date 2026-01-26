@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import MessageBubble from '@/components/chat/MessageBubble';
 import { saveChatHistory, loadChatHistory, clearChatHistory, getChatTimestamp } from '@/lib/chatStorage';
 import { useAuthContext } from '@/contexts/AuthContext';
+import { IconButton } from '@/components/ui/icon-button';
 import { Trash2, X, MessageSquare, ArrowUp } from 'lucide-react';
 
 const MAX_SIDEBAR_MESSAGES = 15;
@@ -123,22 +124,24 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
           <div className="flex items-center gap-2">
             <h2 className="font-semibold">{t('chatSidebar.title')}</h2>
             {messages.length > 0 && (
-              <button
+              <IconButton
+                variant="ghost"
+                size="mini"
+                label={t('chatSidebar.clearChat')}
                 onClick={handleClearChat}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                title={t('chatSidebar.clearChat')}
               >
-                <Trash2 className="w-4 h-4" />
-              </button>
+                <Trash2 />
+              </IconButton>
             )}
           </div>
-          <button
+          <IconButton
+            variant="ghost"
+            size="sm"
+            label={t('chatSidebar.closePanel')}
             onClick={onToggle}
-            className="p-1 hover:bg-accent rounded transition-colors"
-            title={t('chatSidebar.closePanel')}
           >
-            <X className="w-4 h-4" />
-          </button>
+            <X />
+          </IconButton>
         </div>
 
         {/* 对话时间提示 + 查看完整对话链接 */}
@@ -210,26 +213,28 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
               disabled={isLoading || !session?.access_token}
               className="flex-1 px-3 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent outline-none text-sm disabled:opacity-50"
             />
-            <button
+            <IconButton
               type="submit"
+              size="sm"
+              label={t('chatSidebar.send')}
               disabled={isLoading || !inputValue.trim() || !session?.access_token}
-              className="px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <ArrowUp className="w-4 h-4" />
-            </button>
+              <ArrowUp />
+            </IconButton>
           </div>
         </form>
       </aside>
 
       {/* 展开按钮（当侧边栏关闭时显示） */}
       {!isOpen && (
-        <button
+        <IconButton
+          size="lg"
+          label={t('chatSidebar.openPanel')}
           onClick={onToggle}
-          className="hidden lg:flex fixed right-4 bottom-4 w-12 h-12 bg-primary text-primary-foreground rounded-full items-center justify-center shadow-lg hover:opacity-90 transition-opacity z-40"
-          title={t('chatSidebar.openPanel')}
+          className="hidden lg:flex fixed right-4 bottom-4 rounded-full shadow-lg z-40"
         >
-          <MessageSquare className="w-5 h-5" />
-        </button>
+          <MessageSquare />
+        </IconButton>
       )}
     </>
   );

@@ -7,6 +7,8 @@ import { useTranslation } from 'react-i18next';
 import { useLocations, type CreateLocationData, type Location } from '@/hooks/useLocations';
 import type { LocationType } from '@/lib/database.types';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { Home, Image, Building2, MapPin, X, ChevronDown, ChevronRight } from 'lucide-react';
 
 interface LocationDialogProps {
@@ -189,12 +191,14 @@ export default function LocationDialog({
           <h3 className="text-lg font-semibold">
             {isEditMode ? t('location.editTitle') : t('location.createTitle')}
           </h3>
-          <button
+          <IconButton
+            variant="ghost"
+            size="sm"
+            label={t('close')}
             onClick={onClose}
-            className="p-1 text-muted-foreground hover:text-foreground"
           >
-            <X className="w-4 h-4" />
-          </button>
+            <X />
+          </IconButton>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -257,13 +261,14 @@ export default function LocationDialog({
                 placeholder={t('location.aliasPlaceholder')}
                 className="flex-1 px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
               />
-              <button
+              <Button
                 type="button"
+                variant="secondary"
+                size="small"
                 onClick={handleAddAlias}
-                className="px-3 py-2 bg-muted text-foreground rounded-lg hover:bg-muted/80"
               >
                 {t('add')}
-              </button>
+              </Button>
             </div>
             {formData.aliases && formData.aliases.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-2">
@@ -374,20 +379,19 @@ export default function LocationDialog({
 
           {/* 按钮 */}
           <div className="flex gap-3 justify-end pt-2">
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={onClose}
-              className="px-4 py-2 text-sm bg-muted text-foreground rounded-lg hover:bg-muted/80"
             >
               {t('cancel')}
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={saving || !formData.name.trim()}
-              className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
             >
               {saving ? (isEditMode ? t('location.saving') : t('location.creating')) : (isEditMode ? t('save') : t('location.createButton'))}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

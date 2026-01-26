@@ -7,6 +7,9 @@ import { useTranslation } from 'react-i18next';
 import { insertIntoTable, insertIntoTableNoReturn, type EditionFilesInsert, type EditionHistoryInsert } from '@/lib/supabase';
 import { detectLinkType } from '@/lib/imageCompressor';
 import type { FileType, FileSourceType } from '@/lib/database.types';
+import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
+import { ToggleChip } from '@/components/ui/toggle-chip';
 import { Link2, Video, Image, FileText, FileSpreadsheet, Paperclip, FileCode, X } from 'lucide-react';
 
 interface ExternalLinkDialogProps {
@@ -173,12 +176,14 @@ export default function ExternalLinkDialog({
       >
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">{t('externalLink.title')}</h3>
-          <button
+          <IconButton
+            variant="ghost"
+            size="sm"
+            label={t('close')}
             onClick={handleClose}
-            className="p-1 text-muted-foreground hover:text-foreground"
           >
-            <X className="w-4 h-4" />
-          </button>
+            <X />
+          </IconButton>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -200,21 +205,18 @@ export default function ExternalLinkDialog({
           {/* 类型选择 */}
           <div>
             <label className="block text-sm font-medium mb-1">{t('externalLink.linkType')}</label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2" role="listbox" aria-label={t('externalLink.linkType')}>
               {FILE_TYPE_VALUES.map(type => (
-                <button
+                <ToggleChip
                   key={type}
-                  type="button"
+                  variant="primary"
+                  size="small"
+                  selected={fileType === type}
                   onClick={() => setFileType(type)}
-                  className={`px-3 py-1.5 text-sm rounded-lg border transition-colors flex items-center gap-1.5 ${
-                    fileType === type
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-background border-border hover:border-primary/50'
-                  }`}
                 >
                   {FILE_TYPE_ICONS[type]}
                   {t(`externalLink.fileTypes.${type}`)}
-                </button>
+                </ToggleChip>
               ))}
             </div>
           </div>
@@ -240,20 +242,19 @@ export default function ExternalLinkDialog({
 
           {/* 按钮 */}
           <div className="flex gap-3 justify-end">
-            <button
+            <Button
               type="button"
+              variant="secondary"
               onClick={handleClose}
-              className="px-4 py-2 text-sm bg-muted text-foreground rounded-lg hover:bg-muted/80"
             >
               {t('cancel')}
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={saving || !url.trim()}
-              className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
             >
               {saving ? t('externalLink.adding') : t('externalLink.addLink')}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

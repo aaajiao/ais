@@ -250,6 +250,12 @@ h1, h2, h3, .font-display {
 
 /* ---break---*/
 @theme inline {
+  /* ===== 自定义尺寸 (Apple HIG 触控目标) ===== */
+  /* Tailwind v4 默认只到 size-10 = 40px，需要扩展 */
+  --spacing-11: 2.75rem;  /* 44px - Apple HIG 标准最小触控目标 */
+  --spacing-13: 3.25rem;  /* 52px - 大号按钮 */
+
+  /* ===== 圆角系统 ===== */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);

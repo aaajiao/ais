@@ -294,9 +294,31 @@ To adjust global typography, modify CSS variables in `index.css` only.
 
 ### Key Components
 
+- `src/components/ui/button.tsx` - Button component with Apple HIG compliant sizing
+- `src/components/ui/icon-button.tsx` - Icon button with required `label` for accessibility
+- `src/components/ui/toggle-chip.tsx` - Toggle chip for filters and selectable options
 - `src/components/ui/StatusIndicator.tsx` - Edition status indicator
 - `src/components/Layout.tsx` - Unified layout and page width management
 - `src/index.css` - CSS variables, typography system, and global styles
+
+### Button System (Apple HIG Compliant)
+
+All buttons use `Button` or `IconButton` components with responsive sizing:
+
+| Size | Mobile | Desktop | Usage |
+|------|--------|---------|-------|
+| `mini` | 28px | 24px | Inline tags |
+| `small`/`sm` | 36px | 32px | Secondary actions |
+| `default` | **44px** | **36px** | Primary actions |
+| `large`/`lg` | 52px | 44px | CTAs |
+
+```tsx
+import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
+
+<Button variant="primary">Save</Button>
+<IconButton label="Delete" variant="ghost"><Trash2 /></IconButton>
+```
 
 See `docs/style-guide.md` for detailed specifications.
 

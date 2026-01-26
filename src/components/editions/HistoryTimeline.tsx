@@ -7,6 +7,7 @@ import { useState, useCallback, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { insertIntoTable, type EditionHistoryInsert } from '@/lib/supabase';
 import type { HistoryAction } from '@/lib/database.types';
+import { Button } from '@/components/ui/button';
 import {
   PartyPopper,
   RefreshCw,
@@ -464,12 +465,13 @@ export default function HistoryTimeline({
           </span>
         </h3>
         {showAddNoteButton && !showNoteInput && (
-          <button
+          <Button
+            variant="link"
+            size="small"
             onClick={() => setShowNoteInput(true)}
-            className="text-sm text-primary hover:underline"
           >
             {t('addNote')}
-          </button>
+          </Button>
         )}
       </div>
 
@@ -484,23 +486,24 @@ export default function HistoryTimeline({
             rows={3}
             autoFocus
           />
-          <div className="flex gap-2 justify-end mt-2">
-            <button
+          <div className="flex gap-3 justify-end mt-2">
+            <Button
+              variant="ghost"
+              size="small"
               onClick={() => {
                 setShowNoteInput(false);
                 setNoteText('');
               }}
-              className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground"
             >
               {tCommon('cancel')}
-            </button>
-            <button
+            </Button>
+            <Button
+              size="small"
               onClick={handleAddNote}
               disabled={saving || !noteText.trim()}
-              className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
             >
               {saving ? t('saving') : t('save')}
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -526,24 +529,26 @@ export default function HistoryTimeline({
         {/* 查看更多 */}
         {hasMore && !showAll && (
           <div className="mt-4 pl-10">
-            <button
+            <Button
+              variant="link"
+              size="small"
               onClick={() => setShowAll(true)}
-              className="text-sm text-primary hover:underline"
             >
               {t('showMore', { count: mergedHistory.length - defaultLimit })}
-            </button>
+            </Button>
           </div>
         )}
 
         {/* 收起 */}
         {showAll && hasMore && (
           <div className="mt-4 pl-10">
-            <button
+            <Button
+              variant="ghost"
+              size="small"
               onClick={() => setShowAll(false)}
-              className="text-sm text-muted-foreground hover:text-foreground"
             >
               {t('collapse')}
-            </button>
+            </Button>
           </div>
         )}
 

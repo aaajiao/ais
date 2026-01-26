@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { X, FileText, FileType } from 'lucide-react';
 import type { ExportRequest, ExportOptions } from '@/lib/exporters';
 import { useAuthContext } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import EditionSelector from './EditionSelector';
 
 interface ExportDialogProps {
@@ -133,12 +135,14 @@ export default function ExportDialog({
           <h2 className="text-lg font-semibold">
             {t('title', { count: artworkCount })}
           </h2>
-          <button
+          <IconButton
+            variant="ghost"
+            size="sm"
+            label={tCommon('close')}
             onClick={onClose}
-            className="p-1 hover:bg-muted rounded-lg transition-colors"
           >
-            <X className="w-5 h-5" />
-          </button>
+            <X />
+          </IconButton>
         </div>
 
         {/* 内容 */}
@@ -269,20 +273,19 @@ export default function ExportDialog({
 
         {/* 底部按钮 */}
         <div className="flex justify-end gap-3 p-4 border-t border-border">
-          <button
+          <Button
+            variant="ghost"
             onClick={onClose}
             disabled={exporting}
-            className="px-4 py-2 rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
           >
             {tCommon('cancel')}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleExport}
             disabled={isExportDisabled}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
           >
             {exporting ? t('exporting') : t('export')}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

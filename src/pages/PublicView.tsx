@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { Button } from '@/components/ui/button';
 import { AlertCircle, Lock, Image as ImageIcon } from 'lucide-react';
 import type { EditionStatus } from '@/lib/types';
 
@@ -311,12 +312,13 @@ export default function PublicView() {
 
       {/* 语言切换 */}
       <div className="max-w-7xl mx-auto px-6 py-4 flex justify-end">
-        <button
+        <Button
+          variant="ghost"
+          size="small"
           onClick={() => i18n.changeLanguage(i18n.language === 'zh' ? 'en' : 'zh')}
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           {i18n.language === 'zh' ? 'English' : '中文'}
-        </button>
+        </Button>
       </div>
 
       {/* 作品列表 */}

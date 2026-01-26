@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import type { EditionStatus } from '@/lib/database.types';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
 import ListEndIndicator from '@/components/ui/ListEndIndicator';
+import { ToggleChip } from '@/components/ui/toggle-chip';
 import { Image } from 'lucide-react';
 import { queryKeys } from '@/lib/queryKeys';
 import {
@@ -147,21 +148,17 @@ export default function Editions() {
       <h1 className="text-page-title mb-6 xl:mb-8">{t('title')}</h1>
 
       {/* 筛选标签 */}
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+      <div className="flex gap-2 mb-6 overflow-x-auto pb-2" role="listbox" aria-label={t('filters.label')}>
         {filterButtons.map((btn) => (
-          <button
+          <ToggleChip
             key={btn.key}
+            selected={filter === btn.key}
             onClick={() => handleFilterChange(btn.key)}
-            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-1.5 ${
-              filter === btn.key
-                ? 'bg-foreground text-background'
-                : 'bg-muted text-muted-foreground hover:bg-accent'
-            }`}
           >
             {btn.status && <StatusIndicator status={btn.status} size="sm" />}
             {t(btn.labelKey)}
             {btn.key === 'all' && statusCounts && ` (${statusCounts.all})`}
-          </button>
+          </ToggleChip>
         ))}
       </div>
 

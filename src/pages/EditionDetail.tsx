@@ -20,6 +20,7 @@ import InventoryNumberInput from '@/components/editions/InventoryNumberInput';
 import LocationPicker from '@/components/editions/LocationPicker';
 import CreateLocationDialog from '@/components/editions/CreateLocationDialog';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
+import { Button } from '@/components/ui/button';
 import { Image, MessageSquare, Pencil, ChevronDown, ChevronUp } from 'lucide-react';
 
 // 状态选项 - 使用 EditionStatus 类型
@@ -485,21 +486,20 @@ export default function EditionDetail() {
               </div>
             </div>
 
-            <div className="flex gap-3 mt-6">
-              <button
+            <div className="flex gap-3 mt-6 justify-end">
+              <Button
+                variant="outline"
                 onClick={cancelEditing}
                 disabled={saving}
-                className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
               >
                 {tCommon('cancel')}
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={saveEditing}
                 disabled={saving}
-                className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
               >
                 {saving ? t('saving') : tCommon('save')}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -520,20 +520,22 @@ export default function EditionDetail() {
             </p>
             <p className="text-sm text-destructive mb-4">{t('deleteDialog.warning')}</p>
             <div className="flex gap-3">
-              <button
+              <Button
+                variant="outline"
                 onClick={() => setShowDeleteConfirm(false)}
                 disabled={deleting}
-                className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
+                className="flex-1"
               >
                 {tCommon('cancel')}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="destructive"
                 onClick={handleDelete}
                 disabled={deleting}
-                className="flex-1 px-4 py-2 bg-destructive text-destructive-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+                className="flex-1"
               >
                 {deleting ? t('deleteDialog.deleting') : tCommon('confirm')}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -568,12 +570,13 @@ export default function EditionDetail() {
         <Link to="/editions" className="text-primary hover:underline">
           {t('backToList')}
         </Link>
-        <button
+        <Button
+          variant="destructive-outline"
+          size="small"
           onClick={() => setShowDeleteConfirm(true)}
-          className="px-4 py-2 text-sm text-destructive border border-destructive/30 rounded-lg hover:bg-destructive/10 transition-colors"
         >
           {t('deleteEdition')}
-        </button>
+        </Button>
       </div>
 
       {/* 版本基本信息 */}
@@ -704,14 +707,13 @@ export default function EditionDetail() {
           <h2 className="text-lg font-semibold">
             {t('attachments.title')} ({files.length})
           </h2>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowLinkDialog(true)}
-              className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
-            >
-              {t('attachments.addLink')}
-            </button>
-          </div>
+          <Button
+            variant="outline"
+            size="small"
+            onClick={() => setShowLinkDialog(true)}
+          >
+            {t('attachments.addLink')}
+          </Button>
         </div>
 
         {/* 文件上传组件 */}
@@ -747,20 +749,21 @@ export default function EditionDetail() {
 
       {/* 底部操作栏 */}
       <div className="fixed bottom-0 left-0 right-0 md:static md:mt-6 bg-card border-t md:border border-border p-4 md:rounded-xl flex gap-3 z-40">
-        <button
+        <Button
           onClick={handleChatAction}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
+          className="flex-1"
         >
-          <MessageSquare className="w-4 h-4" />
+          <MessageSquare />
           <span>{t('actions.chat')}</span>
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="secondary"
           onClick={startEditing}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-muted text-muted-foreground rounded-lg hover:bg-accent transition-colors"
+          className="flex-1"
         >
-          <Pencil className="w-4 h-4" />
+          <Pencil />
           <span>{t('actions.edit')}</span>
-        </button>
+        </Button>
       </div>
     </div>
   );

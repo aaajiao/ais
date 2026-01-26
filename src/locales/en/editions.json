@@ -4,6 +4,7 @@
   "noEditions": "No editions yet",
   "noMatch": "No matching editions found",
   "filters": {
+    "label": "Filter editions",
     "all": "All",
     "inStudio": "In Studio",
     "atGallery": "Consigned",

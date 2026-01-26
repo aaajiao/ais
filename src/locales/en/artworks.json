@@ -5,6 +5,7 @@
   "noMatch": "No matching artworks found",
   "addArtwork": "Add Artwork",
   "filters": {
+    "label": "Filter artworks",
     "all": "All",
     "inStudio": "In Studio",
     "atGallery": "Consigned",

@@ -7,7 +7,9 @@ import type { ConfirmCardData } from '@/components/chat/EditableConfirmCard';
 import CollapsibleChatHistory from '@/components/chat/CollapsibleChatHistory';
 import { saveChatHistory, loadChatHistory, clearChatHistory, getChatTimestamp } from '@/lib/chatStorage';
 import { useAuthContext } from '@/contexts/AuthContext';
-import { MessageSquare, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
+import { MessageSquare, Trash2, ArrowUp } from 'lucide-react';
 
 export default function Chat() {
   const { t, i18n } = useTranslation('chat');
@@ -193,13 +195,14 @@ export default function Chat() {
               minute: '2-digit'
             })}
           </span>
-          <button
+          <Button
+            variant="ghost"
+            size="mini"
             onClick={handleClearChat}
-            className="flex items-center gap-1.5 hover:text-foreground transition-colors"
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            <Trash2 />
             <span>{t('clearChat')}</span>
-          </button>
+          </Button>
         </div>
       )}
 
@@ -216,13 +219,15 @@ export default function Chat() {
             {/* 快捷操作 */}
             <div className="flex flex-wrap justify-center gap-2">
               {quickActions.map((action) => (
-                <button
+                <Button
                   key={action.labelKey}
+                  variant="outline"
+                  size="small"
                   onClick={() => handleQuickAction(t(action.promptKey))}
-                  className="px-3 py-1.5 bg-card border border-border rounded-full text-sm hover:bg-accent transition-colors"
+                  className="rounded-full"
                 >
                   {t(action.labelKey)}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -254,13 +259,15 @@ export default function Chat() {
             disabled={isLoading || authLoading || !session?.access_token}
             className="flex-1 px-4 py-3 bg-card border border-border rounded-xl focus:ring-2 focus:ring-ring focus:border-transparent outline-none disabled:opacity-50"
           />
-          <button
+          <IconButton
             type="submit"
+            size="lg"
+            label={t('send')}
             disabled={isLoading || authLoading || !session?.access_token || !inputValue.trim()}
-            className="px-4 py-3 bg-primary text-primary-foreground rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
+            className="rounded-xl"
           >
-            {isLoading ? '...' : t('send')}
-          </button>
+            <ArrowUp />
+          </IconButton>
         </form>
 
         {/* 当前模型指示 */}

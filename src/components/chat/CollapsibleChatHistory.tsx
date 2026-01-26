@@ -5,6 +5,7 @@ import type { UIMessage } from 'ai';
 import MessageBubble from './MessageBubble';
 import { groupMessagesByDate, getTodayDateKey, type MessageGroup } from '@/lib/chatUtils';
 import type { ConfirmCardData } from './EditableConfirmCard';
+import { Button } from '@/components/ui/button';
 import { MessageSquare, ChevronDown, ChevronRight } from 'lucide-react';
 
 interface CollapsibleChatHistoryProps {
@@ -106,19 +107,21 @@ export default function CollapsibleChatHistory({
           {t('chatHistory.dateCount', { dates: messageGroups.length, messages: messages.length })}
         </span>
         <div className="flex gap-2">
-          <button
+          <Button
+            variant="link"
+            size="mini"
             onClick={expandAll}
-            className="text-primary hover:underline"
           >
             {t('chatHistory.expandAll')}
-          </button>
+          </Button>
           <span className="text-muted-foreground">|</span>
-          <button
+          <Button
+            variant="link"
+            size="mini"
             onClick={collapseAll}
-            className="text-primary hover:underline"
           >
             {t('chatHistory.collapseAll')}
-          </button>
+          </Button>
         </div>
       </div>
 
