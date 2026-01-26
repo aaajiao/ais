@@ -7,8 +7,8 @@
     "label": "筛选版本",
     "all": "全部",
     "inStudio": "在库",
-    "atGallery": "寄售",
-    "atMuseum": "美术馆",
+    "atGallery": "外借中",
+    "atMuseum": "展览中",
     "inTransit": "运输中",
     "sold": "已售"
   },

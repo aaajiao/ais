@@ -84,9 +84,9 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 | 状态 | 中文 | 说明 |
 |------|------|------|
 | `in_production` | 制作中 | 正在制作 |
-| `in_studio` | 工作室 | 在艺术家工作室 |
-| `at_gallery` | 寄售 | 在画廊寄售 |
-| `at_museum` | 美术馆 | 在美术馆展览 |
+| `in_studio` | 在库 | 在艺术家工作室 |
+| `at_gallery` | 外借中 | 借给画廊、私人藏家、机构等 |
+| `at_museum` | 展览中 | 在美术馆展览 |
 | `in_transit` | 运输中 | 正在运输 |
 | `sold` | 已售 | 已出售（终态） |
 | `gifted` | 赠送 | 已赠送（终态） |

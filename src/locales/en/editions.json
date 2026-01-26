@@ -7,8 +7,8 @@
     "label": "Filter editions",
     "all": "All",
     "inStudio": "In Studio",
-    "atGallery": "Consigned",
-    "atMuseum": "Museum",
+    "atGallery": "On Loan",
+    "atMuseum": "Exhibition",
     "inTransit": "In Transit",
     "sold": "Sold"
   },

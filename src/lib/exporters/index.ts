@@ -27,7 +27,7 @@ export interface ArtworkExportData {
   stats: {
     total: number;
     inStock: number;      // 在库（in_studio, at_gallery, at_museum）
-    consigned: number;    // 寄售（at_gallery）
+    onLoan: number;       // 外借中（at_gallery）
     sold: number;         // 已售
     other: number;        // 其他（in_production, in_transit, gifted, lost, damaged）
   };
@@ -41,14 +41,14 @@ export interface ArtworkExportData {
 // 状态分类
 const IN_STOCK_STATUSES: EditionStatus[] = ['in_studio', 'at_gallery', 'at_museum'];
 const SOLD_STATUSES: EditionStatus[] = ['sold'];
-const CONSIGNED_STATUSES: EditionStatus[] = ['at_gallery']; // 画廊可能是寄售
+const ON_LOAN_STATUSES: EditionStatus[] = ['at_gallery']; // 外借中（画廊、私人藏家、机构等）
 
 // 计算版本统计
 export function calculateEditionStats(editions: Edition[]): ArtworkExportData['stats'] {
   const stats = {
     total: editions.length,
     inStock: 0,
-    consigned: 0,
+    onLoan: 0,
     sold: 0,
     other: 0,
   };
@@ -58,9 +58,9 @@ export function calculateEditionStats(editions: Edition[]): ArtworkExportData['s
       stats.sold++;
     } else if (IN_STOCK_STATUSES.includes(edition.status)) {
       stats.inStock++;
-      // at_gallery 同时计入寄售
-      if (CONSIGNED_STATUSES.includes(edition.status)) {
-        stats.consigned++;
+      // at_gallery 同时计入外借中
+      if (ON_LOAN_STATUSES.includes(edition.status)) {
+        stats.onLoan++;
       }
     } else {
       stats.other++;
@@ -118,14 +118,14 @@ export function formatStatusStats(stats: ArtworkExportData['stats'], lang: 'zh' 
   const parts: string[] = [];
 
   const labels = lang === 'en'
-    ? { inStock: 'In Stock', consigned: 'Consigned', sold: 'Sold', none: 'No editions' }
-    : { inStock: '在库', consigned: '寄售', sold: '已售', none: '无版本' };
+    ? { inStock: 'In Stock', onLoan: 'On Loan', sold: 'Sold', none: 'No editions' }
+    : { inStock: '在库', onLoan: '外借中', sold: '已售', none: '无版本' };
 
   if (stats.inStock > 0) {
     parts.push(`${labels.inStock}: ${stats.inStock}`);
   }
-  if (stats.consigned > 0) {
-    parts.push(`${labels.consigned}: ${stats.consigned}`);
+  if (stats.onLoan > 0) {
+    parts.push(`${labels.onLoan}: ${stats.onLoan}`);
   }
   if (stats.sold > 0) {
     parts.push(`${labels.sold}: ${stats.sold}`);
@@ -154,8 +154,8 @@ export function getLocationNames(editions: Edition[], locations: Map<string, Loc
 const STATUS_LABELS: Record<EditionStatus, { zh: string; en: string }> = {
   in_production: { zh: '制作中', en: 'In Production' },
   in_studio: { zh: '在库', en: 'In Studio' },
-  at_gallery: { zh: '寄售', en: 'At Gallery' },
-  at_museum: { zh: '美术馆', en: 'At Museum' },
+  at_gallery: { zh: '外借中', en: 'On Loan' },
+  at_museum: { zh: '展览中', en: 'On Exhibition' },
   in_transit: { zh: '运输中', en: 'In Transit' },
   sold: { zh: '已售', en: 'Sold' },
   gifted: { zh: '赠送', en: 'Gifted' },
