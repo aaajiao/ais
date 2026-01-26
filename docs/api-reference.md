@@ -1,0 +1,455 @@
+# API 参考
+
+本文档详细说明 AI 对话系统的工具定义和 API 端点。
+
+## AI 对话 API
+
+### 端点
+
+```
+POST /api/chat
+```
+
+### 请求
+
+```typescript
+{
+  messages: UIMessage[];  // 对话历史
+  model?: string;         // 模型 ID，默认 claude-sonnet-4.5
+}
+```
+
+### 支持的模型
+
+| 模型 ID | 说明 |
+|---------|------|
+| `claude-sonnet-4-5-20250929` | Claude Sonnet 4.5（默认） |
+| `claude-opus-4-*` | Claude Opus 4 |
+| `claude-3-*` | Claude 3 系列 |
+| `gpt-4o` | GPT-4o |
+| `o1-*` / `o3-*` / `o4-*` | OpenAI 推理模型 |
+
+### 响应
+
+流式响应，使用 Vercel AI SDK 的 `toUIMessageStreamResponse()` 格式。
+
+---
+
+## AI 工具定义
+
+AI 助手可以调用以下工具完成任务。
+
+### search_artworks
+
+搜索作品。
+
+**参数**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `query` | string | 否 | 搜索关键词（匹配中英文标题） |
+| `year` | string | 否 | 年份 |
+| `type` | string | 否 | 作品类型 |
+
+**返回**
+
+```typescript
+{
+  artworks: Artwork[];
+  message?: string;  // 无结果时的提示
+}
+```
+
+**示例**
+
+```
+用户: Guard 有几个版本？
+AI: [调用 search_artworks { query: "Guard" }]
+```
+
+---
+
+### search_editions
+
+搜索版本。
+
+**参数**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `artwork_title` | string | 否 | 作品标题 |
+| `edition_number` | number | 否 | 版本号 |
+| `status` | string | 否 | 状态（见下方状态列表） |
+| `location` | string | 否 | 位置名称或城市 |
+
+**版本状态**
+
+| 状态 | 说明 |
+|------|------|
+| `in_production` | 制作中 |
+| `in_studio` | 在库 |
+| `at_gallery` | 寄售 |
+| `at_museum` | 美术馆 |
+| `in_transit` | 运输中 |
+| `sold` | 已售 |
+| `gifted` | 赠送 |
+| `lost` | 遗失 |
+| `damaged` | 损坏 |
+
+**返回**
+
+```typescript
+{
+  editions: Edition[];  // 包含关联的 artwork 和 location
+  message?: string;
+}
+```
+
+---
+
+### get_statistics
+
+获取库存统计。
+
+**参数**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `type` | enum | 是 | `overview` / `by_status` / `by_location` |
+
+**返回**
+
+```typescript
+// type: 'overview'
+{
+  total_artworks: number;
+  total_editions: number;
+  status_breakdown: Record<string, number>;
+}
+
+// type: 'by_status'
+{
+  by_status: Record<string, number>;
+}
+
+// type: 'by_location'
+{
+  by_location: Record<string, number>;
+}
+```
+
+---
+
+### generate_update_confirmation
+
+生成版本更新确认卡片。修改操作必须先调用此工具，让用户确认后再执行。
+
+**参数**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `edition_id` | string | 是 | 版本 ID |
+| `updates` | object | 是 | 要更新的字段（见下方） |
+| `reason` | string | 是 | 更新原因 |
+
+**updates 对象**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `status` | string | 新状态 |
+| `location_id` | string | 新位置 ID |
+| `sale_price` | number | 销售价格 |
+| `sale_currency` | string | 货币（USD/EUR/CNY/...） |
+| `buyer_name` | string | 买家名称 |
+| `sold_at` | string | 销售日期 |
+| `notes` | string | 备注 |
+
+**返回**
+
+```typescript
+{
+  type: 'confirmation_card';
+  edition_id: string;
+  current: {
+    artwork_title: string;
+    edition_number: number;
+    edition_total: number;
+    status: string;
+    location: string;
+  };
+  updates: object;
+  reason: string;
+  requires_confirmation: true;
+}
+```
+
+---
+
+### execute_edition_update
+
+执行版本更新（用户确认后调用）。
+
+**参数**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `edition_id` | string | 是 | 版本 ID |
+| `updates` | object | 是 | 要更新的字段 |
+| `confirmed` | boolean | 是 | 用户是否已确认 |
+
+**返回**
+
+```typescript
+{
+  success: true;
+  message: string;
+  edition: Edition;
+}
+```
+
+**历史记录**
+
+更新会自动记录到 `edition_history` 表：
+- 状态变更 → `status_change` / `sold` / `consigned` / `returned`
+- 位置变更 → `location_change`
+
+---
+
+### search_locations
+
+搜索位置/画廊。
+
+**参数**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `query` | string | 是 | 搜索关键词（匹配名称或城市） |
+
+**返回**
+
+```typescript
+{
+  locations: Location[];
+}
+```
+
+---
+
+### export_artworks
+
+导出作品为 PDF 或 Markdown。
+
+**参数**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `artwork_title` | string | 否 | 作品标题（搜索单个作品） |
+| `artwork_ids` | string[] | 否 | 作品 ID 列表 |
+| `format` | enum | 是 | `pdf` / `md` |
+| `include_price` | boolean | 否 | 包含价格 |
+| `include_status` | boolean | 否 | 包含状态 |
+| `include_location` | boolean | 否 | 包含位置 |
+
+**返回**
+
+```typescript
+// 准备就绪
+{
+  type: 'export_ready';
+  format: string;
+  scope: 'all' | 'single' | 'selected';
+  artworkCount: number | '全部';
+  exportRequest: object;
+  message: string;
+}
+
+// 多个匹配
+{
+  type: 'multiple_matches';
+  matches: { id: string; title: string }[];
+  message: string;
+}
+```
+
+---
+
+### import_artwork_from_url
+
+从网页 URL 导入作品。
+
+**参数**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `url` | string | 是 | 作品页面 URL |
+
+**处理流程**
+
+1. 抓取网页 HTML
+2. 使用 LLM（Claude Sonnet）提取作品信息
+3. 选择最佳缩略图 URL
+4. 检查是否已存在（通过 `source_url` 或 `title_en`）
+5. 创建或更新作品
+
+**返回**
+
+```typescript
+{
+  success: true;
+  action: 'created' | 'updated';
+  artwork_id: string;
+  artwork_title: string;
+  has_thumbnail: boolean;
+  message: string;
+}
+```
+
+**示例**
+
+```
+用户: 导入 https://eventstructure.com/Guard-I
+AI: [调用 import_artwork_from_url { url: "..." }]
+AI: 已创建作品「Guard, I...」，已获取缩略图
+```
+
+---
+
+## 导出 API
+
+### PDF 导出
+
+```
+POST /api/export/pdf
+```
+
+**请求**
+
+```typescript
+{
+  scope: 'all' | 'single' | 'selected';
+  artworkIds?: string[];
+  options: {
+    includePrice: boolean;
+    includeStatus: boolean;
+    includeLocation: boolean;
+  };
+}
+```
+
+**响应**
+
+`application/pdf` 文件流
+
+### Markdown 导出
+
+```
+POST /api/export/md
+```
+
+参数同上，返回 `text/markdown` 文件流。
+
+---
+
+## 导入 API
+
+### Markdown 导入
+
+```
+POST /api/import/md
+```
+
+**请求**
+
+```typescript
+{
+  content: string;       // MD 文件内容
+  preview?: boolean;     // true = 仅预览，false = 执行导入
+  selectedIds?: string[]; // 要导入的作品（按 source_url）
+  thumbnails?: Record<string, string>; // 缩略图 URL 映射
+}
+```
+
+**响应（预览）**
+
+```typescript
+{
+  success: true;
+  preview: true;
+  results: {
+    new: ArtworkPreview[];
+    updated: ArtworkPreview[];
+    unchanged: ArtworkPreview[];
+  };
+}
+```
+
+**响应（执行）**
+
+```typescript
+{
+  success: true;
+  preview: false;
+  imported: number;
+  updated: number;
+  errors: string[];
+}
+```
+
+---
+
+## 公开链接 API
+
+### 获取公开视图
+
+```
+GET /api/view/[token]
+```
+
+无需认证。返回位置下的所有版本信息。
+
+**响应**
+
+```typescript
+{
+  location: {
+    name: string;
+    show_prices: boolean;
+  };
+  editions: EditionWithArtwork[];
+}
+```
+
+---
+
+## 扩展工具
+
+如需添加新的 AI 工具：
+
+1. 在 `api/chat.ts` 的 `getTools()` 函数中添加工具定义
+2. 使用 Zod schema 定义参数
+3. 实现 `execute` 函数
+4. 更新系统提示词说明新功能
+
+**示例**
+
+```typescript
+new_tool: tool({
+  description: '工具描述',
+  inputSchema: z.object({
+    param1: z.string().describe('参数说明'),
+  }),
+  execute: async ({ param1 }) => {
+    // 实现逻辑
+    return { result: '...' };
+  },
+}),
+```
+
+---
+
+## 安全性
+
+- 所有 API（除公开链接）需要 Supabase 认证
+- 邮箱白名单验证（`ALLOWED_EMAILS`）
+- SQL 注入防护：搜索词自动转义特殊字符
+- 修改操作需要用户确认（确认卡片机制）
