@@ -1,10 +1,11 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useDeferredValue } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { EditionStatus } from '@/lib/database.types';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
 import ListEndIndicator from '@/components/ui/ListEndIndicator';
 import { ToggleChip } from '@/components/ui/toggle-chip';
+import { SearchInput } from '@/components/ui/SearchInput';
 import { Image } from 'lucide-react';
 import { queryKeys } from '@/lib/queryKeys';
 import {
@@ -45,17 +46,18 @@ export default function Editions() {
 
   const [filter, setFilter] = useState<FilterStatus>(initialFilter);
   const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearchQuery = useDeferredValue(searchQuery);
 
   // Status counts for filter tabs
   const { data: statusCounts } = useEditionStatusCounts();
 
-  // Create query function with current filters
+  // Create query function with current filters - use deferred search for debounce
   const filters = useMemo(
     () => ({
       status: filter,
-      search: searchQuery,
+      search: deferredSearchQuery,
     }),
-    [filter, searchQuery]
+    [filter, deferredSearchQuery]
   );
 
   const queryFn = useEditionsQueryFn(filters);
@@ -164,11 +166,10 @@ export default function Editions() {
 
       {/* 搜索框 */}
       <div className="mb-6">
-        <input
-          type="text"
+        <SearchInput
           placeholder={t('searchPlaceholder')}
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={setSearchQuery}
           className="w-full px-4 py-3 bg-card border border-border rounded-xl focus:ring-2 focus:ring-ring focus:border-transparent outline-none"
         />
       </div>

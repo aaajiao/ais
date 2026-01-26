@@ -3,7 +3,7 @@
  * 独立管理所有位置的增删改查
  */
 
-import { useState, useCallback, useEffect, type ReactNode } from 'react';
+import { useState, useCallback, useEffect, useDeferredValue, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocations, type Location } from '@/hooks/useLocations';
 import type { LocationType } from '@/lib/database.types';
@@ -38,6 +38,8 @@ export default function Locations() {
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
   const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const isComposing = useRef(false);
   const [locationUsage, setLocationUsage] = useState<Record<string, number>>({});
 
   // 加载每个位置的使用次数
@@ -101,17 +103,17 @@ export default function Locations() {
     refetch();
   }, [refetch]);
 
-  // 过滤位置
+  // 过滤位置 - 使用 deferredSearchQuery 实现 debounce
   const filterLocations = useCallback((locs: Location[]) => {
-    if (!searchQuery.trim()) return locs;
-    const query = searchQuery.toLowerCase();
+    if (!deferredSearchQuery.trim()) return locs;
+    const query = deferredSearchQuery.toLowerCase();
     return locs.filter(loc =>
       loc.name.toLowerCase().includes(query) ||
       loc.aliases?.some(a => a.toLowerCase().includes(query)) ||
       loc.city?.toLowerCase().includes(query) ||
       loc.country?.toLowerCase().includes(query)
     );
-  }, [searchQuery]);
+  }, [deferredSearchQuery]);
 
   // 统计信息
   const totalLocations = locations.length;
@@ -183,6 +185,8 @@ export default function Locations() {
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
+            onCompositionStart={() => { isComposing.current = true; }}
+            onCompositionEnd={() => { isComposing.current = false; }}
             placeholder={t('searchPlaceholder')}
             className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
