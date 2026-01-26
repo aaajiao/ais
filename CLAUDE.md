@@ -74,6 +74,7 @@ bun run lint
 - `src/lib/queryClient.ts` - React Query client configuration (with offline-first mode)
 - `src/lib/indexedDBPersister.ts` - IndexedDB persister for React Query cache
 - `src/lib/queryKeys.ts` - Query key factory for cache management
+- `src/lib/cacheInvalidation.ts` - Centralized cache invalidation helpers
 - `src/hooks/queries/` - React Query hooks (useArtworks, useEditions, useDashboard)
 - `src/hooks/useInfiniteVirtualList.ts` - Virtual scrolling + infinite loading hook
 - `api/chat.ts` - AI chat handler with tool definitions

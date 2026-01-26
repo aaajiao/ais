@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { invalidateOnArtworkDelete, invalidateOnArtworkPermanentDelete } from '@/lib/cacheInvalidation';
 import type { Database } from '@/lib/database.types';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
@@ -10,6 +12,7 @@ type Artwork = Database['public']['Tables']['artworks']['Row'];
 
 export default function Trash() {
   const { t, i18n } = useTranslation('trash');
+  const queryClient = useQueryClient();
   const [artworks, setArtworks] = useState<Artwork[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +58,9 @@ export default function Trash() {
         .eq('id', artwork.id);
 
       if (restoreError) throw restoreError;
+
+      // Invalidate cache
+      await invalidateOnArtworkDelete(queryClient);
 
       // 从列表中移除
       setArtworks(prev => prev.filter(a => a.id !== artwork.id));
@@ -107,6 +113,9 @@ export default function Trash() {
         .eq('id', artwork.id);
 
       if (deleteError) throw deleteError;
+
+      // Invalidate cache
+      await invalidateOnArtworkPermanentDelete(queryClient);
 
       // 从列表中移除
       setArtworks(prev => prev.filter(a => a.id !== artwork.id));

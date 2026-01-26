@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { queryKeys } from '@/lib/queryKeys';
+import { invalidateOnArtworkEdit, invalidateOnEditionCreate, invalidateOnArtworkDelete } from '@/lib/cacheInvalidation';
 import { useArtworkDetail } from '@/hooks/queries/useArtworks';
 import { useEditionsByArtwork } from '@/hooks/queries/useEditions';
 import type { EditionStatus } from '@/lib/database.types';
@@ -137,7 +137,7 @@ export default function ArtworkDetail() {
       if (updateError) throw updateError;
 
       // Invalidate and refetch
-      await queryClient.invalidateQueries({ queryKey: queryKeys.artworks.detail(id) });
+      await invalidateOnArtworkEdit(queryClient, id);
       setIsEditing(false);
       setFormData(null);
     } catch (err) {
@@ -173,7 +173,7 @@ export default function ArtworkDetail() {
       if (insertError) throw insertError;
 
       // Invalidate and refetch editions
-      await queryClient.invalidateQueries({ queryKey: queryKeys.editions.byArtwork(id) });
+      await invalidateOnEditionCreate(queryClient, id);
 
       // 重置表单
       setNewEdition({
@@ -209,7 +209,7 @@ export default function ArtworkDetail() {
       if (deleteError) throw deleteError;
 
       // Invalidate artworks cache
-      await queryClient.invalidateQueries({ queryKey: queryKeys.artworks.all });
+      await invalidateOnArtworkDelete(queryClient);
 
       // 删除成功，返回作品列表
       navigate('/artworks', { replace: true });

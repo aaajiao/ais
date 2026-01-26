@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { queryKeys } from '@/lib/queryKeys';
+import { invalidateOnEditionEdit, invalidateOnEditionDelete } from '@/lib/cacheInvalidation';
 import {
   useEditionDetail,
   useEditionHistory,
@@ -244,7 +245,7 @@ export default function EditionDetail() {
       if (updateError) throw updateError;
 
       // Invalidate and refetch
-      await queryClient.invalidateQueries({ queryKey: queryKeys.editions.detail(id) });
+      await invalidateOnEditionEdit(queryClient, id, edition.artwork_id);
       setIsEditing(false);
       setFormData(null);
     } catch (err) {
@@ -283,7 +284,7 @@ export default function EditionDetail() {
       if (deleteError) throw deleteError;
 
       // Invalidate editions cache
-      await queryClient.invalidateQueries({ queryKey: queryKeys.editions.all });
+      await invalidateOnEditionDelete(queryClient, edition.artwork_id);
 
       navigate(`/artworks/${edition.artwork_id}`, { replace: true });
     } catch (err) {
