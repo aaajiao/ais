@@ -26,10 +26,11 @@ interface ValidationResult {
 }
 
 export function useInventoryNumber(options: UseInventoryNumberOptions = {}) {
-  // excludeEditionId 目前未实现，保留接口以备将来使用
-  const { debounceMs = 300 } = options;
+  const { excludeEditionId, debounceMs = 300 } = options;
 
   const [existingNumbers, setExistingNumbers] = useState<string[]>([]);
+  // 存储 edition ID 到编号的映射，用于编辑时排除当前版本
+  const [editionNumberMap, setEditionNumberMap] = useState<Map<string, string>>(new Map());
   const [suggestion, setSuggestion] = useState<NumberSuggestion | null>(null);
   const [pattern, setPattern] = useState<NumberPattern | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -46,17 +47,28 @@ export function useInventoryNumber(options: UseInventoryNumberOptions = {}) {
     setIsLoading(true);
 
     try {
+      // 同时获取 id 和 inventory_number，用于排除当前编辑的版本
       const { data, error } = await supabase
         .from('editions')
-        .select('inventory_number')
+        .select('id, inventory_number')
         .not('inventory_number', 'is', null);
 
       if (error) throw error;
 
-      const numbers = (data as { inventory_number: string | null }[])
+      const typedData = data as { id: string; inventory_number: string | null }[];
+
+      const numbers = typedData
         .map(d => d.inventory_number)
         .filter((n): n is string => n !== null);
 
+      // 构建 edition ID 到编号的映射
+      const numberMap = new Map<string, string>();
+      for (const d of typedData) {
+        if (d.inventory_number) {
+          numberMap.set(d.id, d.inventory_number);
+        }
+      }
+      setEditionNumberMap(numberMap);
       setExistingNumbers(numbers);
 
       // 分析模式并生成建议
@@ -95,10 +107,10 @@ export function useInventoryNumber(options: UseInventoryNumberOptions = {}) {
 
     // 防抖处理
     debounceTimer.current = setTimeout(() => {
-      // 找到要排除的编号（当前版本的编号）
-      // 注意：由于我们只有编号列表，无法通过 editionId 排除
-      // 在编辑模式下，应该由调用方传入当前编号进行排除
-      const excludeNumber: string | undefined = undefined;
+      // 获取当前版本的编号并排除
+      const excludeNumber = excludeEditionId
+        ? editionNumberMap.get(excludeEditionId)
+        : undefined;
 
       // 检查唯一性
       const isUnique = isNumberUnique(number, existingNumbers, excludeNumber);
@@ -116,7 +128,7 @@ export function useInventoryNumber(options: UseInventoryNumberOptions = {}) {
 
       setIsChecking(false);
     }, debounceMs);
-  }, [debounceMs, existingNumbers, pattern]);
+  }, [debounceMs, existingNumbers, pattern, editionNumberMap, excludeEditionId]);
 
   // 清理定时器
   useEffect(() => {
@@ -133,7 +145,12 @@ export function useInventoryNumber(options: UseInventoryNumberOptions = {}) {
       return { isUnique: true, isValidFormat: true };
     }
 
-    const isUnique = isNumberUnique(number, existingNumbers);
+    // 获取当前版本的编号并排除
+    const excludeNumber = excludeEditionId
+      ? editionNumberMap.get(excludeEditionId)
+      : undefined;
+
+    const isUnique = isNumberUnique(number, existingNumbers, excludeNumber);
     const formatResult = validateNumberFormat(number, pattern || undefined);
 
     return {
@@ -141,7 +158,7 @@ export function useInventoryNumber(options: UseInventoryNumberOptions = {}) {
       isValidFormat: formatResult.valid,
       message: !isUnique ? '此编号已存在' : formatResult.message,
     };
-  }, [existingNumbers, pattern]);
+  }, [existingNumbers, pattern, editionNumberMap, excludeEditionId]);
 
   // 应用建议的编号
   const applySuggestion = useCallback((): string | null => {
