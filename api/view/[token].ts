@@ -151,7 +151,7 @@ async function handleGet(request: Request) {
 
     // 处理返回数据
     const items = (editions || []).map((edition) => {
-      const artwork = edition.artwork as {
+      const artwork = edition.artwork as unknown as {
         id: string;
         title_en: string;
         title_cn: string | null;
@@ -165,7 +165,12 @@ async function handleGet(request: Request) {
         edition_total: number | null;
         ap_total: number | null;
         is_unique: boolean | null;
-      };
+      } | null;
+
+      // 跳过没有关联作品的版本
+      if (!artwork) {
+        return null;
+      }
 
       // 格式化版本编号（如 "2/3" 或 "AP 1/2" 或 "Unique"）
       let editionLabel = '';
@@ -226,7 +231,7 @@ async function handleGet(request: Request) {
           source_url: artwork.source_url,
         },
       };
-    });
+    }).filter(Boolean);
 
     return new Response(
       JSON.stringify({
