@@ -606,7 +606,7 @@ export default function MDImport() {
             <Button
               onClick={handleExecuteImport}
               disabled={loading || selectedArtworks.size === 0}
-              className="flex-1"
+              className="flex-1 md:flex-none"
             >
               {loading ? t('actions.importing') : t('mdImport.confirmImport', { count: selectedArtworks.size })}
             </Button>
@@ -617,10 +617,10 @@ export default function MDImport() {
       {step === 'result' && (
         <>
           {renderResult()}
-          <div className="flex gap-3 pt-4 border-t border-border">
+          <div className="flex gap-3 pt-4 border-t border-border md:justify-end">
             <Button
               onClick={handleReset}
-              className="flex-1"
+              className="flex-1 md:flex-none"
             >
               {t('mdImport.continueImport')}
             </Button>

@@ -336,6 +336,56 @@ import { Trash2, Pencil, X } from 'lucide-react';
 </div>
 ```
 
+#### 按钮宽度规范
+
+遵循 Apple HIG "Avoid full-width buttons" 原则，在不同设备上使用响应式宽度：
+
+| 场景 | 移动端 (< md) | 桌面端/iPad (≥ md) |
+|------|--------------|-------------------|
+| 底部操作栏 | `flex-1` 全宽 | `flex-none` 紧凑靠右 |
+| 对话框按钮 | `flex-1` 等宽 | `flex-1` 等宽（可保持） |
+| 表单提交 | 自适应 | 自适应 + `justify-end` |
+
+**底部操作栏标准实现**：
+
+移动端需要避开全局底部导航栏（高度约 72px），使用 `bottom-[72px]`：
+
+```tsx
+{/* 页面容器需要足够的底部 padding */}
+<div className="p-6 pb-40 md:pb-6">
+  {/* 页面内容 */}
+</div>
+
+{/* 底部操作栏 - 移动端位于全局导航上方 */}
+<div className="fixed bottom-[72px] left-0 right-0 md:bottom-0 md:static md:mt-6
+               bg-card border-t md:border border-border p-4 md:rounded-xl
+               flex gap-3 md:justify-end z-40">
+  <Button variant="secondary" className="flex-1 md:flex-none">
+    次要操作
+  </Button>
+  <Button className="flex-1 md:flex-none">
+    主要操作
+  </Button>
+</div>
+```
+
+**移动端布局层级**（从下到上）：
+| 层级 | 元素 | 高度 | z-index |
+|------|------|------|---------|
+| 1 | 全局底部导航 | 72px | z-50 |
+| 2 | 页面操作栏 | 76px | z-40 |
+| 3 | 页面内容 | - | - |
+
+页面内容 `pb-40`（160px）= 操作栏 76px + 导航栏 72px + 12px 安全边距
+
+**对话框按钮**（无需响应式宽度）：
+```tsx
+<div className="flex gap-3 justify-end">
+  <Button variant="outline" className="flex-1">取消</Button>
+  <Button className="flex-1">确认</Button>
+</div>
+```
+
 ### ToggleChip 组件
 
 用于筛选标签、多选选项等可切换芯片场景：
@@ -416,3 +466,5 @@ src/
 7. **语义化状态** - 使用 StatusIndicator 组件
 8. **无障碍** - IconButton 必须提供 `label`，ToggleChip 使用 `role="option"`
 9. **按钮位置** - Cancel 在左，Primary 在右（Apple HIG 规范）
+10. **移动端底部导航** - 全局导航栏高度 72px，页面级固定元素需使用 `bottom-[72px]`
+11. **虚拟滚动列表** - 移动端高度需减去顶部 header (80px) + 底部导航 (72px) = 152px

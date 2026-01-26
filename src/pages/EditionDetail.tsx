@@ -329,7 +329,7 @@ export default function EditionDetail() {
   }
 
   return (
-    <div className="p-6 pb-24 md:pb-6">
+    <div className="p-6 pb-40 md:pb-6">
       {/* 编辑弹窗 */}
       {isEditing && formData && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -748,10 +748,10 @@ export default function EditionDetail() {
       </div>
 
       {/* 底部操作栏 */}
-      <div className="fixed bottom-0 left-0 right-0 md:static md:mt-6 bg-card border-t md:border border-border p-4 md:rounded-xl flex gap-3 z-40">
+      <div className="fixed bottom-[72px] left-0 right-0 md:bottom-0 md:static md:mt-6 bg-card border-t md:border border-border p-4 md:rounded-xl flex gap-3 md:justify-end z-40">
         <Button
           onClick={handleChatAction}
-          className="flex-1"
+          className="flex-1 md:flex-none"
         >
           <MessageSquare />
           <span>{t('actions.chat')}</span>
@@ -759,7 +759,7 @@ export default function EditionDetail() {
         <Button
           variant="secondary"
           onClick={startEditing}
-          className="flex-1"
+          className="flex-1 md:flex-none"
         >
           <Pencil />
           <span>{t('actions.edit')}</span>

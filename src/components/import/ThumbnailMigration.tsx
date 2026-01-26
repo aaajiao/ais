@@ -174,7 +174,7 @@ export default function ThumbnailMigration() {
                 </table>
               </div>
 
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-3 pt-2 md:justify-end">
                 <Button
                   variant="outline"
                   onClick={handleReset}
@@ -183,7 +183,7 @@ export default function ThumbnailMigration() {
                 </Button>
                 <Button
                   onClick={handleMigrate}
-                  className="flex-1"
+                  className="flex-1 md:flex-none"
                 >
                   {t('thumbnailMigration.startMigrate', { count: previewData.total })}
                 </Button>

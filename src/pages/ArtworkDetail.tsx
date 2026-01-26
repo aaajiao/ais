@@ -10,7 +10,7 @@ import type { EditionStatus } from '@/lib/database.types';
 import ExportDialog from '@/components/export/ExportDialog';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
 import { Button } from '@/components/ui/button';
-import { Image } from 'lucide-react';
+import { Image, Download, Pencil } from 'lucide-react';
 
 // 编辑表单数据类型
 interface ArtworkFormData {
@@ -256,7 +256,7 @@ export default function ArtworkDetail() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6 pb-40 md:pb-6">
       {/* 导出对话框 */}
       {id && (
         <ExportDialog
@@ -312,38 +312,18 @@ export default function ArtworkDetail() {
         </div>
       )}
 
-      {/* 返回链接和操作按钮 */}
+      {/* 返回链接和删除按钮 */}
       <div className="flex items-center justify-between mb-6">
         <Link to="/artworks" className="text-primary hover:underline">
           {t('backToList')}
         </Link>
-        <div className="flex gap-3">
-          {!isEditing && (
-            <>
-              <Button
-                variant="outline"
-                size="small"
-                onClick={() => setShowExportDialog(true)}
-              >
-                {t('export')}
-              </Button>
-              <Button
-                variant="outline"
-                size="small"
-                onClick={startEditing}
-              >
-                {t('editArtwork')}
-              </Button>
-            </>
-          )}
-          <Button
-            variant="destructive-outline"
-            size="small"
-            onClick={() => setShowDeleteConfirm(true)}
-          >
-            {t('deleteArtwork')}
-          </Button>
-        </div>
+        <Button
+          variant="destructive-outline"
+          size="small"
+          onClick={() => setShowDeleteConfirm(true)}
+        >
+          {t('deleteArtwork')}
+        </Button>
       </div>
 
       {/* 作品基本信息 */}
@@ -731,6 +711,24 @@ export default function ArtworkDetail() {
           </div>
         )}
       </div>
+
+      {/* 底部操作栏 - 非编辑模式时显示 */}
+      {!isEditing && (
+        <div className="fixed bottom-[72px] left-0 right-0 md:bottom-0 md:static md:mt-6 bg-card border-t md:border border-border p-4 md:rounded-xl flex gap-3 md:justify-end z-40">
+          <Button
+            variant="secondary"
+            onClick={() => setShowExportDialog(true)}
+            className="flex-1 md:flex-none"
+          >
+            <Download />
+            <span>{t('export')}</span>
+          </Button>
+          <Button onClick={startEditing} className="flex-1 md:flex-none">
+            <Pencil />
+            <span>{t('editArtwork')}</span>
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
