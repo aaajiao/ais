@@ -65,7 +65,8 @@
 | 状态 | CSS 变量 | 用途 |
 |------|----------|------|
 | `--status-available` | `oklch(0.52 0.12 145)` | 在库 (柔和绿) |
-| `--status-consigned` | `oklch(0.60 0.12 85)` | 寄售 (柔和金) |
+| `--status-consigned` | `oklch(0.60 0.12 85)` | 外借中 (柔和金) |
+| `--status-museum` | `oklch(0.52 0.12 310)` | 展览中 (柔和紫) |
 | `--status-sold` | `oklch(0.52 0.14 25)` | 已售 (柔和红) |
 | `--status-transit` | `oklch(0.52 0.12 250)` | 运输中 (柔和蓝) |
 | `--status-inactive` | `oklch(0.55 0.02 265)` | 遗失/损坏 (中性灰) |
@@ -131,7 +132,7 @@ import { StatusIndicator, getStatusLabel } from '@/components/ui/StatusIndicator
 <StatusIndicator status="sold" size="lg" />
 
 // 获取状态文本
-getStatusLabel('at_gallery') // → "寄售中"
+getStatusLabel('at_gallery') // → "外借中"
 ```
 
 **尺寸选项**：
@@ -140,7 +141,7 @@ getStatusLabel('at_gallery') // → "寄售中"
 - `lg`: 12px 圆点，带文字标签
 
 **活跃状态脉冲**：
-`in_production`、`at_gallery`、`in_transit` 状态显示脉冲动画。
+`in_production`、`at_gallery`、`at_museum`、`in_transit` 状态显示脉冲动画。
 
 ---
 

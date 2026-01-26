@@ -88,8 +88,8 @@ AI: [调用 search_artworks { query: "Guard" }]
 |------|------|
 | `in_production` | 制作中 |
 | `in_studio` | 在库 |
-| `at_gallery` | 寄售 |
-| `at_museum` | 美术馆 |
+| `at_gallery` | 外借中 |
+| `at_museum` | 展览中 |
 | `in_transit` | 运输中 |
 | `sold` | 已售 |
 | `gifted` | 赠送 |
