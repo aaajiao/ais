@@ -1,6 +1,7 @@
 {
   "framework": "vite",
   "rewrites": [
+    { "source": "/api/view/:token", "destination": "/api/view/[token]" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
