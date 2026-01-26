@@ -1,13 +1,3 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-bun-debug.log*
-
 # Dependencies
 node_modules
 
@@ -15,26 +5,26 @@ node_modules
 dist
 dist-ssr
 
-# Environment
+# Environment (secrets)
 .env
 .env.local
-*.local
+.env*.local
 
-# Claude Code local settings
-.claude/*.local.*
+# Vercel
+.vercel
 
-# Other AI agent configs (keep if you want to track them, remove if not)
-# .agent/
-# .agents/
-# .codex/
-# .gemini/
-# .opencode/
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+bun-debug.log*
 
-# Editor directories and files
+# Editor
 .vscode/*
 !.vscode/extensions.json
 .idea
-.DS_Store
 *.suo
 *.ntvs*
 *.njsproj
@@ -45,5 +35,12 @@ dist-ssr
 .DS_Store
 .AppleDouble
 .LSOverride
-.vercel
-.env*.local
+Icon?
+
+# Claude Code local settings
+.claude/*.local.*
+
+# Redundant lock files (using bun.lock)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
