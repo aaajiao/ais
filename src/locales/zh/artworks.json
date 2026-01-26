@@ -8,7 +8,9 @@
     "label": "筛选作品",
     "all": "全部",
     "inStudio": "在库",
-    "atGallery": "寄售",
+    "atGallery": "外借中",
+    "atMuseum": "展览中",
+    "inTransit": "运输中",
     "sold": "已售",
     "hasEditions": "有版本",
     "noEditions": "无版本"

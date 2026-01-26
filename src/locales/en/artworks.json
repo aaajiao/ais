@@ -8,7 +8,9 @@
     "label": "Filter artworks",
     "all": "All",
     "inStudio": "In Studio",
-    "atGallery": "Consigned",
+    "atGallery": "On Loan",
+    "atMuseum": "Exhibition",
+    "inTransit": "In Transit",
     "sold": "Sold",
     "hasEditions": "Has editions",
     "noEditions": "No editions"

@@ -22,7 +22,7 @@ import {
   type GroupHeaderData,
 } from '@/hooks/useInfiniteVirtualList';
 
-type FilterStatus = 'all' | 'in_studio' | 'at_gallery' | 'sold';
+type FilterStatus = 'all' | 'in_studio' | 'at_gallery' | 'at_museum' | 'in_transit' | 'sold';
 
 export default function Artworks() {
   const { t, i18n } = useTranslation('artworks');
@@ -316,6 +316,20 @@ export default function Artworks() {
         >
           <StatusIndicator status="at_gallery" size="sm" />
           {t('filters.atGallery')}
+        </ToggleChip>
+        <ToggleChip
+          selected={filter === 'at_museum'}
+          onClick={() => setFilter('at_museum')}
+        >
+          <StatusIndicator status="at_museum" size="sm" />
+          {t('filters.atMuseum')}
+        </ToggleChip>
+        <ToggleChip
+          selected={filter === 'in_transit'}
+          onClick={() => setFilter('in_transit')}
+        >
+          <StatusIndicator status="in_transit" size="sm" />
+          {t('filters.inTransit')}
         </ToggleChip>
         <ToggleChip
           selected={filter === 'sold'}
