@@ -345,7 +345,7 @@ export default function PublicView() {
       {/* 底部 */}
       <footer className="border-t border-border py-6">
         <div className="max-w-7xl mx-auto px-6 text-center text-sm text-muted-foreground">
-          <p>aaajiao</p>
+          <p>&copy; {new Date().getFullYear()} aaajiao studio</p>
         </div>
       </footer>
     </div>

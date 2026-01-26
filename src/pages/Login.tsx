@@ -79,7 +79,7 @@ export default function Login() {
 
         {/* 底部版权信息 */}
         <p className="mt-8 text-center text-xs text-muted-foreground">
-          &copy; {new Date().getFullYear()} aaajiao Studio
+          &copy; {new Date().getFullYear()} aaajiao studio
         </p>
       </div>
     </div>

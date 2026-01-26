@@ -401,7 +401,7 @@ async function addArtworkPage(
   // 版权信息（页面底部）
   doc.setFontSize(9);
   doc.setTextColor(150, 150, 150);
-  doc.text('© aaajiao studio', pageWidth / 2, pageHeight - margin, { align: 'center' });
+  doc.text(`© ${new Date().getFullYear()} aaajiao studio`, pageWidth / 2, pageHeight - margin, { align: 'center' });
 
   // 重置颜色
   doc.setTextColor(0, 0, 0);

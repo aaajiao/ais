@@ -129,7 +129,7 @@ export function generateFullMarkdown(
   lines.push('');
   lines.push('---');
   lines.push('');
-  lines.push('© aaajiao studio');
+  lines.push(`© ${new Date().getFullYear()} aaajiao studio`);
 
   return lines.join('\n');
 }
