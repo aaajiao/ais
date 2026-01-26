@@ -14,8 +14,10 @@ POST /api/chat
 
 ```typescript
 {
-  messages: UIMessage[];  // 对话历史
-  model?: string;         // 模型 ID，默认 claude-sonnet-4.5
+  messages: UIMessage[];           // 对话历史
+  model?: string;                  // 聊天模型 ID，默认 claude-sonnet-4.5
+  extractionModel?: string;        // URL 导入提取模型（默认使用 model）
+  searchExpansionModel?: string;   // 搜索翻译模型（默认 claude-3-5-haiku）
 }
 ```
 
@@ -33,6 +35,20 @@ POST /api/chat
 
 流式响应，使用 Vercel AI SDK 的 `toUIMessageStreamResponse()` 格式。
 
+### 模型配置
+
+系统支持三种独立的模型配置：
+
+| 用途 | 参数 | localStorage Key | 默认值 |
+|------|------|------------------|--------|
+| 对话 | `model` | `ai-model` | `claude-sonnet-4.5` |
+| URL 导入提取 | `extractionModel` | `extraction-model` | 使用对话模型 |
+| 搜索翻译 | `searchExpansionModel` | `search-expansion-model` | `claude-3-5-haiku` |
+
+**设计考虑**：
+- URL 导入是复杂任务（HTML 解析、多字段提取），推荐使用 Sonnet/GPT-4o
+- 搜索翻译是简单任务（单词翻译），默认使用 Haiku 以保证速度和低成本
+
 ---
 
 ## AI 工具定义
@@ -41,7 +57,7 @@ AI 助手可以调用以下工具完成任务。
 
 ### search_artworks
 
-搜索作品。
+搜索作品。支持中英文搜索，系统会自动翻译和扩展搜索词。
 
 **参数**
 
@@ -49,9 +65,19 @@ AI 助手可以调用以下工具完成任务。
 |------|------|------|------|
 | `query` | string | 否 | 搜索关键词（匹配中英文标题） |
 | `year` | string | 否 | 年份 |
-| `type` | string | 否 | 作品类型 |
-| `materials` | string | 否 | 材料关键词 |
+| `type` | string | 否 | 作品类型（支持中英文） |
+| `materials` | string | 否 | 材料关键词（支持中英文） |
 | `is_unique` | boolean | 否 | 是否独版作品 |
+
+**多语言搜索**
+
+`type` 和 `materials` 字段支持 AI 驱动的查询扩展：
+
+1. 中文搜索词会自动翻译为英文
+2. 自动处理单复数形式（magnet/magnets）
+3. 生成相关同义词（wood → wooden, timber）
+
+示例：用户搜索 "磁铁" → 系统搜索 `["magnet", "magnets", "magnetic"]`
 
 **返回**
 
@@ -67,6 +93,10 @@ AI 助手可以调用以下工具完成任务。
 ```
 用户: Guard 有几个版本？
 AI: [调用 search_artworks { query: "Guard" }]
+
+用户: 找所有用磁铁的作品
+AI: [调用 search_artworks { materials: "磁铁" }]
+    // 系统自动扩展为 ["magnet", "magnets", "magnetic"]
 ```
 
 ---
@@ -357,7 +387,7 @@ AI: [调用 search_history { action: "sold", after: "2025-01-01", before: "2025-
 **处理流程**
 
 1. 抓取网页 HTML
-2. 使用 LLM（Claude Sonnet）提取作品信息
+2. 使用 LLM 提取作品信息（使用 `extractionModel`，推荐 Sonnet/GPT-4o）
 3. 选择最佳缩略图 URL
 4. 检查是否已存在（通过 `source_url` 或 `title_en`）
 5. 创建或更新作品

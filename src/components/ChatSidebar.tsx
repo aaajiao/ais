@@ -33,6 +33,11 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
     return localStorage.getItem('extraction-model') || '';
   });
 
+  // 获取搜索扩展模型（空字符串表示使用默认快速模型）
+  const [searchExpansionModel] = useState(() => {
+    return localStorage.getItem('search-expansion-model') || '';
+  });
+
   // 创建带认证的 fetch 函数
   const authenticatedFetch = useCallback(async (url: RequestInfo | URL, options?: RequestInit) => {
     return fetch(url, {
@@ -54,9 +59,11 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
           model: selectedModel,
           // 传递提取模型：空字符串时使用聊天模型
           extractionModel: extractionModel || selectedModel,
+          // 传递搜索扩展模型：空字符串表示使用默认快速模型
+          searchExpansionModel: searchExpansionModel || '',
         },
       }),
-    [selectedModel, extractionModel, authenticatedFetch]
+    [selectedModel, extractionModel, searchExpansionModel, authenticatedFetch]
   );
 
   const {

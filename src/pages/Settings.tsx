@@ -38,15 +38,16 @@ export default function Settings() {
   const [extractionModel, setExtractionModel] = useState<string>(() => {
     return localStorage.getItem('extraction-model') || '';
   });
+  // 搜索扩展模型：空字符串表示"使用默认快速模型"
+  const [searchExpansionModel, setSearchExpansionModel] = useState<string>(() => {
+    return localStorage.getItem('search-expansion-model') || '';
+  });
   const [models, setModels] = useState<ModelsResponse | null>(null);
   const [loadingModels, setLoadingModels] = useState(true);
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [exporting, setExporting] = useState<string | null>(null);
-  const [showAdvanced, setShowAdvanced] = useState(() => {
-    // 如果已经配置了独立的提取模型，默认展开高级选项
-    return localStorage.getItem('extraction-model') !== null && localStorage.getItem('extraction-model') !== '';
-  });
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const hasInitializedModels = useRef(false);
 
   // 从 API 加载可用模型列表
@@ -93,6 +94,16 @@ export default function Settings() {
       localStorage.removeItem('extraction-model');
     } else {
       localStorage.setItem('extraction-model', modelId);
+    }
+  };
+
+  // 处理搜索扩展模型变更
+  const handleSearchExpansionModelChange = (modelId: string) => {
+    setSearchExpansionModel(modelId);
+    if (modelId === '') {
+      localStorage.removeItem('search-expansion-model');
+    } else {
+      localStorage.setItem('search-expansion-model', modelId);
     }
   };
 
@@ -249,6 +260,13 @@ export default function Settings() {
     return allModels.find(m => m.id === extractionModel);
   }, [models, extractionModel]);
 
+  // 获取搜索扩展模型的信息
+  const searchExpansionModelInfo = useMemo(() => {
+    if (!models || !searchExpansionModel) return null;
+    const allModels = [...models.anthropic, ...models.openai];
+    return allModels.find(m => m.id === searchExpansionModel);
+  }, [models, searchExpansionModel]);
+
   // 渲染模型选择器
   const renderModelSelector = () => {
     if (loadingModels) {
@@ -399,7 +417,7 @@ export default function Settings() {
 
                   {extractionModel === '' ? (
                     <p className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-lg">
-                      {t('ai.usingMainModel')}
+                      {t('ai.usingMainModel', { modelName: selectedModelInfo?.name || selectedModel || 'Claude Sonnet 4.5' })}
                     </p>
                   ) : (
                     <div className="space-y-3">
@@ -474,6 +492,99 @@ export default function Settings() {
                 <p className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-lg flex items-start gap-2">
                   <Lightbulb className="w-4 h-4 flex-shrink-0 mt-0.5" />
                   <span>{t('ai.backgroundModelHint')}</span>
+                </p>
+
+                {/* 搜索扩展模型选择 */}
+                <div className="space-y-3 pt-4 border-t border-border/50">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium">{t('ai.searchExpansionModel')}</label>
+                    {searchExpansionModel !== '' && (
+                      <button
+                        onClick={() => handleSearchExpansionModelChange('')}
+                        className="text-xs text-primary hover:underline"
+                      >
+                        {t('ai.resetToDefault')}
+                      </button>
+                    )}
+                  </div>
+
+                  {searchExpansionModel === '' ? (
+                    <p className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-lg">
+                      {t('ai.usingDefaultFastModel')}
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Anthropic Claude */}
+                      {models.anthropic.length > 0 && (
+                        <div className="space-y-2">
+                          <label className="text-xs text-muted-foreground">Anthropic Claude</label>
+                          <Select
+                            value={models.anthropic.some(m => m.id === searchExpansionModel) ? searchExpansionModel : ''}
+                            onValueChange={handleSearchExpansionModelChange}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder={t('ai.selectClaude')} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {models.anthropic.map(model => (
+                                <SelectItem key={model.id} value={model.id}>
+                                  {model.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {/* OpenAI GPT */}
+                      {models.openai.length > 0 && (
+                        <div className="space-y-2">
+                          <label className="text-xs text-muted-foreground">OpenAI GPT</label>
+                          <Select
+                            value={models.openai.some(m => m.id === searchExpansionModel) ? searchExpansionModel : ''}
+                            onValueChange={handleSearchExpansionModelChange}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder={t('ai.selectGPT')} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {models.openai.map(model => (
+                                <SelectItem key={model.id} value={model.id}>
+                                  {model.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {/* 显示选中模型的描述 */}
+                      {searchExpansionModelInfo && (
+                        <div className="text-sm text-muted-foreground space-y-1 p-3 bg-muted/50 rounded-lg">
+                          {searchExpansionModelInfo.description && (
+                            <p>{searchExpansionModelInfo.description}</p>
+                          )}
+                          <p className="text-xs font-mono">{searchExpansionModel}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 选择其他模型按钮 */}
+                  {searchExpansionModel === '' && (
+                    <Button
+                      variant="outline"
+                      size="small"
+                      onClick={() => handleSearchExpansionModelChange('claude-3-5-haiku-20241022')}
+                    >
+                      {t('ai.selectDifferentModel')}
+                    </Button>
+                  )}
+                </div>
+
+                <p className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-lg flex items-start gap-2">
+                  <Lightbulb className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>{t('ai.searchExpansionModelHint')}</span>
                 </p>
               </div>
             )}

@@ -10,12 +10,15 @@
     "selectGPT": "选择 GPT 模型",
     "modelHint": "选择用于对话的 AI 模型。模型列表从 API 动态加载。",
     "advancedOptions": "高级选项",
-    "advancedDescription": "后台任务（如从网页导入作品）可以使用不同的模型，以平衡成本和效果。",
-    "backgroundModel": "后台任务模型",
-    "usingMainModel": "当前使用主模型处理后台任务",
+    "advancedDescription": "不同类型的后台任务可以使用不同的模型，以平衡成本和效果。",
+    "backgroundModel": "导入提取模型",
+    "usingMainModel": "当前使用主模型（{{modelName}}）",
     "selectDifferentModel": "选择其他模型",
     "resetToDefault": "恢复默认",
-    "backgroundModelHint": "Claude Sonnet 推荐用于结构化数据提取，GPT-4o 也表现良好。较小模型可降低成本但可能影响准确性。"
+    "backgroundModelHint": "用于从网页导入作品时提取信息。Claude Sonnet 推荐用于结构化数据提取，GPT-4o 也表现良好。",
+    "searchExpansionModel": "搜索翻译模型",
+    "usingDefaultFastModel": "当前使用默认快速模型（Claude 3.5 Haiku）",
+    "searchExpansionModelHint": "用于将中文搜索词翻译为英文。默认使用 Haiku，速度快成本低。如需更准确的翻译可选择更大模型。"
   },
   "export": {
     "title": "数据导出",

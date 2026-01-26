@@ -158,13 +158,28 @@ System prompt is in Chinese for the target user.
 | `search_history` | edition_id, artwork_title, action, after, before, related_party |
 
 Example queries:
-- "找所有用磁铁的作品" → materials search
+- "找所有用磁铁的作品" → materials search with AI query expansion
 - "所有 AP 版本" → edition_type filter
 - "品相为差的版本" → condition filter
 - "某某买的作品" → buyer_name search
 - "售价超过 10000 的版本" → price_min search
 - "这个版本什么时候卖的" → search_history
 - "去年的销售记录" → search_history with date range
+
+### AI-Powered Query Expansion
+
+Database stores English text in `materials`, `type` fields. When users search in Chinese:
+
+1. `expandSearchQuery()` uses `generateText` + `Output.object()` to translate and expand queries
+2. Uses configurable "Search Translation Model" (Settings > AI Model > Advanced Options)
+3. Defaults to Claude 3.5 Haiku (fast, low-cost)
+4. Generates multiple search variants including translations, singular/plural forms, and synonyms
+
+Example: "磁铁" → `["magnet", "magnets", "magnetic"]`
+
+**Key files:**
+- `api/chat.ts` - `expandSearchQuery()` function
+- Model configured via `localStorage.getItem('search-expansion-model')`
 
 ### Modification Capabilities
 
@@ -195,12 +210,13 @@ Import artworks directly from web pages by typing "导入 URL" in chat. The syst
 - `api/lib/image-downloader.ts` - Image URL selection (`selectBestImage`)
 - `api/chat.ts` - `import_artwork_from_url` tool definition
 
-**Configurable Extraction Model:**
-- Users can configure a separate AI model for background tasks (like URL import) in Settings > "AI Model" > "Advanced Options"
-- Default: Uses the same model as chat (main model)
-- Supports both Anthropic (Claude) and OpenAI (GPT) models
-- Claude Sonnet recommended for structured data extraction; GPT-4o also works well
-- Storage: `localStorage.getItem('extraction-model')` (empty = use main model)
+**Background Task Models (Settings > AI Model > Advanced Options):**
+Two configurable models for background tasks:
+
+| Task | Storage Key | Default | Recommended |
+|------|-------------|---------|-------------|
+| URL Import | `extraction-model` | Main chat model | Sonnet/GPT-4o |
+| Search Translation | `search-expansion-model` | Haiku | Haiku (fast) |
 
 ## Public Links Feature
 

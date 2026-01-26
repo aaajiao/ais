@@ -10,12 +10,15 @@
     "selectGPT": "Select GPT model",
     "modelHint": "Select AI model for conversations. Model list is dynamically loaded from API.",
     "advancedOptions": "Advanced Options",
-    "advancedDescription": "Background tasks (like importing artworks from web pages) can use a different model to balance cost and quality.",
-    "backgroundModel": "Background Task Model",
-    "usingMainModel": "Currently using main model for background tasks",
+    "advancedDescription": "Different types of background tasks can use different models to balance cost and quality.",
+    "backgroundModel": "Import Extraction Model",
+    "usingMainModel": "Currently using main model ({{modelName}})",
     "selectDifferentModel": "Select different model",
     "resetToDefault": "Reset to default",
-    "backgroundModelHint": "Claude Sonnet is recommended for structured data extraction. GPT-4o also works well. Smaller models may reduce costs but affect accuracy."
+    "backgroundModelHint": "Used for extracting info when importing artworks from web pages. Claude Sonnet is recommended for structured data extraction. GPT-4o also works well.",
+    "searchExpansionModel": "Search Translation Model",
+    "usingDefaultFastModel": "Currently using default fast model (Claude 3.5 Haiku)",
+    "searchExpansionModelHint": "Used for translating Chinese search terms to English. Defaults to Haiku for speed and low cost. Choose a larger model for more accurate translation."
   },
   "export": {
     "title": "Data Export",

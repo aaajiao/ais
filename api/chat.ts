@@ -1,4 +1,4 @@
-import { streamText, tool, convertToModelMessages, stepCountIs, type UIMessage } from 'ai';
+import { streamText, generateText, Output, tool, convertToModelMessages, stepCountIs, type UIMessage } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
@@ -64,6 +64,87 @@ function sanitizeSearchTerm(term: string): string {
     .replace(/_/g, '\\_');
 }
 
+// 默认查询扩展模型（用于后台任务的快速模型）
+const DEFAULT_EXPANSION_MODEL = 'claude-3-5-haiku-20241022';
+
+/**
+ * AI 驱动的搜索词扩展
+ * 使用 LLM 将用户查询翻译并扩展为多个搜索变体
+ * @param term 用户输入的搜索词
+ * @param modelId 使用的模型 ID（来自用户设置）
+ */
+async function expandSearchQuery(
+  term: string,
+  modelId?: string
+): Promise<string[]> {
+  // 快速路径：纯英文且较短的单词，只做基本的单复数处理
+  if (/^[a-z]+$/i.test(term) && term.length < 20) {
+    const normalized = term.toLowerCase();
+    const variants = new Set<string>([normalized]);
+
+    // 基本单复数处理
+    if (normalized.endsWith('ies') && normalized.length > 4) {
+      variants.add(normalized.slice(0, -3) + 'y');
+    } else if (normalized.endsWith('es') && normalized.length > 3) {
+      variants.add(normalized.slice(0, -2));
+    } else if (normalized.endsWith('s') && normalized.length > 2) {
+      variants.add(normalized.slice(0, -1));
+    }
+    if (!normalized.endsWith('s')) {
+      variants.add(normalized + 's');
+    }
+
+    return [...variants];
+  }
+
+  // 对于非纯英文（如中文）或复杂查询，使用 AI 扩展
+  try {
+    // 选择模型：优先使用用户配置，否则使用默认快速模型
+    const selectedModelId = modelId || DEFAULT_EXPANSION_MODEL;
+    const model = getModel(selectedModelId);
+
+    console.log('[expandSearchQuery] Using model:', selectedModelId, 'for term:', term);
+
+    const result = await generateText({
+      model,
+      output: Output.object({
+        schema: z.object({
+          searchTerms: z.array(z.string()).describe('English search term variants'),
+        }),
+      }),
+      prompt: `You are a search query expander for an art inventory database. The materials field in the database is stored in English.
+
+Given the user's search term: "${term}"
+
+Generate 2-5 English search variants that should be used to search the materials field. Include:
+1. Direct translation if it's not in English
+2. Singular and plural forms
+3. Common synonyms or related terms in art/materials context
+
+Rules:
+- Output ONLY lowercase English words
+- Each variant should be a single word or short phrase
+- Focus on exact matches for database ILIKE search
+- Don't include the original term if it's not English
+
+Example:
+- Input: "磁铁" → ["magnet", "magnets", "magnetic"]
+- Input: "木头" → ["wood", "wooden", "timber"]
+- Input: "LED" → ["led", "leds", "light"]`,
+    });
+
+    if (result.output?.searchTerms && result.output.searchTerms.length > 0) {
+      console.log('[expandSearchQuery] AI expanded:', term, '→', result.output.searchTerms);
+      return result.output.searchTerms;
+    }
+  } catch (error) {
+    console.warn('[expandSearchQuery] AI expansion failed, falling back:', error);
+  }
+
+  // 回退：返回原始词
+  return [term.toLowerCase()];
+}
+
 // 系统提示词
 const systemPrompt = `你是 aaajiao 艺术作品库存管理系统的 AI 助手。你可以帮助用户：
 1. 查询作品和版本信息
@@ -110,7 +191,7 @@ const systemPrompt = `你是 aaajiao 艺术作品库存管理系统的 AI 助手
 3. 如果用户提供了价格信息，也一并记录
 
 搜索能力：
-- 可以按材料搜索作品（如「找所有用磁铁的作品」）
+- 可以按材料搜索作品（如「找所有用磁铁的作品」）- 支持中文搜索，系统会自动翻译
 - 可以按版本类型筛选（如「所有 AP 版本」）
 - 可以按品相筛选（如「品相为差的版本」）
 - 可以按买家搜索（如「某某买的作品」）
@@ -120,7 +201,7 @@ const systemPrompt = `你是 aaajiao 艺术作品库存管理系统的 AI 助手
 修改能力：
 - 可以更新版本品相（condition）和品相备注
 - 可以更新存储位置详情（storage_detail）
-- 可以设置借展日期（consignment_start, loan_end）
+- 可以设置借出日期（consignment_start, consignment_end）和展览日期（loan_start, loan_end）
 
 不支持的操作（请用户通过界面操作）：
 - 修改作品基本信息（标题、年份、材料等）
@@ -128,19 +209,21 @@ const systemPrompt = `你是 aaajiao 艺术作品库存管理系统的 AI 助手
 - 分配库存编号
 - 修改证书编号`;
 
-// 定义工具 - 使用函数形式以便延迟获取 supabase
-function getTools(extractionModel?: string) {
+// 定义工具
+// - extractionModel: 用于 URL 导入提取（复杂任务，需要强模型）
+// - searchExpansionModel: 用于搜索词翻译/扩展（简单任务，用快速模型）
+function getTools(extractionModel?: string, searchExpansionModel?: string) {
   const supabase = getSupabase();
 
   return {
     // 搜索作品
     search_artworks: tool({
-      description: '搜索艺术作品，可以按标题、年份、类型、材料搜索',
+      description: '搜索艺术作品，可以按标题、年份、类型、材料搜索。支持中英文搜索，系统会自动翻译和扩展搜索词',
       inputSchema: z.object({
         query: z.string().optional().describe('搜索关键词（标题）'),
         year: z.string().optional().describe('年份'),
         type: z.string().optional().describe('作品类型'),
-        materials: z.string().optional().describe('材料关键词'),
+        materials: z.string().optional().describe('材料关键词（支持中英文）'),
         is_unique: z.boolean().optional().describe('是否独版作品'),
       }),
       execute: async ({ query, year, type, materials, is_unique }) => {
@@ -155,12 +238,16 @@ function getTools(extractionModel?: string) {
           queryBuilder = queryBuilder.eq('year', year);
         }
         if (type) {
-          const sanitized = sanitizeSearchTerm(type);
-          queryBuilder = queryBuilder.ilike('type', `%${sanitized}%`);
+          // 对 type 也使用 AI 扩展（可能是中文）
+          const typeVariants = await expandSearchQuery(type, searchExpansionModel);
+          const typeFilters = typeVariants.map(v => `type.ilike.%${sanitizeSearchTerm(v)}%`);
+          queryBuilder = queryBuilder.or(typeFilters.join(','));
         }
         if (materials) {
-          const sanitized = sanitizeSearchTerm(materials);
-          queryBuilder = queryBuilder.ilike('materials', `%${sanitized}%`);
+          // 使用 AI 驱动的查询扩展（处理翻译、单复数、同义词）
+          const variants = await expandSearchQuery(materials, searchExpansionModel);
+          const filters = variants.map(v => `materials.ilike.%${sanitizeSearchTerm(v)}%`);
+          queryBuilder = queryBuilder.or(filters.join(','));
         }
         if (is_unique !== undefined) {
           queryBuilder = queryBuilder.eq('is_unique', is_unique);
@@ -369,8 +456,10 @@ function getTools(extractionModel?: string) {
           condition: z.enum(['excellent', 'good', 'fair', 'poor', 'damaged']).optional().describe('品相'),
           condition_notes: z.string().optional().describe('品相备注'),
           storage_detail: z.string().optional().describe('存储位置详情'),
-          consignment_start: z.string().optional().describe('借展/寄售开始日期'),
-          loan_end: z.string().optional().describe('借展结束日期'),
+          consignment_start: z.string().optional().describe('借出日期（at_gallery 状态）'),
+          consignment_end: z.string().optional().describe('预计归还日期（at_gallery 状态）'),
+          loan_start: z.string().optional().describe('展期开始日期（at_museum 状态）'),
+          loan_end: z.string().optional().describe('展期结束日期（at_museum 状态）'),
         }).describe('要更新的字段'),
         reason: z.string().describe('更新原因/说明'),
       }),
@@ -425,6 +514,8 @@ function getTools(extractionModel?: string) {
           condition_notes: z.string().optional(),
           storage_detail: z.string().optional(),
           consignment_start: z.string().optional(),
+          consignment_end: z.string().optional(),
+          loan_start: z.string().optional(),
           loan_end: z.string().optional(),
         }).describe('要更新的字段'),
         confirmed: z.boolean().describe('用户是否已确认'),
@@ -456,6 +547,8 @@ function getTools(extractionModel?: string) {
         if (updates.condition_notes) updateData.condition_notes = updates.condition_notes;
         if (updates.storage_detail) updateData.storage_detail = updates.storage_detail;
         if (updates.consignment_start) updateData.consignment_start = updates.consignment_start;
+        if (updates.consignment_end) updateData.consignment_end = updates.consignment_end;
+        if (updates.loan_start) updateData.loan_start = updates.loan_start;
         if (updates.loan_end) updateData.loan_end = updates.loan_end;
 
         // 执行更新
@@ -866,21 +959,24 @@ export default async function handler(req: Request) {
     }
 
     const body = await req.json();
-    const { messages: uiMessages, model = 'claude-sonnet-4.5', extractionModel } = body;
+    const { messages: uiMessages, model = 'claude-sonnet-4.5', extractionModel, searchExpansionModel } = body;
 
     // 2. 安全日志（不记录敏感消息内容）
     console.log('[chat] Request', {
       userId: auth.userId,
       model,
       extractionModel: extractionModel || 'default',
+      searchExpansionModel: searchExpansionModel || 'default',
       messageCount: uiMessages?.length,
     });
 
     // 获取模型（延迟初始化）
     const selectedModel = getModel(model);
 
-    // 获取工具（延迟初始化，传入提取模型）
-    const tools = getTools(extractionModel);
+    // 获取工具（延迟初始化）
+    // - extractionModel: 用于 URL 导入提取
+    // - searchExpansionModel: 用于搜索词翻译/扩展
+    const tools = getTools(extractionModel, searchExpansionModel);
 
     // 使用官方的 convertToModelMessages 转换 UIMessage 到 CoreMessage
     const modelMessages = await convertToModelMessages(uiMessages as UIMessage[]);

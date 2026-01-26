@@ -37,6 +37,11 @@ export default function Chat() {
     return localStorage.getItem('extraction-model') || '';
   });
 
+  // 获取搜索扩展模型（空字符串表示使用默认快速模型）
+  const [searchExpansionModel] = useState(() => {
+    return localStorage.getItem('search-expansion-model') || '';
+  });
+
   // 获取模型显示名称（包含版本号）
   const getModelDisplayName = (modelId: string) => {
     // Claude 模型：提取版本号
@@ -102,9 +107,11 @@ export default function Chat() {
           model: selectedModel,
           // 传递提取模型：空字符串时使用聊天模型
           extractionModel: extractionModel || selectedModel,
+          // 传递搜索扩展模型：空字符串表示使用默认快速模型
+          searchExpansionModel: searchExpansionModel || '',
         },
       }),
-    [selectedModel, extractionModel, authenticatedFetch]
+    [selectedModel, extractionModel, searchExpansionModel, authenticatedFetch]
   );
 
   const {
