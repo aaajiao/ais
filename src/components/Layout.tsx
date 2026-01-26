@@ -5,6 +5,7 @@ import { useAuthContext } from '@/contexts/AuthContext';
 import { useThemeContext } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
+import { NetworkIndicator } from '@/components/ui/NetworkIndicator';
 import { MessageSquare, Sun, Moon, Home, Package, MessageCircle, Settings } from 'lucide-react';
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher';
 import ChatSidebar from './ChatSidebar';
@@ -74,6 +75,9 @@ export default function Layout() {
 
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">
+      {/* 网络状态指示器 */}
+      <NetworkIndicator />
+
       {/* 移动端顶部工具栏 (iPhone + iPad 竖屏) */}
       <header className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-border">
         <h1 className="text-lg font-bold tracking-tight">{t('appTitle')}</h1>

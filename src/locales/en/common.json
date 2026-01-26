@@ -154,6 +154,9 @@
   },
   "newVersionAvailable": "New version available",
   "reloadNow": "Reload now",
+  "network": {
+    "offline": "Offline - Viewing cached data only"
+  },
   "thumbnailMigration": {
     "description": "Check and migrate artwork thumbnails from external links to local storage",
     "checkButton": "Check artworks to migrate",

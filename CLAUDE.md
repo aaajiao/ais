@@ -36,6 +36,7 @@ bun run lint
 - **Database**: Supabase (PostgreSQL + Storage + Auth)
 - **AI**: Vercel AI SDK with Claude (Anthropic) and GPT (OpenAI)
 - **PWA**: vite-plugin-pwa (manifest, service worker, offline caching)
+- **Offline**: React Query persist to IndexedDB via `@tanstack/react-query-persist-client` + `idb-keyval`
 
 ## Project Structure
 
@@ -70,7 +71,8 @@ bun run lint
 
 - `src/lib/database.types.ts` - Auto-generated Supabase types
 - `src/lib/types.ts` - App-specific TypeScript types
-- `src/lib/queryClient.ts` - React Query client configuration
+- `src/lib/queryClient.ts` - React Query client configuration (with offline-first mode)
+- `src/lib/indexedDBPersister.ts` - IndexedDB persister for React Query cache
 - `src/lib/queryKeys.ts` - Query key factory for cache management
 - `src/hooks/queries/` - React Query hooks (useArtworks, useEditions, useDashboard)
 - `src/hooks/useInfiniteVirtualList.ts` - Virtual scrolling + infinite loading hook
@@ -213,13 +215,23 @@ Non-critical pages use `React.lazy()` for code splitting:
 - Chat, Import, Settings loaded on demand
 - Reduces initial bundle size
 
-### Query Caching
+### Query Caching & Offline Support
 
 React Query provides:
 - 5-minute stale time (data considered fresh)
-- 30-minute garbage collection
+- 24-hour garbage collection (matches IndexedDB persistence)
 - Automatic background refetching
 - Query key invalidation on mutations
+- **Offline-first mode** (`networkMode: 'offlineFirst'`)
+- **IndexedDB persistence** via `PersistQueryClientProvider`
+
+**Key files:**
+- `src/lib/queryClient.ts` - Query client with offline-first config
+- `src/lib/indexedDBPersister.ts` - IndexedDB persister
+- `src/hooks/useNetworkStatus.ts` - Network status hook
+- `src/components/ui/NetworkIndicator.tsx` - Offline banner
+
+**Design decision:** Read-only offline mode. Users can browse cached data offline but editing requires network connection. This simplifies the mental model and avoids sync conflicts.
 
 ## Common Tasks
 
