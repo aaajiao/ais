@@ -54,12 +54,12 @@ export default function Dashboard() {
       <div className="p-4 sm:p-6 lg:p-8">
         <h1 className="text-page-title mb-6 xl:mb-8">{t('title')}</h1>
         {/* 骨架屏 - 不对称网格 */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-6 mb-8">
           <div className="col-span-2 md:row-span-2 bg-card border border-border rounded-xl p-6">
             <div className="h-16 w-24 bg-muted rounded animate-pulse mb-2" />
             <div className="h-4 w-20 bg-muted rounded animate-pulse" />
           </div>
-          {[1, 2, 3].map((i) => (
+          {[1, 2, 3, 4].map((i) => (
             <div key={i} className="bg-card border border-border rounded-xl p-4">
               <div className="h-9 w-12 bg-muted rounded animate-pulse mb-2" />
               <div className="h-4 w-16 bg-muted rounded animate-pulse" />
@@ -76,13 +76,14 @@ export default function Dashboard() {
     );
   }
 
-  const displayStats = stats || {
+  const displayStats = {
     totalArtworks: 0,
     totalEditions: 0,
     inStudio: 0,
     atGallery: 0,
     atMuseum: 0,
     sold: 0,
+    ...stats,
   };
 
   return (
