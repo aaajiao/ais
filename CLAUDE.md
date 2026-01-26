@@ -22,6 +22,11 @@ bun run build
 
 # Lint
 bun run lint
+
+# Run tests
+bun test              # Watch mode
+bun test:run          # Single run
+bun test:ui           # Visual UI
 ```
 
 **Note**: Local development uses `vercel-dev.json` to override production SPA rewrites config for Vite 7 compatibility.
@@ -37,16 +42,33 @@ bun run lint
 - **AI**: Vercel AI SDK with Claude (Anthropic) and GPT (OpenAI)
 - **PWA**: vite-plugin-pwa (manifest, service worker, offline caching)
 - **Offline**: React Query persist to IndexedDB via `@tanstack/react-query-persist-client` + `idb-keyval`
+- **Testing**: Vitest + React Testing Library + happy-dom
 
 ## Project Structure
 
 ```
 ./
 ├── api/                    # Serverless API handlers
-│   ├── chat.ts            # AI chat with tools
+│   ├── chat.ts            # AI chat entry point (~80 lines)
+│   ├── __tests__/         # API unit tests
 │   ├── lib/               # Shared API utilities
 │   │   ├── artwork-extractor.ts  # LLM-based HTML parsing
-│   │   └── image-downloader.ts   # Image URL selection
+│   │   ├── image-downloader.ts   # Image URL selection
+│   │   ├── model-provider.ts     # AI model provider setup
+│   │   ├── search-utils.ts       # Search utilities (sanitize, expand)
+│   │   └── system-prompt.ts      # AI system prompt
+│   ├── tools/             # AI chat tools (modular)
+│   │   ├── index.ts              # Tool registry
+│   │   ├── types.ts              # ToolContext type
+│   │   ├── search-artworks.ts    # Search artworks tool
+│   │   ├── search-editions.ts    # Search editions tool
+│   │   ├── search-locations.ts   # Search locations tool
+│   │   ├── search-history.ts     # Search history tool
+│   │   ├── get-statistics.ts     # Statistics tool
+│   │   ├── update-confirmation.ts # Update confirmation card
+│   │   ├── execute-update.ts     # Execute edition update
+│   │   ├── export-artworks.ts    # Export to PDF/MD
+│   │   └── import-from-url.ts    # Import from URL
 │   ├── export/            # PDF/Markdown export
 │   └── import/            # Markdown import
 ├── src/
@@ -59,7 +81,8 @@ bun run lint
 │   ├── pages/             # Route pages
 │   ├── contexts/          # AuthContext, ThemeContext
 │   ├── hooks/             # useAuth, useFileUpload, etc.
-│   └── lib/               # Utils, types, Supabase client
+│   ├── lib/               # Utils, types, Supabase client
+│   └── test/              # Test setup
 ├── supabase/              # Supabase config
 ├── public/                # Static assets
 ├── docs/                  # Documentation files
@@ -75,9 +98,16 @@ bun run lint
 - `src/lib/indexedDBPersister.ts` - IndexedDB persister for React Query cache
 - `src/lib/queryKeys.ts` - Query key factory for cache management
 - `src/lib/cacheInvalidation.ts` - Centralized cache invalidation helpers
+- `src/lib/formatters.ts` - Display formatting utilities (edition number, price, date)
+- `src/lib/inventoryNumber.ts` - Inventory number pattern analysis and suggestion
+- `src/lib/md-parser.ts` - Markdown file parser for artwork import
 - `src/hooks/queries/` - React Query hooks (useArtworks, useEditions, useDashboard)
 - `src/hooks/useInfiniteVirtualList.ts` - Virtual scrolling + infinite loading hook
-- `api/chat.ts` - AI chat handler with tool definitions
+- `api/chat.ts` - AI chat handler entry point
+- `api/lib/model-provider.ts` - AI model provider setup (Anthropic/OpenAI)
+- `api/lib/search-utils.ts` - SQL sanitization and search query expansion
+- `api/lib/system-prompt.ts` - AI system prompt (Chinese)
+- `api/tools/index.ts` - AI tool registry (creates all tools)
 - `src/lib/supabase.ts` - Supabase client initialization
 
 ## Environment Variables
@@ -178,7 +208,7 @@ Database stores English text in `materials`, `type` fields. When users search in
 Example: "磁铁" → `["magnet", "magnets", "magnetic"]`
 
 **Key files:**
-- `api/chat.ts` - `expandSearchQuery()` function
+- `api/lib/search-utils.ts` - `expandSearchQuery()` and `expandEnglishPluralForms()` functions
 - Model configured via `localStorage.getItem('search-expansion-model')`
 
 ### Modification Capabilities
@@ -208,7 +238,7 @@ Import artworks directly from web pages by typing "导入 URL" in chat. The syst
 **Key files:**
 - `api/lib/artwork-extractor.ts` - LLM extraction with Zod schema (supports Anthropic + OpenAI)
 - `api/lib/image-downloader.ts` - Image URL selection (`selectBestImage`)
-- `api/chat.ts` - `import_artwork_from_url` tool definition
+- `api/tools/import-from-url.ts` - `import_artwork_from_url` tool
 
 **Background Task Models (Settings > AI Model > Advanced Options):**
 Two configurable models for background tasks:
@@ -296,9 +326,28 @@ React Query provides:
 3. Add navigation link in `src/components/layout/Sidebar.tsx`
 
 ### Add a new AI tool
-1. Define tool in `api/chat.ts` tools object
-2. Add Zod schema for parameters
-3. Implement tool logic with Supabase queries
+1. Create tool file in `api/tools/` (e.g., `api/tools/my-tool.ts`)
+2. Define tool with `tool()` from `ai` package and Zod schema
+3. Export a factory function: `createMyTool(ctx: ToolContext)`
+4. Register in `api/tools/index.ts`
+
+Example:
+```typescript
+// api/tools/my-tool.ts
+import { tool } from 'ai';
+import { z } from 'zod';
+import type { ToolContext } from './types.js';
+
+export function createMyTool(ctx: ToolContext) {
+  return tool({
+    description: 'Tool description',
+    inputSchema: z.object({ ... }),
+    execute: async (params) => {
+      // Use ctx.supabase for database queries
+    },
+  });
+}
+```
 
 ### Update database types
 After schema changes in Supabase:
@@ -434,6 +483,66 @@ t('selected', { count: 5 }) // "已选择 5 项" / "5 selected"
 - `LanguageSwitcher` component in Settings page
 - Language preference stored in `localStorage` (`i18nextLng`)
 - Auto-detects browser language on first visit
+
+## Testing
+
+The project uses **Vitest** for unit testing with React Testing Library and happy-dom.
+
+### Test Commands
+
+```bash
+bun test              # Run tests in watch mode
+bun test:run          # Run tests once
+bun test:ui           # Open visual test UI
+```
+
+### Test Structure
+
+```
+api/__tests__/
+├── search-utils.test.ts      # SQL sanitization, plural expansion
+├── image-downloader.test.ts  # Image selection logic
+└── artwork-extractor.test.ts # HTML parsing, image extraction
+
+src/lib/
+├── formatters.test.ts        # Edition number, price, date formatting
+├── inventoryNumber.test.ts   # Pattern analysis, number suggestion
+└── md-parser.test.ts         # Markdown parsing for import
+```
+
+### Test Coverage (164 tests)
+
+| Module | Tests | Coverage |
+|--------|-------|----------|
+| `search-utils` | 26 | SQL injection prevention, English plural expansion |
+| `image-downloader` | 13 | CDN priority, size-based selection |
+| `artwork-extractor` | 31 | HTML image extraction, HTML cleaning |
+| `formatters` | 24 | Edition number, price, date display |
+| `inventoryNumber` | 37 | Pattern detection, number generation, validation |
+| `md-parser` | 33 | Title parsing, field extraction, image extraction |
+
+### Writing Tests
+
+Tests are colocated with source files or in `__tests__` directories:
+- API tests: `api/__tests__/*.test.ts`
+- Library tests: `src/lib/*.test.ts`
+
+Example test:
+```typescript
+import { describe, it, expect } from 'vitest';
+import { formatPrice } from './formatters';
+
+describe('formatPrice', () => {
+  it('should format USD price', () => {
+    expect(formatPrice(1000, 'USD')).toBe('$1,000');
+  });
+});
+```
+
+### Test Configuration
+
+- `vitest.config.ts` - Test runner configuration
+- `src/test/setup.ts` - Test environment setup (jest-dom matchers)
 
 ## Notes
 

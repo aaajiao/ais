@@ -62,7 +62,7 @@ export interface ExtractionResult {
 /**
  * 从 HTML 中提取所有图片 URL
  */
-function extractImageUrls(html: string): string[] {
+export function extractImageUrls(html: string): string[] {
   const images: string[] = [];
 
   // 匹配 <img> 标签的 src 属性
@@ -110,7 +110,7 @@ function extractImageUrls(html: string): string[] {
 /**
  * 清理 HTML，移除脚本和样式，减少 token 消耗
  */
-function cleanHtml(html: string): string {
+export function cleanHtml(html: string): string {
   return html
     // 移除 script 标签
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
