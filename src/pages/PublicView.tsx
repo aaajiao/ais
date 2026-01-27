@@ -86,7 +86,7 @@ function ArtworkCard({
 }: {
   item: PublicViewItem;
   showPrices: boolean;
-  t: (key: string) => string;
+  t: (key: string, options?: Record<string, unknown>) => string;
 }) {
   const { artwork, inventory_number, edition_label, edition_total, ap_total, is_unique, status, price, currency } = item;
   const statusColor = STATUS_COLORS[status] || 'var(--muted-foreground)';
