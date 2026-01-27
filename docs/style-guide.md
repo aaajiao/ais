@@ -503,12 +503,14 @@ import { Trash2, Pencil, X } from 'lucide-react';
 
 | 设备 | 按钮可见性 |
 |------|-----------|
-| 移动端 (< 768px) | 始终可见 |
-| 桌面端 (≥ 768px) | hover 时显示 |
+| 移动端 (< 1024px) | 始终可见 |
+| 桌面端 (≥ 1024px) | hover 时显示 |
+
+> **注意**：必须使用 `lg:` (1024px) 断点，与项目核心断点保持一致。禁止使用 `md:` (768px)，否则 iPad 竖屏会出现按钮隐藏问题。
 
 ```tsx
 <div
-  className="flex items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+  className="flex items-center gap-1 text-muted-foreground lg:opacity-0 lg:group-hover:opacity-100 transition-opacity"
   onClick={e => e.stopPropagation()}
 >
   <IconButton variant="ghost" size="sm" label="编辑">

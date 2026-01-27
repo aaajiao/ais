@@ -68,7 +68,7 @@ export default function LocationItem({
 
           {/* 操作按钮 - 移动端始终可见，桌面端 hover 显示 */}
           <div
-            className="flex items-center gap-1 text-muted-foreground md:opacity-0 md:group-hover:opacity-100 transition-opacity flex-shrink-0"
+            className="flex items-center gap-1 text-muted-foreground lg:opacity-0 lg:group-hover:opacity-100 transition-opacity flex-shrink-0"
             onClick={e => e.stopPropagation()}
           >
             <IconButton
