@@ -66,9 +66,9 @@ export default function LocationItem({
           <span className="text-muted-foreground flex-shrink-0">{TYPE_ICONS[location.type]}</span>
           <p className="font-medium truncate flex-1 min-w-0">{location.name}</p>
 
-          {/* 操作按钮 - 移动端始终可见，桌面端 hover 显示 */}
+          {/* 操作按钮 - 触摸设备始终可见，有 hover 能力的设备 hover 显示 */}
           <div
-            className="flex items-center gap-1 text-muted-foreground lg:opacity-0 lg:group-hover:opacity-100 transition-opacity flex-shrink-0"
+            className="hover-action-buttons flex items-center gap-1 text-muted-foreground flex-shrink-0"
             onClick={e => e.stopPropagation()}
           >
             <IconButton

@@ -29,8 +29,8 @@ export const FileGridItem = memo(function FileGridItem({
         </div>
       )}
 
-      {/* 悬浮操作层 */}
-      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+      {/* 悬浮操作层 - 触摸设备始终可见，鼠标设备 hover 显示 */}
+      <div className="hover-action-buttons absolute inset-0 bg-black/50 flex items-center justify-center gap-2">
         <button
           onClick={() => onOpen(file)}
           className="p-2 bg-white/20 hover:bg-white/30 rounded-full text-white"

@@ -256,6 +256,24 @@ h1, h2, h3, .font-display {
   }
 }
 
+/* 列表项操作按钮 - 基于 hover 能力而非屏幕尺寸 */
+/* 触摸设备：始终可见 */
+@media (hover: none) {
+  .hover-action-buttons {
+    opacity: 1 !important;
+  }
+}
+/* 有 hover 能力的设备：默认隐藏，hover 时显示 */
+@media (hover: hover) and (pointer: fine) {
+  .hover-action-buttons {
+    opacity: 0;
+    transition: opacity 150ms;
+  }
+  .group:hover .hover-action-buttons {
+    opacity: 1;
+  }
+}
+
 /* 导航链接下划线动画 */
 .nav-link {
   position: relative;

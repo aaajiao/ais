@@ -499,18 +499,18 @@ import { Trash2, Pencil, X } from 'lucide-react';
 
 ### 列表项操作按钮
 
-列表项的编辑/删除操作按钮采用**响应式可见性**策略：
+列表项的编辑/删除操作按钮采用**基于 hover 能力**的可见性策略：
 
-| 设备 | 按钮可见性 |
-|------|-----------|
-| 移动端 (< 1024px) | 始终可见 |
-| 桌面端 (≥ 1024px) | hover 时显示 |
+| 设备类型 | 按钮可见性 |
+|----------|-----------|
+| 触摸设备（iPhone/iPad/Android） | 始终可见 |
+| 鼠标设备（桌面电脑） | hover 时显示 |
 
-> **注意**：必须使用 `lg:` (1024px) 断点，与项目核心断点保持一致。禁止使用 `md:` (768px)，否则 iPad 竖屏会出现按钮隐藏问题。
+> **重要**：使用 CSS 类 `hover-action-buttons` 而非 Tailwind 断点。该类基于 `@media (hover: hover)` 检测设备能力，而非屏幕尺寸。这确保 iPad 横屏（虽然宽度 > 1024px 但无 hover）也能正确显示按钮。
 
 ```tsx
 <div
-  className="flex items-center gap-1 text-muted-foreground lg:opacity-0 lg:group-hover:opacity-100 transition-opacity"
+  className="hover-action-buttons flex items-center gap-1 text-muted-foreground"
   onClick={e => e.stopPropagation()}
 >
   <IconButton variant="ghost" size="sm" label="编辑">
@@ -520,6 +520,26 @@ import { Trash2, Pencil, X } from 'lucide-react';
     <Trash2 />
   </IconButton>
 </div>
+```
+
+**CSS 定义**（位于 `src/index.css`）：
+```css
+/* 触摸设备：始终可见 */
+@media (hover: none) {
+  .hover-action-buttons {
+    opacity: 1 !important;
+  }
+}
+/* 有 hover 能力的设备：默认隐藏，hover 时显示 */
+@media (hover: hover) and (pointer: fine) {
+  .hover-action-buttons {
+    opacity: 0;
+    transition: opacity 150ms;
+  }
+  .group:hover .hover-action-buttons {
+    opacity: 1;
+  }
+}
 ```
 
 **删除操作采用两阶段确认**（参考 FileListItem、LocationItem）：
