@@ -28,6 +28,21 @@ interface ModelsResponse {
   defaultModel: string | null;
 }
 
+/**
+ * 将完整模型 ID 转换为短别名显示
+ * claude-sonnet-4-5-20250929 → claude-sonnet-4-5
+ * claude-haiku-4-5-20251001 → claude-haiku-4-5
+ */
+function formatModelIdForDisplay(modelId: string): string {
+  // 匹配 Claude 模型的日期后缀 (如 -20250929)
+  const claudeDatePattern = /^(claude-(?:sonnet|opus|haiku)-\d+-\d+)-\d{8}$/;
+  const match = modelId.match(claudeDatePattern);
+  if (match) {
+    return match[1];
+  }
+  return modelId;
+}
+
 export default function Settings() {
   const { t, i18n } = useTranslation('settings');
   const descLang = i18n.language.startsWith('zh') ? 'zh' : 'en';
@@ -363,7 +378,7 @@ export default function Settings() {
             {selectedModelInfo.description && (
               <p>{selectedModelInfo.description[descLang]}</p>
             )}
-            <p className="text-xs font-mono">{selectedModel}</p>
+            <p className="text-xs font-mono">{formatModelIdForDisplay(selectedModel)}</p>
           </div>
         )}
       </div>
@@ -472,7 +487,7 @@ export default function Settings() {
                           {extractionModelInfo.description && (
                             <p>{extractionModelInfo.description[descLang]}</p>
                           )}
-                          <p className="text-xs font-mono">{extractionModel}</p>
+                          <p className="text-xs font-mono">{formatModelIdForDisplay(extractionModel)}</p>
                         </div>
                       )}
                     </div>
@@ -565,7 +580,7 @@ export default function Settings() {
                           {searchExpansionModelInfo.description && (
                             <p>{searchExpansionModelInfo.description[descLang]}</p>
                           )}
-                          <p className="text-xs font-mono">{searchExpansionModel}</p>
+                          <p className="text-xs font-mono">{formatModelIdForDisplay(searchExpansionModel)}</p>
                         </div>
                       )}
                     </div>
