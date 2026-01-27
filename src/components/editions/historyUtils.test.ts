@@ -2,7 +2,7 @@
  * Tests for historyUtils
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import type { TFunction } from 'i18next';
 import type { EditionHistory } from './historyTypes';
 import {
@@ -46,6 +46,7 @@ const createMockHistoryItem = (
   currency: null,
   related_party: null,
   notes: null,
+  created_by: null,
   ...overrides,
 });
 
