@@ -167,11 +167,11 @@ export default function ExternalLinkDialog({
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]"
       onClick={handleClose}
     >
       <div
-        className="bg-card border border-border rounded-xl p-6 w-full max-w-md"
+        className="bg-card border border-border rounded-xl p-6 w-full max-w-md max-h-[85vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">

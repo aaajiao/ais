@@ -197,7 +197,7 @@ export default function Chat() {
   const hasHistory = messages.length > 0 && chatTimestamp;
 
   return (
-    <div className="absolute inset-0 flex flex-col pb-[var(--spacing-nav-bottom)] md:pb-0">
+    <div className="absolute inset-x-0 top-0 bottom-[var(--spacing-nav-bottom)] lg:bottom-0 flex flex-col">
       {/* 顶部栏 - 显示历史信息和清除按钮 */}
       {hasHistory && (
         <div className="px-6 py-2 border-b border-border flex items-center justify-between text-xs text-muted-foreground">
