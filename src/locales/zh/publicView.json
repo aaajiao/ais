@@ -9,6 +9,8 @@
   "dimensions": "尺寸：",
   "duration": "时长：",
   "edition": "版本：",
+  "editionInfo": "{{count}} 版",
+  "unique": "唯一",
   "status": {
     "in_production": "制作中",
     "in_studio": "在库",

@@ -9,6 +9,8 @@
   "dimensions": "Dimensions:",
   "duration": "Duration:",
   "edition": "Edition:",
+  "editionInfo": "{{count}} editions",
+  "unique": "Unique",
   "status": {
     "in_production": "In Production",
     "in_studio": "In Studio",

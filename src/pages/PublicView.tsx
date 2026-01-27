@@ -16,7 +16,9 @@ interface PublicViewItem {
   edition_id: string;
   inventory_number: string | null;
   edition_label: string;
-  edition_info: string;
+  edition_total: number | null;
+  ap_total: number | null;
+  is_unique: boolean;
   edition_type: 'numbered' | 'ap' | 'unique';
   status: EditionStatus;
   price: number | null;
@@ -86,7 +88,7 @@ function ArtworkCard({
   showPrices: boolean;
   t: (key: string) => string;
 }) {
-  const { artwork, inventory_number, edition_label, edition_info, status, price, currency } = item;
+  const { artwork, inventory_number, edition_label, edition_total, ap_total, is_unique, status, price, currency } = item;
   const statusColor = STATUS_COLORS[status] || 'var(--muted-foreground)';
 
   // 格式化顶部标识行（如 "1/3 #AAJ-2025-001"）
@@ -176,10 +178,19 @@ function ArtworkCard({
           )}
 
           {/* 版本信息（如 "3 版 + 1 AP"） */}
-          {edition_info && (
+          {(edition_total || ap_total || is_unique) && (
             <p>
               <span className="text-muted-foreground">{t('edition')}</span>
-              <span className="ml-1">{edition_info}</span>
+              <span className="ml-1">
+                {is_unique
+                  ? t('unique')
+                  : [
+                      edition_total && t('editionInfo', { count: edition_total }),
+                      ap_total && `${ap_total} AP`,
+                    ]
+                      .filter(Boolean)
+                      .join(' + ')}
+              </span>
             </p>
           )}
         </div>

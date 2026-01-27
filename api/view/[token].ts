@@ -192,26 +192,14 @@ async function handleGet(request: Request) {
         }
       }
 
-      // 格式化版本总数描述（如 "3 版 + 1 AP"）
-      let editionInfo = '';
-      if (artwork.is_unique) {
-        editionInfo = 'Unique';
-      } else {
-        const parts = [];
-        if (artwork.edition_total) {
-          parts.push(`${artwork.edition_total} 版`);
-        }
-        if (artwork.ap_total) {
-          parts.push(`${artwork.ap_total} AP`);
-        }
-        editionInfo = parts.join(' + ');
-      }
-
       return {
         edition_id: edition.id,
         inventory_number: edition.inventory_number,
         edition_label: editionLabel,
-        edition_info: editionInfo,
+        // 返回原始数据，由前端根据语言格式化
+        edition_total: artwork.edition_total,
+        ap_total: artwork.ap_total,
+        is_unique: artwork.is_unique,
         edition_type: edition.edition_type,
         status: edition.status,
         // 根据配置决定是否包含价格
