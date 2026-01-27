@@ -42,7 +42,8 @@
     "sharp": "^0.34.5",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
-    "vercel": "^50.5.0",
+    "use-debounce": "^10.1.0",
+    "vercel": "^50.6.1",
     "zod": "^4.3.6"
   },
   "devDependencies": {

@@ -3,7 +3,8 @@
  * 独立管理所有位置的增删改查
  */
 
-import { useState, useCallback, useEffect, useDeferredValue, useRef, type ReactNode } from 'react';
+import { useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
+import { useDebounce } from 'use-debounce';
 import { useTranslation } from 'react-i18next';
 import { useLocations, type Location } from '@/hooks/useLocations';
 import type { LocationType } from '@/lib/database.types';
@@ -38,7 +39,7 @@ export default function Locations() {
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
   const [searchQuery, setSearchQuery] = useState('');
-  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const [debouncedSearchQuery] = useDebounce(searchQuery, 300);
   const isComposing = useRef(false);
   const [locationUsage, setLocationUsage] = useState<Record<string, number>>({});
 
@@ -103,17 +104,17 @@ export default function Locations() {
     refetch();
   }, [refetch]);
 
-  // 过滤位置 - 使用 deferredSearchQuery 实现 debounce
+  // 过滤位置 - 使用 debouncedSearchQuery 减少过滤频率
   const filterLocations = useCallback((locs: Location[]) => {
-    if (!deferredSearchQuery.trim()) return locs;
-    const query = deferredSearchQuery.toLowerCase();
+    if (!debouncedSearchQuery.trim()) return locs;
+    const query = debouncedSearchQuery.toLowerCase();
     return locs.filter(loc =>
       loc.name.toLowerCase().includes(query) ||
       loc.aliases?.some(a => a.toLowerCase().includes(query)) ||
       loc.city?.toLowerCase().includes(query) ||
       loc.country?.toLowerCase().includes(query)
     );
-  }, [deferredSearchQuery]);
+  }, [debouncedSearchQuery]);
 
   // 统计信息
   const totalLocations = locations.length;

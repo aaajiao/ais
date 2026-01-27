@@ -1,4 +1,5 @@
-import { useState, useMemo, useCallback, useDeferredValue } from 'react';
+import { useState, useMemo, useCallback } from 'react';
+import { useDebounce } from 'use-debounce';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/lib/supabase';
@@ -28,7 +29,7 @@ export default function Artworks() {
   const { t, i18n } = useTranslation('artworks');
   const [filter, setFilter] = useState<FilterStatus>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const [debouncedSearchQuery] = useDebounce(searchQuery, 300);
 
   // 批量选择状态
   const [selectMode, setSelectMode] = useState(false);
@@ -40,13 +41,13 @@ export default function Artworks() {
   // Total count for "全部" tab
   const { data: totalCount } = useArtworksTotalCount();
 
-  // Create query function with current filters - use deferred search for debounce
+  // Create query function with current filters - use debounced search to reduce API calls
   const filters = useMemo(
     () => ({
       status: filter,
-      search: deferredSearchQuery,
+      search: debouncedSearchQuery,
     }),
-    [filter, deferredSearchQuery]
+    [filter, debouncedSearchQuery]
   );
 
   const queryFn = useArtworksQueryFn(filters);

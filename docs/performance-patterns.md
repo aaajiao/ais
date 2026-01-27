@@ -60,6 +60,34 @@ React Query 提供：
 
 ---
 
+## 搜索防抖
+
+搜索输入使用 `use-debounce` 库实现防抖，减少 API 请求：
+
+```typescript
+import { useDebounce } from 'use-debounce';
+
+const [searchQuery, setSearchQuery] = useState('');
+const [debouncedSearchQuery] = useDebounce(searchQuery, 300);
+
+// 使用 debouncedSearchQuery 作为查询参数
+const filters = useMemo(() => ({
+  search: debouncedSearchQuery,
+}), [debouncedSearchQuery]);
+```
+
+### 注意
+
+- **`useDeferredValue`** 用于渲染优化，不减少 API 请求
+- **`useDebounce`** 真正的防抖，用户停止输入后才触发搜索
+
+### 关键文件
+
+- `src/components/ui/SearchInput.tsx` - 支持 IME 的搜索输入框
+- `src/pages/Artworks.tsx`、`Editions.tsx`、`Locations.tsx` - 使用防抖搜索
+
+---
+
 ## 查询键管理
 
 使用 `queryKeys.ts` 中的查询键工厂进行统一管理：

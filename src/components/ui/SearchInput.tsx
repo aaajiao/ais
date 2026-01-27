@@ -13,7 +13,8 @@ interface SearchInputProps {
  * 处理中文输入法的 composition 事件，确保在拼音输入阶段不会触发搜索，
  * 只有在选字完成后才更新外部状态。
  *
- * 注意：父组件应配合 useDeferredValue 使用以实现 debounce 效果。
+ * 注意：父组件应配合 useDebounce (from 'use-debounce') 使用以减少 API 请求。
+ * 示例：const [debouncedSearch] = useDebounce(searchQuery, 300);
  */
 export function SearchInput({
   value,

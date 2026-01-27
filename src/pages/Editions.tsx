@@ -1,4 +1,5 @@
-import { useState, useMemo, useCallback, useDeferredValue } from 'react';
+import { useState, useMemo, useCallback } from 'react';
+import { useDebounce } from 'use-debounce';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { EditionStatus } from '@/lib/database.types';
@@ -46,18 +47,18 @@ export default function Editions() {
 
   const [filter, setFilter] = useState<FilterStatus>(initialFilter);
   const [searchQuery, setSearchQuery] = useState('');
-  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const [debouncedSearchQuery] = useDebounce(searchQuery, 300);
 
   // Status counts for filter tabs
   const { data: statusCounts } = useEditionStatusCounts();
 
-  // Create query function with current filters - use deferred search for debounce
+  // Create query function with current filters - use debounced search to reduce API calls
   const filters = useMemo(
     () => ({
       status: filter,
-      search: deferredSearchQuery,
+      search: debouncedSearchQuery,
     }),
-    [filter, deferredSearchQuery]
+    [filter, debouncedSearchQuery]
   );
 
   const queryFn = useEditionsQueryFn(filters);
