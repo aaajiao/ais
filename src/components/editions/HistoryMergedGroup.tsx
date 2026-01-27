@@ -102,7 +102,7 @@ export const HistoryMergedGroup = memo(function HistoryMergedGroup({
         {isExpanded && (
           <div className="mt-2 space-y-2 border-t border-border pt-2">
             {merged.items.map(item => (
-              <div key={item.id} className="text-sm">
+              <div key={item.id} className="text-sm break-words">
                 <span className="text-muted-foreground text-xs">
                   {new Date(item.created_at).toLocaleTimeString(
                     locale === 'zh' ? 'zh-CN' : 'en-US',

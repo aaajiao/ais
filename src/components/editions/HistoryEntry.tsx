@@ -58,13 +58,13 @@ export const HistoryEntry = memo(function HistoryEntry({
         </div>
 
         {/* Description */}
-        <p className="text-sm text-foreground">{description}</p>
+        <p className="text-sm text-foreground break-words">{description}</p>
 
         {/* Notes (if present and not the main content) */}
         {item.notes &&
           item.action !== 'file_added' &&
           item.action !== 'condition_update' && (
-            <p className="text-xs text-muted-foreground mt-1 italic">
+            <p className="text-xs text-muted-foreground mt-1 italic break-words">
               {t('details.notes')}: {item.notes}
             </p>
           )}
