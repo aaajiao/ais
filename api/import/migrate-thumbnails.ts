@@ -95,7 +95,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (dryRun) {
       response.results = artworksToMigrate.map(artwork => ({
         artworkId: artwork.id,
-        title: artwork.title_cn || artwork.title_en,
+        title: artwork.title_en,
         originalUrl: artwork.thumbnail_url!,
         status: 'skipped' as const,
       }));
@@ -108,7 +108,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     for (const artwork of artworksToMigrate) {
       const result: MigrateResult = {
         artworkId: artwork.id,
-        title: artwork.title_cn || artwork.title_en,
+        title: artwork.title_en,
         originalUrl: artwork.thumbnail_url!,
         status: 'skipped',
       };
