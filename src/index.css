@@ -389,3 +389,18 @@ h1, h2, h3, .font-display {
     @apply bg-background text-foreground;
   }
 }
+
+/* ===== 模态框滚动锁定 ===== */
+/* 模态框遮罩层：阻止所有触摸手势 */
+.modal-overlay {
+  touch-action: none;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: auto;
+}
+
+/* 模态框内容区：允许垂直滚动，防止滚动穿透 */
+.modal-content {
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
