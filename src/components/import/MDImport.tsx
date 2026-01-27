@@ -211,6 +211,7 @@ export default function MDImport() {
       // 分批处理，每批 30 个
       const BATCH_SIZE = 30;
       const totalBatches = Math.ceil(artworksToImport.length / BATCH_SIZE);
+      const totalArtworks = artworksToImport.length;
 
       const accumulatedResults: ExecuteResult = {
         created: [],
@@ -219,15 +220,26 @@ export default function MDImport() {
         imageProcessing: { processed: 0, failed: 0 },
       };
 
+      // 初始进度：0%，使用 await 确保 UI 更新
+      setBatchProgress({
+        current: 1,
+        total: totalBatches,
+        processed: 0,
+        totalArtworks,
+      });
+      // 让 React 有机会渲染初始进度
+      await new Promise(resolve => setTimeout(resolve, 50));
+
       for (let i = 0; i < totalBatches; i++) {
         const startIdx = i * BATCH_SIZE;
         const batch = artworksToImport.slice(startIdx, startIdx + BATCH_SIZE);
 
+        // 更新当前批次（在请求开始时）
         setBatchProgress({
           current: i + 1,
           total: totalBatches,
           processed: startIdx,
-          totalArtworks: artworksToImport.length,
+          totalArtworks,
         });
 
         try {
@@ -256,11 +268,28 @@ export default function MDImport() {
             accumulatedResults.imageProcessing!.processed += result.imageProcessing.processed;
             accumulatedResults.imageProcessing!.failed += result.imageProcessing.failed;
           }
+
+          // 批次完成后更新进度
+          const completedCount = startIdx + batch.length;
+          setBatchProgress({
+            current: i + 1,
+            total: totalBatches,
+            processed: completedCount,
+            totalArtworks,
+          });
+
+          // 多批次时，在批次之间短暂暂停让 UI 更新
+          if (i < totalBatches - 1) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
         } catch {
           accumulatedResults.errors.push(t('mdImport.errors.batchFailed', { batch: i + 1 }));
           break;
         }
       }
+
+      // 完成后短暂显示 100% 进度
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       setBatchProgress(null);
       setExecuteResult(accumulatedResults);
@@ -647,11 +676,15 @@ export default function MDImport() {
           {loading && batchProgress && (
             <div className="space-y-3 py-4 bg-muted/30 rounded-xl p-4">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">
-                  {t('mdImport.batchProgress', {
-                    current: batchProgress.current,
-                    total: batchProgress.total
-                  })}
+                <span className="text-muted-foreground flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {batchProgress.total > 1
+                    ? t('mdImport.batchProgress', {
+                        current: batchProgress.current,
+                        total: batchProgress.total
+                      })
+                    : t('actions.importing')
+                  }
                 </span>
                 <span className="font-medium">
                   {batchProgress.processed} / {batchProgress.totalArtworks}
