@@ -10,7 +10,7 @@ import type { FileType, FileSourceType } from '@/lib/database.types';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { ToggleChip } from '@/components/ui/toggle-chip';
-import { Link2, Video, Image, FileText, FileType, FileSpreadsheet, Paperclip, FileCode, X, Loader2 } from 'lucide-react';
+import { Link2, Video, Image, FileText, FileType as FileTypeIcon, FileSpreadsheet, Paperclip, FileCode, X, Loader2 } from 'lucide-react';
 
 interface ExternalLinkDialogProps {
   isOpen: boolean;
@@ -38,7 +38,7 @@ const FILE_TYPE_ICONS: Record<FileType, ReactNode> = {
   link: <Link2 className="w-4 h-4" />,
   video: <Video className="w-4 h-4" />,
   image: <Image className="w-4 h-4" />,
-  pdf: <FileType className="w-4 h-4" />,
+  pdf: <FileTypeIcon className="w-4 h-4" />,
   document: <FileText className="w-4 h-4" />,
   markdown: <FileCode className="w-4 h-4" />,
   spreadsheet: <FileSpreadsheet className="w-4 h-4" />,
