@@ -78,6 +78,12 @@
   --sidebar-accent-foreground: oklch(0.25 0.005 265);
   --sidebar-border: oklch(0.88 0.004 265);
   --sidebar-ring: oklch(0.55 0.15 250);
+
+  /* ===== iOS Safe Area ===== */
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
 }
 
 /* ===== 深色模式 - 护眼深灰 ===== */
@@ -153,6 +159,14 @@ html, body {
   min-width: 320px;
   height: 100%;
   overflow: hidden;
+}
+
+/* 防止移动端意外水平滚动 */
+@media (max-width: 1023px) {
+  html, body, #root {
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+  }
 }
 
 /* 标题字体 */
@@ -317,6 +331,12 @@ h1, h2, h3, .font-display {
   --text-section-title: 1.125rem;
   --text-section-title--line-height: 1.4;
   --text-section-title--letter-spacing: 0.05em;
+
+  /* ===== iOS Safe Area 间距 ===== */
+  /* 底部导航栏高度 (5rem) + safe area：用于主内容区 pb */
+  --spacing-safe-bottom: calc(5rem + var(--safe-area-bottom));
+  /* 纯 safe area：用于底部导航栏 pb */
+  --spacing-safe-inset: max(0.5rem, var(--safe-area-bottom));
 }
 
 /* ===== 桌面端排版增强 (xl: 1280px+) ===== */

@@ -215,7 +215,7 @@ export default function Layout() {
       {/* 主内容区 + 侧边栏 */}
       <div className="flex-1 flex overflow-hidden">
         {/* 主内容区 */}
-        <main className="flex-1 overflow-y-auto pb-20 lg:pb-0 relative">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden pb-[calc(5rem+env(safe-area-inset-bottom,0px))] lg:pb-0 relative">
           <div className={`${pageWidthConfig.maxWidth} ${pageWidthConfig.centered ? 'mx-auto' : ''}`}>
             <Outlet />
           </div>
@@ -231,7 +231,7 @@ export default function Layout() {
       </div>
 
       {/* 移动端底部导航 (iPhone + iPad 竖屏) */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border flex justify-around py-2 z-50">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border flex justify-around pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] z-50">
         <NavLink
           to="/"
           end

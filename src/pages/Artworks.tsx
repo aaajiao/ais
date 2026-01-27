@@ -353,7 +353,7 @@ export default function Artworks() {
       {/* 虚拟滚动列表 */}
       <div
         ref={parentRef}
-        className="flex-1 overflow-y-auto"
+        className="flex-1 overflow-y-auto overflow-x-hidden"
         style={{ contain: 'strict' }}
       >
         {flattenedItems.length === 0 && !isLoading ? (
