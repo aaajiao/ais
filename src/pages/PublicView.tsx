@@ -226,6 +226,24 @@ export default function PublicView() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<{ type: string; message: string } | null>(null);
 
+  // 检测是否从应用内部跳转（管理员预览场景）
+  // 只有从同源页面跳转过来时才显示返回按钮
+  const [showBackButton, setShowBackButton] = useState(false);
+
+  useEffect(() => {
+    try {
+      // 检查 referrer 是否为同源
+      if (document.referrer) {
+        const referrerOrigin = new URL(document.referrer).origin;
+        const currentOrigin = window.location.origin;
+        setShowBackButton(referrerOrigin === currentOrigin);
+      }
+    } catch {
+      // URL 解析失败，不显示返回按钮
+      setShowBackButton(false);
+    }
+  }, []);
+
   // 启用页面滚动（绕过全局 overflow: hidden）
   useEffect(() => {
     document.documentElement.classList.add('scrollable-page');
@@ -321,19 +339,21 @@ export default function PublicView() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* 顶部导航栏 - 始终显示，确保用户可以返回 */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border supports-[backdrop-filter]:bg-background/80">
-        <div className="max-w-7xl mx-auto px-4 h-12 flex items-center">
-          <IconButton
-            variant="ghost"
-            size="sm"
-            label={t('back')}
-            onClick={handleBack}
-          >
-            <ArrowLeft />
-          </IconButton>
+      {/* 顶部导航栏 - 仅在从应用内跳转时显示（管理员预览场景） */}
+      {showBackButton && (
+        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border supports-[backdrop-filter]:bg-background/80">
+          <div className="max-w-7xl mx-auto px-4 h-12 flex items-center">
+            <IconButton
+              variant="ghost"
+              size="sm"
+              label={t('back')}
+              onClick={handleBack}
+            >
+              <ArrowLeft />
+            </IconButton>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 头部 */}
       <header className="border-b border-border">
