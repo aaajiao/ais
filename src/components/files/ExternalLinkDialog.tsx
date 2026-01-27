@@ -4,7 +4,7 @@
 
 import { useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { supabase, insertIntoTable, insertIntoTableNoReturn, type EditionFilesInsert, type EditionHistoryInsert } from '@/lib/supabase';
+import { insertIntoTable, insertIntoTableNoReturn, updateTable, type EditionFilesInsert, type EditionHistoryInsert } from '@/lib/supabase';
 import { detectLinkType } from '@/lib/imageCompressor';
 import type { FileType, FileSourceType } from '@/lib/database.types';
 import { Button } from '@/components/ui/button';
@@ -216,10 +216,7 @@ export default function ExternalLinkDialog({
       await insertIntoTableNoReturn('edition_history', historyData);
 
       // 更新版本的 updated_at
-      await supabase
-        .from('editions')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('id', editionId);
+      await updateTable('editions', { updated_at: new Date().toISOString() }, editionId);
 
       onLinkAdded?.(data as EditionFile);
       handleClose();
