@@ -126,6 +126,7 @@ bunx supabase gen types typescript --project-id <id> > src/lib/database.types.ts
 | [docs/public-links.md](docs/public-links.md) | 公开链接功能 |
 | [docs/database-fields.md](docs/database-fields.md) | 数据库字段说明 |
 | [docs/api-reference.md](docs/api-reference.md) | API 参考 |
+| [docs/claude-code-skills.md](docs/claude-code-skills.md) | Claude Code Skills 配置指南 |
 
 ## Claude Code Skills
 
@@ -135,3 +136,4 @@ bunx supabase gen types typescript --project-id <id> > src/lib/database.types.ts
 - **context7** - 获取最新库文档（需要设置 `CONTEXT7_API_KEY` 环境变量）
 - **ai-sdk** - Vercel AI SDK 文档
 - **frontend-design** - 前端设计技能
+- **skill-creator** - 创建 Claude Code skills 的指南和工具
