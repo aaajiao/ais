@@ -18,7 +18,7 @@ interface ChatSidebarProps {
 
 export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
   const { t, i18n } = useTranslation('common');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const historyLoadedRef = useRef(false);
   const [inputValue, setInputValue] = useState('');
   const { session } = useAuthContext();
@@ -104,7 +104,10 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
 
   // 滚动到底部
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const container = messagesContainerRef.current;
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
   }, [messages]);
 
   // 清除对话
@@ -183,7 +186,7 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
         )}
 
         {/* 消息区域 */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+        <div ref={messagesContainerRef} className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
           {recentMessages.length === 0 ? (
             <div className="text-center text-muted-foreground py-8">
               <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
@@ -213,7 +216,6 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
             </div>
           )}
 
-          <div ref={messagesEndRef} />
         </div>
 
         {/* 输入区域 */}

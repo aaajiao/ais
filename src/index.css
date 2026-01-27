@@ -148,10 +148,11 @@
   --sidebar-ring: oklch(0.60 0.16 250);
 }
 
-body {
+html, body {
   margin: 0;
   min-width: 320px;
-  min-height: 100vh;
+  height: 100%;
+  overflow: hidden;
 }
 
 /* 标题字体 */
