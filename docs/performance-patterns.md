@@ -149,11 +149,26 @@ function FileList({ files }: Props) {
 
 | 原文件 | 拆分后 | 行数变化 |
 |--------|--------|----------|
-| `FileList.tsx` | FileListItem, FileGridItem, FilePreviewModal, ImageThumbnail, ImagePreview | 497 → 212 |
-| `HistoryTimeline.tsx` | HistoryEntry, HistoryMergedGroup, AddNoteSection, historyUtils | 564 → 235 |
+| `FileList.tsx` | FileListItem, FileGridItem, FilePreviewModal, ImageThumbnail, ImagePreview, FileDeleteConfirmDialog | 497 → 212 |
+| `HistoryTimeline.tsx` | HistoryEntry, HistoryMergedGroup, AddNoteSection, historyUtils, historyTypes | 564 → 235 |
 | `EditionDetail.tsx` | EditionInfoCard, editionDetailUtils | 529 → 321 |
 | `Artworks.tsx` | FilterPanel, SelectionToolbar, ArtworkListCard, useArtworksSelection | 566 → 408 |
-| `Settings.tsx` | 多个子组件 | 800+ → ~300 |
+| `Settings.tsx` | ModelSettings, ExportSettings, AccountSettings, useModelSettings, useExport | 800+ → 23 |
+| `ArtworkDetail.tsx` | ArtworkEditForm, EditionsSection, DeleteConfirmDialog | 900+ → 418 |
+| `MDImport.tsx` | UploadStep, PreviewStep, ResultStep | 500+ → 333 |
+
+### 组件目录统计
+
+| 目录 | 文件数 | 职责 |
+|------|--------|------|
+| editions/ | 15 | 版本详情、历史时间线、位置管理 |
+| files/ | 11 | 文件上传、预览、列表显示 |
+| settings/ | 10 | 模型配置、导出设置、账户管理 |
+| import/ | 8 | Markdown 导入、缩略图迁移 |
+| artworks/ | 7 | 作品列表、筛选、批量选择 |
+| artwork/ | 6 | 作品编辑表单 |
+| chat/ | 4 | AI 对话界面 |
+| ui/ | 16 | 基础 UI 组件 |
 
 ---
 

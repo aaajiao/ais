@@ -25,19 +25,31 @@ bun run test:run      # 运行测试（使用 vitest）
 ```
 api/                    # Serverless API
 ├── chat.ts            # AI 聊天入口
-├── lib/               # 工具函数
-└── tools/             # AI 工具（模块化）
+├── models.ts          # 可用模型列表
+├── lib/               # 工具函数（auth, search-utils, artwork-extractor, image-downloader, model-provider, system-prompt）
+├── tools/             # AI 工具（9 个工具 + types + index）
+├── import/            # 导入 API（md, migrate-thumbnails, process-image）
+├── export/            # 导出 API（pdf, md, shared）
+├── links/             # 公开链接 API
+└── view/              # 公开查看 API
 src/
 ├── components/        # UI 组件（按功能模块化）
-│   ├── artworks/      # 作品列表组件（FilterPanel, SelectionToolbar, ArtworkListCard）
-│   ├── editions/      # 版本组件（HistoryTimeline, EditionInfoCard, historyUtils）
-│   ├── files/         # 文件组件（FileList, FileListItem, FilePreviewModal）
-│   ├── settings/      # 设置组件（已拆分为多个子组件）
+│   ├── artwork/       # 作品编辑（ArtworkEditForm, EditionsSection, DeleteConfirmDialog）
+│   ├── artworks/      # 作品列表（FilterPanel, SelectionToolbar, ArtworkListCard, useArtworksSelection）
+│   ├── editions/      # 版本管理（HistoryTimeline, HistoryEntry, EditionInfoCard, EditionEditDialog, LocationDialog, historyUtils, editionDetailUtils）
+│   ├── files/         # 文件管理（FileList, FileListItem, FileGridItem, FilePreviewModal, ImageThumbnail）
+│   ├── settings/      # 设置（ModelSettings, ExportSettings, AccountSettings, useModelSettings, useExport）
+│   ├── chat/          # 聊天（MessageBubble, EditableConfirmCard, ConfirmDialog, CollapsibleChatHistory）
+│   ├── import/        # 导入（MDImport, UploadStep, PreviewStep, ResultStep, ThumbnailMigration）
+│   ├── export/        # 导出（ExportDialog, EditionSelector）
+│   ├── locations/     # 位置（LocationItem）
+│   ├── pwa/           # PWA（ReloadPrompt）
 │   └── ui/            # 基础 UI 组件
 ├── hooks/queries/     # React Query hooks
 ├── lib/               # 工具、类型、Supabase
 ├── locales/           # i18n 翻译
-└── pages/             # 路由页面
+├── pages/             # 路由页面（13 个）
+└── test/              # 测试工具和 mocks
 docs/                   # 详细文档
 ```
 
