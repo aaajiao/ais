@@ -198,7 +198,7 @@ function CreateLinkDialog({
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       {/* 对话框 */}
-      <div className="relative bg-card border border-border rounded-lg shadow-xl w-full max-w-md max-h-[85vh] overflow-y-auto">
+      <div className="relative bg-card border border-border rounded-lg shadow-xl w-full max-w-md max-h-[85dvh] overflow-y-auto">
         {/* 头部 */}
         <div className="flex items-center justify-between p-4 border-b border-border">
           <h2 className="text-lg font-medium">{t('createLink')}</h2>

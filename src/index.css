@@ -289,8 +289,8 @@ h1, h2, h3, .font-display {
   --spacing-13: 3.25rem;  /* 52px - 大号按钮 */
 
   /* ===== 底部导航布局变量 ===== */
-  /* 底部导航栏内容高度（不含 safe-area）：pt-2 + 图标文字 + 内边距 ≈ 56px */
-  --spacing-nav-height: 3.5rem;
+  /* 底部导航栏内容高度（不含 safe-area）：pt-2(8px) + icon(20px) + mt-1(4px) + text(12px) + pb(8px) = 52px */
+  --spacing-nav-height: 3.25rem;
   /* 底部导航栏总高度（含 safe-area），用于页面操作栏定位 */
   --spacing-nav-bottom: calc(var(--spacing-nav-height) + env(safe-area-inset-bottom, 0px));
   /* 页面底部内边距（导航栏 + 操作栏 + 安全边距） */

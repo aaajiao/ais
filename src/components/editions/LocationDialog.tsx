@@ -184,7 +184,7 @@ export default function LocationDialog({
       onClick={onClose}
     >
       <div
-        className="bg-card border border-border rounded-xl p-6 w-full max-w-md max-h-[85vh] overflow-y-auto"
+        className="bg-card border border-border rounded-xl p-6 w-full max-w-md max-h-[85dvh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">

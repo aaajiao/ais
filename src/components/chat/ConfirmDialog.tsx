@@ -84,7 +84,7 @@ export default function ConfirmDialog({
       {/* 对话框 */}
       <div
         ref={dialogRef}
-        className="relative bg-card border border-border rounded-xl shadow-xl max-w-md w-full max-h-[85vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        className="relative bg-card border border-border rounded-xl shadow-xl max-w-md w-full max-h-[85dvh] overflow-hidden animate-in fade-in zoom-in-95 duration-200"
       >
         {/* 标题 */}
         <div className="px-6 py-4 border-b border-border">

@@ -26,7 +26,7 @@ export const FileDeleteConfirmDialog = memo(function FileDeleteConfirmDialog({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
-      <div className="bg-card border border-border rounded-xl p-6 max-w-sm w-full max-h-[85vh] overflow-y-auto">
+      <div className="bg-card border border-border rounded-xl p-6 max-w-sm w-full max-h-[85dvh] overflow-y-auto">
         <h3 className="text-lg font-semibold mb-2">{t('files.confirmDelete')}</h3>
         <p className="text-muted-foreground mb-4">
           {t('files.confirmDeleteMessage')}
