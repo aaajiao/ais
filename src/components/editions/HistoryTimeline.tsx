@@ -5,7 +5,7 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { insertIntoTable, type EditionHistoryInsert } from '@/lib/supabase';
+import { supabase, insertIntoTable, type EditionHistoryInsert } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { ScrollText } from 'lucide-react';
 import { HistoryEntry } from './HistoryEntry';
@@ -77,6 +77,13 @@ export default function HistoryTimeline({
       const { data, error } = await insertIntoTable('edition_history', insertData);
 
       if (error) throw error;
+
+      // 更新版本的 updated_at
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any)
+        .from('editions')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', editionId);
 
       setNoteText('');
       setShowNoteInput(false);

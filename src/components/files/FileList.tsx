@@ -107,6 +107,13 @@ export default function FileList({
         };
         await insertIntoTableNoReturn('edition_history', historyData);
 
+        // 更新版本的 updated_at
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any)
+          .from('editions')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', editionId);
+
         onDelete?.(file.id);
       } catch (err) {
         console.error('Failed to delete file:', err);

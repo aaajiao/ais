@@ -4,6 +4,8 @@
   "recentUpdates": "Recent Updates",
   "noUpdates": "No updates yet",
   "viewAll": "View all",
+  "showMore": "Show more ({{count}})",
+  "showLess": "Show less",
   "stats": {
     "totalArtworks": "Total Artworks",
     "totalEditions": "Total Editions",

@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import { uploadFile, deleteFile, insertIntoTable, insertIntoTableNoReturn, type EditionFilesInsert, type EditionHistoryInsert } from '@/lib/supabase';
+import { supabase, uploadFile, deleteFile, insertIntoTable, insertIntoTableNoReturn, type EditionFilesInsert, type EditionHistoryInsert } from '@/lib/supabase';
 import {
   compressImage,
   needsCompression,
@@ -158,6 +158,13 @@ export function useFileUpload(options: UseFileUploadOptions) {
         notes: `添加文件: ${file.name}`,
       };
       await insertIntoTableNoReturn('edition_history', historyData);
+
+      // 更新版本的 updated_at
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any)
+        .from('editions')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', editionId);
 
       updateFileStatus(id, { status: 'complete', progress: 100 });
 

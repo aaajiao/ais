@@ -1,14 +1,19 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
-import { Package, Layers, MapPin, Link as LinkIcon, MessageSquare } from 'lucide-react';
+import { Package, Layers, MapPin, Link as LinkIcon, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
 import { useDashboardStats, useRecentUpdates } from '@/hooks/queries/useDashboard';
+
+const COLLAPSED_COUNT = 5;
 
 export default function Dashboard() {
   const { t } = useTranslation('dashboard');
   const { t: tStatus } = useTranslation('status');
   const { t: tNav } = useTranslation('nav');
   const { t: tCommon } = useTranslation('common');
+
+  const [expanded, setExpanded] = useState(false);
 
   const {
     data: stats,
@@ -229,7 +234,7 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="bg-card border border-border rounded-xl divide-y divide-border">
-            {recentUpdates.map((update) => (
+            {(expanded ? recentUpdates : recentUpdates.slice(0, COLLAPSED_COUNT)).map((update) => (
               <Link
                 key={update.id}
                 to={
@@ -253,6 +258,24 @@ export default function Dashboard() {
                 </span>
               </Link>
             ))}
+            {recentUpdates.length > COLLAPSED_COUNT && (
+              <button
+                onClick={() => setExpanded(!expanded)}
+                className="w-full p-3 flex items-center justify-center gap-2 text-sm text-muted-foreground hover:bg-accent transition-colors rounded-b-xl"
+              >
+                {expanded ? (
+                  <>
+                    <ChevronUp className="w-4 h-4" />
+                    {t('showLess')}
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="w-4 h-4" />
+                    {t('showMore', { count: recentUpdates.length - COLLAPSED_COUNT })}
+                  </>
+                )}
+              </button>
+            )}
           </div>
         )}
       </div>

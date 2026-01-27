@@ -65,7 +65,7 @@ async function fetchRecentUpdates(): Promise<RecentUpdate[]> {
     .from('editions')
     .select('id, artwork_id, edition_number, edition_type, status, updated_at')
     .order('updated_at', { ascending: false })
-    .limit(5)
+    .limit(10)
     .returns<EditionPartial[]>();
 
   if (editionsError) throw editionsError;

@@ -4,6 +4,8 @@
   "recentUpdates": "最近更新",
   "noUpdates": "暂无更新记录",
   "viewAll": "查看全部",
+  "showMore": "显示更多 ({{count}})",
+  "showLess": "收起",
   "stats": {
     "totalArtworks": "作品总数",
     "totalEditions": "版本总数",
