@@ -180,7 +180,7 @@ export default function LocationDialog({
 
   return (
     <div
-      className="modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]"
+      className="modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pb-[--spacing-modal-bottom]"
       onClick={onClose}
     >
       <div

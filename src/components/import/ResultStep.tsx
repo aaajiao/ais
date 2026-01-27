@@ -69,8 +69,8 @@ export default function ResultStep({ executeResult, onReset }: ResultStepProps) 
         )}
       </div>
 
-      <div className="flex gap-3 pt-4 border-t border-border md:justify-end">
-        <Button onClick={onReset} className="flex-1 md:flex-none">
+      <div className="flex gap-3 pt-4 border-t border-border lg:justify-end">
+        <Button onClick={onReset} className="flex-1 lg:flex-none">
           {t('mdImport.continueImport')}
         </Button>
       </div>

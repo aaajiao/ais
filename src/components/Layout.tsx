@@ -74,7 +74,7 @@ export default function Layout() {
   );
 
   return (
-    <div className="h-screen bg-background flex flex-col overflow-hidden">
+    <div className="h-dvh bg-background flex flex-col overflow-hidden">
       {/* 网络状态指示器 */}
       <NetworkIndicator />
 

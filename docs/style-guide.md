@@ -173,6 +173,21 @@ getStatusLabel('at_gallery') // → "外借中"
 - `lg` (1024px) - 移动端/桌面端分界
 - `xl` (1280px) - 大屏排版增强
 
+**断点使用规范**：
+
+| 断点 | 用途 | 示例 |
+|------|------|------|
+| 默认 (无前缀) | 移动端基础样式 | `flex-1`, `fixed` |
+| `lg:` | 桌面端布局切换 | `lg:static`, `lg:flex-none` |
+| `xl:` | 大屏排版优化 | `xl:text-lg`, `xl:gap-8` |
+
+> **重要规则**：
+> - 移动端/桌面端布局切换**必须使用 `lg:`** 断点
+> - **禁止使用 `md:`** 用于固定定位元素、底部操作栏、导航相关布局
+> - `md:` 仅用于内容区域的细微调整（如网格列数 `md:grid-cols-2`）
+>
+> 原因：Layout 组件使用 `lg:hidden` 控制底部导航可见性。如果其他组件使用 `md:` 断点，会导致 iPad 竖屏（768-1023px）下底部导航可见但操作栏已变为桌面端样式，造成布局冲突。
+
 ### 移动端导航 (< 1024px)
 
 **顶部工具栏** (`lg:hidden`)：
@@ -396,22 +411,24 @@ import { Trash2, Pencil, X } from 'lucide-react';
 
 ```tsx
 {/* 页面容器需要足够的底部 padding */}
-<div className="p-6 pb-[var(--spacing-page-bottom)] md:pb-6">
+<div className="p-6 pb-[var(--spacing-page-bottom)] lg:pb-6">
   {/* 页面内容 */}
 </div>
 
 {/* 底部操作栏 - 使用 CSS 变量适配 safe-area */}
-<div className="fixed bottom-[var(--spacing-nav-bottom)] left-0 right-0 md:bottom-0 md:static md:mt-6
-               bg-card border-t md:border border-border p-4 md:rounded-xl
-               flex gap-3 md:justify-end z-40">
-  <Button variant="secondary" className="flex-1 md:flex-none">
+<div className="fixed bottom-[var(--spacing-nav-bottom)] left-0 right-0 lg:bottom-0 lg:static lg:mt-6
+               bg-card border-t lg:border border-border p-4 lg:rounded-xl
+               flex gap-3 lg:justify-end z-40">
+  <Button variant="secondary" className="flex-1 lg:flex-none">
     次要操作
   </Button>
-  <Button className="flex-1 md:flex-none">
+  <Button className="flex-1 lg:flex-none">
     主要操作
   </Button>
 </div>
 ```
+
+> **重要**：底部操作栏必须使用 `lg:` (1024px) 断点，以与 Layout 组件的移动端/桌面端分界保持一致。禁止使用 `md:` (768px) 断点，否则会导致 iPad 竖屏（768-1023px）下的布局问题。
 
 **CSS 变量说明**（定义在 `src/index.css` 的 `@theme inline` 中）：
 | 变量 | 计算公式 | 说明 |
@@ -446,7 +463,7 @@ import { Trash2, Pencil, X } from 'lucide-react';
 
 ```tsx
 {/* 模态对话框标准实现 */}
-<div className="modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
+<div className="modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pb-[--spacing-modal-bottom]">
   <div className="modal-content bg-card border border-border rounded-xl p-6 w-full max-w-md max-h-[85dvh] overflow-y-auto">
     {/* 对话框内容 */}
   </div>
@@ -458,7 +475,7 @@ import { Trash2, Pencil, X } from 'lucide-react';
 |------|-----|------|
 | 外层 `modal-overlay` | CSS 类 | 阻止触摸手势，防止页面晃动 |
 | 外层 `p-4` | `1rem` | 基础内边距 |
-| 外层 `pb-[calc(1rem+env(...))]` | 动态计算 | 底部额外加上 safe-area 高度 |
+| 外层 `pb-[--spacing-modal-bottom]` | CSS 变量 | 底部额外加上 safe-area 高度（定义在 index.css） |
 | 内层 `modal-content` | CSS 类 | 允许垂直滚动，防止滚动穿透 |
 | 内层 `max-h-[85dvh]` | 85% 动态视口高度 | 限制对话框最大高度 |
 | 内层 `overflow-y-auto` | 自动滚动 | 内容过多时可滚动 |

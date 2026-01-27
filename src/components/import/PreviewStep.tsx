@@ -138,7 +138,7 @@ export default function PreviewStep({
         <Button
           onClick={onExecuteImport}
           disabled={loading || selectedArtworks.size === 0}
-          className="flex-1 md:flex-none"
+          className="flex-1 lg:flex-none"
         >
           {loading ? t('actions.importing') : t('mdImport.confirmImport', { count: selectedArtworks.size })}
         </Button>

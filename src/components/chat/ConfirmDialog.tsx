@@ -77,7 +77,7 @@ export default function ConfirmDialog({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-[--spacing-modal-bottom]">
       {/* 遮罩 */}
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
 

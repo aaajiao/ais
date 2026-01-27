@@ -211,7 +211,7 @@ export default function ArtworkDetail() {
   }
 
   return (
-    <div className="p-6 pb-[var(--spacing-page-bottom)] md:pb-6">
+    <div className="p-6 pb-[var(--spacing-page-bottom)] lg:pb-6">
       {/* 导出对话框 */}
       {id && (
         <ExportDialog
@@ -285,16 +285,16 @@ export default function ArtworkDetail() {
 
       {/* 底部操作栏 - 非编辑模式时显示 */}
       {!isEditing && (
-        <div className="fixed bottom-[var(--spacing-nav-bottom)] left-0 right-0 md:bottom-0 md:static md:mt-6 bg-card border-t md:border border-border p-4 md:rounded-xl flex gap-3 md:justify-end z-40">
+        <div className="fixed bottom-[var(--spacing-nav-bottom)] left-0 right-0 lg:bottom-0 lg:static lg:mt-6 bg-card border-t lg:border border-border p-4 lg:rounded-xl flex gap-3 lg:justify-end z-40">
           <Button
             variant="secondary"
             onClick={() => setShowExportDialog(true)}
-            className="flex-1 md:flex-none"
+            className="flex-1 lg:flex-none"
           >
             <Download />
             <span>{t('export')}</span>
           </Button>
-          <Button onClick={startEditing} className="flex-1 md:flex-none">
+          <Button onClick={startEditing} className="flex-1 lg:flex-none">
             <Pencil />
             <span>{t('editArtwork')}</span>
           </Button>

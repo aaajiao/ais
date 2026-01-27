@@ -174,7 +174,7 @@ export default function EditionEditDialog({
 
   return (
     <>
-      <div className="modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
+      <div className="modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pb-[--spacing-modal-bottom]">
         <div className="modal-content bg-card border border-border rounded-xl p-6 max-w-lg w-full max-h-[85dvh] overflow-y-auto">
           <h3 className="text-lg font-semibold mb-4">{t('editDialog.title')}</h3>
 

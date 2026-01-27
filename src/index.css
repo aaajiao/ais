@@ -367,6 +367,8 @@ h1, h2, h3, .font-display {
   --spacing-safe-bottom: calc(5rem + var(--safe-area-bottom));
   /* 纯 safe area：用于底部导航栏 pb */
   --spacing-safe-inset: max(0.5rem, var(--safe-area-bottom));
+  /* 模态框遮罩底部内边距：1rem + safe area */
+  --spacing-modal-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
 }
 
 /* ===== 桌面端排版增强 ===== */
