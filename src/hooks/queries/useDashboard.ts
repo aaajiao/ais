@@ -115,6 +115,7 @@ export function useDashboardStats() {
   return useQuery({
     queryKey: queryKeys.dashboard.stats,
     queryFn: fetchDashboardStats,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -122,5 +123,6 @@ export function useRecentUpdates() {
   return useQuery({
     queryKey: queryKeys.dashboard.recentUpdates,
     queryFn: fetchRecentUpdates,
+    refetchOnWindowFocus: true,
   });
 }
