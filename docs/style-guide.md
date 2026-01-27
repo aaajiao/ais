@@ -497,6 +497,65 @@ import { Trash2, Pencil, X } from 'lucide-react';
 }
 ```
 
+### 列表项操作按钮
+
+列表项的编辑/删除操作按钮采用**响应式可见性**策略：
+
+| 设备 | 按钮可见性 |
+|------|-----------|
+| 移动端 (< 768px) | 始终可见 |
+| 桌面端 (≥ 768px) | hover 时显示 |
+
+```tsx
+<div
+  className="flex items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+  onClick={e => e.stopPropagation()}
+>
+  <IconButton variant="ghost" size="sm" label="编辑">
+    <Pencil />
+  </IconButton>
+  <IconButton variant="ghost" size="sm" label="删除">
+    <Trash2 />
+  </IconButton>
+</div>
+```
+
+**删除操作采用两阶段确认**（参考 FileListItem、LocationItem）：
+
+1. 点击删除图标 → 显示"确认/取消"按钮
+2. 点击确认 → 执行删除
+
+```tsx
+const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+{confirmingDelete ? (
+  <div className="flex items-center gap-1">
+    <Button variant="destructive" size="mini" onClick={handleDelete}>
+      {t('confirm')}
+    </Button>
+    <Button variant="secondary" size="mini" onClick={() => setConfirmingDelete(false)}>
+      {t('cancel')}
+    </Button>
+  </div>
+) : (
+  <IconButton
+    variant="ghost"
+    size="sm"
+    label={t('delete')}
+    onClick={() => setConfirmingDelete(true)}
+    className="hover:text-destructive hover:bg-destructive/10"
+  >
+    <Trash2 />
+  </IconButton>
+)}
+```
+
+**优点**：
+- 触摸设备友好（无需 hover）
+- 防止误删（两阶段确认）
+- 与桌面端 hover 体验兼容
+- 无需额外依赖
+
 ### ToggleChip 组件
 
 用于筛选标签、多选选项等可切换芯片场景：

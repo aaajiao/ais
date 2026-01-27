@@ -34,7 +34,7 @@ export default function LocationItem({
 }: LocationItemProps) {
   const { t } = useTranslation('common');
   const { t: tLocations } = useTranslation('locations');
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
@@ -47,7 +47,7 @@ export default function LocationItem({
     setDeleteError(null);
     try {
       await onDelete(location);
-      setShowDeleteConfirm(false);
+      setConfirmingDelete(false);
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : t('location.deleteFailed'));
     } finally {
@@ -58,60 +58,89 @@ export default function LocationItem({
   return (
     <div className="group relative">
       <div
-        className={`flex items-center justify-between p-3 bg-muted/30 hover:bg-muted/50 rounded-lg transition-colors ${hasDetails ? 'cursor-pointer' : ''} ${expanded ? 'rounded-b-none' : ''}`}
+        className={`p-3 bg-muted/30 hover:bg-muted/50 rounded-lg transition-colors ${hasDetails ? 'cursor-pointer' : ''} ${expanded ? 'rounded-b-none' : ''}`}
         onClick={() => hasDetails && setExpanded(!expanded)}
       >
-        <div className="flex items-center gap-3 min-w-0 flex-1">
+        {/* 第一行：图标 + 名称 + 操作按钮 */}
+        <div className="flex items-center gap-3">
           <span className="text-muted-foreground flex-shrink-0">{TYPE_ICONS[location.type]}</span>
-          <div className="min-w-0 flex-1">
-            <p className="font-medium truncate">{location.name}</p>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              {location.city && <span>{location.city}</span>}
-              {location.city && location.country && <span>·</span>}
-              {location.country && <span>{location.country}</span>}
-              {location.aliases && location.aliases.length > 0 && (
-                <>
-                  <span>·</span>
-                  <span className="text-xs">{t('location.alias')}: {location.aliases.join(', ')}</span>
-                </>
-              )}
-            </div>
+          <p className="font-medium truncate flex-1 min-w-0">{location.name}</p>
+
+          {/* 操作按钮 - 移动端始终可见，桌面端 hover 显示 */}
+          <div
+            className="flex items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex-shrink-0"
+            onClick={e => e.stopPropagation()}
+          >
+            <IconButton
+              variant="ghost"
+              size="sm"
+              label={t('location.editLocation')}
+              onClick={() => onEdit(location)}
+            >
+              <Pencil />
+            </IconButton>
+            {confirmingDelete ? (
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="destructive"
+                  size="mini"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                >
+                  {deleting ? t('location.deleting') : t('confirm')}
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="mini"
+                  onClick={() => {
+                    setConfirmingDelete(false);
+                    setDeleteError(null);
+                  }}
+                  disabled={deleting}
+                >
+                  {t('cancel')}
+                </Button>
+              </div>
+            ) : (
+              <IconButton
+                variant="ghost"
+                size="sm"
+                label={t('location.deleteLocation')}
+                onClick={() => setConfirmingDelete(true)}
+                className="hover:text-destructive hover:bg-destructive/10"
+              >
+                <Trash2 />
+              </IconButton>
+            )}
+          </div>
+        </div>
+
+        {/* 第二行：城市/国家 + 版本数量 + 展开箭头 */}
+        <div className="flex items-center gap-2 mt-1 ml-8 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 flex-1 min-w-0 truncate">
+            {location.city && <span>{location.city}</span>}
+            {location.city && location.country && <span>·</span>}
+            {location.country && <span>{location.country}</span>}
+            {location.aliases && location.aliases.length > 0 && (
+              <>
+                <span className="hidden sm:inline">·</span>
+                <span className="hidden sm:inline text-xs truncate">
+                  {t('location.alias')}: {location.aliases.join(', ')}
+                </span>
+              </>
+            )}
           </div>
           {usageCount !== undefined && usageCount > 0 && (
-            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full flex-shrink-0">
+            <span className="text-xs bg-muted px-2 py-0.5 rounded-full flex-shrink-0">
               {t('location.editionsCount', { count: usageCount })}
             </span>
           )}
           {/* 展开/收起图标 */}
           {hasDetails && (
-            <span className="text-muted-foreground flex-shrink-0 ml-1">
+            <span className="flex-shrink-0">
               {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </span>
           )}
-        </div>
-
-        {/* 操作按钮 */}
-        <div
-          className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-2"
-          onClick={e => e.stopPropagation()}
-        >
-          <IconButton
-            variant="ghost"
-            size="sm"
-            label={t('location.editLocation')}
-            onClick={() => onEdit(location)}
-          >
-            <Pencil />
-          </IconButton>
-          <IconButton
-            variant="ghost"
-            size="sm"
-            label={t('location.deleteLocation')}
-            onClick={() => setShowDeleteConfirm(true)}
-            className="hover:text-destructive hover:bg-destructive/10"
-          >
-            <Trash2 />
-          </IconButton>
         </div>
       </div>
 
@@ -139,44 +168,10 @@ export default function LocationItem({
         </div>
       )}
 
-      {/* 删除确认弹窗 */}
-      {showDeleteConfirm && (
-        <div className="modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pb-[--spacing-modal-bottom]">
-          <div
-            className="modal-content bg-card border border-border rounded-xl p-6 w-full max-w-sm max-h-[85dvh] overflow-y-auto"
-            onClick={e => e.stopPropagation()}
-          >
-            <h3 className="text-lg font-semibold mb-2">{t('location.confirmDelete')}</h3>
-            <p className="text-muted-foreground mb-4">
-              {t('location.confirmDeleteMessage', { name: location.name })}
-            </p>
-
-            {deleteError && (
-              <div className="text-sm text-red-500 bg-red-500/10 px-3 py-2 rounded-lg mb-4">
-                {deleteError}
-              </div>
-            )}
-
-            <div className="flex gap-3 justify-end">
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setShowDeleteConfirm(false);
-                  setDeleteError(null);
-                }}
-                disabled={deleting}
-              >
-                {t('cancel')}
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleDelete}
-                disabled={deleting}
-              >
-                {deleting ? t('location.deleting') : t('delete')}
-              </Button>
-            </div>
-          </div>
+      {/* 删除错误提示 */}
+      {deleteError && (
+        <div className="mt-2 text-sm text-red-500 bg-red-500/10 px-3 py-2 rounded-lg">
+          {deleteError}
         </div>
       )}
     </div>
