@@ -87,7 +87,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8 pb-[var(--spacing-nav-bottom)] lg:pb-8">
       <h1 className="text-page-title mb-6 xl:mb-8">{t('title')}</h1>
 
       {/* 统计卡片 - 不对称网格 */}

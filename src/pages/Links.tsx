@@ -387,7 +387,7 @@ export default function Links() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6 pb-[var(--spacing-nav-bottom)] lg:pb-6">
       {/* 页面标题 */}
       <div className="flex items-center justify-between mb-2">
         <div>

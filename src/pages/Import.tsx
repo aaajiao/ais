@@ -7,7 +7,7 @@ export default function Import() {
   const { t } = useTranslation('import');
 
   return (
-    <div className="p-6">
+    <div className="p-6 pb-[var(--spacing-nav-bottom)] lg:pb-6">
       {/* 页面标题 */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-page-title">{t('title')}</h1>

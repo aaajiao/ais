@@ -176,7 +176,7 @@ export default function Trash() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6 pb-[var(--spacing-nav-bottom)] lg:pb-6">
       {/* 永久删除确认对话框 */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">

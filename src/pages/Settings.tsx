@@ -7,7 +7,7 @@ export default function Settings() {
   const { t } = useTranslation('settings');
 
   return (
-    <div className="p-6">
+    <div className="p-6 pb-[var(--spacing-nav-bottom)] lg:pb-6">
       <h1 className="text-page-title mb-6 xl:mb-8">{t('title')}</h1>
 
       {/* AI 模型设置 */}
