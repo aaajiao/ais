@@ -9,7 +9,7 @@ bun install           # 安装依赖
 bun start             # 启动开发（推荐，端口 3000）
 bun run build         # 构建生产版本
 bun run lint          # 代码检查
-bun test              # 运行测试
+bun run test:run      # 运行测试（使用 vitest）
 ```
 
 ## Tech Stack
@@ -28,7 +28,12 @@ api/                    # Serverless API
 ├── lib/               # 工具函数
 └── tools/             # AI 工具（模块化）
 src/
-├── components/        # UI 组件（按功能）
+├── components/        # UI 组件（按功能模块化）
+│   ├── artworks/      # 作品列表组件（FilterPanel, SelectionToolbar, ArtworkListCard）
+│   ├── editions/      # 版本组件（HistoryTimeline, EditionInfoCard, historyUtils）
+│   ├── files/         # 文件组件（FileList, FileListItem, FilePreviewModal）
+│   ├── settings/      # 设置组件（已拆分为多个子组件）
+│   └── ui/            # 基础 UI 组件
 ├── hooks/queries/     # React Query hooks
 ├── lib/               # 工具、类型、Supabase
 ├── locales/           # i18n 翻译

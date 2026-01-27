@@ -1,20 +1,20 @@
+/**
+ * 作品列表页面
+ * 支持筛选、搜索、批量选择、虚拟滚动
+ */
+
 import { useState, useMemo, useCallback } from 'react';
 import { useDebounce } from 'use-debounce';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/lib/supabase';
 import ExportDialog from '@/components/export/ExportDialog';
-import { StatusIndicator } from '@/components/ui/StatusIndicator';
 import ListEndIndicator from '@/components/ui/ListEndIndicator';
-import { Button } from '@/components/ui/button';
-import { ToggleChip } from '@/components/ui/toggle-chip';
 import { SearchInput } from '@/components/ui/SearchInput';
-import { Image, Check } from 'lucide-react';
 import { queryKeys } from '@/lib/queryKeys';
 import {
   useArtworksQueryFn,
   useArtworksTotalCount,
-  getArtworkMainStatus,
   type ArtworkWithStats,
 } from '@/hooks/queries/useArtworks';
 import {
@@ -22,8 +22,44 @@ import {
   isGroupHeader,
   type GroupHeaderData,
 } from '@/hooks/useInfiniteVirtualList';
+import {
+  FilterPanel,
+  SelectionToolbar,
+  ArtworkListCard,
+  useArtworksSelection,
+  type FilterStatus,
+} from '@/components/artworks';
+import { Button } from '@/components/ui/button';
 
-type FilterStatus = 'all' | 'in_studio' | 'at_gallery' | 'at_museum' | 'in_transit' | 'sold';
+// 骨架屏组件（静态提升）
+const LoadingSkeleton = (
+  <div className="p-6">
+    <div className="h-8 w-32 bg-muted rounded mb-6 animate-pulse" />
+    <div className="flex gap-2 mb-6">
+      {[1, 2, 3, 4].map((i) => (
+        <div
+          key={i}
+          className="h-10 w-16 bg-muted rounded-full animate-pulse"
+        />
+      ))}
+    </div>
+    <div className="h-12 bg-muted rounded-xl mb-6 animate-pulse" />
+    <div className="space-y-4">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="bg-card border border-border rounded-xl p-4">
+          <div className="flex gap-4">
+            <div className="w-20 h-20 bg-muted rounded-lg animate-pulse" />
+            <div className="flex-1 space-y-2">
+              <div className="h-5 bg-muted rounded w-3/4 animate-pulse" />
+              <div className="h-4 bg-muted rounded w-1/2 animate-pulse" />
+              <div className="h-4 bg-muted rounded w-1/4 animate-pulse" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
 export default function Artworks() {
   const { t, i18n } = useTranslation('artworks');
@@ -32,16 +68,26 @@ export default function Artworks() {
   const [debouncedSearchQuery] = useDebounce(searchQuery, 300);
 
   // 批量选择状态
-  const [selectMode, setSelectMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const {
+    selectMode,
+    selectedIds,
+    showDeleteConfirm,
+    deleting,
+    toggleSelectMode,
+    toggleSelect,
+    selectAll,
+    deselectAll,
+    setShowDeleteConfirm,
+    setDeleting,
+    resetSelection,
+  } = useArtworksSelection();
+
   const [showExportDialog, setShowExportDialog] = useState(false);
 
   // Total count for "全部" tab
   const { data: totalCount } = useArtworksTotalCount();
 
-  // Create query function with current filters - use debounced search to reduce API calls
+  // Create query function with current filters
   const filters = useMemo(
     () => ({
       status: filter,
@@ -90,37 +136,17 @@ export default function Artworks() {
     estimateSize: (item) => (item.type === 'header' ? 48 : 112),
   });
 
-  // 切换选择模式
-  const toggleSelectMode = () => {
-    setSelectMode(!selectMode);
-    setSelectedIds(new Set());
-  };
-
-  // 切换选中状态
-  const toggleSelect = (id: string, e: React.MouseEvent) => {
-    if (!selectMode) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const newSelected = new Set(selectedIds);
-    if (newSelected.has(id)) {
-      newSelected.delete(id);
-    } else {
-      newSelected.add(id);
-    }
-    setSelectedIds(newSelected);
-  };
-
   // 全选/全不选 (只对已加载的项目)
-  const handleSelectAll = () => {
+  const handleSelectAll = useCallback(() => {
     if (selectedIds.size === items.length) {
-      setSelectedIds(new Set());
+      deselectAll();
     } else {
-      setSelectedIds(new Set(items.map((a) => a.id)));
+      selectAll(items.map((a) => a.id));
     }
-  };
+  }, [selectedIds.size, items, selectAll, deselectAll]);
 
   // 批量删除（软删除）
-  const handleBatchDelete = async () => {
+  const handleBatchDelete = useCallback(async () => {
     if (selectedIds.size === 0) return;
 
     try {
@@ -137,15 +163,14 @@ export default function Artworks() {
 
       // Refetch data
       await refetch();
-      setSelectedIds(new Set());
-      setSelectMode(false);
+      resetSelection();
       setShowDeleteConfirm(false);
     } catch (err) {
       console.error('批量删除失败:', err);
     } finally {
       setDeleting(false);
     }
-  };
+  }, [selectedIds, setDeleting, refetch, resetSelection, setShowDeleteConfirm]);
 
   // Calculate total editions for selected artworks
   const selectedEditionsCount = useMemo(() => {
@@ -155,35 +180,7 @@ export default function Artworks() {
   }, [items, selectedIds]);
 
   if (isLoading && items.length === 0) {
-    return (
-      <div className="p-6">
-        <h1 className="text-page-title mb-6 xl:mb-8">{t('title')}</h1>
-        {/* 骨架屏 */}
-        <div className="flex gap-2 mb-6">
-          {[1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className="h-10 w-16 bg-muted rounded-full animate-pulse"
-            />
-          ))}
-        </div>
-        <div className="h-12 bg-muted rounded-xl mb-6 animate-pulse" />
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-card border border-border rounded-xl p-4">
-              <div className="flex gap-4">
-                <div className="w-20 h-20 bg-muted rounded-lg animate-pulse" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-5 bg-muted rounded w-3/4 animate-pulse" />
-                  <div className="h-4 bg-muted rounded w-1/2 animate-pulse" />
-                  <div className="h-4 bg-muted rounded w-1/4 animate-pulse" />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+    return LoadingSkeleton;
   }
 
   if (error) {
@@ -248,98 +245,23 @@ export default function Artworks() {
       {/* 标题和批量操作按钮 */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-page-title">{t('title')}</h1>
-        <div className="flex gap-2">
-          {selectMode ? (
-            <>
-              <Button
-                variant="outline"
-                size="small"
-                onClick={handleSelectAll}
-              >
-                {selectedIds.size === items.length ? t('bulkActions.deselectAll') : t('bulkActions.selectAll')}
-              </Button>
-              {selectedIds.size > 0 && (
-                <>
-                  <Button
-                    variant="outline"
-                    size="small"
-                    onClick={() => setShowExportDialog(true)}
-                  >
-                    {t('bulkActions.export')} ({selectedIds.size})
-                  </Button>
-                  <Button
-                    variant="destructive-outline"
-                    size="small"
-                    onClick={() => setShowDeleteConfirm(true)}
-                  >
-                    {t('bulkActions.delete')} ({selectedIds.size})
-                  </Button>
-                </>
-              )}
-              <Button
-                variant="outline"
-                size="small"
-                onClick={toggleSelectMode}
-              >
-                {t('bulkActions.cancel')}
-              </Button>
-            </>
-          ) : (
-            <Button
-              variant="outline"
-              size="small"
-              onClick={toggleSelectMode}
-            >
-              {t('bulkActions.manage')}
-            </Button>
-          )}
-        </div>
+        <SelectionToolbar
+          selectMode={selectMode}
+          selectedCount={selectedIds.size}
+          totalCount={items.length}
+          onToggleSelectMode={toggleSelectMode}
+          onSelectAll={handleSelectAll}
+          onExport={() => setShowExportDialog(true)}
+          onDelete={() => setShowDeleteConfirm(true)}
+        />
       </div>
 
       {/* 筛选标签 */}
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-2" role="listbox" aria-label={t('filters.label')}>
-        <ToggleChip
-          selected={filter === 'all'}
-          onClick={() => setFilter('all')}
-        >
-          {t('filters.all')} ({totalCount ?? '...'})
-        </ToggleChip>
-        <ToggleChip
-          selected={filter === 'in_studio'}
-          onClick={() => setFilter('in_studio')}
-        >
-          <StatusIndicator status="in_studio" size="sm" />
-          {t('filters.inStudio')}
-        </ToggleChip>
-        <ToggleChip
-          selected={filter === 'at_gallery'}
-          onClick={() => setFilter('at_gallery')}
-        >
-          <StatusIndicator status="at_gallery" size="sm" />
-          {t('filters.atGallery')}
-        </ToggleChip>
-        <ToggleChip
-          selected={filter === 'at_museum'}
-          onClick={() => setFilter('at_museum')}
-        >
-          <StatusIndicator status="at_museum" size="sm" />
-          {t('filters.atMuseum')}
-        </ToggleChip>
-        <ToggleChip
-          selected={filter === 'in_transit'}
-          onClick={() => setFilter('in_transit')}
-        >
-          <StatusIndicator status="in_transit" size="sm" />
-          {t('filters.inTransit')}
-        </ToggleChip>
-        <ToggleChip
-          selected={filter === 'sold'}
-          onClick={() => setFilter('sold')}
-        >
-          <StatusIndicator status="sold" size="sm" />
-          {t('filters.sold')}
-        </ToggleChip>
-      </div>
+      <FilterPanel
+        filter={filter}
+        onFilterChange={setFilter}
+        totalCount={totalCount}
+      />
 
       {/* 搜索框 */}
       <div className="mb-6">
@@ -422,97 +344,7 @@ export default function Artworks() {
 
               // Render artwork card
               const artwork = item.data as ArtworkWithStats;
-              const mainStatus = getArtworkMainStatus(artwork.editions);
               const isSelected = selectedIds.has(artwork.id);
-
-              const cardContent = (
-                <div className="flex gap-4">
-                  {/* 选择框 */}
-                  {selectMode && (
-                    <div
-                      className="flex items-center"
-                      onClick={(e) => toggleSelect(artwork.id, e)}
-                    >
-                      <div
-                        className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
-                          isSelected
-                            ? 'bg-primary border-primary'
-                            : 'border-border hover:border-primary/50'
-                        }`}
-                      >
-                        {isSelected && (
-                          <Check className="w-4 h-4 text-primary-foreground" />
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 缩略图 */}
-                  <div className="w-20 h-20 bg-muted rounded-lg overflow-hidden flex-shrink-0">
-                    {artwork.thumbnail_url ? (
-                      <img
-                        src={artwork.thumbnail_url}
-                        alt={artwork.title_en}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                        <Image className="w-8 h-8" />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 作品信息 */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-medium truncate">
-                        {artwork.title_en}
-                        {artwork.title_cn && (
-                          <span className="text-muted-foreground ml-2">
-                            {artwork.title_cn}
-                          </span>
-                        )}
-                      </h3>
-                      {mainStatus && (
-                        <StatusIndicator status={mainStatus} size="lg" />
-                      )}
-                    </div>
-
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {artwork.year && <span>{artwork.year}</span>}
-                      {artwork.type && <span> · {artwork.type}</span>}
-                    </p>
-
-                    {/* 版本统计 */}
-                    <div className="flex gap-3 mt-2 text-xs text-muted-foreground">
-                      {artwork.stats.total > 0 && (
-                        <>
-                          <span>{t('totalEditions', { count: artwork.stats.total })}</span>
-                          {artwork.stats.inStudio > 0 && (
-                            <span className="flex items-center gap-1">
-                              <StatusIndicator status="in_studio" size="sm" />
-                              {artwork.stats.inStudio}
-                            </span>
-                          )}
-                          {artwork.stats.atGallery > 0 && (
-                            <span className="flex items-center gap-1">
-                              <StatusIndicator status="at_gallery" size="sm" />
-                              {artwork.stats.atGallery}
-                            </span>
-                          )}
-                          {artwork.stats.sold > 0 && (
-                            <span className="flex items-center gap-1">
-                              <StatusIndicator status="sold" size="sm" />
-                              {artwork.stats.sold}
-                            </span>
-                          )}
-                        </>
-                      )}
-                      {artwork.stats.total === 0 && <span>{t('noEditionsYet')}</span>}
-                    </div>
-                  </div>
-                </div>
-              );
 
               return (
                 <div
@@ -536,14 +368,24 @@ export default function Artworks() {
                           : 'border-border hover:border-primary/50'
                       }`}
                     >
-                      {cardContent}
+                      <ArtworkListCard
+                        artwork={artwork}
+                        selectMode={selectMode}
+                        isSelected={isSelected}
+                        onToggleSelect={toggleSelect}
+                      />
                     </div>
                   ) : (
                     <Link
                       to={`/artworks/${artwork.id}`}
                       className="block bg-card border border-border rounded-xl p-4 hover:border-primary/50 transition-colors mb-3"
                     >
-                      {cardContent}
+                      <ArtworkListCard
+                        artwork={artwork}
+                        selectMode={selectMode}
+                        isSelected={isSelected}
+                        onToggleSelect={toggleSelect}
+                      />
                     </Link>
                   )}
                 </div>

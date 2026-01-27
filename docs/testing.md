@@ -7,10 +7,12 @@
 ## 测试命令
 
 ```bash
-bun test              # 监听模式
-bun test:run          # 单次运行
-bun test:ui           # 可视化 UI
+bun run test          # 监听模式（vitest）
+bun run test:run      # 单次运行
+bun run test:ui       # 可视化 UI
 ```
+
+> **注意**：不要使用 `bun test`，这会调用 Bun 内置测试运行器而非 Vitest，可能导致环境配置问题。
 
 ---
 
@@ -50,6 +52,13 @@ src/components/import/
 src/components/artwork/
 └── types.test.ts             # 表单初始化、版本号格式化
 
+src/components/editions/
+├── historyUtils.test.ts      # 历史记录合并、描述生成、时间格式化
+└── editionDetailUtils.test.ts # 版本号格式化、价格格式化、日期格式化
+
+src/components/artworks/
+└── useArtworksSelection.test.ts # 选择状态管理 hook
+
 src/test/
 ├── setup.ts                  # 测试环境设置（MSW + jest-dom）
 ├── test-utils.tsx            # React Query 测试工具
@@ -60,7 +69,7 @@ src/test/
 
 ---
 
-## 测试覆盖率（498 个测试）
+## 测试覆盖率（572 个测试）
 
 | 模块 | 测试数 | 覆盖内容 |
 |------|--------|----------|
@@ -69,12 +78,15 @@ src/test/
 | `imageCompressor` | 40 | 文件类型检测、链接类型识别 |
 | `inventoryNumber` | 37 | 模式检测、编号生成、验证 |
 | `md-parser` | 33 | 标题解析、字段提取、图片提取 |
-| `useEditions` | 32 | Query keys、过滤、状态计数 |
 | `artwork-extractor` | 31 | HTML 图片提取、HTML 清理 |
-| `useArtworks` | 27 | Query keys、统计计算、状态优先级 |
+| `historyUtils` | 30 | 历史合并、相对时间、描述生成 |
+| `useArtworks` | 29 | Query keys、统计计算、状态优先级 |
 | `search-utils` | 26 | SQL 注入防护、英文复数扩展 |
 | `tool-schemas` | 24 | AI 工具 Zod schema 验证 |
 | `formatters` | 24 | 版本号、价格、日期显示 |
+| `editionDetailUtils` | 23 | 版本号格式化、价格格式化 |
+| `useArtworksSelection` | 21 | 选择模式、批量选择、状态管理 |
+| `useEditions` | 21 | Query keys、过滤、状态计数 |
 | `chatUtils` | 16 | 日期标签、消息分组 |
 | `useExport` | 15 | CSV 格式化、文件下载、日期工具 |
 | `artwork/types` | 15 | 表单数据初始化、版本号格式化 |
@@ -93,6 +105,7 @@ src/test/
 - AI 工具测试：`api/tools/__tests__/*.test.ts`
 - 库测试：`src/lib/*.test.ts`
 - Hook 测试：`src/hooks/queries/*.test.ts`
+- 组件工具测试：`src/components/*/*.test.ts`
 
 ### 示例：纯函数测试
 
@@ -103,6 +116,48 @@ import { formatPrice } from './formatters';
 describe('formatPrice', () => {
   it('should format USD price', () => {
     expect(formatPrice(1000, 'USD')).toBe('$1,000');
+  });
+});
+```
+
+### 示例：React Hook 测试
+
+```typescript
+import { describe, it, expect } from 'vitest';
+import { renderHook, act } from '@testing-library/react';
+import { useArtworksSelection } from './useArtworksSelection';
+
+describe('useArtworksSelection', () => {
+  it('should toggle select mode', () => {
+    const { result } = renderHook(() => useArtworksSelection());
+
+    act(() => {
+      result.current.toggleSelectMode();
+    });
+
+    expect(result.current.selectMode).toBe(true);
+  });
+});
+```
+
+### 示例：工具函数测试（带 mock 翻译）
+
+```typescript
+import { describe, it, expect } from 'vitest';
+import type { TFunction } from 'i18next';
+import { getDescription } from './historyUtils';
+
+const createMockT = (translations: Record<string, string>): TFunction => {
+  return ((key: string) => translations[key] || key) as TFunction;
+};
+
+describe('getDescription', () => {
+  it('should describe status change', () => {
+    const t = createMockT({ 'descriptions.statusChange': '从{{from}}变更为{{to}}' });
+    const tStatus = createMockT({ in_studio: '在工作室', sold: '已售出' });
+
+    const item = { action: 'status_change', from_status: 'in_studio', to_status: 'sold' };
+    expect(getDescription(item, t, tStatus)).toContain('在工作室');
   });
 });
 ```
@@ -168,6 +223,6 @@ export const handlers = [
 
 ## 配置文件
 
-- `vitest.config.ts` - 测试运行器配置
+- `vitest.config.ts` - 测试运行器配置（使用 happy-dom 环境）
 - `src/test/setup.ts` - 测试环境设置（MSW + jest-dom matchers）
 - `src/test/test-utils.tsx` - React Query 测试工具函数

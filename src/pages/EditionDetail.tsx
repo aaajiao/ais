@@ -18,16 +18,20 @@ import FileList, { type EditionFile as FileListEditionFile } from '@/components/
 import ExternalLinkDialog from '@/components/files/ExternalLinkDialog';
 import HistoryTimeline, { type EditionHistory as TimelineEditionHistory } from '@/components/editions/HistoryTimeline';
 import EditionEditDialog from '@/components/editions/EditionEditDialog';
+import { EditionInfoCard } from '@/components/editions/EditionInfoCard';
+import {
+  formatEditionNumber as formatEditionNumberUtil,
+  type EditionWithDetails,
+} from '@/components/editions/editionDetailUtils';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
-import { StatusIndicator } from '@/components/ui/StatusIndicator';
 import { Button } from '@/components/ui/button';
-import { Image, MessageSquare, Pencil, ChevronDown, ChevronUp } from 'lucide-react';
+import { MessageSquare, Pencil } from 'lucide-react';
 
 type EditionHistory = Database['public']['Tables']['edition_history']['Row'];
 type EditionFile = Database['public']['Tables']['edition_files']['Row'];
 
 export default function EditionDetail() {
-  const { t, i18n } = useTranslation('editionDetail');
+  const { t } = useTranslation('editionDetail');
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -57,40 +61,9 @@ export default function EditionDetail() {
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [locationExpanded, setLocationExpanded] = useState(false);
 
-  // 格式化版本号
-  const formatEditionNumber = (): string => {
-    if (!edition) return '';
-    if (edition.edition_type === 'unique') return t('unique');
-    if (edition.edition_type === 'ap') return `AP${edition.edition_number || ''}`;
-    return `${edition.edition_number || '?'}/${edition.artwork?.edition_total || '?'}`;
-  };
-
-  // 格式化日期
-  const formatDate = (dateString: string | null): string => {
-    if (!dateString) return '-';
-    const locale = i18n.language === 'zh' ? 'zh-CN' : 'en-US';
-    return new Date(dateString).toLocaleDateString(locale, {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  };
-
-  // 格式化价格
-  const formatPrice = (price: number | null, currency: string | null): string => {
-    if (!price) return '-';
-    const currencySymbol: Record<string, string> = {
-      USD: '$',
-      EUR: '€',
-      GBP: '£',
-      CNY: '¥',
-      JPY: '¥',
-    };
-    const symbol = currencySymbol[currency || 'USD'] || currency || '$';
-    return `${symbol}${price.toLocaleString()}`;
-  };
+  // 格式化版本号（用于删除确认对话框等）
+  const editionNumber = formatEditionNumberUtil(edition as EditionWithDetails, t);
 
   // 处理文件上传完成
   const handleFileUploaded = useCallback((file: FileListEditionFile) => {
@@ -146,7 +119,7 @@ export default function EditionDetail() {
         context: {
           editionId: edition?.id,
           artworkTitle: edition?.artwork?.title_en,
-          editionNumber: formatEditionNumber(),
+          editionNumber,
         }
       }
     });
@@ -240,7 +213,7 @@ export default function EditionDetail() {
       <DeleteConfirmDialog
         isOpen={showDeleteConfirm}
         title={t('deleteDialog.title')}
-        message={t('deleteDialog.message', { title: edition?.artwork?.title_en, edition: formatEditionNumber() })}
+        message={t('deleteDialog.message', { title: edition?.artwork?.title_en, edition: editionNumber })}
         warning={t('deleteDialog.warning')}
         warningItems={history.length > 0 ? [t('deleteDialog.historyWarning', { count: history.length })] : undefined}
         onClose={() => setShowDeleteConfirm(false)}
@@ -279,188 +252,7 @@ export default function EditionDetail() {
       </div>
 
       {/* 版本基本信息 */}
-      <div className="bg-card border border-border rounded-xl p-6 mb-6">
-        <div className="flex flex-col md:flex-row gap-6">
-          {/* 缩略图 */}
-          <div className="w-full md:w-64 h-64 bg-muted rounded-lg overflow-hidden flex-shrink-0">
-            {edition.artwork?.thumbnail_url ? (
-              <img
-                src={edition.artwork.thumbnail_url}
-                alt={edition.artwork.title_en}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                <Image className="w-12 h-12" />
-              </div>
-            )}
-          </div>
-
-          {/* 版本信息 */}
-          <div className="flex-1">
-            {/* 作品标题 */}
-            <Link
-              to={`/artworks/${edition.artwork_id}`}
-              className="text-primary hover:underline"
-            >
-              <h2 className="text-lg text-muted-foreground mb-1">
-                {edition.artwork?.title_en}
-                {edition.artwork?.title_cn && ` · ${edition.artwork.title_cn}`}
-              </h2>
-            </Link>
-
-            {/* 版本号 */}
-            <h1 className="text-page-title mb-4">
-              {formatEditionNumber()}
-              {edition.inventory_number && (
-                <span className="text-muted-foreground font-normal ml-2">
-                  #{edition.inventory_number}
-                </span>
-              )}
-            </h1>
-
-            {/* 状态标签 */}
-            <div className="inline-flex items-center gap-2 mb-4">
-              <StatusIndicator status={edition.status} showLabel size="lg" />
-            </div>
-
-            {/* 详细信息 */}
-            <div className="space-y-2 text-sm">
-              {edition.location && (() => {
-                const hasLocationDetails = Boolean(
-                  edition.location.address || edition.location.contact || edition.location.notes
-                );
-                return (
-                  <div>
-                    <p
-                      className={hasLocationDetails ? 'cursor-pointer inline-flex items-center gap-1' : ''}
-                      onClick={() => hasLocationDetails && setLocationExpanded(!locationExpanded)}
-                    >
-                      <span className="text-muted-foreground">{t('info.location')}</span>
-                      <span className={hasLocationDetails ? 'underline decoration-dotted underline-offset-2' : ''}>
-                        {edition.location.name}
-                      </span>
-                      {hasLocationDetails && (
-                        locationExpanded
-                          ? <ChevronUp className="w-3 h-3 text-muted-foreground" />
-                          : <ChevronDown className="w-3 h-3 text-muted-foreground" />
-                      )}
-                    </p>
-                    {locationExpanded && hasLocationDetails && (
-                      <div className="mt-2 ml-4 p-2 bg-muted/50 rounded text-xs space-y-1">
-                        {edition.location.address && (
-                          <p><span className="text-muted-foreground">{t('info.locationAddress')}</span>{edition.location.address}</p>
-                        )}
-                        {edition.location.contact && (
-                          <p><span className="text-muted-foreground">{t('info.locationContact')}</span>{edition.location.contact}</p>
-                        )}
-                        {edition.location.notes && (
-                          <p><span className="text-muted-foreground">{t('info.locationNotes')}</span>{edition.location.notes}</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-
-              {/* 价格信息 */}
-              {edition.sale_price && (
-                <p>
-                  <span className="text-muted-foreground">
-                    {edition.status === 'sold' ? t('info.soldPrice') : t('info.listPrice')}
-                  </span>
-                  {formatPrice(edition.sale_price, edition.sale_currency)}
-                </p>
-              )}
-
-              {/* 销售详情（仅已售状态显示） */}
-              {edition.status === 'sold' && (
-                <>
-                  {edition.sale_date && (
-                    <p>
-                      <span className="text-muted-foreground">{t('info.saleDate')}</span>
-                      {formatDate(edition.sale_date)}
-                    </p>
-                  )}
-                  {edition.buyer_name && (
-                    <p>
-                      <span className="text-muted-foreground">{t('info.buyer')}</span>
-                      {edition.buyer_name}
-                    </p>
-                  )}
-                </>
-              )}
-
-              {/* 借出信息（仅 at_gallery 状态显示） */}
-              {edition.status === 'at_gallery' && (
-                <>
-                  {edition.consignment_start && (
-                    <p>
-                      <span className="text-muted-foreground">{t('info.loanStart')}</span>
-                      {formatDate(edition.consignment_start)}
-                    </p>
-                  )}
-                  {edition.consignment_end && (
-                    <p>
-                      <span className="text-muted-foreground">{t('info.loanExpectedReturn')}</span>
-                      {formatDate(edition.consignment_end)}
-                    </p>
-                  )}
-                </>
-              )}
-
-              {/* 展览信息（仅 at_museum 状态显示） */}
-              {edition.status === 'at_museum' && (
-                <>
-                  {edition.loan_start && (
-                    <p>
-                      <span className="text-muted-foreground">{t('info.exhibitionStart')}</span>
-                      {formatDate(edition.loan_start)}
-                    </p>
-                  )}
-                  {edition.loan_end && (
-                    <p>
-                      <span className="text-muted-foreground">{t('info.exhibitionEnd')}</span>
-                      {formatDate(edition.loan_end)}
-                    </p>
-                  )}
-                </>
-              )}
-
-              {/* 证书编号 */}
-              {edition.certificate_number && (
-                <p>
-                  <span className="text-muted-foreground">{t('info.certificate')}</span>
-                  #{edition.certificate_number}
-                </p>
-              )}
-
-              {/* 存储位置 */}
-              {edition.storage_detail && (
-                <p>
-                  <span className="text-muted-foreground">{t('info.storageDetail')}</span>
-                  {edition.storage_detail}
-                </p>
-              )}
-
-              {/* 作品状态（非 excellent 时显示） */}
-              {edition.condition && edition.condition !== 'excellent' && (
-                <p>
-                  <span className="text-muted-foreground">{t('info.condition')}</span>
-                  {t(`info.conditionValues.${edition.condition}`)}
-                </p>
-              )}
-            </div>
-
-            {edition.notes && (
-              <div className="mt-4 p-3 bg-muted rounded-lg text-sm">
-                <p className="text-muted-foreground mb-1">{t('info.notes')}</p>
-                <p>{edition.notes}</p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      <EditionInfoCard edition={edition as EditionWithDetails} />
 
       {/* 附件列表 */}
       <div className="bg-card border border-border rounded-xl p-6 mb-6">

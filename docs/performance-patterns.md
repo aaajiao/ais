@@ -88,6 +88,75 @@ const filters = useMemo(() => ({
 
 ---
 
+## 组件拆分与 Memoization
+
+大型组件（300+ 行）应拆分为更小的子组件，遵循 React 最佳实践：
+
+### 拆分原则
+
+- **每个文件 < 300 行**：提高可读性和可维护性
+- **单一职责**：每个组件只做一件事
+- **提取工具函数**：将纯函数逻辑移至独立的 `*Utils.ts` 文件
+- **提取类型定义**：将类型移至 `types.ts` 文件
+
+### Memoization 模式
+
+使用 `React.memo()` 包装子组件以避免不必要的重渲染：
+
+```typescript
+// ✅ 好：使用 memo 包装子组件
+export const ArtworkListCard = memo(function ArtworkListCard({
+  artwork,
+  selectMode,
+  isSelected,
+  onToggleSelect,
+}: ArtworkListCardProps) {
+  // ...
+});
+```
+
+### 函数式 setState
+
+使用函数式更新避免闭包陷阱和不必要的依赖：
+
+```typescript
+// ✅ 好：函数式更新，无需依赖 selectedIds
+const toggleSelect = useCallback((id: string) => {
+  setSelectedIds(prev => {
+    const newSet = new Set(prev);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    return newSet;
+  });
+}, []);  // 空依赖数组
+```
+
+### 静态 JSX 提升
+
+将不变的 JSX 提升到组件外部：
+
+```typescript
+// ✅ 好：静态 JSX 在组件外部定义
+const emptyStateIcon = <Inbox className="w-10 h-10 mx-auto mb-2" />;
+
+function FileList({ files }: Props) {
+  if (!files.length) return emptyStateIcon;
+  // ...
+}
+```
+
+### 已拆分的组件
+
+| 原文件 | 拆分后 | 行数变化 |
+|--------|--------|----------|
+| `FileList.tsx` | FileListItem, FileGridItem, FilePreviewModal, ImageThumbnail, ImagePreview | 497 → 212 |
+| `HistoryTimeline.tsx` | HistoryEntry, HistoryMergedGroup, AddNoteSection, historyUtils | 564 → 235 |
+| `EditionDetail.tsx` | EditionInfoCard, editionDetailUtils | 529 → 321 |
+| `Artworks.tsx` | FilterPanel, SelectionToolbar, ArtworkListCard, useArtworksSelection | 566 → 408 |
+| `Settings.tsx` | 多个子组件 | 800+ → ~300 |
+
+---
+
 ## 查询键管理
 
 使用 `queryKeys.ts` 中的查询键工厂进行统一管理：
