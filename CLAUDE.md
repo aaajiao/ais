@@ -55,6 +55,7 @@ SUPABASE_SERVICE_KEY=xxx
 ANTHROPIC_API_KEY=sk-ant-xxx
 OPENAI_API_KEY=sk-xxx
 ALLOWED_EMAILS=email1@example.com,email2@example.com
+CONTEXT7_API_KEY=xxx                # Context7 API（获取最新库文档）
 ```
 
 ## Database
@@ -114,6 +115,6 @@ bunx supabase gen types typescript --project-id <id> > src/lib/database.types.ts
 已安装技能（`.claude/skills/`）：
 - **react-best-practices** - React/Next.js 性能优化
 - **postgres-best-practices** - PostgreSQL 最佳实践
-- **context7** - 获取最新库文档
+- **context7** - 获取最新库文档（需要设置 `CONTEXT7_API_KEY` 环境变量）
 - **ai-sdk** - Vercel AI SDK 文档
 - **frontend-design** - 前端设计技能
