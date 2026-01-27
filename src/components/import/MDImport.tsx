@@ -2,50 +2,16 @@ import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { parseAndValidateMDFile, type ParsedArtwork } from '@/lib/md-parser';
 import { useAuthContext } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Loader2, FileText, ImageIcon, CheckCircle } from 'lucide-react';
-
-interface PreviewResult {
-  new: Array<{
-    artwork: ParsedArtwork & { thumbnail_url: string | null };
-    requiresThumbnail: boolean;
-    availableImages: string[];
-    _uid?: string; // 临时唯一标识符
-  }>;
-  updates: Array<{
-    existingId: string;
-    existingArtwork: Record<string, unknown>;
-    newData: ParsedArtwork;
-    changes: Array<{
-      field: string;
-      fieldLabel: string;
-      oldValue: string | null;
-      newValue: string | null;
-    }>;
-    _uid?: string; // 临时唯一标识符
-  }>;
-  unchanged: Array<{
-    existingId: string;
-    title: string;
-  }>;
-}
-
-// 生成作品的唯一标识符（优先使用 source_url，否则用 title_en + index）
-function getArtworkUid(artwork: { title_en: string; source_url?: string | null }, index: number): string {
-  return artwork.source_url || `${artwork.title_en}::${index}`;
-}
-
-interface ExecuteResult {
-  created: string[];
-  updated: string[];
-  errors: string[];
-  imageProcessing?: {
-    processed: number;
-    failed: number;
-  };
-}
-
-type ImportStep = 'upload' | 'preview' | 'result';
+import UploadStep from './UploadStep';
+import PreviewStep from './PreviewStep';
+import ResultStep from './ResultStep';
+import {
+  type PreviewResult,
+  type ExecuteResult,
+  type BatchProgress,
+  type ImportStep,
+  getArtworkUid,
+} from './types';
 
 export default function MDImport() {
   const { t } = useTranslation('import');
@@ -55,17 +21,12 @@ export default function MDImport() {
   const [previewResult, setPreviewResult] = useState<PreviewResult | null>(null);
   const [executeResult, setExecuteResult] = useState<ExecuteResult | null>(null);
   const [selectedThumbnails, setSelectedThumbnails] = useState<Record<string, string>>({});
-  const [selectedArtworks, setSelectedArtworks] = useState<Set<string>>(new Set()); // 选中要导入的作品 UID
-  const [artworkUidMap, setArtworkUidMap] = useState<Map<string, ParsedArtwork>>(new Map()); // UID -> artwork 映射
+  const [selectedArtworks, setSelectedArtworks] = useState<Set<string>>(new Set());
+  const [artworkUidMap, setArtworkUidMap] = useState<Map<string, ParsedArtwork>>(new Map());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [parseWarnings, setParseWarnings] = useState<Array<{ title: string; issues: string[] }>>([]);
-  const [batchProgress, setBatchProgress] = useState<{
-    current: number;
-    total: number;
-    processed: number;
-    totalArtworks: number;
-  } | null>(null);
+  const [batchProgress, setBatchProgress] = useState<BatchProgress | null>(null);
 
   // 步骤 1: 文件上传和解析
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -88,7 +49,7 @@ export default function MDImport() {
       setParsedArtworks(artworks);
       setParseWarnings(warnings);
 
-      // 为每个作品设置默认缩略图（使用 source_url 或索引作为 key）
+      // 为每个作品设置默认缩略图
       const defaultThumbnails: Record<string, string> = {};
       artworks.forEach((artwork, index) => {
         const uid = getArtworkUid(artwork, index);
@@ -141,7 +102,6 @@ export default function MDImport() {
       setArtworkUidMap(uidMap);
       setPreviewResult(result);
       setSelectedArtworks(defaultSelected);
-
       setStep('preview');
     } catch (err) {
       setError(err instanceof Error ? err.message : t('mdImport.errors.parseFailed'));
@@ -150,15 +110,12 @@ export default function MDImport() {
     }
   }, [session?.access_token, t]);
 
-  // 处理缩略图选择（使用 UID 作为 key）
+  // 处理缩略图选择
   const handleThumbnailSelect = (uid: string, imageUrl: string) => {
-    setSelectedThumbnails(prev => ({
-      ...prev,
-      [uid]: imageUrl,
-    }));
+    setSelectedThumbnails(prev => ({ ...prev, [uid]: imageUrl }));
   };
 
-  // 处理作品选择/取消选择（使用 UID）
+  // 处理作品选择/取消选择
   const handleArtworkToggle = (uid: string) => {
     setSelectedArtworks(prev => {
       const newSet = new Set(prev);
@@ -190,7 +147,7 @@ export default function MDImport() {
       setLoading(true);
       setError(null);
 
-      // 只导入选中的作品（通过 UID 映射获取）
+      // 只导入选中的作品
       const artworksToImport: Array<ParsedArtwork & { thumbnail_url: string | null }> = [];
       for (const uid of selectedArtworks) {
         const artwork = artworkUidMap.get(uid);
@@ -220,27 +177,14 @@ export default function MDImport() {
         imageProcessing: { processed: 0, failed: 0 },
       };
 
-      // 初始进度：0%，使用 await 确保 UI 更新
-      setBatchProgress({
-        current: 1,
-        total: totalBatches,
-        processed: 0,
-        totalArtworks,
-      });
-      // 让 React 有机会渲染初始进度
+      setBatchProgress({ current: 1, total: totalBatches, processed: 0, totalArtworks });
       await new Promise(resolve => setTimeout(resolve, 50));
 
       for (let i = 0; i < totalBatches; i++) {
         const startIdx = i * BATCH_SIZE;
         const batch = artworksToImport.slice(startIdx, startIdx + BATCH_SIZE);
 
-        // 更新当前批次（在请求开始时）
-        setBatchProgress({
-          current: i + 1,
-          total: totalBatches,
-          processed: startIdx,
-          totalArtworks,
-        });
+        setBatchProgress({ current: i + 1, total: totalBatches, processed: startIdx, totalArtworks });
 
         try {
           const response = await fetch('/api/import/md', {
@@ -249,10 +193,7 @@ export default function MDImport() {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${session?.access_token || ''}`,
             },
-            body: JSON.stringify({
-              artworks: batch,
-              mode: 'execute',
-            }),
+            body: JSON.stringify({ artworks: batch, mode: 'execute' }),
           });
 
           if (!response.ok) {
@@ -269,16 +210,9 @@ export default function MDImport() {
             accumulatedResults.imageProcessing!.failed += result.imageProcessing.failed;
           }
 
-          // 批次完成后更新进度
           const completedCount = startIdx + batch.length;
-          setBatchProgress({
-            current: i + 1,
-            total: totalBatches,
-            processed: completedCount,
-            totalArtworks,
-          });
+          setBatchProgress({ current: i + 1, total: totalBatches, processed: completedCount, totalArtworks });
 
-          // 多批次时，在批次之间短暂暂停让 UI 更新
           if (i < totalBatches - 1) {
             await new Promise(resolve => setTimeout(resolve, 100));
           }
@@ -288,7 +222,6 @@ export default function MDImport() {
         }
       }
 
-      // 完成后短暂显示 100% 进度
       await new Promise(resolve => setTimeout(resolve, 300));
 
       setBatchProgress(null);
@@ -316,306 +249,10 @@ export default function MDImport() {
     setBatchProgress(null);
   };
 
-  // 渲染预览结果
-  const renderPreview = () => {
-    if (!previewResult) return null;
-
-    const hasChanges = previewResult.new.length > 0 || previewResult.updates.length > 0;
-    const totalSelectable = previewResult.new.length + previewResult.updates.length;
-    const allSelected = selectedArtworks.size === totalSelectable && totalSelectable > 0;
-
-    return (
-      <div className="space-y-6">
-        {/* 全选控制栏 */}
-        {hasChanges && (
-          <div className="flex items-center justify-between bg-muted/30 rounded-lg p-3">
-            <span className="text-sm text-muted-foreground">
-              {t('mdImport.selection.selected', { selected: selectedArtworks.size, total: totalSelectable })}
-              {previewResult.unchanged.length > 0 && (
-                <span className="ml-2 text-xs">{t('mdImport.selection.existingCount', { count: previewResult.unchanged.length })}</span>
-              )}
-            </span>
-            <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                size="mini"
-                onClick={() => handleSelectAll(true)}
-                disabled={allSelected}
-              >
-                {t('mdImport.selection.selectAll')}
-              </Button>
-              <Button
-                variant="ghost"
-                size="mini"
-                onClick={() => handleSelectAll(false)}
-                disabled={selectedArtworks.size === 0}
-              >
-                {t('mdImport.selection.deselectAll')}
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* 新作品 */}
-        {previewResult.new.length > 0 && (
-          <div>
-            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-green-500"></span>
-              {t('mdImport.new.count', { count: previewResult.new.length })}
-            </h3>
-            <div className="space-y-3">
-              {previewResult.new.map((item, i) => {
-                // 通过 source_url 或 title_en+source_url 组合来匹配正确的作品
-                const artwork = parsedArtworks.find(a =>
-                  a.source_url && item.artwork.source_url
-                    ? a.source_url === item.artwork.source_url
-                    : a.title_en === item.artwork.title_en && a.source_url === item.artwork.source_url
-                );
-                const images = artwork?.images || item.artwork.images || [];
-                const uid = item._uid || `new-${i}`;
-                const isSelected = selectedArtworks.has(uid);
-
-                return (
-                  <div
-                    key={uid}
-                    className={`rounded-xl p-4 transition-all ${
-                      isSelected
-                        ? 'bg-green-500/10 border border-green-500/20'
-                        : 'bg-muted/30 border border-border opacity-60'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      {/* 勾选框 */}
-                      <label className="flex items-center cursor-pointer mt-1">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => handleArtworkToggle(uid)}
-                          className="w-5 h-5 rounded border-2 border-green-500 text-green-500 focus:ring-green-500/30"
-                        />
-                      </label>
-                      <div className="flex-1">
-                        <p className="font-medium text-lg">
-                          {item.artwork.title_cn
-                            ? `${item.artwork.title_en} / ${item.artwork.title_cn}`
-                            : item.artwork.title_en}
-                        </p>
-                    <div className="mt-2 text-sm text-muted-foreground space-y-1">
-                      {item.artwork.year && <p>{t('mdImport.fields.year')}: {item.artwork.year}</p>}
-                      {item.artwork.type && <p>{t('mdImport.fields.type')}: {item.artwork.type}</p>}
-                      {item.artwork.dimensions && <p>{t('mdImport.fields.dimensions')}: {item.artwork.dimensions}</p>}
-                      {item.artwork.materials && <p>{t('mdImport.fields.materials')}: {item.artwork.materials}</p>}
-                      {item.artwork.duration && <p>{t('mdImport.fields.duration')}: {item.artwork.duration}</p>}
-                    </div>
-
-                    {/* 缩略图选择 */}
-                    {images.length > 0 && isSelected && (
-                      <div className="mt-4">
-                        <p className="text-sm font-medium mb-2">{t('mdImport.thumbnail.select')}</p>
-                        <div className="flex gap-2 flex-wrap">
-                          {images.map((img, imgIndex) => (
-                            <button
-                              key={imgIndex}
-                              onClick={() => handleThumbnailSelect(uid, img)}
-                              className={`w-16 h-16 rounded-lg border-2 overflow-hidden transition-all ${
-                                selectedThumbnails[uid] === img
-                                  ? 'border-primary ring-2 ring-primary/30'
-                                  : 'border-border hover:border-primary/50'
-                              }`}
-                            >
-                              <img
-                                src={img}
-                                alt=""
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect fill="%23374151" width="64" height="64"/><text x="50%" y="50%" fill="%239CA3AF" font-size="10" text-anchor="middle" dy=".3em">Error</text></svg>';
-                                }}
-                              />
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* 更新作品 */}
-        {previewResult.updates.length > 0 && (
-          <div>
-            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
-              {t('mdImport.updates.count', { count: previewResult.updates.length })}
-            </h3>
-            <div className="space-y-3">
-              {previewResult.updates.map((item, i) => {
-                const uid = item._uid || `update-${i}`;
-                const isSelected = selectedArtworks.has(uid);
-
-                return (
-                  <div
-                    key={uid}
-                    className={`rounded-xl p-4 transition-all ${
-                      isSelected
-                        ? 'bg-yellow-500/10 border border-yellow-500/20'
-                        : 'bg-muted/30 border border-border opacity-60'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      {/* 勾选框 */}
-                      <label className="flex items-center cursor-pointer mt-1">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => handleArtworkToggle(uid)}
-                          className="w-5 h-5 rounded border-2 border-yellow-500 text-yellow-500 focus:ring-yellow-500/30"
-                        />
-                      </label>
-                      <div className="flex-1">
-                        <p className="font-medium">
-                          {item.newData.title_cn
-                            ? `${item.newData.title_en} / ${item.newData.title_cn}`
-                            : item.newData.title_en}
-                        </p>
-                        {isSelected && (
-                          <div className="mt-3 space-y-2">
-                            {item.changes.map((change, ci) => (
-                              <div key={ci} className="text-sm flex items-start gap-2">
-                                <span className="text-muted-foreground min-w-[60px]">{change.fieldLabel}:</span>
-                                <span className="line-through text-red-500">{change.oldValue || t('mdImport.fields.empty')}</span>
-                                <span className="text-muted-foreground">→</span>
-                                <span className="text-green-600">{change.newValue}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* 无变更 */}
-        {previewResult.unchanged.length > 0 && (
-          <div>
-            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-gray-400"></span>
-              {t('mdImport.unchanged.count', { count: previewResult.unchanged.length })}
-            </h3>
-            <div className="bg-muted/50 rounded-xl p-4">
-              <p className="text-sm text-muted-foreground">
-                {previewResult.unchanged.map(u => u.title).join('、')}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* 无任何变更的提示 */}
-        {!hasChanges && (
-          <div className="bg-muted/50 rounded-xl p-8 text-center">
-            <p className="text-muted-foreground">{t('mdImport.noChanges')}</p>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // 渲染执行结果
-  const renderResult = () => {
-    if (!executeResult) return null;
-
-    const imageStats = executeResult.imageProcessing;
-    const hasImageProcessing = imageStats && (imageStats.processed > 0 || imageStats.failed > 0);
-
-    return (
-      <div className="space-y-6">
-        <div className="text-center py-8">
-          <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-500" />
-          <h2 className="text-xl font-semibold mb-2">{t('mdImport.result.complete')}</h2>
-        </div>
-
-        <div className="grid grid-cols-3 gap-4 text-center">
-          <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4">
-            <p className="text-3xl font-bold text-green-600">{executeResult.created.length}</p>
-            <p className="text-sm text-muted-foreground">{t('mdImport.result.created')}</p>
-          </div>
-          <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4">
-            <p className="text-3xl font-bold text-yellow-600">{executeResult.updated.length}</p>
-            <p className="text-sm text-muted-foreground">{t('mdImport.result.updated')}</p>
-          </div>
-          <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
-            <p className="text-3xl font-bold text-red-600">{executeResult.errors.length}</p>
-            <p className="text-sm text-muted-foreground">{t('mdImport.result.failed')}</p>
-          </div>
-        </div>
-
-        {/* 图片处理统计 */}
-        {hasImageProcessing && (
-          <div className="bg-muted/50 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <ImageIcon className="w-4 h-4 text-muted-foreground" />
-              <span className="font-medium text-sm">{t('mdImport.result.imageProcessing')}</span>
-            </div>
-            <div className="flex gap-4 text-sm">
-              <span className="text-green-600">
-                {t('mdImport.result.imageSuccess', { count: imageStats.processed })}
-              </span>
-              {imageStats.failed > 0 && (
-                <span className="text-muted-foreground">
-                  {t('mdImport.result.imageFailed', { count: imageStats.failed })}
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-
-        {executeResult.errors.length > 0 && (
-          <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4">
-            <p className="font-medium text-destructive mb-2">{t('mdImport.result.errorDetails')}</p>
-            <ul className="text-sm space-y-1">
-              {executeResult.errors.map((err, i) => (
-                <li key={i} className="text-destructive">{err}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-    );
-  };
-
   return (
     <div className="space-y-6">
       {/* 步骤指示器 */}
-      <div className="flex items-center gap-4 text-sm">
-        <div className={`flex items-center gap-2 ${step === 'upload' ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
-          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-            step === 'upload' ? 'bg-primary text-primary-foreground' : 'bg-muted'
-          }`}>1</span>
-          {t('mdImport.steps.upload')}
-        </div>
-        <div className="flex-1 h-px bg-border" />
-        <div className={`flex items-center gap-2 ${step === 'preview' ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
-          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-            step === 'preview' ? 'bg-primary text-primary-foreground' : 'bg-muted'
-          }`}>2</span>
-          {t('mdImport.steps.preview')}
-        </div>
-        <div className="flex-1 h-px bg-border" />
-        <div className={`flex items-center gap-2 ${step === 'result' ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
-          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-            step === 'result' ? 'bg-primary text-primary-foreground' : 'bg-muted'
-          }`}>3</span>
-          {t('mdImport.steps.complete')}
-        </div>
-      </div>
+      <StepIndicator currentStep={step} />
 
       {/* 错误提示 */}
       {error && (
@@ -640,97 +277,57 @@ export default function MDImport() {
 
       {/* 步骤内容 */}
       {step === 'upload' && (
-        <div className="border-2 border-dashed border-border rounded-xl p-12 text-center hover:border-primary/50 transition-colors">
-          <input
-            type="file"
-            accept=".md,.markdown,.txt"
-            onChange={handleFileUpload}
-            className="hidden"
-            id="md-upload"
-            disabled={loading}
-          />
-          <label htmlFor="md-upload" className="cursor-pointer block">
-            {loading ? (
-              <>
-                <Loader2 className="w-12 h-12 mx-auto mb-4 text-muted-foreground animate-spin" />
-                <p className="font-medium">{t('mdImport.upload.parsing')}</p>
-              </>
-            ) : (
-              <>
-                <FileText className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="font-medium">{t('mdImport.upload.click')}</p>
-                <p className="text-sm text-muted-foreground mt-2">
-                  {t('mdImport.upload.supportedFormats')}
-                </p>
-              </>
-            )}
-          </label>
+        <UploadStep loading={loading} onFileUpload={handleFileUpload} />
+      )}
+
+      {step === 'preview' && previewResult && (
+        <PreviewStep
+          previewResult={previewResult}
+          parsedArtworks={parsedArtworks}
+          selectedArtworks={selectedArtworks}
+          selectedThumbnails={selectedThumbnails}
+          loading={loading}
+          batchProgress={batchProgress}
+          onArtworkToggle={handleArtworkToggle}
+          onSelectAll={handleSelectAll}
+          onThumbnailSelect={handleThumbnailSelect}
+          onExecuteImport={handleExecuteImport}
+          onReset={handleReset}
+        />
+      )}
+
+      {step === 'result' && executeResult && (
+        <ResultStep executeResult={executeResult} onReset={handleReset} />
+      )}
+    </div>
+  );
+}
+
+// 步骤指示器子组件
+function StepIndicator({ currentStep }: { currentStep: ImportStep }) {
+  const { t } = useTranslation('import');
+
+  const steps: { key: ImportStep; label: string }[] = [
+    { key: 'upload', label: t('mdImport.steps.upload') },
+    { key: 'preview', label: t('mdImport.steps.preview') },
+    { key: 'result', label: t('mdImport.steps.complete') },
+  ];
+
+  return (
+    <div className="flex items-center gap-4 text-sm">
+      {steps.map((s, index) => (
+        <div key={s.key} className="contents">
+          <div className={`flex items-center gap-2 ${currentStep === s.key ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
+              currentStep === s.key ? 'bg-primary text-primary-foreground' : 'bg-muted'
+            }`}>
+              {index + 1}
+            </span>
+            {s.label}
+          </div>
+          {index < steps.length - 1 && <div className="flex-1 h-px bg-border" />}
         </div>
-      )}
-
-      {step === 'preview' && (
-        <>
-          {renderPreview()}
-
-          {/* 批量导入进度 */}
-          {loading && batchProgress && (
-            <div className="space-y-3 py-4 bg-muted/30 rounded-xl p-4">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  {batchProgress.total > 1
-                    ? t('mdImport.batchProgress', {
-                        current: batchProgress.current,
-                        total: batchProgress.total
-                      })
-                    : t('actions.importing')
-                  }
-                </span>
-                <span className="font-medium">
-                  {batchProgress.processed} / {batchProgress.totalArtworks}
-                </span>
-              </div>
-              <div className="w-full bg-muted rounded-full h-2">
-                <div
-                  className="bg-primary h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${(batchProgress.processed / batchProgress.totalArtworks) * 100}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          <div className="flex gap-3 pt-4 border-t border-border">
-            <Button
-              variant="outline"
-              onClick={handleReset}
-              disabled={loading}
-            >
-              {t('mdImport.reupload')}
-            </Button>
-            <Button
-              onClick={handleExecuteImport}
-              disabled={loading || selectedArtworks.size === 0}
-              className="flex-1 md:flex-none"
-            >
-              {loading ? t('actions.importing') : t('mdImport.confirmImport', { count: selectedArtworks.size })}
-            </Button>
-          </div>
-        </>
-      )}
-
-      {step === 'result' && (
-        <>
-          {renderResult()}
-          <div className="flex gap-3 pt-4 border-t border-border md:justify-end">
-            <Button
-              onClick={handleReset}
-              className="flex-1 md:flex-none"
-            >
-              {t('mdImport.continueImport')}
-            </Button>
-          </div>
-        </>
-      )}
+      ))}
     </div>
   );
 }

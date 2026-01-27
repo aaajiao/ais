@@ -1,0 +1,202 @@
+import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { Button } from '@/components/ui/button';
+import { StatusIndicator } from '@/components/ui/StatusIndicator';
+import type { EditionStatus } from '@/lib/database.types';
+import { type EditionData, type NewEditionData, formatEditionNumber } from './types';
+
+interface EditionsSectionProps {
+  editions: EditionData[];
+  editionTotal: number | null | undefined;
+  showAddEdition: boolean;
+  addingEdition: boolean;
+  newEdition: NewEditionData;
+  onShowAddEdition: (show: boolean) => void;
+  onNewEditionChange: (data: NewEditionData) => void;
+  onAddEdition: () => void;
+}
+
+export default function EditionsSection({
+  editions,
+  editionTotal,
+  showAddEdition,
+  addingEdition,
+  newEdition,
+  onShowAddEdition,
+  onNewEditionChange,
+  onAddEdition,
+}: EditionsSectionProps) {
+  const { t } = useTranslation('artworkDetail');
+  const { t: tStatus } = useTranslation('status');
+
+  return (
+    <div className="bg-card border border-border rounded-xl p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold">
+          {t('editionsList.title')} ({editions.length})
+        </h2>
+        <Button
+          size="small"
+          onClick={() => onShowAddEdition(true)}
+        >
+          {t('editionsList.addEdition')}
+        </Button>
+      </div>
+
+      {/* 添加版本表单 */}
+      {showAddEdition && (
+        <AddEditionForm
+          newEdition={newEdition}
+          addingEdition={addingEdition}
+          onNewEditionChange={onNewEditionChange}
+          onCancel={() => onShowAddEdition(false)}
+          onAdd={onAddEdition}
+        />
+      )}
+
+      {editions.length === 0 && !showAddEdition ? (
+        <div className="text-center text-muted-foreground py-8">
+          {t('editionsList.noEditions')}
+        </div>
+      ) : editions.length === 0 ? null : (
+        <div className="space-y-3">
+          {editions.map(edition => (
+            <Link
+              key={edition.id}
+              to={`/editions/${edition.id}`}
+              className="block p-4 bg-muted/50 rounded-lg hover:bg-muted transition-colors"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <StatusIndicator status={edition.status} size="lg" />
+                  <div>
+                    <p className="font-medium">
+                      {formatEditionNumber(edition, editionTotal, t('info.unique'))}
+                      {edition.inventory_number && (
+                        <span className="text-muted-foreground ml-2 text-sm">
+                          #{edition.inventory_number}
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {tStatus(edition.status)}
+                      {edition.location && (
+                        <span> · {edition.location.name}</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-muted-foreground">→</span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 添加版本表单子组件
+interface AddEditionFormProps {
+  newEdition: NewEditionData;
+  addingEdition: boolean;
+  onNewEditionChange: (data: NewEditionData) => void;
+  onCancel: () => void;
+  onAdd: () => void;
+}
+
+function AddEditionForm({
+  newEdition,
+  addingEdition,
+  onNewEditionChange,
+  onCancel,
+  onAdd,
+}: AddEditionFormProps) {
+  const { t } = useTranslation('artworkDetail');
+  const { t: tStatus } = useTranslation('status');
+  const { t: tCommon } = useTranslation('common');
+
+  return (
+    <div className="mb-4 p-4 bg-muted/50 rounded-lg border border-border">
+      <h3 className="font-medium mb-3">{t('editionsList.addNew')}</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium mb-1">{t('editionsList.editionType')}</label>
+          <select
+            value={newEdition.edition_type}
+            onChange={e => onNewEditionChange({ ...newEdition, edition_type: e.target.value as 'numbered' | 'ap' | 'unique' })}
+            className="w-full px-3 py-2 border border-border rounded-lg bg-background focus:ring-2 focus:ring-ring outline-none"
+          >
+            <option value="numbered">{t('editionsList.numbered')}</option>
+            <option value="ap">{t('editionsList.ap')}</option>
+            <option value="unique">{t('editionsList.unique')}</option>
+          </select>
+        </div>
+        {newEdition.edition_type !== 'unique' && (
+          <div>
+            <label className="block text-sm font-medium mb-1">{t('editionsList.editionNumber')}</label>
+            <input
+              type="number"
+              value={newEdition.edition_number}
+              onChange={e => onNewEditionChange({ ...newEdition, edition_number: parseInt(e.target.value) || 1 })}
+              min={1}
+              className="w-full px-3 py-2 border border-border rounded-lg bg-background focus:ring-2 focus:ring-ring outline-none"
+            />
+          </div>
+        )}
+        <div>
+          <label className="block text-sm font-medium mb-1">{t('editionsList.status')}</label>
+          <select
+            value={newEdition.status}
+            onChange={e => onNewEditionChange({ ...newEdition, status: e.target.value as EditionStatus })}
+            className="w-full px-3 py-2 border border-border rounded-lg bg-background focus:ring-2 focus:ring-ring outline-none"
+          >
+            <option value="in_production">{tStatus('in_production')}</option>
+            <option value="in_studio">{tStatus('in_studio')}</option>
+            <option value="at_gallery">{tStatus('at_gallery')}</option>
+            <option value="at_museum">{tStatus('at_museum')}</option>
+            <option value="in_transit">{tStatus('in_transit')}</option>
+            <option value="sold">{tStatus('sold')}</option>
+            <option value="gifted">{tStatus('gifted')}</option>
+            <option value="lost">{tStatus('lost')}</option>
+            <option value="damaged">{tStatus('damaged')}</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">{t('editionsList.inventoryNumber')}</label>
+          <input
+            type="text"
+            value={newEdition.inventory_number}
+            onChange={e => onNewEditionChange({ ...newEdition, inventory_number: e.target.value })}
+            placeholder={t('editionsList.inventoryPlaceholder')}
+            className="w-full px-3 py-2 border border-border rounded-lg bg-background focus:ring-2 focus:ring-ring outline-none"
+          />
+        </div>
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium mb-1">{t('editionsList.notes')}</label>
+          <input
+            type="text"
+            value={newEdition.notes}
+            onChange={e => onNewEditionChange({ ...newEdition, notes: e.target.value })}
+            className="w-full px-3 py-2 border border-border rounded-lg bg-background focus:ring-2 focus:ring-ring outline-none"
+          />
+        </div>
+      </div>
+      <div className="flex gap-3 mt-4 justify-end">
+        <Button
+          variant="outline"
+          onClick={onCancel}
+          disabled={addingEdition}
+        >
+          {tCommon('cancel')}
+        </Button>
+        <Button
+          onClick={onAdd}
+          disabled={addingEdition}
+        >
+          {addingEdition ? t('editionsList.adding') : tCommon('add')}
+        </Button>
+      </div>
+    </div>
+  );
+}

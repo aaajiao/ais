@@ -40,6 +40,16 @@ src/hooks/queries/
 ├── useEditions.test.ts       # Edition hooks 和过滤逻辑
 └── useArtworks.test.ts       # Artwork hooks 和统计计算
 
+src/components/settings/
+├── useModelSettings.test.ts  # 模型 ID 格式化
+└── useExport.test.ts         # CSV 格式化、下载工具
+
+src/components/import/
+└── types.test.ts             # 作品 UID 生成
+
+src/components/artwork/
+└── types.test.ts             # 表单初始化、版本号格式化
+
 src/test/
 ├── setup.ts                  # 测试环境设置（MSW + jest-dom）
 ├── test-utils.tsx            # React Query 测试工具
@@ -50,7 +60,7 @@ src/test/
 
 ---
 
-## 测试覆盖率（449 个测试）
+## 测试覆盖率（498 个测试）
 
 | 模块 | 测试数 | 覆盖内容 |
 |------|--------|----------|
@@ -66,8 +76,12 @@ src/test/
 | `tool-schemas` | 24 | AI 工具 Zod schema 验证 |
 | `formatters` | 24 | 版本号、价格、日期显示 |
 | `chatUtils` | 16 | 日期标签、消息分组 |
+| `useExport` | 15 | CSV 格式化、文件下载、日期工具 |
+| `artwork/types` | 15 | 表单数据初始化、版本号格式化 |
 | `image-downloader` | 13 | CDN 优先级、基于尺寸的选择 |
 | `paginationUtils` | 11 | 游标编码/解码、错误处理 |
+| `import/types` | 10 | 作品 UID 生成 |
+| `useModelSettings` | 9 | 模型 ID 格式化显示 |
 | `utils` | 8 | Tailwind 类名合并 |
 
 ---
