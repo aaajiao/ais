@@ -1,4 +1,5 @@
 {
+  "back": "Back",
   "subtitle": "{{count}} artworks",
   "noItems": "No artworks",
   "viewDetails": "View on Website →",

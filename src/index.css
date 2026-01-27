@@ -158,12 +158,28 @@ html, body {
   margin: 0;
   min-width: 320px;
   height: 100%;
+}
+
+/* 默认：主应用使用 Layout 管理滚动 */
+html:not(.scrollable-page),
+body:not(.scrollable-page) {
   overflow: hidden;
 }
 
-/* 防止移动端意外水平滚动 */
+/* 独立页面（PublicView）：启用正常滚动 */
+html.scrollable-page,
+body.scrollable-page {
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: auto;
+  min-height: 100%;
+}
+
+/* 防止移动端意外水平滚动（仅限主应用） */
 @media (max-width: 1023px) {
-  html, body, #root {
+  html:not(.scrollable-page),
+  body:not(.scrollable-page),
+  #root {
     overflow-x: hidden;
     overscroll-behavior-x: none;
   }

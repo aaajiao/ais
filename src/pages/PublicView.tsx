@@ -7,7 +7,8 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, Lock, Image as ImageIcon } from 'lucide-react';
+import { IconButton } from '@/components/ui/icon-button';
+import { AlertCircle, Lock, Image as ImageIcon, ArrowLeft } from 'lucide-react';
 import type { EditionStatus } from '@/lib/types';
 
 // 公开展示项目类型
@@ -225,6 +226,26 @@ export default function PublicView() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<{ type: string; message: string } | null>(null);
 
+  // 启用页面滚动（绕过全局 overflow: hidden）
+  useEffect(() => {
+    document.documentElement.classList.add('scrollable-page');
+    document.body.classList.add('scrollable-page');
+
+    return () => {
+      document.documentElement.classList.remove('scrollable-page');
+      document.body.classList.remove('scrollable-page');
+    };
+  }, []);
+
+  // 处理返回导航
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      window.location.href = '/';
+    }
+  };
+
   // 加载数据
   useEffect(() => {
     const fetchData = async () => {
@@ -300,6 +321,20 @@ export default function PublicView() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* 顶部导航栏 - 始终显示，确保用户可以返回 */}
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border supports-[backdrop-filter]:bg-background/80">
+        <div className="max-w-7xl mx-auto px-4 h-12 flex items-center">
+          <IconButton
+            variant="ghost"
+            size="sm"
+            label={t('back')}
+            onClick={handleBack}
+          >
+            <ArrowLeft />
+          </IconButton>
+        </div>
+      </div>
+
       {/* 头部 */}
       <header className="border-b border-border">
         <div className="max-w-7xl mx-auto px-6 py-8">
