@@ -90,14 +90,12 @@ describe('groupMessagesByDate', () => {
       {
         id: '1',
         role: 'user',
-        content: 'Hello',
         parts: [],
         metadata: { createdAt: now },
       },
       {
         id: '2',
         role: 'assistant',
-        content: 'Hi',
         parts: [],
         metadata: { createdAt: now + 1000 },
       },
@@ -116,14 +114,12 @@ describe('groupMessagesByDate', () => {
       {
         id: '1',
         role: 'user',
-        content: 'Old',
         parts: [],
         metadata: { createdAt: yesterday },
       },
       {
         id: '2',
         role: 'user',
-        content: 'New',
         parts: [],
         metadata: { createdAt: now },
       },
@@ -140,7 +136,6 @@ describe('groupMessagesByDate', () => {
       {
         id: '1',
         role: 'user',
-        content: 'Hello',
         parts: [],
       },
     ];
