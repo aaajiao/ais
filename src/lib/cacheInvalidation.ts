@@ -28,6 +28,7 @@ export const invalidateOnEditionEdit = async (
 ) => {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: queryKeys.editions.detail(editionId) }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.editions.history(editionId) }),
     queryClient.invalidateQueries({ queryKey: ['editions', 'infinite'] }),
     queryClient.invalidateQueries({ queryKey: ['editions', 'counts'] }),
     queryClient.invalidateQueries({ queryKey: queryKeys.editions.byArtwork(artworkId) }),
