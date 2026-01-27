@@ -19,7 +19,7 @@ interface ModelInfo {
   id: string;
   name: string;
   provider: 'anthropic' | 'openai';
-  description?: string;
+  description?: { en: string; zh: string };
 }
 
 interface ModelsResponse {
@@ -29,7 +29,8 @@ interface ModelsResponse {
 }
 
 export default function Settings() {
-  const { t } = useTranslation('settings');
+  const { t, i18n } = useTranslation('settings');
+  const descLang = i18n.language.startsWith('zh') ? 'zh' : 'en';
   const { user, signOut } = useAuthContext();
   const [selectedModel, setSelectedModel] = useState<string>(() => {
     return localStorage.getItem('ai-model') || '';
@@ -360,7 +361,7 @@ export default function Settings() {
         {selectedModelInfo && (
           <div className="text-sm text-muted-foreground space-y-1 p-3 bg-muted/50 rounded-lg">
             {selectedModelInfo.description && (
-              <p>{selectedModelInfo.description}</p>
+              <p>{selectedModelInfo.description[descLang]}</p>
             )}
             <p className="text-xs font-mono">{selectedModel}</p>
           </div>
@@ -469,7 +470,7 @@ export default function Settings() {
                       {extractionModelInfo && (
                         <div className="text-sm text-muted-foreground space-y-1 p-3 bg-muted/50 rounded-lg">
                           {extractionModelInfo.description && (
-                            <p>{extractionModelInfo.description}</p>
+                            <p>{extractionModelInfo.description[descLang]}</p>
                           )}
                           <p className="text-xs font-mono">{extractionModel}</p>
                         </div>
@@ -562,7 +563,7 @@ export default function Settings() {
                       {searchExpansionModelInfo && (
                         <div className="text-sm text-muted-foreground space-y-1 p-3 bg-muted/50 rounded-lg">
                           {searchExpansionModelInfo.description && (
-                            <p>{searchExpansionModelInfo.description}</p>
+                            <p>{searchExpansionModelInfo.description[descLang]}</p>
                           )}
                           <p className="text-xs font-mono">{searchExpansionModel}</p>
                         </div>
@@ -575,7 +576,7 @@ export default function Settings() {
                     <Button
                       variant="outline"
                       size="small"
-                      onClick={() => handleSearchExpansionModelChange('claude-3-5-haiku-20241022')}
+                      onClick={() => handleSearchExpansionModelChange('claude-haiku-4-5')}
                     >
                       {t('ai.selectDifferentModel')}
                     </Button>

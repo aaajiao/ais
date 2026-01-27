@@ -7,8 +7,8 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
 
-// 默认提取模型
-const DEFAULT_EXTRACTION_MODEL = 'claude-sonnet-4-5-20250929';
+// 默认提取模型（使用别名）
+const DEFAULT_EXTRACTION_MODEL = 'claude-sonnet-4-5';
 
 /**
  * 根据模型 ID 获取对应的 provider 实例

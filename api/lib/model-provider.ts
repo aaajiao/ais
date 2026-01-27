@@ -2,11 +2,11 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createClient } from '@supabase/supabase-js';
 
-// 默认模型 ID
-export const DEFAULT_MODEL = 'claude-sonnet-4-5-20250929';
+// 默认模型 ID（使用别名，自动指向最新快照版本）
+export const DEFAULT_MODEL = 'claude-sonnet-4-5';
 
 // 默认查询扩展模型（用于后台任务的快速模型）
-export const DEFAULT_EXPANSION_MODEL = 'claude-3-5-haiku-20241022';
+export const DEFAULT_EXPANSION_MODEL = 'claude-haiku-4-5';
 
 /**
  * 延迟创建 Anthropic provider 实例

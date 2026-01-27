@@ -11,7 +11,7 @@ interface ModelInfo {
   id: string;
   name: string;
   provider: 'anthropic' | 'openai';
-  description?: string;
+  description?: { en: string; zh: string };
 }
 
 // Anthropic API response type
@@ -202,22 +202,49 @@ function formatOpenAIModelName(modelId: string): string {
     .join(' ');
 }
 
-function getAnthropicDescription(modelId: string): string {
-  if (modelId.includes('opus')) return '最强大，适合复杂任务';
-  if (modelId.includes('sonnet')) return '推荐，平衡性能和成本';
-  if (modelId.includes('haiku')) return '快速低成本';
-  return '';
+function getAnthropicDescription(modelId: string): { en: string; zh: string } | undefined {
+  if (modelId.includes('opus')) return {
+    en: 'Most powerful, for complex tasks',
+    zh: '最强大，适合复杂任务'
+  };
+  if (modelId.includes('sonnet')) return {
+    en: 'Recommended, balanced performance and cost',
+    zh: '推荐，平衡性能和成本'
+  };
+  if (modelId.includes('haiku')) return {
+    en: 'Fast and low cost',
+    zh: '快速低成本'
+  };
+  return undefined;
 }
 
-function getOpenAIDescription(modelId: string): string {
+function getOpenAIDescription(modelId: string): { en: string; zh: string } | undefined {
   const lower = modelId.toLowerCase();
-  if (lower.includes('5.2')) return '最新旗舰，最精确';
-  if (lower.includes('5.1')) return '旗舰推理模型';
-  if (lower.includes('4.1')) return '编码优化，长上下文';
-  if (lower.includes('4o-mini')) return '快速低成本';
-  if (lower.includes('4o')) return '多模态，高性能';
-  if (lower.startsWith('o1') || lower.startsWith('o3') || lower.startsWith('o4')) return '推理模型';
-  return '';
+  if (lower.includes('5.2')) return {
+    en: 'Latest flagship, most accurate',
+    zh: '最新旗舰，最精确'
+  };
+  if (lower.includes('5.1')) return {
+    en: 'Flagship reasoning model',
+    zh: '旗舰推理模型'
+  };
+  if (lower.includes('4.1')) return {
+    en: 'Coding optimized, long context',
+    zh: '编码优化，长上下文'
+  };
+  if (lower.includes('4o-mini')) return {
+    en: 'Fast and low cost',
+    zh: '快速低成本'
+  };
+  if (lower.includes('4o')) return {
+    en: 'Multimodal, high performance',
+    zh: '多模态，高性能'
+  };
+  if (lower.startsWith('o1') || lower.startsWith('o3') || lower.startsWith('o4')) return {
+    en: 'Reasoning model',
+    zh: '推理模型'
+  };
+  return undefined;
 }
 
 export default async function handler(req: Request) {

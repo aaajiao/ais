@@ -15,21 +15,23 @@ POST /api/chat
 ```typescript
 {
   messages: UIMessage[];           // 对话历史
-  model?: string;                  // 聊天模型 ID，默认 claude-sonnet-4.5
+  model?: string;                  // 聊天模型 ID，默认 claude-sonnet-4-5
   extractionModel?: string;        // URL 导入提取模型（默认使用 model）
-  searchExpansionModel?: string;   // 搜索翻译模型（默认 claude-3-5-haiku）
+  searchExpansionModel?: string;   // 搜索翻译模型（默认 claude-haiku-4-5）
 }
 ```
 
 ### 支持的模型
 
-| 模型 ID | 说明 |
-|---------|------|
-| `claude-sonnet-4-5-20250929` | Claude Sonnet 4.5（默认） |
-| `claude-opus-4-*` | Claude Opus 4 |
-| `claude-3-*` | Claude 3 系列 |
-| `gpt-4o` | GPT-4o |
-| `o1-*` / `o3-*` / `o4-*` | OpenAI 推理模型 |
+可以使用别名（alias）或完整快照版本。别名会自动指向最新快照，但生产环境建议使用完整版本以确保行为一致。
+
+| 别名 | 完整快照版本 | 说明 |
+|------|-------------|------|
+| `claude-sonnet-4-5` | `claude-sonnet-4-5-20250929` | Claude Sonnet 4.5（默认） |
+| `claude-opus-4-5` | `claude-opus-4-5-20251101` | Claude Opus 4.5 |
+| `claude-haiku-4-5` | `claude-haiku-4-5-20251001` | Claude Haiku 4.5 |
+| `gpt-4o` | — | GPT-4o |
+| `o1-*` / `o3-*` / `o4-*` | — | OpenAI 推理模型 |
 
 ### 响应
 
@@ -41,9 +43,9 @@ POST /api/chat
 
 | 用途 | 参数 | localStorage Key | 默认值 |
 |------|------|------------------|--------|
-| 对话 | `model` | `ai-model` | `claude-sonnet-4.5` |
+| 对话 | `model` | `ai-model` | `claude-sonnet-4-5` |
 | URL 导入提取 | `extractionModel` | `extraction-model` | 使用对话模型 |
-| 搜索翻译 | `searchExpansionModel` | `search-expansion-model` | `claude-3-5-haiku` |
+| 搜索翻译 | `searchExpansionModel` | `search-expansion-model` | `claude-haiku-4-5` |
 
 **设计考虑**：
 - URL 导入是复杂任务（HTML 解析、多字段提取），推荐使用 Sonnet/GPT-4o

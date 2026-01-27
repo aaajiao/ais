@@ -25,7 +25,7 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
 
   // 获取用户选择的模型
   const [selectedModel] = useState(() => {
-    return localStorage.getItem('ai-model') || 'claude-sonnet-4.5';
+    return localStorage.getItem('ai-model') || 'claude-sonnet-4-5';
   });
 
   // 获取提取模型（空字符串表示使用聊天模型）
