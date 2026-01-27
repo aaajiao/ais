@@ -50,7 +50,8 @@
     "foundLocations": "Found {{count}} locations:",
     "unknownArtwork": "Unknown artwork",
     "showMore": "Show more ({{count}})",
-    "collapse": "Collapse"
+    "collapse": "Collapse",
+    "viewArtwork": "View artwork"
   },
   "statistics": {
     "title": "Inventory Statistics",

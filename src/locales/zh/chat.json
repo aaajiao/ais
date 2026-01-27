@@ -50,7 +50,8 @@
     "foundLocations": "找到 {{count}} 个位置：",
     "unknownArtwork": "未知作品",
     "showMore": "显示更多 ({{count}})",
-    "collapse": "收起"
+    "collapse": "收起",
+    "viewArtwork": "查看作品"
   },
   "statistics": {
     "title": "库存统计",
