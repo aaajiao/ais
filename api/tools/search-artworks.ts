@@ -63,5 +63,32 @@ export function createSearchArtworksTool(ctx: ToolContext) {
 
       return { artworks };
     },
+    // 控制返回给模型的内容，避免模型重复描述搜索结果
+    toModelOutput({ output }) {
+      const result = output as { artworks?: Array<{ title_en: string }>; message?: string; error?: string };
+
+      if (result.error) {
+        return {
+          type: 'content' as const,
+          value: [{ type: 'text' as const, text: `搜索出错: ${result.error}` }],
+        };
+      }
+
+      if (!result.artworks || result.artworks.length === 0) {
+        return {
+          type: 'content' as const,
+          value: [{ type: 'text' as const, text: result.message || '没有找到相关作品' }],
+        };
+      }
+
+      // 只告诉模型找到了多少结果，详情由前端渲染
+      return {
+        type: 'content' as const,
+        value: [{
+          type: 'text' as const,
+          text: `找到 ${result.artworks.length} 件相关作品，结果已显示在界面上供用户查看和点击。`
+        }],
+      };
+    },
   });
 }

@@ -48,7 +48,9 @@
     "moreEditions": "{{count}} more...",
     "noLocations": "No matching locations found",
     "foundLocations": "Found {{count}} locations:",
-    "unknownArtwork": "Unknown artwork"
+    "unknownArtwork": "Unknown artwork",
+    "showMore": "Show more ({{count}})",
+    "collapse": "Collapse"
   },
   "statistics": {
     "title": "Inventory Statistics",

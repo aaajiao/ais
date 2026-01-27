@@ -1,10 +1,11 @@
 import { useState, useCallback, useMemo, memo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import type { UIMessage } from 'ai';
 import EditableConfirmCard, { type ConfirmCardData } from './EditableConfirmCard';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
 import type { EditionStatus } from '@/lib/database.types';
-import { Loader2, CheckCircle, XCircle, Undo2 } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, Undo2, ChevronRight } from 'lucide-react';
 
 interface MessageBubbleProps {
   message: UIMessage;
@@ -16,7 +17,7 @@ interface ToolPart {
   type: string;
   toolCallId: string;
   toolName?: string;
-  state: 'input-streaming' | 'input' | 'output' | 'error';
+  state: 'input-streaming' | 'input-available' | 'output-available' | 'output-error' | 'input' | 'output' | 'error';
   input?: Record<string, unknown>;
   output?: Record<string, unknown>;
   errorText?: string;
@@ -148,7 +149,7 @@ function ToolResult({
   }, []);
 
   // 正在执行中
-  if (state === 'input-streaming' || state === 'input') {
+  if (state === 'input-streaming' || state === 'input' || state === 'input-available') {
     return (
       <div className="text-sm text-muted-foreground flex items-center gap-2">
         <Loader2 className="w-4 h-4 animate-spin" />
@@ -158,7 +159,7 @@ function ToolResult({
   }
 
   // 错误
-  if (state === 'error' || errorText) {
+  if (state === 'error' || state === 'output-error' || errorText) {
     return (
       <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg text-red-700 dark:text-red-300 text-sm flex items-center gap-2">
         <XCircle className="w-4 h-4 flex-shrink-0" />
@@ -168,7 +169,7 @@ function ToolResult({
   }
 
   // 有输出结果
-  if (state === 'output' && output) {
+  if ((state === 'output' || state === 'output-available') && output) {
     // 确认卡片
     if (output.type === 'confirmation_card') {
       if (confirmed) {
@@ -244,25 +245,43 @@ function ToolResult({
 // 作品搜索结果
 function ArtworkResults({ artworks }: { artworks: Record<string, unknown>[] }) {
   const { t } = useTranslation('chat');
+  const [expanded, setExpanded] = useState(false);
 
   if (artworks.length === 0) {
     return <div className="text-sm text-muted-foreground">{t('results.noArtworks')}</div>;
   }
 
+  const displayCount = expanded ? artworks.length : Math.min(5, artworks.length);
+  const hasMore = artworks.length > 5;
+
   return (
     <div className="space-y-2">
       <div className="text-xs text-muted-foreground">{t('results.foundArtworks', { count: artworks.length })}</div>
-      {artworks.slice(0, 5).map((artwork) => (
-        <div key={String(artwork.id)} className="p-2 bg-muted/50 rounded-lg text-sm">
-          <p className="font-medium">{String(artwork.title_en)}</p>
-          {artwork.title_cn != null && <p className="text-muted-foreground">{String(artwork.title_cn)}</p>}
-          <p className="text-xs text-muted-foreground">
-            {String(artwork.year)} · {String(artwork.type)}
-          </p>
-        </div>
+      {artworks.slice(0, displayCount).map((artwork) => (
+        <Link
+          key={String(artwork.id)}
+          to={`/artworks/${String(artwork.id)}`}
+          className="block p-2 bg-muted/50 rounded-lg text-sm hover:bg-muted transition-colors group"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium">{String(artwork.title_en)}</p>
+              {artwork.title_cn != null && <p className="text-muted-foreground">{String(artwork.title_cn)}</p>}
+              <p className="text-xs text-muted-foreground">
+                {String(artwork.year)} · {String(artwork.type)}
+              </p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
+        </Link>
       ))}
-      {artworks.length > 5 && (
-        <div className="text-xs text-muted-foreground">{t('results.moreArtworks', { count: artworks.length - 5 })}</div>
+      {hasMore && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {expanded ? t('results.collapse') : t('results.showMore', { count: artworks.length - 5 })}
+        </button>
       )}
     </div>
   );
@@ -272,37 +291,55 @@ function ArtworkResults({ artworks }: { artworks: Record<string, unknown>[] }) {
 function EditionResults({ editions }: { editions: Record<string, unknown>[] }) {
   const { t } = useTranslation('chat');
   const { t: tStatus } = useTranslation('status');
+  const [expanded, setExpanded] = useState(false);
 
   if (editions.length === 0) {
     return <div className="text-sm text-muted-foreground">{t('results.noEditions')}</div>;
   }
 
+  const displayCount = expanded ? editions.length : Math.min(5, editions.length);
+  const hasMore = editions.length > 5;
+
   return (
     <div className="space-y-2">
       <div className="text-xs text-muted-foreground">{t('results.foundEditions', { count: editions.length })}</div>
-      {editions.slice(0, 5).map((edition) => {
+      {editions.slice(0, displayCount).map((edition) => {
         const artwork = edition.artworks as Record<string, unknown> | undefined;
         const location = edition.locations as Record<string, unknown> | undefined;
         const status = edition.status as EditionStatus;
 
         return (
-          <div key={String(edition.id)} className="p-2 bg-muted/50 rounded-lg text-sm">
-            <p className="font-medium flex items-center gap-2">
-              <span>
-                {artwork?.title_en ? String(artwork.title_en) : t('results.unknownArtwork')}{' '}
-                {String(edition.edition_number)}/{artwork?.edition_total ? String(artwork.edition_total) : '?'}
-              </span>
-              <StatusIndicator status={status} size="sm" />
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {tStatus(status)}
-              {location && ` · ${String(location.name)}`}
-            </p>
-          </div>
+          <Link
+            key={String(edition.id)}
+            to={`/editions/${String(edition.id)}`}
+            className="block p-2 bg-muted/50 rounded-lg text-sm hover:bg-muted transition-colors group"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium flex items-center gap-2">
+                  <span>
+                    {artwork?.title_en ? String(artwork.title_en) : t('results.unknownArtwork')}{' '}
+                    {String(edition.edition_number)}/{artwork?.edition_total ? String(artwork.edition_total) : '?'}
+                  </span>
+                  <StatusIndicator status={status} size="sm" />
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {tStatus(status)}
+                  {location && ` · ${String(location.name)}`}
+                </p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
+          </Link>
         );
       })}
-      {editions.length > 5 && (
-        <div className="text-xs text-muted-foreground">{t('results.moreEditions', { count: editions.length - 5 })}</div>
+      {hasMore && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {expanded ? t('results.collapse') : t('results.showMore', { count: editions.length - 5 })}
+        </button>
       )}
     </div>
   );

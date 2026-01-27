@@ -48,7 +48,9 @@
     "moreEditions": "还有 {{count}} 个...",
     "noLocations": "未找到匹配的位置",
     "foundLocations": "找到 {{count}} 个位置：",
-    "unknownArtwork": "未知作品"
+    "unknownArtwork": "未知作品",
+    "showMore": "显示更多 ({{count}})",
+    "collapse": "收起"
   },
   "statistics": {
     "title": "库存统计",

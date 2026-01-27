@@ -123,5 +123,32 @@ export function createSearchEditionsTool(ctx: ToolContext) {
 
       return { editions };
     },
+    // 控制返回给模型的内容，避免模型重复描述搜索结果
+    toModelOutput({ output }) {
+      const result = output as { editions?: Array<unknown>; message?: string; error?: string };
+
+      if (result.error) {
+        return {
+          type: 'content' as const,
+          value: [{ type: 'text' as const, text: `搜索出错: ${result.error}` }],
+        };
+      }
+
+      if (!result.editions || result.editions.length === 0) {
+        return {
+          type: 'content' as const,
+          value: [{ type: 'text' as const, text: result.message || '没有找到符合条件的版本' }],
+        };
+      }
+
+      // 只告诉模型找到了多少结果，详情由前端渲染
+      return {
+        type: 'content' as const,
+        value: [{
+          type: 'text' as const,
+          text: `找到 ${result.editions.length} 个符合条件的版本，结果已显示在界面上供用户查看和点击。`
+        }],
+      };
+    },
   });
 }

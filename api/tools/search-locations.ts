@@ -39,5 +39,32 @@ export function createSearchLocationsTool(ctx: ToolContext) {
 
       return { locations: data || [] };
     },
+    // 控制返回给模型的内容，避免模型重复描述搜索结果
+    toModelOutput({ output }) {
+      const result = output as { locations?: Array<unknown>; error?: string };
+
+      if (result.error) {
+        return {
+          type: 'content' as const,
+          value: [{ type: 'text' as const, text: `搜索出错: ${result.error}` }],
+        };
+      }
+
+      if (!result.locations || result.locations.length === 0) {
+        return {
+          type: 'content' as const,
+          value: [{ type: 'text' as const, text: '没有找到相关位置' }],
+        };
+      }
+
+      // 只告诉模型找到了多少结果，详情由前端渲染
+      return {
+        type: 'content' as const,
+        value: [{
+          type: 'text' as const,
+          text: `找到 ${result.locations.length} 个相关位置，结果已显示在界面上。`
+        }],
+      };
+    },
   });
 }

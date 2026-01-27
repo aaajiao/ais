@@ -100,12 +100,35 @@
 
 ---
 
+## 搜索结果渲染
+
+搜索工具返回的结果会在聊天界面中渲染为可点击的卡片：
+
+- **作品搜索结果**：显示作品标题（中英文）、年份、类型，点击跳转到作品详情页
+- **版本搜索结果**：显示作品标题、版本号、状态、位置，点击跳转到版本详情页
+- **展开/折叠**：默认显示前 5 个结果，超过 5 个时显示"显示更多"按钮
+
+### toModelOutput 机制
+
+为避免 AI 重复描述搜索结果，搜索工具使用 `toModelOutput` 函数：
+
+- `execute()` 返回完整数据给前端渲染
+- `toModelOutput()` 返回简短文本给模型（如"找到 10 件相关作品"）
+- 这样 AI 只会简短确认，不会用文字重复列出所有结果
+
+**关键文件**：
+- `src/components/chat/MessageBubble.tsx` - 搜索结果卡片渲染（ArtworkResults、EditionResults）
+- `api/tools/search-artworks.ts` - toModelOutput 实现示例
+
+---
+
 ## 添加新 AI 工具
 
 1. 在 `api/tools/` 创建工具文件（如 `api/tools/my-tool.ts`）
 2. 使用 `ai` 包的 `tool()` 和 Zod schema 定义工具
 3. 导出工厂函数：`createMyTool(ctx: ToolContext)`
 4. 在 `api/tools/index.ts` 注册
+5. （可选）添加 `toModelOutput` 控制返回给模型的内容
 
 **示例**：
 
@@ -121,6 +144,15 @@ export function createMyTool(ctx: ToolContext) {
     inputSchema: z.object({ ... }),
     execute: async (params) => {
       // 使用 ctx.supabase 进行数据库查询
+      return { data: [...] };  // 完整数据给前端
+    },
+    // 可选：控制返回给模型的内容
+    toModelOutput({ output }) {
+      const result = output as { data?: unknown[] };
+      return {
+        type: 'content' as const,
+        value: [{ type: 'text' as const, text: `找到 ${result.data?.length || 0} 个结果` }],
+      };
     },
   });
 }
