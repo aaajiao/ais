@@ -99,6 +99,8 @@ export default function EditionDetail() {
         queryKeys.editions.files(id),
         (old) => [file as EditionFile, ...(old || [])]
       );
+      // 失效历史记录缓存（文件上传会创建历史记录）
+      queryClient.invalidateQueries({ queryKey: queryKeys.editions.history(id) });
     }
   }, [id, queryClient]);
 
@@ -109,6 +111,8 @@ export default function EditionDetail() {
         queryKeys.editions.files(id),
         (old) => old?.filter(f => f.id !== fileId) || []
       );
+      // 失效历史记录缓存（文件删除会创建历史记录）
+      queryClient.invalidateQueries({ queryKey: queryKeys.editions.history(id) });
     }
   }, [id, queryClient]);
 
@@ -119,6 +123,8 @@ export default function EditionDetail() {
         queryKeys.editions.files(id),
         (old) => [file as EditionFile, ...(old || [])]
       );
+      // 失效历史记录缓存（添加链接会创建历史记录）
+      queryClient.invalidateQueries({ queryKey: queryKeys.editions.history(id) });
     }
     setShowLinkDialog(false);
   }, [id, queryClient]);
