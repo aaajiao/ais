@@ -200,7 +200,7 @@ export default function EditionDetail() {
   }
 
   return (
-    <div className="p-6 pb-40 md:pb-6">
+    <div className="p-6 pb-[var(--spacing-page-bottom)] md:pb-6">
       {/* 编辑对话框 */}
       <EditionEditDialog
         isOpen={showEditDialog}
@@ -299,7 +299,7 @@ export default function EditionDetail() {
       </div>
 
       {/* 底部操作栏 */}
-      <div className="fixed bottom-[72px] left-0 right-0 md:bottom-0 md:static md:mt-6 bg-card border-t md:border border-border p-4 md:rounded-xl flex gap-3 md:justify-end z-40">
+      <div className="fixed bottom-[var(--spacing-nav-bottom)] left-0 right-0 md:bottom-0 md:static md:mt-6 bg-card border-t md:border border-border p-4 md:rounded-xl flex gap-3 md:justify-end z-40">
         <Button
           onClick={handleChatAction}
           className="flex-1 md:flex-none"

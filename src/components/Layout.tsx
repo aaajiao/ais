@@ -215,7 +215,7 @@ export default function Layout() {
       {/* 主内容区 + 侧边栏 */}
       <div className="flex-1 flex overflow-hidden">
         {/* 主内容区 */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden pb-[calc(5rem+env(safe-area-inset-bottom,0px))] lg:pb-0 relative">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden pb-[var(--spacing-nav-bottom)] lg:pb-0 relative">
           <div className={`${pageWidthConfig.maxWidth} ${pageWidthConfig.centered ? 'mx-auto' : ''}`}>
             <Outlet />
           </div>

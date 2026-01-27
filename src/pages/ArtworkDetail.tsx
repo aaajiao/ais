@@ -211,7 +211,7 @@ export default function ArtworkDetail() {
   }
 
   return (
-    <div className="p-6 pb-40 md:pb-6">
+    <div className="p-6 pb-[var(--spacing-page-bottom)] md:pb-6">
       {/* 导出对话框 */}
       {id && (
         <ExportDialog
@@ -285,7 +285,7 @@ export default function ArtworkDetail() {
 
       {/* 底部操作栏 - 非编辑模式时显示 */}
       {!isEditing && (
-        <div className="fixed bottom-[72px] left-0 right-0 md:bottom-0 md:static md:mt-6 bg-card border-t md:border border-border p-4 md:rounded-xl flex gap-3 md:justify-end z-40">
+        <div className="fixed bottom-[var(--spacing-nav-bottom)] left-0 right-0 md:bottom-0 md:static md:mt-6 bg-card border-t md:border border-border p-4 md:rounded-xl flex gap-3 md:justify-end z-40">
           <Button
             variant="secondary"
             onClick={() => setShowExportDialog(true)}

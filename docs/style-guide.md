@@ -387,16 +387,16 @@ import { Trash2, Pencil, X } from 'lucide-react';
 
 **底部操作栏标准实现**：
 
-移动端需要避开全局底部导航栏（高度约 72px），使用 `bottom-[72px]`：
+使用 CSS 变量自动适配 iOS safe-area-inset（Home Indicator 区域）：
 
 ```tsx
 {/* 页面容器需要足够的底部 padding */}
-<div className="p-6 pb-40 md:pb-6">
+<div className="p-6 pb-[var(--spacing-page-bottom)] md:pb-6">
   {/* 页面内容 */}
 </div>
 
-{/* 底部操作栏 - 移动端位于全局导航上方 */}
-<div className="fixed bottom-[72px] left-0 right-0 md:bottom-0 md:static md:mt-6
+{/* 底部操作栏 - 使用 CSS 变量适配 safe-area */}
+<div className="fixed bottom-[var(--spacing-nav-bottom)] left-0 right-0 md:bottom-0 md:static md:mt-6
                bg-card border-t md:border border-border p-4 md:rounded-xl
                flex gap-3 md:justify-end z-40">
   <Button variant="secondary" className="flex-1 md:flex-none">
@@ -408,14 +408,22 @@ import { Trash2, Pencil, X } from 'lucide-react';
 </div>
 ```
 
+**CSS 变量说明**（定义在 `src/index.css` 的 `@theme inline` 中）：
+| 变量 | 计算公式 | 说明 |
+|------|---------|------|
+| `--spacing-nav-height` | `3.5rem` (56px) | 底部导航栏内容高度 |
+| `--spacing-nav-bottom` | `nav-height + safe-area` | 导航栏总高度（含 safe-area） |
+| `--spacing-page-bottom` | `nav-bottom + 5rem` | 页面底部内边距 |
+
 **移动端布局层级**（从下到上）：
 | 层级 | 元素 | 高度 | z-index |
 |------|------|------|---------|
-| 1 | 全局底部导航 | 72px | z-50 |
-| 2 | 页面操作栏 | 76px | z-40 |
-| 3 | 页面内容 | - | - |
+| 1 | Safe Area (Home Indicator) | 0-34px | - |
+| 2 | 全局底部导航 | 56px | z-50 |
+| 3 | 页面操作栏 | ~76px | z-40 |
+| 4 | 页面内容 | - | - |
 
-页面内容 `pb-40`（160px）= 操作栏 76px + 导航栏 72px + 12px 安全边距
+页面内容使用 `pb-[var(--spacing-page-bottom)]` 自动计算：导航栏 + safe-area + 操作栏高度
 
 **对话框按钮**（无需响应式宽度）：
 ```tsx
@@ -505,6 +513,6 @@ src/
 7. **语义化状态** - 使用 StatusIndicator 组件
 8. **无障碍** - IconButton 必须提供 `label`，ToggleChip 使用 `role="option"`
 9. **按钮位置** - Cancel 在左，Primary 在右（Apple HIG 规范）
-10. **移动端底部导航** - 全局导航栏高度约 80px，页面级固定元素需使用 `bottom-20`
+10. **移动端底部导航** - 使用 `var(--spacing-nav-bottom)` 定位页面固定元素，自动适配 safe-area
 11. **虚拟滚动列表** - 移动端高度需减去顶部工具栏 + 底部导航 ≈ 160px，桌面端减去顶部导航 ≈ 73px
 12. **响应式断点** - 以 `lg` (1024px) 为核心断点区分移动端/桌面端
