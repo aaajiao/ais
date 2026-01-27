@@ -171,8 +171,8 @@ export default function EditionDetail() {
       <div className="p-6">
         <div className="h-8 w-24 bg-muted rounded mb-6 animate-pulse" />
         <div className="bg-card border border-border rounded-xl p-6 mb-6">
-          <div className="flex flex-col md:flex-row gap-6">
-            <div className="w-full md:w-48 h-48 bg-muted rounded-lg animate-pulse" />
+          <div className="flex flex-col min-[720px]:flex-row gap-6">
+            <div className="w-full min-[720px]:w-48 h-48 bg-muted rounded-lg animate-pulse" />
             <div className="flex-1 space-y-4">
               <div className="h-8 bg-muted rounded w-3/4 animate-pulse" />
               <div className="h-4 bg-muted rounded w-1/2 animate-pulse" />

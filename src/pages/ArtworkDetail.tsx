@@ -183,8 +183,8 @@ export default function ArtworkDetail() {
         {/* 骨架屏 */}
         <div className="h-8 w-24 bg-muted rounded mb-6 animate-pulse" />
         <div className="bg-card border border-border rounded-xl p-6">
-          <div className="flex flex-col md:flex-row gap-6">
-            <div className="w-full md:w-64 h-64 bg-muted rounded-lg animate-pulse" />
+          <div className="flex flex-col min-[720px]:flex-row gap-6">
+            <div className="w-full min-[720px]:w-56 lg:w-64 h-64 min-[720px]:h-56 lg:h-64 bg-muted rounded-lg animate-pulse" />
             <div className="flex-1 space-y-4">
               <div className="h-8 bg-muted rounded w-3/4 animate-pulse" />
               <div className="h-4 bg-muted rounded w-1/2 animate-pulse" />
@@ -327,9 +327,9 @@ function ArtworkViewMode({ artwork }: ArtworkViewModeProps) {
   const { t } = useTranslation('artworkDetail');
 
   return (
-    <div className="flex flex-col md:flex-row gap-6">
+    <div className="flex flex-col min-[720px]:flex-row gap-6">
       {/* 缩略图 */}
-      <div className="w-full md:w-64 h-64 bg-muted rounded-lg overflow-hidden flex-shrink-0">
+      <div className="w-full min-[720px]:w-56 lg:w-64 h-64 min-[720px]:h-56 lg:h-64 bg-muted rounded-lg overflow-hidden flex-shrink-0">
         {artwork.thumbnail_url ? (
           <img
             src={artwork.thumbnail_url}

@@ -29,9 +29,9 @@ export const EditionInfoCard = memo(function EditionInfoCard({
 
   return (
     <div className="bg-card border border-border rounded-xl p-6 mb-6">
-      <div className="flex flex-col md:flex-row gap-6">
+      <div className="flex flex-col min-[720px]:flex-row gap-6">
         {/* Thumbnail */}
-        <div className="w-full md:w-64 h-64 bg-muted rounded-lg overflow-hidden flex-shrink-0">
+        <div className="w-full min-[720px]:w-56 lg:w-64 h-64 min-[720px]:h-56 lg:h-64 bg-muted rounded-lg overflow-hidden flex-shrink-0">
           {edition.artwork?.thumbnail_url ? (
             <img
               src={edition.artwork.thumbnail_url}
