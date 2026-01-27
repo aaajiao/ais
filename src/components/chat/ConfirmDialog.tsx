@@ -77,14 +77,14 @@ export default function ConfirmDialog({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
       {/* 遮罩 */}
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
 
       {/* 对话框 */}
       <div
         ref={dialogRef}
-        className="relative bg-card border border-border rounded-xl shadow-xl max-w-md w-full mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        className="relative bg-card border border-border rounded-xl shadow-xl max-w-md w-full max-h-[85vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200"
       >
         {/* 标题 */}
         <div className="px-6 py-4 border-b border-border">

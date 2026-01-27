@@ -193,12 +193,12 @@ function CreateLinkDialog({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
       {/* 背景遮罩 */}
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       {/* 对话框 */}
-      <div className="relative bg-card border border-border rounded-lg shadow-xl w-full max-w-md mx-4">
+      <div className="relative bg-card border border-border rounded-lg shadow-xl w-full max-w-md max-h-[85vh] overflow-y-auto">
         {/* 头部 */}
         <div className="flex items-center justify-between p-4 border-b border-border">
           <h2 className="text-lg font-medium">{t('createLink')}</h2>

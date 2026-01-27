@@ -433,6 +433,27 @@ import { Trash2, Pencil, X } from 'lucide-react';
 </div>
 ```
 
+**模态对话框 Safe Area 处理**：
+
+所有模态对话框必须支持 iOS safe-area-inset，避免在 iPhone（Face ID 机型）上被 Home Indicator 遮挡：
+
+```tsx
+{/* 模态对话框标准实现 */}
+<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
+  <div className="bg-card border border-border rounded-xl p-6 w-full max-w-md max-h-[85vh] overflow-y-auto">
+    {/* 对话框内容 */}
+  </div>
+</div>
+```
+
+关键属性说明：
+| 属性 | 值 | 说明 |
+|------|-----|------|
+| 外层 `p-4` | `1rem` | 基础内边距 |
+| 外层 `pb-[calc(1rem+env(...))]` | 动态计算 | 底部额外加上 safe-area 高度 |
+| 内层 `max-h-[85vh]` | 85% 视口高度 | 限制对话框最大高度 |
+| 内层 `overflow-y-auto` | 自动滚动 | 内容过多时可滚动 |
+
 ### ToggleChip 组件
 
 用于筛选标签、多选选项等可切换芯片场景：
