@@ -53,7 +53,7 @@ export default function LocationItem({
     } finally {
       setDeleting(false);
     }
-  }, [location, onDelete]);
+  }, [location, onDelete, t]);
 
   return (
     <div className="group relative">

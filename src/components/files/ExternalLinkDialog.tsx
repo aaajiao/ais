@@ -149,7 +149,7 @@ export default function ExternalLinkDialog({
     } finally {
       setSaving(false);
     }
-  }, [url, description, fileType, editionId, validateUrl, onLinkAdded, handleClose]);
+  }, [url, description, fileType, editionId, validateUrl, onLinkAdded, handleClose, t]);
 
   // 键盘事件
   useEffect(() => {

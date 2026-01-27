@@ -121,7 +121,7 @@ export default function FileList({
     } finally {
       setDeletingId(null);
     }
-  }, [deletingId, editionId, onDelete]);
+  }, [deletingId, editionId, onDelete, t]);
 
   // 关闭预览
   const closePreview = useCallback(() => {

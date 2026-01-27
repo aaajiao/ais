@@ -162,7 +162,7 @@ export default function LocationDialog({
     } finally {
       setSaving(false);
     }
-  }, [formData, isEditMode, editingLocation, createLocation, updateLocation, onSaved, onClose]);
+  }, [formData, isEditMode, editingLocation, createLocation, updateLocation, onSaved, onClose, t]);
 
   // 键盘事件
   useEffect(() => {

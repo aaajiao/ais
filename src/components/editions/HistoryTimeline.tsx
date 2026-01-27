@@ -288,7 +288,7 @@ export default function HistoryTimeline({
     } finally {
       setSaving(false);
     }
-  }, [noteText, editionId, onHistoryAdded]);
+  }, [noteText, editionId, onHistoryAdded, t]);
 
   // 切换合并组的展开状态
   const toggleMergedExpand = (mergedId: string) => {
