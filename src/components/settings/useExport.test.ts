@@ -74,17 +74,17 @@ describe('useExport utilities', () => {
   });
 
   describe('downloadFile', () => {
-    let createObjectURLMock: ReturnType<typeof vi.fn>;
-    let revokeObjectURLMock: ReturnType<typeof vi.fn>;
+    let originalCreateObjectURL: typeof URL.createObjectURL;
+    let originalRevokeObjectURL: typeof URL.revokeObjectURL;
     let clickMock: ReturnType<typeof vi.fn>;
 
     beforeEach(() => {
-      createObjectURLMock = vi.fn().mockReturnValue('blob:mock-url');
-      revokeObjectURLMock = vi.fn();
-      clickMock = vi.fn();
+      originalCreateObjectURL = URL.createObjectURL;
+      originalRevokeObjectURL = URL.revokeObjectURL;
 
-      global.URL.createObjectURL = createObjectURLMock;
-      global.URL.revokeObjectURL = revokeObjectURLMock;
+      URL.createObjectURL = vi.fn().mockReturnValue('blob:mock-url');
+      URL.revokeObjectURL = vi.fn();
+      clickMock = vi.fn();
 
       vi.spyOn(document, 'createElement').mockImplementation(() => {
         const element = {
@@ -97,6 +97,8 @@ describe('useExport utilities', () => {
     });
 
     afterEach(() => {
+      URL.createObjectURL = originalCreateObjectURL;
+      URL.revokeObjectURL = originalRevokeObjectURL;
       vi.restoreAllMocks();
     });
 
@@ -107,9 +109,9 @@ describe('useExport utilities', () => {
 
       downloadFile(content, filename, type);
 
-      expect(createObjectURLMock).toHaveBeenCalledWith(expect.any(Blob));
+      expect(URL.createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
       expect(clickMock).toHaveBeenCalled();
-      expect(revokeObjectURLMock).toHaveBeenCalledWith('blob:mock-url');
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
     });
 
     it('should add BOM for CSV files', () => {
@@ -120,7 +122,7 @@ describe('useExport utilities', () => {
       downloadFile(content, filename, type);
 
       // The Blob should contain BOM prefix
-      expect(createObjectURLMock).toHaveBeenCalled();
+      expect(URL.createObjectURL).toHaveBeenCalled();
     });
 
     it('should set correct download filename', () => {

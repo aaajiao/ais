@@ -96,7 +96,9 @@ export function useExport() {
         a.created_at,
       ]);
 
-      const csvContent = [headers, ...rows].map(formatCSVRow).join('\n');
+      type CSVRow = (string | number | boolean | null | undefined)[];
+      const allRows: CSVRow[] = [headers, ...rows];
+      const csvContent = allRows.map(formatCSVRow).join('\n');
 
       downloadFile(
         csvContent,
@@ -125,24 +127,26 @@ export function useExport() {
         return { success: false, isEmpty: true };
       }
 
-      const headers = ['ID', 'Artwork', 'Edition #', 'Type', 'Status', 'Location', 'Inventory #', 'Sale Price', 'Currency', 'Buyer', 'Sale Date', 'Notes', 'Created At'];
-      const rows = editions.map((e: Record<string, unknown>) => [
-        e.id,
+      type CSVRow = (string | number | boolean | null | undefined)[];
+      const headers: CSVRow = ['ID', 'Artwork', 'Edition #', 'Type', 'Status', 'Location', 'Inventory #', 'Sale Price', 'Currency', 'Buyer', 'Sale Date', 'Notes', 'Created At'];
+      const rows: CSVRow[] = editions.map((e: Record<string, unknown>): CSVRow => [
+        e.id as string,
         (e.artworks as { title_en: string } | null)?.title_en || '',
-        e.edition_number || '',
-        e.edition_type || '',
-        e.status || '',
+        (e.edition_number as number | null) || '',
+        (e.edition_type as string | null) || '',
+        (e.status as string | null) || '',
         (e.locations as { name: string } | null)?.name || '',
-        e.inventory_number || '',
-        e.sale_price || '',
-        e.sale_currency || '',
-        e.buyer_name || '',
-        e.sale_date || '',
-        e.notes || '',
-        e.created_at,
+        (e.inventory_number as string | null) || '',
+        (e.sale_price as number | null) || '',
+        (e.sale_currency as string | null) || '',
+        (e.buyer_name as string | null) || '',
+        (e.sale_date as string | null) || '',
+        (e.notes as string | null) || '',
+        e.created_at as string,
       ]);
 
-      const csvContent = [headers, ...rows].map(formatCSVRow).join('\n');
+      const allRows: CSVRow[] = [headers, ...rows];
+      const csvContent = allRows.map(formatCSVRow).join('\n');
 
       downloadFile(
         csvContent,
