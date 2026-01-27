@@ -195,7 +195,7 @@ export default function Artworks() {
   }
 
   return (
-    <div className="p-6 flex flex-col h-[calc(100dvh-160px)] lg:h-[calc(100dvh-73px)]">
+    <div className="p-6 flex flex-col h-[calc(100dvh-var(--spacing-chrome-mobile))] lg:h-[calc(100dvh-var(--spacing-chrome-desktop))]">
       {/* 导出对话框 */}
       <ExportDialog
         isOpen={showExportDialog}

@@ -295,6 +295,12 @@ h1, h2, h3, .font-display {
   --spacing-nav-bottom: calc(var(--spacing-nav-height) + env(safe-area-inset-bottom, 0px));
   /* 页面底部内边距（导航栏 + 操作栏 + 安全边距） */
   --spacing-page-bottom: calc(var(--spacing-nav-bottom) + 5rem);
+  /* 移动端头部高度（顶部工具栏）：py-3 + 内容 ≈ 57px */
+  --spacing-header-mobile: 3.5625rem;
+  /* 移动端全屏列表需要减去的高度：头部 + 底部导航 + 页面内边距 (p-6 × 2) */
+  --spacing-chrome-mobile: calc(var(--spacing-header-mobile) + var(--spacing-nav-bottom) + 3rem);
+  /* 桌面端全屏列表需要减去的高度：头部导航 ≈ 73px */
+  --spacing-chrome-desktop: 4.5625rem;
 
   /* ===== 圆角系统 ===== */
   --radius-sm: calc(var(--radius) - 4px);

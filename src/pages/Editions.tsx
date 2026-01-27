@@ -147,7 +147,7 @@ export default function Editions() {
   }
 
   return (
-    <div className="p-6 flex flex-col h-[calc(100dvh-160px)] lg:h-[calc(100dvh-73px)]">
+    <div className="p-6 flex flex-col h-[calc(100dvh-var(--spacing-chrome-mobile))] lg:h-[calc(100dvh-var(--spacing-chrome-desktop))]">
       <h1 className="text-page-title mb-6 xl:mb-8">{t('title')}</h1>
 
       {/* 筛选标签 */}

@@ -514,5 +514,5 @@ src/
 8. **无障碍** - IconButton 必须提供 `label`，ToggleChip 使用 `role="option"`
 9. **按钮位置** - Cancel 在左，Primary 在右（Apple HIG 规范）
 10. **移动端底部导航** - 使用 `var(--spacing-nav-bottom)` 定位页面固定元素，自动适配 safe-area
-11. **虚拟滚动列表** - 移动端高度需减去顶部工具栏 + 底部导航 ≈ 160px，桌面端减去顶部导航 ≈ 73px
+11. **虚拟滚动列表** - 使用 `h-[calc(100dvh-var(--spacing-chrome-mobile))] lg:h-[calc(100dvh-var(--spacing-chrome-desktop))]` 自动适配 safe-area
 12. **响应式断点** - 以 `lg` (1024px) 为核心断点区分移动端/桌面端
