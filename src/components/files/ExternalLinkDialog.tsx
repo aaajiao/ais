@@ -4,13 +4,13 @@
 
 import { useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { insertIntoTable, insertIntoTableNoReturn, type EditionFilesInsert, type EditionHistoryInsert } from '@/lib/supabase';
+import { supabase, insertIntoTable, insertIntoTableNoReturn, type EditionFilesInsert, type EditionHistoryInsert } from '@/lib/supabase';
 import { detectLinkType } from '@/lib/imageCompressor';
 import type { FileType, FileSourceType } from '@/lib/database.types';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { ToggleChip } from '@/components/ui/toggle-chip';
-import { Link2, Video, Image, FileText, FileSpreadsheet, Paperclip, FileCode, X, Loader2 } from 'lucide-react';
+import { Link2, Video, Image, FileText, FileType, FileSpreadsheet, Paperclip, FileCode, X, Loader2 } from 'lucide-react';
 
 interface ExternalLinkDialogProps {
   isOpen: boolean;
@@ -38,7 +38,7 @@ const FILE_TYPE_ICONS: Record<FileType, ReactNode> = {
   link: <Link2 className="w-4 h-4" />,
   video: <Video className="w-4 h-4" />,
   image: <Image className="w-4 h-4" />,
-  pdf: <FileText className="w-4 h-4" />,
+  pdf: <FileType className="w-4 h-4" />,
   document: <FileText className="w-4 h-4" />,
   markdown: <FileCode className="w-4 h-4" />,
   spreadsheet: <FileSpreadsheet className="w-4 h-4" />,
@@ -214,6 +214,12 @@ export default function ExternalLinkDialog({
         notes: `External link added: ${fileName}`,
       };
       await insertIntoTableNoReturn('edition_history', historyData);
+
+      // 更新版本的 updated_at
+      await supabase
+        .from('editions')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', editionId);
 
       onLinkAdded?.(data as EditionFile);
       handleClose();
