@@ -401,7 +401,7 @@ export default function PublicView() {
                 key={item.edition_id}
                 item={item}
                 showPrices={data.show_prices}
-                t={(key) => t(key)}
+                t={t}
               />
             ))}
           </div>
