@@ -96,9 +96,9 @@ export default function Layout() {
 
       {/* 桌面端顶部导航 (iPad 横屏 + 桌面) */}
       <header className="hidden lg:flex items-center justify-between px-6 py-4 border-b border-border">
-        <div className="flex items-center gap-8">
+        <div className="flex items-center gap-4 xl:gap-5 2xl:gap-8">
           <h1 className="text-xl font-bold tracking-tight">{t('appTitle')}</h1>
-          <nav className="flex gap-6">
+          <nav className="flex gap-3 xl:gap-4 2xl:gap-6">
             <NavLink
               to="/"
               end

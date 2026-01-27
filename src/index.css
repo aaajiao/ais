@@ -369,14 +369,23 @@ h1, h2, h3, .font-display {
   --spacing-safe-inset: max(0.5rem, var(--safe-area-bottom));
 }
 
-/* ===== 桌面端排版增强 (xl: 1280px+) ===== */
+/* ===== 桌面端排版增强 ===== */
+
+/* xl: 1280px+ (iPad Pro 横屏起点) */
 @media (min-width: 1280px) {
   :root {
     --text-page-title: 2.5rem;
     --text-section-title: 1.625rem;
   }
   .nav-link {
-    font-size: 1.3125rem;
+    font-size: 0.9375rem;  /* 15px - iPad 横屏专用，比基础 14px 稍大 */
+  }
+}
+
+/* 2xl: 1536px+ (桌面端) */
+@media (min-width: 1536px) {
+  .nav-link {
+    font-size: 1.125rem;  /* 18px - 桌面端使用更大字体 */
   }
 }
 

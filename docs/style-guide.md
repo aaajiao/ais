@@ -224,7 +224,7 @@ getStatusLabel('at_gallery') // → "外借中"
 |--------|------|------|--------------|
 | `text-page-title` | 页面主标题 | 28px | 40px |
 | `text-section-title` | 分区标题 | 18px | 26px |
-| `.nav-link` | 导航链接（CSS类） | 14px | 21px |
+| `.nav-link` | 导航链接（CSS类） | 14px | 15px (xl:) / 18px (2xl:) |
 
 **使用示例**：
 
@@ -242,6 +242,11 @@ getStatusLabel('at_gallery') // → "外借中"
 - 导航链接 `.nav-link` 已内置响应式，无需额外处理
 - 快捷操作图标使用 `w-6 h-6 xl:w-7 xl:h-7` 响应式尺寸
 - 如需调整全局排版尺寸，只需修改 `index.css` 中的 CSS 变量
+
+**iPad 横屏适配**：
+- iPad Pro 12.9" 横屏视口为 1366px，触发 `xl:` 断点
+- 导航使用较小字体（15px）和紧凑间距，确保 8 个英文导航项不溢出
+- 桌面端（1536px+）恢复正常字体（18px）和间距
 
 ---
 
