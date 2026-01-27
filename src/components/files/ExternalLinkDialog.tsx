@@ -2,7 +2,7 @@
  * 外部链接添加对话框
  */
 
-import { useState, useCallback, useEffect, type ReactNode } from 'react';
+import { useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { insertIntoTable, insertIntoTableNoReturn, type EditionFilesInsert, type EditionHistoryInsert } from '@/lib/supabase';
 import { detectLinkType } from '@/lib/imageCompressor';
@@ -10,7 +10,7 @@ import type { FileType, FileSourceType } from '@/lib/database.types';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { ToggleChip } from '@/components/ui/toggle-chip';
-import { Link2, Video, Image, FileText, FileSpreadsheet, Paperclip, FileCode, X } from 'lucide-react';
+import { Link2, Video, Image, FileText, FileSpreadsheet, Paperclip, FileCode, X, Loader2 } from 'lucide-react';
 
 interface ExternalLinkDialogProps {
   isOpen: boolean;
@@ -57,10 +57,54 @@ export default function ExternalLinkDialog({
 }: ExternalLinkDialogProps) {
   const { t } = useTranslation('common');
   const [url, setUrl] = useState('');
+  const [linkName, setLinkName] = useState('');
   const [description, setDescription] = useState('');
   const [fileType, setFileType] = useState<FileType>('link');
   const [saving, setSaving] = useState(false);
+  const [fetchingTitle, setFetchingTitle] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastFetchedUrlRef = useRef<string>('');
+
+  // 从 URL 中提取回退名称
+  const extractFallbackName = useCallback((urlStr: string): string => {
+    try {
+      const urlObj = new URL(urlStr);
+      const pathParts = urlObj.pathname.split('/');
+      return pathParts[pathParts.length - 1] || urlObj.hostname;
+    } catch {
+      return urlStr;
+    }
+  }, []);
+
+  // 获取网页标题
+  const fetchTitle = useCallback(async (urlStr: string) => {
+    if (!urlStr.trim()) return;
+
+    // 如果已经获取过这个 URL，跳过
+    if (lastFetchedUrlRef.current === urlStr) return;
+
+    setFetchingTitle(true);
+    try {
+      const response = await fetch(`/api/fetch-title?url=${encodeURIComponent(urlStr)}`);
+      const data = await response.json();
+
+      if (data.title) {
+        setLinkName(data.title);
+        lastFetchedUrlRef.current = urlStr;
+      } else {
+        // 回退到 URL 路径提取
+        setLinkName(extractFallbackName(urlStr));
+        lastFetchedUrlRef.current = urlStr;
+      }
+    } catch {
+      // 出错时回退到 URL 路径提取
+      setLinkName(extractFallbackName(urlStr));
+      lastFetchedUrlRef.current = urlStr;
+    } finally {
+      setFetchingTitle(false);
+    }
+  }, [extractFallbackName]);
 
   // 自动检测链接类型
   useEffect(() => {
@@ -70,12 +114,44 @@ export default function ExternalLinkDialog({
     }
   }, [url]);
 
+  // URL 变化时 debounce 获取标题
+  useEffect(() => {
+    const trimmedUrl = url.trim();
+
+    // 清除之前的定时器
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+
+    // 验证 URL 格式
+    if (!trimmedUrl) return;
+    try {
+      new URL(trimmedUrl);
+    } catch {
+      return;
+    }
+
+    // 500ms debounce
+    fetchTimeoutRef.current = setTimeout(() => {
+      fetchTitle(trimmedUrl);
+    }, 500);
+
+    return () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+    };
+  }, [url, fetchTitle]);
+
   // 重置表单
   const resetForm = useCallback(() => {
     setUrl('');
+    setLinkName('');
     setDescription('');
     setFileType('link');
     setError(null);
+    setFetchingTitle(false);
+    lastFetchedUrlRef.current = '';
   }, []);
 
   // 关闭对话框
@@ -113,10 +189,8 @@ export default function ExternalLinkDialog({
     setError(null);
 
     try {
-      // 从 URL 中提取文件名
-      const urlObj = new URL(trimmedUrl);
-      const pathParts = urlObj.pathname.split('/');
-      const fileName = pathParts[pathParts.length - 1] || urlObj.hostname;
+      // 使用用户输入的链接名称，如果为空则从 URL 提取
+      const fileName = linkName.trim() || extractFallbackName(trimmedUrl);
 
       // 创建数据库记录
       const insertData: EditionFilesInsert = {
@@ -149,7 +223,7 @@ export default function ExternalLinkDialog({
     } finally {
       setSaving(false);
     }
-  }, [url, description, fileType, editionId, validateUrl, onLinkAdded, handleClose, t]);
+  }, [url, linkName, description, fileType, editionId, validateUrl, extractFallbackName, onLinkAdded, handleClose, t]);
 
   // 键盘事件
   useEffect(() => {
@@ -200,6 +274,26 @@ export default function ExternalLinkDialog({
               className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
               autoFocus
             />
+          </div>
+
+          {/* 链接名称 */}
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              {t('externalLink.linkName')}
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                value={linkName}
+                onChange={e => setLinkName(e.target.value)}
+                placeholder={fetchingTitle ? t('externalLink.fetchingTitle') : t('externalLink.linkNamePlaceholder')}
+                disabled={fetchingTitle}
+                className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+              />
+              {fetchingTitle && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
+              )}
+            </div>
           </div>
 
           {/* 类型选择 */}

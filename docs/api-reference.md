@@ -500,6 +500,46 @@ POST /api/import/md
 
 ---
 
+## 网页标题获取 API
+
+### 端点
+
+```
+GET /api/fetch-title?url=<URL>
+```
+
+获取网页的标题，用于外部链接添加时自动填充链接名称。
+
+**参数**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `url` | string | 是 | 要获取标题的网页 URL |
+
+**响应**
+
+```typescript
+{
+  title: string | null;  // 网页标题，获取失败时为 null
+  error?: string;        // 错误信息
+}
+```
+
+**标题优先级**
+
+1. `og:title` (Open Graph)
+2. `twitter:title` (Twitter Card)
+3. `dc:title` (Dublin Core)
+4. `<title>` 标签
+
+**技术说明**
+
+- 使用 `open-graph-scraper` 库
+- 超时设置：5 秒
+- Runtime：Node.js（因库依赖）
+
+---
+
 ## 公开链接 API
 
 ### 获取公开视图
