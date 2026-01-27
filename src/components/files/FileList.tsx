@@ -5,6 +5,7 @@
 
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   supabase,
   getSignedUrl,
@@ -12,6 +13,7 @@ import {
   insertIntoTableNoReturn,
   type EditionHistoryInsert,
 } from '@/lib/supabase';
+import { queryKeys } from '@/lib/queryKeys';
 import { Inbox } from 'lucide-react';
 import { FileListItem } from './FileListItem';
 import { FileGridItem } from './FileGridItem';
@@ -37,6 +39,7 @@ export default function FileList({
   isEditing = false,
 }: FileListProps) {
   const { t, i18n } = useTranslation('common');
+  const queryClient = useQueryClient();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -113,6 +116,9 @@ export default function FileList({
           .from('editions')
           .update({ updated_at: new Date().toISOString() })
           .eq('id', editionId);
+
+        // 刷新首页最近更新
+        await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.recentUpdates });
 
         onDelete?.(file.id);
       } catch (err) {

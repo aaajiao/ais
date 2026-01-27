@@ -4,7 +4,9 @@
 
 import { useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import { insertIntoTable, insertIntoTableNoReturn, updateTable, type EditionFilesInsert, type EditionHistoryInsert } from '@/lib/supabase';
+import { queryKeys } from '@/lib/queryKeys';
 import { detectLinkType } from '@/lib/imageCompressor';
 import type { FileType, FileSourceType } from '@/lib/database.types';
 import { Button } from '@/components/ui/button';
@@ -56,6 +58,7 @@ export default function ExternalLinkDialog({
   onLinkAdded,
 }: ExternalLinkDialogProps) {
   const { t } = useTranslation('common');
+  const queryClient = useQueryClient();
   const [url, setUrl] = useState('');
   const [linkName, setLinkName] = useState('');
   const [description, setDescription] = useState('');
@@ -217,6 +220,9 @@ export default function ExternalLinkDialog({
 
       // 更新版本的 updated_at
       await updateTable('editions', { updated_at: new Date().toISOString() }, editionId);
+
+      // 刷新首页最近更新
+      await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.recentUpdates });
 
       onLinkAdded?.(data as EditionFile);
       handleClose();

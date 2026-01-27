@@ -4,7 +4,9 @@
  */
 
 import { useState, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase, uploadFile, deleteFile, insertIntoTable, insertIntoTableNoReturn, type EditionFilesInsert, type EditionHistoryInsert } from '@/lib/supabase';
+import { queryKeys } from '@/lib/queryKeys';
 import {
   compressImage,
   needsCompression,
@@ -63,6 +65,7 @@ export function useFileUpload(options: UseFileUploadOptions) {
     onError,
   } = options;
 
+  const queryClient = useQueryClient();
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -165,6 +168,9 @@ export function useFileUpload(options: UseFileUploadOptions) {
         .from('editions')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', editionId);
+
+      // 刷新首页最近更新
+      await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.recentUpdates });
 
       updateFileStatus(id, { status: 'complete', progress: 100 });
 

@@ -5,7 +5,9 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase, insertIntoTable, type EditionHistoryInsert } from '@/lib/supabase';
+import { queryKeys } from '@/lib/queryKeys';
 import { Button } from '@/components/ui/button';
 import { ScrollText } from 'lucide-react';
 import { HistoryEntry } from './HistoryEntry';
@@ -39,6 +41,7 @@ export default function HistoryTimeline({
 }: HistoryTimelineProps) {
   const { t, i18n } = useTranslation('history');
   const { t: tStatus } = useTranslation('status');
+  const queryClient = useQueryClient();
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [noteText, setNoteText] = useState('');
   const [saving, setSaving] = useState(false);
@@ -84,6 +87,9 @@ export default function HistoryTimeline({
         .from('editions')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', editionId);
+
+      // 刷新首页最近更新
+      await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.recentUpdates });
 
       setNoteText('');
       setShowNoteInput(false);
