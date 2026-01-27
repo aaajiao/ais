@@ -6,7 +6,7 @@ import { processExternalImage, isSupabaseUrl } from './process-image.js';
 // Vercel 配置：使用 Node.js runtime（因为 process-image 使用 sharp）
 export const config = {
   runtime: 'nodejs',
-  maxDuration: 60, // 图片处理需要更长时间
+  maxDuration: 300, // 5 分钟，支持大批量导入
 };
 
 // 请求体类型

@@ -60,6 +60,12 @@ export default function MDImport() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [parseWarnings, setParseWarnings] = useState<Array<{ title: string; issues: string[] }>>([]);
+  const [batchProgress, setBatchProgress] = useState<{
+    current: number;
+    total: number;
+    processed: number;
+    totalArtworks: number;
+  } | null>(null);
 
   // 步骤 1: 文件上传和解析
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -178,7 +184,7 @@ export default function MDImport() {
     }
   };
 
-  // 步骤 3: 执行导入
+  // 步骤 3: 执行导入（分批处理）
   const handleExecuteImport = async () => {
     try {
       setLoading(true);
@@ -202,29 +208,68 @@ export default function MDImport() {
         return;
       }
 
-      const response = await fetch('/api/import/md', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token || ''}`,
-        },
-        body: JSON.stringify({
-          artworks: artworksToImport,
-          mode: 'execute',
-        }),
-      });
+      // 分批处理，每批 30 个
+      const BATCH_SIZE = 30;
+      const totalBatches = Math.ceil(artworksToImport.length / BATCH_SIZE);
 
-      if (!response.ok) {
-        throw new Error(t('mdImport.errors.importFailed'));
+      const accumulatedResults: ExecuteResult = {
+        created: [],
+        updated: [],
+        errors: [],
+        imageProcessing: { processed: 0, failed: 0 },
+      };
+
+      for (let i = 0; i < totalBatches; i++) {
+        const startIdx = i * BATCH_SIZE;
+        const batch = artworksToImport.slice(startIdx, startIdx + BATCH_SIZE);
+
+        setBatchProgress({
+          current: i + 1,
+          total: totalBatches,
+          processed: startIdx,
+          totalArtworks: artworksToImport.length,
+        });
+
+        try {
+          const response = await fetch('/api/import/md', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session?.access_token || ''}`,
+            },
+            body: JSON.stringify({
+              artworks: batch,
+              mode: 'execute',
+            }),
+          });
+
+          if (!response.ok) {
+            accumulatedResults.errors.push(t('mdImport.errors.batchFailed', { batch: i + 1 }));
+            break;
+          }
+
+          const result: ExecuteResult = await response.json();
+          accumulatedResults.created.push(...result.created);
+          accumulatedResults.updated.push(...result.updated);
+          accumulatedResults.errors.push(...result.errors);
+          if (result.imageProcessing) {
+            accumulatedResults.imageProcessing!.processed += result.imageProcessing.processed;
+            accumulatedResults.imageProcessing!.failed += result.imageProcessing.failed;
+          }
+        } catch {
+          accumulatedResults.errors.push(t('mdImport.errors.batchFailed', { batch: i + 1 }));
+          break;
+        }
       }
 
-      const result: ExecuteResult = await response.json();
-      setExecuteResult(result);
+      setBatchProgress(null);
+      setExecuteResult(accumulatedResults);
       setStep('result');
     } catch (err) {
       setError(err instanceof Error ? err.message : t('mdImport.errors.importFailed'));
     } finally {
       setLoading(false);
+      setBatchProgress(null);
     }
   };
 
@@ -239,6 +284,7 @@ export default function MDImport() {
     setArtworkUidMap(new Map());
     setError(null);
     setParseWarnings([]);
+    setBatchProgress(null);
   };
 
   // 渲染预览结果
@@ -596,10 +642,35 @@ export default function MDImport() {
       {step === 'preview' && (
         <>
           {renderPreview()}
+
+          {/* 批量导入进度 */}
+          {loading && batchProgress && (
+            <div className="space-y-3 py-4 bg-muted/30 rounded-xl p-4">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">
+                  {t('mdImport.batchProgress', {
+                    current: batchProgress.current,
+                    total: batchProgress.total
+                  })}
+                </span>
+                <span className="font-medium">
+                  {batchProgress.processed} / {batchProgress.totalArtworks}
+                </span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-2">
+                <div
+                  className="bg-primary h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${(batchProgress.processed / batchProgress.totalArtworks) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-3 pt-4 border-t border-border">
             <Button
               variant="outline"
               onClick={handleReset}
+              disabled={loading}
             >
               {t('mdImport.reupload')}
             </Button>

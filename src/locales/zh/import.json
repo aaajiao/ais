@@ -44,8 +44,10 @@
       "previewFailed": "预览请求失败",
       "parseFailed": "解析失败",
       "importFailed": "导入请求失败",
-      "selectAtLeastOne": "请至少选择一个作品进行导入"
+      "selectAtLeastOne": "请至少选择一个作品进行导入",
+      "batchFailed": "批次 {{batch}} 导入失败"
     },
+    "batchProgress": "正在导入第 {{current}} / {{total}} 批...",
     "selection": {
       "selected": "已选择 {{selected}} / {{total}} 个作品",
       "existingCount": "另有 {{count}} 个已存在",

@@ -44,8 +44,10 @@
       "previewFailed": "Preview request failed",
       "parseFailed": "Parse failed",
       "importFailed": "Import request failed",
-      "selectAtLeastOne": "Please select at least one artwork to import"
+      "selectAtLeastOne": "Please select at least one artwork to import",
+      "batchFailed": "Batch {{batch}} import failed"
     },
+    "batchProgress": "Importing batch {{current}} of {{total}}...",
     "selection": {
       "selected": "{{selected}} / {{total}} artworks selected",
       "existingCount": "({{count}} already exist)",

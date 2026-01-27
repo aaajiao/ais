@@ -14,6 +14,16 @@
 
 ---
 
+## 批量导入
+
+支持大批量导入（100+ 作品）：
+
+- **API 超时**：`maxDuration: 300` 秒（5 分钟）
+- **前端分批**：每批 30 个作品，显示进度条
+- **容错**：批次失败时保留已完成的结果
+
+---
+
 ## 设计原因
 
 确保同标题但不同 URL 的作品（如 `Guard, I…` 的不同版本）被正确识别为独立作品。
@@ -24,4 +34,5 @@
 
 - `api/import/md.ts` - Markdown 导入 API
 - `src/lib/md-parser.ts` - Markdown 解析器
+- `src/components/import/MDImport.tsx` - 导入组件（含分批逻辑）
 - `src/pages/Import.tsx` - 导入页面 UI
