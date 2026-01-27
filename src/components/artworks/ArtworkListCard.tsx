@@ -1,9 +1,9 @@
 /**
  * 作品列表卡片组件
+ * 只渲染卡片内容，外层包裹由父组件决定
  */
 
 import { memo } from 'react';
-import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
 import { Image, Check } from 'lucide-react';
@@ -14,24 +14,24 @@ import {
 
 interface ArtworkListCardProps {
   artwork: ArtworkWithStats;
-  selectMode: boolean;
-  isSelected: boolean;
-  onToggleSelect: (id: string, e: React.MouseEvent) => void;
+  selectMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (id: string, e: React.MouseEvent) => void;
 }
 
 export const ArtworkListCard = memo(function ArtworkListCard({
   artwork,
-  selectMode,
-  isSelected,
+  selectMode = false,
+  isSelected = false,
   onToggleSelect,
 }: ArtworkListCardProps) {
   const { t } = useTranslation('artworks');
   const mainStatus = getArtworkMainStatus(artwork.editions);
 
-  const cardContent = (
+  return (
     <div className="flex gap-4">
       {/* Selection checkbox */}
-      {selectMode && (
+      {selectMode && onToggleSelect && (
         <div
           className="flex items-center"
           onClick={e => onToggleSelect(artwork.id, e)}
@@ -110,29 +110,5 @@ export const ArtworkListCard = memo(function ArtworkListCard({
         </div>
       </div>
     </div>
-  );
-
-  if (selectMode) {
-    return (
-      <div
-        onClick={e => onToggleSelect(artwork.id, e)}
-        className={`bg-card border rounded-xl p-4 cursor-pointer transition-colors mb-3 ${
-          isSelected
-            ? 'border-primary bg-primary/5'
-            : 'border-border hover:border-primary/50'
-        }`}
-      >
-        {cardContent}
-      </div>
-    );
-  }
-
-  return (
-    <Link
-      to={`/artworks/${artwork.id}`}
-      className="block bg-card border border-border rounded-xl p-4 hover:border-primary/50 transition-colors mb-3"
-    >
-      {cardContent}
-    </Link>
   );
 });
