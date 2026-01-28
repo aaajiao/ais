@@ -26,12 +26,14 @@ export default async function handler(req: Request) {
     const { messages: uiMessages, model = 'claude-sonnet-4-5', extractionModel, searchExpansionModel } = body;
 
     // 2. 安全日志（不记录敏感消息内容）
+    const requestSize = JSON.stringify(uiMessages || []).length;
     console.log('[chat] Request', {
       userId: auth.userId,
       model,
       extractionModel: extractionModel || 'default',
       searchExpansionModel: searchExpansionModel || 'default',
       messageCount: uiMessages?.length,
+      requestSizeKB: Math.round(requestSize / 1024),
     });
 
     // 3. 获取模型和工具（延迟初始化）

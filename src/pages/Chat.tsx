@@ -104,18 +104,30 @@ export default function Chat() {
     });
   }, [session?.access_token]);
 
+  // 限制发送给 API 的消息数量（避免请求体过大）
+  const MAX_MESSAGES_TO_SEND = 30;
+
   // 创建 transport - model 或 fetch 函数变化时重新创建
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
         api: '/api/chat',
         fetch: authenticatedFetch,
-        body: {
-          model: selectedModel,
-          // 传递提取模型：空字符串时使用聊天模型
-          extractionModel: extractionModel || selectedModel,
-          // 传递搜索扩展模型：空字符串表示使用默认快速模型
-          searchExpansionModel: searchExpansionModel || '',
+        // 关键优化：只发送最近 N 条消息，避免请求体过大
+        prepareSendMessagesRequest: ({ messages }) => {
+          // 保留第一条消息（系统上下文）和最近的消息
+          const truncatedMessages = messages.length > MAX_MESSAGES_TO_SEND
+            ? [messages[0], ...messages.slice(-MAX_MESSAGES_TO_SEND + 1)]
+            : messages;
+
+          return {
+            body: {
+              messages: truncatedMessages,
+              model: selectedModel,
+              extractionModel: extractionModel || selectedModel,
+              searchExpansionModel: searchExpansionModel || '',
+            },
+          };
         },
       }),
     [selectedModel, extractionModel, searchExpansionModel, authenticatedFetch]
