@@ -77,6 +77,7 @@
     "certificate": "证书编号：",
     "storageDetail": "存储位置：",
     "condition": "状态：",
+    "conditionNotes": "状态备注：",
     "conditionValues": {
       "excellent": "优秀",
       "good": "良好",

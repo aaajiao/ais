@@ -71,7 +71,8 @@ function LinkCard({
           <p className="text-sm text-muted-foreground mt-1">
             {t('editionCount', { count: link.edition_count || 0 })} ·{' '}
             {t('accessCount', { count: link.access_count })} ·{' '}
-            {formatRelativeTime(link.last_accessed, t)}
+            {formatRelativeTime(link.last_accessed, t)} ·{' '}
+            {t('createdAt', { date: formatRelativeTime(link.created_at, t) })}
           </p>
         </div>
         <div className="flex items-center gap-2">

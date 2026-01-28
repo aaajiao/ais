@@ -122,8 +122,10 @@ export interface Edition {
   sale_date?: string;
   buyer_name?: string;
   consignment_start?: string;
-  loan_institution?: string;
+  consignment_end?: string;
+  loan_start?: string;
   loan_end?: string;
+  loan_institution?: string;
   certificate_number?: string;
   notes?: string;
   created_at: string;

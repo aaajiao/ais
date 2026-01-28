@@ -23,6 +23,7 @@ export interface EditionWithDetails {
   certificate_number: string | null;
   storage_detail: string | null;
   condition: string | null;
+  condition_notes: string | null;
   notes: string | null;
   location: {
     id: string;

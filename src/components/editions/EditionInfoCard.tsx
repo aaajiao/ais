@@ -252,6 +252,16 @@ export const EditionInfoCard = memo(function EditionInfoCard({
                 {t(`info.conditionValues.${edition.condition}`)}
               </p>
             )}
+
+            {/* Condition notes */}
+            {edition.condition_notes && (
+              <p>
+                <span className="text-muted-foreground">
+                  {t('info.conditionNotes')}
+                </span>
+                {edition.condition_notes}
+              </p>
+            )}
           </div>
 
           {/* Notes */}

@@ -42,5 +42,6 @@
   "updateError": "Failed to update",
   "deleteConfirm": "Are you sure you want to delete the link for \"{{name}}\"? This action cannot be undone.",
   "deleteSuccess": "Link deleted",
-  "deleteError": "Failed to delete link"
+  "deleteError": "Failed to delete link",
+  "createdAt": "Created {{date}}"
 }

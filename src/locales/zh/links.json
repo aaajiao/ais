@@ -42,5 +42,6 @@
   "updateError": "更新失败",
   "deleteConfirm": "确定要删除「{{name}}」的链接吗？此操作无法撤销。",
   "deleteSuccess": "链接已删除",
-  "deleteError": "删除链接失败"
+  "deleteError": "删除链接失败",
+  "createdAt": "创建于{{date}}"
 }
