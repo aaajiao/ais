@@ -39,6 +39,7 @@ const createMockEdition = (
   certificate_number: null,
   storage_detail: null,
   condition: null,
+  condition_notes: null,
   notes: null,
   location: null,
   artwork: {
