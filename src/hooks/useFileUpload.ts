@@ -16,6 +16,13 @@ import {
 } from '@/lib/imageCompressor';
 import type { FileType, FileSourceType } from '@/lib/database.types';
 
+// 文件元数据（用于自定义上传信息）
+export interface FileMetadata {
+  displayName?: string;
+  description?: string;
+  fileType?: FileType;
+}
+
 // 上传文件状态
 export interface UploadingFile {
   id: string;
@@ -88,7 +95,8 @@ export function useFileUpload(options: UseFileUploadOptions) {
 
   // 上传单个文件
   const uploadSingleFile = useCallback(async (
-    uploadingFile: UploadingFile
+    uploadingFile: UploadingFile,
+    metadata?: FileMetadata
   ): Promise<UploadedFile | null> => {
     const { id, file } = uploadingFile;
 
@@ -133,15 +141,16 @@ export function useFileUpload(options: UseFileUploadOptions) {
       updateFileStatus(id, { progress: 70 });
 
       // 创建数据库记录
-      const fileType = detectFileType(file) as FileType;
+      const fileType = metadata?.fileType ?? detectFileType(file) as FileType;
+      const fileName = metadata?.displayName ?? file.name;
       const insertData: EditionFilesInsert = {
         edition_id: editionId,
         source_type: 'upload',
         file_url: path,
         file_type: fileType,
-        file_name: file.name,
+        file_name: fileName,
         file_size: finalSize,
-        description: null,
+        description: metadata?.description ?? null,
         sort_order: 0,
       };
       const { data: dbRecord, error: dbError } = await insertIntoTable('edition_files', insertData);
@@ -158,7 +167,7 @@ export function useFileUpload(options: UseFileUploadOptions) {
       const historyData: EditionHistoryInsert = {
         edition_id: editionId,
         action: 'file_added',
-        notes: `添加文件: ${file.name}`,
+        notes: `添加文件: ${fileName}`,
       };
       await insertIntoTableNoReturn('edition_history', historyData);
 
@@ -241,6 +250,61 @@ export function useFileUpload(options: UseFileUploadOptions) {
     return results;
   }, [maxConcurrent, onUploadComplete, uploadSingleFile]);
 
+  // 批量上传文件（带元数据）
+  const uploadFilesWithMetadata = useCallback(async (
+    files: File[],
+    metadataMap: Map<File, FileMetadata>
+  ): Promise<UploadedFile[]> => {
+    if (files.length === 0) return [];
+
+    setIsUploading(true);
+
+    // 创建上传任务
+    const uploadTasks: Array<{ task: UploadingFile; metadata?: FileMetadata }> = files.map(file => ({
+      task: {
+        id: crypto.randomUUID(),
+        file,
+        progress: 0,
+        status: 'pending' as const,
+        originalSize: file.size,
+      },
+      metadata: metadataMap.get(file),
+    }));
+
+    setUploadingFiles(prev => [...prev, ...uploadTasks.map(t => t.task)]);
+
+    const results: UploadedFile[] = [];
+
+    // 简化的并发上传逻辑
+    const uploadWithLimit = async (tasks: Array<{ task: UploadingFile; metadata?: FileMetadata }>, limit: number) => {
+      const executing = new Set<Promise<void>>();
+
+      for (const { task, metadata } of tasks) {
+        const promise = uploadSingleFile(task, metadata).then(result => {
+          if (result) {
+            results.push(result);
+            onUploadComplete?.(result);
+          }
+          executing.delete(promise);
+        });
+
+        executing.add(promise);
+
+        if (executing.size >= limit) {
+          await Promise.race(executing);
+        }
+      }
+
+      // 等待剩余任务完成
+      await Promise.all(executing);
+    };
+
+    await uploadWithLimit(uploadTasks, maxConcurrent);
+
+    setIsUploading(false);
+    return results;
+  }, [maxConcurrent, onUploadComplete, uploadSingleFile]);
+
   // 取消上传（移除待处理的文件）
   const cancelUpload = useCallback((fileId: string) => {
     setUploadingFiles(prev =>
@@ -271,6 +335,7 @@ export function useFileUpload(options: UseFileUploadOptions) {
 
   return {
     uploadFiles,
+    uploadFilesWithMetadata,
     uploadingFiles,
     isUploading,
     cancelUpload,

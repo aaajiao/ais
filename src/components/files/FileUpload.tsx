@@ -11,6 +11,7 @@ import { getFileTypeIcon } from '@/lib/fileIcons';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { X, Check, Paperclip, Download } from 'lucide-react';
+import FileUploadDialog from './FileUploadDialog';
 
 interface FileUploadProps {
   editionId: string;
@@ -35,10 +36,11 @@ export default function FileUpload({
 }: FileUploadProps) {
   const { t } = useTranslation('common');
   const [isDragging, setIsDragging] = useState(false);
+  const [stagedFiles, setStagedFiles] = useState<File[]>([]);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
-    uploadFiles,
     uploadingFiles,
     isUploading: _isUploading,
     cancelUpload,
@@ -61,17 +63,15 @@ export default function FileUpload({
     return null;
   }, [maxSizeMB, t]);
 
-  // 处理文件选择
-  const handleFiles = useCallback(async (files: FileList | null) => {
+  // 处理文件选择 - 改为打开对话框而非直接上传
+  const handleFiles = useCallback((files: FileList | null) => {
     if (!files || files.length === 0) return;
 
     const validFiles: File[] = [];
-    const errors: string[] = [];
 
     for (const file of Array.from(files)) {
       const error = validateFile(file);
       if (error) {
-        errors.push(`${file.name}: ${error}`);
         onError?.(error, file);
       } else {
         validFiles.push(file);
@@ -79,9 +79,10 @@ export default function FileUpload({
     }
 
     if (validFiles.length > 0) {
-      await uploadFiles(validFiles);
+      setStagedFiles(validFiles);
+      setShowUploadDialog(true);
     }
-  }, [validateFile, uploadFiles, onError]);
+  }, [validateFile, onError]);
 
   // 拖拽事件处理
   const handleDragEnter = useCallback((e: React.DragEvent) => {
@@ -171,8 +172,30 @@ export default function FileUpload({
     }
   }, [uploadingFiles, clearCompleted]);
 
+  // 处理对话框关闭
+  const handleDialogClose = useCallback(() => {
+    setShowUploadDialog(false);
+    setStagedFiles([]);
+  }, []);
+
+  // 处理上传完成
+  const handleUploadComplete = useCallback((files: UploadedFile[]) => {
+    files.forEach(f => onUploadComplete?.(f));
+    setShowUploadDialog(false);
+    setStagedFiles([]);
+  }, [onUploadComplete]);
+
   return (
     <div className="space-y-4">
+      {/* 文件上传对话框 */}
+      <FileUploadDialog
+        isOpen={showUploadDialog}
+        onClose={handleDialogClose}
+        editionId={editionId}
+        stagedFiles={stagedFiles}
+        onUploadComplete={handleUploadComplete}
+      />
+
       {/* 拖拽上传区域 */}
       <div
         onClick={handleClick}

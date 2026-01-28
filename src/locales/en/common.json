@@ -45,6 +45,19 @@
     "complete": "Complete",
     "failed": "Failed"
   },
+  "fileUpload": {
+    "dialogTitle": "Upload File",
+    "dialogTitleMultiple": "Upload {{count}} Files",
+    "fileName": "File Name",
+    "description": "Description (optional)",
+    "fileType": "File Type",
+    "fileSize": "Size",
+    "originalName": "Original: {{name}}",
+    "upload": "Upload",
+    "uploading": "Uploading...",
+    "expandDetails": "Edit details",
+    "collapseDetails": "Collapse"
+  },
   "externalLink": {
     "title": "Add External Link",
     "url": "URL",

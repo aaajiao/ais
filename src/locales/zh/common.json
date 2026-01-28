@@ -45,6 +45,19 @@
     "complete": "完成",
     "failed": "失败"
   },
+  "fileUpload": {
+    "dialogTitle": "上传文件",
+    "dialogTitleMultiple": "上传 {{count}} 个文件",
+    "fileName": "文件名称",
+    "description": "描述（可选）",
+    "fileType": "文件类型",
+    "fileSize": "大小",
+    "originalName": "原文件名: {{name}}",
+    "upload": "上传",
+    "uploading": "上传中...",
+    "expandDetails": "编辑详情",
+    "collapseDetails": "收起"
+  },
   "externalLink": {
     "title": "添加外部链接",
     "url": "链接地址",
