@@ -5,11 +5,17 @@ import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { ConfirmCardData } from '@/components/chat/EditableConfirmCard';
 import CollapsibleChatHistory from '@/components/chat/CollapsibleChatHistory';
-import { saveChatHistory, loadChatHistory, clearChatHistory, getChatTimestamp } from '@/lib/chatStorage';
+import {
+  saveChatHistory,
+  loadChatHistory,
+  clearChatHistory,
+  getChatTimestamp,
+  type StorageStatus,
+} from '@/lib/chatStorage';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
-import { MessageSquare, Trash2, ArrowUp } from 'lucide-react';
+import { MessageSquare, Trash2, ArrowUp, AlertCircle, RotateCcw } from 'lucide-react';
 
 export default function Chat() {
   const { t, i18n } = useTranslation('chat');
@@ -25,7 +31,8 @@ export default function Chat() {
     }
     return '';
   });
-  const { session, loading: authLoading } = useAuthContext();
+  const { session, loading: authLoading, signInWithGoogle } = useAuthContext();
+  const [storageWarning, setStorageWarning] = useState<string | null>(null);
 
   // 获取用户选择的模型（现在存储的是完整的模型 ID）
   const [selectedModel] = useState(() => {
@@ -120,16 +127,50 @@ export default function Chat() {
     status,
     error,
     setMessages,
+    regenerate,
   } = useChat({
     transport,
     experimental_throttle: 50,  // 减少流式响应时的渲染次数
     onFinish: ({ messages: finalMessages }) => {
       // 只在完成时保存（官方推荐方式）
       if (finalMessages.length > 0) {
-        saveChatHistory(finalMessages);
+        const storageStatus: StorageStatus = saveChatHistory(finalMessages);
+        if (storageStatus.error) {
+          setStorageWarning(storageStatus.error);
+        } else {
+          setStorageWarning(null);
+        }
       }
     },
   });
+
+  // 错误类型识别
+  const getErrorInfo = useCallback(
+    (err: Error | null): { message: string; action: 'reSignIn' | 'clearChat' | 'retry' | null } | null => {
+      if (!err) return null;
+
+      const message = err.message.toLowerCase();
+
+      if (message.includes('401') || message.includes('unauthorized') || message.includes('token')) {
+        return { message: t('errors.sessionExpired'), action: 'reSignIn' };
+      }
+      if (message.includes('413') || message.includes('too large') || message.includes('context')) {
+        return { message: t('errors.conversationTooLong'), action: 'clearChat' };
+      }
+      if (message.includes('network') || message.includes('failed to fetch')) {
+        return { message: t('errors.networkError'), action: 'retry' };
+      }
+
+      // 其他错误也提供重试选项
+      return { message: err.message, action: 'retry' };
+    },
+    [t]
+  );
+
+  // 重试上一次请求
+  const handleRetry = useCallback(() => {
+    regenerate();
+  }, [regenerate]);
 
   const isLoading = status === 'submitted' || status === 'streaming';
 
@@ -254,10 +295,55 @@ export default function Chat() {
         />
       )}
 
+      {/* 存储警告 */}
+      {storageWarning && (
+        <div className="mx-4 mb-2 p-3 bg-warning/10 border border-warning/20 rounded-xl text-sm flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-warning flex-shrink-0" />
+          <span className="text-muted-foreground">{t(`errors.${storageWarning}`)}</span>
+        </div>
+      )}
+
       {/* 错误提示 */}
       {error && (
-        <div className="mx-4 mb-2 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive text-sm">
-          {t('error', { message: error.message })}
+        <div className="mx-4 mb-2 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-sm">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-medium text-destructive">{t('error')}</p>
+              <p className="text-muted-foreground mt-1">{getErrorInfo(error)?.message || error.message}</p>
+              {getErrorInfo(error)?.action === 'reSignIn' && (
+                <Button
+                  variant="outline"
+                  size="small"
+                  onClick={signInWithGoogle}
+                  className="mt-2"
+                >
+                  {t('reSignIn')}
+                </Button>
+              )}
+              {getErrorInfo(error)?.action === 'clearChat' && (
+                <Button
+                  variant="outline"
+                  size="small"
+                  onClick={handleClearChat}
+                  className="mt-2"
+                >
+                  {t('clearChatToFix')}
+                </Button>
+              )}
+              {getErrorInfo(error)?.action === 'retry' && (
+                <Button
+                  variant="outline"
+                  size="small"
+                  onClick={handleRetry}
+                  className="mt-2"
+                >
+                  <RotateCcw className="w-3 h-3 mr-1" />
+                  {t('retry')}
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

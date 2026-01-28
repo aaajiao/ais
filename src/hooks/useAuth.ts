@@ -116,6 +116,51 @@ export function useAuth() {
     };
   }, [isEmailAllowed]);
 
+  // Token 自动刷新：在过期前 5 分钟刷新
+  const session = state.session;
+  useEffect(() => {
+    if (!session?.expires_at) return;
+
+    const checkAndRefresh = async () => {
+      const expirationTime = session.expires_at! * 1000; // 转换为毫秒
+      const now = Date.now();
+      const timeUntilExpiry = expirationTime - now;
+
+      // 剩余 5 分钟时刷新
+      if (timeUntilExpiry < 5 * 60 * 1000 && timeUntilExpiry > 0) {
+        console.log('[auth] Token 即将过期，正在刷新...');
+        try {
+          const { data, error } = await supabase.auth.refreshSession();
+          if (error) {
+            console.error('[auth] 刷新会话失败:', error);
+            setState((prev) => ({
+              ...prev,
+              error: '会话已过期，请重新登录',
+            }));
+          } else if (data.session) {
+            setState((prev) => ({
+              ...prev,
+              session: data.session,
+              user: data.user || prev.user,
+              error: null,
+            }));
+            console.log('[auth] Token 刷新成功');
+          }
+        } catch (err) {
+          console.error('[auth] 刷新错误:', err);
+        }
+      }
+    };
+
+    // 立即检查一次
+    checkAndRefresh();
+
+    // 每分钟检查一次
+    const interval = setInterval(checkAndRefresh, 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [session]);
+
   // Google 登录
   const signInWithGoogle = async () => {
     setState(prev => ({ ...prev, loading: true, error: null }));

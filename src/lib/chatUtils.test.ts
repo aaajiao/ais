@@ -85,19 +85,23 @@ describe('groupMessagesByDate', () => {
   });
 
   it('should group messages by date', () => {
-    const now = Date.now();
+    // 使用今天中午 12 点，避免时区边界问题
+    const today = new Date();
+    today.setHours(12, 0, 0, 0);
+    const todayTimestamp = today.getTime();
+
     const messages: UIMessage[] = [
       {
         id: '1',
         role: 'user',
         parts: [],
-        metadata: { createdAt: now },
+        metadata: { createdAt: todayTimestamp },
       },
       {
         id: '2',
         role: 'assistant',
         parts: [],
-        metadata: { createdAt: now + 1000 },
+        metadata: { createdAt: todayTimestamp + 1000 },
       },
     ];
 
@@ -108,20 +112,29 @@ describe('groupMessagesByDate', () => {
   });
 
   it('should sort groups by date (newest first)', () => {
-    const now = Date.now();
-    const yesterday = now - 24 * 60 * 60 * 1000;
+    // 使用明确的日期来避免时区问题
+    // 今天中午 12 点（本地时间）
+    const today = new Date();
+    today.setHours(12, 0, 0, 0);
+    const todayTimestamp = today.getTime();
+
+    // 昨天中午 12 点（本地时间）
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayTimestamp = yesterday.getTime();
+
     const messages: UIMessage[] = [
       {
         id: '1',
         role: 'user',
         parts: [],
-        metadata: { createdAt: yesterday },
+        metadata: { createdAt: yesterdayTimestamp },
       },
       {
         id: '2',
         role: 'user',
         parts: [],
-        metadata: { createdAt: now },
+        metadata: { createdAt: todayTimestamp },
       },
     ];
 

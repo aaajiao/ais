@@ -16,7 +16,17 @@
     "inStudioEditions": "Show all in-studio editions",
     "recentlySold": "Which artworks were recently sold?"
   },
-  "error": "Error: {{message}}",
+  "error": "Error",
+  "errors": {
+    "sessionExpired": "Session expired, please sign in again",
+    "conversationTooLong": "Conversation too long, please clear history",
+    "networkError": "Network error, please check your connection",
+    "storage_nearly_full": "Storage nearly full, some messages were removed",
+    "storage_full": "Storage full, chat history was cleared"
+  },
+  "reSignIn": "Sign In Again",
+  "clearChatToFix": "Clear Chat",
+  "retry": "Retry",
   "placeholder": {
     "verifying": "Verifying login...",
     "pleaseSignIn": "Please sign in",

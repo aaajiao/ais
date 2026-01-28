@@ -1,8 +1,9 @@
-import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from 'ai';
+import { streamText, stepCountIs, type UIMessage } from 'ai';
 import { verifyAuth, unauthorizedResponse } from './lib/auth.js';
 import { getModel, getSupabase } from './lib/model-provider.js';
 import { systemPrompt } from './lib/system-prompt.js';
 import { createTools } from './tools/index.js';
+import { prepareMessagesForModel } from './lib/message-utils.js';
 
 // Vercel Edge Function
 export const config = {
@@ -43,18 +44,29 @@ export default async function handler(req: Request) {
       searchExpansionModel,
     });
 
-    // 4. 转换消息格式并执行流式对话
-    const modelMessages = await convertToModelMessages(uiMessages as UIMessage[]);
+    // 4. 准备消息：使用 pruneMessages 清理工具调用 + 截断超限消息
+    const modelMessages = await prepareMessagesForModel(uiMessages as UIMessage[], 150000);
 
+    // 5. 流式对话
     const result = streamText({
       model: selectedModel,
       system: systemPrompt,
       messages: modelMessages,
       tools,
       stopWhen: stepCountIs(5),
+      onError({ error }) {
+        // 记录流式错误（不中断流）
+        console.error('[chat] Stream error:', error);
+      },
     });
 
-    return result.toUIMessageStreamResponse();
+    return result.toUIMessageStreamResponse({
+      onError(error) {
+        // 提取错误信息发送给客户端
+        console.error('[chat] Response error:', error);
+        return error instanceof Error ? error.message : 'Unknown error';
+      },
+    });
   } catch (error) {
     const err = error as Error & { cause?: Error; status?: number; statusText?: string };
     console.error('[chat] Error:', {

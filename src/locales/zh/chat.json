@@ -16,7 +16,17 @@
     "inStudioEditions": "显示所有在库的版本",
     "recentlySold": "最近售出了哪些作品？"
   },
-  "error": "出错了：{{message}}",
+  "error": "出错了",
+  "errors": {
+    "sessionExpired": "登录已过期，请重新登录",
+    "conversationTooLong": "对话太长，请清除历史重新开始",
+    "networkError": "网络连接失败，请检查网络后重试",
+    "storage_nearly_full": "存储空间不足，部分历史消息已被删除",
+    "storage_full": "存储空间已满，对话历史已清空"
+  },
+  "reSignIn": "重新登录",
+  "clearChatToFix": "清除对话",
+  "retry": "重试",
   "placeholder": {
     "verifying": "正在验证登录...",
     "pleaseSignIn": "请先登录",
