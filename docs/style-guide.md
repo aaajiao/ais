@@ -32,12 +32,12 @@
 
 ```css
 :root {
-  /* 背景系统：微灰白，避免纯白刺眼 */
-  --background: oklch(0.975 0.002 265);
+  /* 背景系统：柔和灰白，保持冷色调 */
+  --background: oklch(0.85 0.012 265);
   --foreground: oklch(0.20 0.005 265);
 
-  /* 卡片 */
-  --card: oklch(0.99 0.001 265);
+  /* 卡片：比背景稍亮，保持层次 */
+  --card: oklch(0.88 0.009 265);
   --card-foreground: oklch(0.20 0.005 265);
 
   /* 主要操作 */
@@ -45,7 +45,7 @@
   --primary-foreground: oklch(0.97 0.002 265);
 
   /* 静音/辅助文字 */
-  --muted-foreground: oklch(0.50 0.005 265);
+  --muted-foreground: oklch(0.40 0.005 265);
 
   /* 强调色 - 电子蓝（克制使用） */
   --accent-blue: oklch(0.55 0.15 250);
