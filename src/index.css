@@ -16,14 +16,14 @@
 
   /* ===== 亮色模式 - 护眼冷白 ===== */
 
-  /* 背景系统：微灰白，避免纯白刺眼 */
-  --background: oklch(0.975 0.002 265);
+  /* 背景系统：柔和灰白，保持冷色调 */
+  --background: oklch(0.85 0.012 265);
   --foreground: oklch(0.20 0.005 265);
 
-  --card: oklch(0.99 0.001 265);
+  --card: oklch(0.88 0.009 265);
   --card-foreground: oklch(0.20 0.005 265);
 
-  --popover: oklch(0.99 0.001 265);
+  --popover: oklch(0.88 0.009 265);
   --popover-foreground: oklch(0.20 0.005 265);
 
   /* 主要操作 */
@@ -31,23 +31,23 @@
   --primary-foreground: oklch(0.97 0.002 265);
 
   /* 次要元素 */
-  --secondary: oklch(0.94 0.003 265);
+  --secondary: oklch(0.83 0.010 265);
   --secondary-foreground: oklch(0.30 0.005 265);
 
   /* 静音/辅助文字 */
-  --muted: oklch(0.94 0.003 265);
-  --muted-foreground: oklch(0.50 0.005 265);
+  --muted: oklch(0.83 0.010 265);
+  --muted-foreground: oklch(0.40 0.005 265);
 
   /* 交互状态 */
-  --accent: oklch(0.92 0.004 265);
+  --accent: oklch(0.81 0.011 265);
   --accent-foreground: oklch(0.25 0.005 265);
 
   /* 危险操作 */
   --destructive: oklch(0.55 0.18 25);
 
   /* 边界 */
-  --border: oklch(0.88 0.004 265);
-  --input: oklch(0.92 0.003 265);
+  --border: oklch(0.77 0.011 265);
+  --input: oklch(0.81 0.010 265);
   --ring: oklch(0.55 0.15 250);
 
   /* 强调色 - 电子蓝 */
@@ -70,13 +70,13 @@
   --chart-5: oklch(0.52 0.12 290);
 
   /* 侧边栏 */
-  --sidebar: oklch(0.96 0.003 265);
+  --sidebar: oklch(0.85 0.010 265);
   --sidebar-foreground: oklch(0.20 0.005 265);
   --sidebar-primary: oklch(0.25 0.005 265);
   --sidebar-primary-foreground: oklch(0.97 0.002 265);
-  --sidebar-accent: oklch(0.92 0.004 265);
+  --sidebar-accent: oklch(0.81 0.011 265);
   --sidebar-accent-foreground: oklch(0.25 0.005 265);
-  --sidebar-border: oklch(0.88 0.004 265);
+  --sidebar-border: oklch(0.77 0.011 265);
   --sidebar-ring: oklch(0.55 0.15 250);
 
   /* ===== iOS Safe Area ===== */
