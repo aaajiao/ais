@@ -31,7 +31,7 @@ export default function Chat() {
     }
     return '';
   });
-  const { session, loading: authLoading, signInWithGoogle } = useAuthContext();
+  const { session, loading: authLoading } = useAuthContext();
   const [storageWarning, setStorageWarning] = useState<string | null>(null);
 
   // 获取用户选择的模型（现在存储的是完整的模型 ID）
@@ -145,17 +145,20 @@ export default function Chat() {
   });
 
   // 错误类型识别
+  // 401 错误也用重试，因为 Supabase 会自动刷新 session
+  // 只有刷新失败时才需要重新登录，但那时 useAuth 会处理
   const getErrorInfo = useCallback(
-    (err: Error | null): { message: string; action: 'reSignIn' | 'clearChat' | 'retry' | null } | null => {
+    (err: Error | null): { message: string; action: 'clearChat' | 'retry' | null } | null => {
       if (!err) return null;
 
       const message = err.message.toLowerCase();
 
-      if (message.includes('401') || message.includes('unauthorized') || message.includes('token')) {
-        return { message: t('errors.sessionExpired'), action: 'reSignIn' };
-      }
       if (message.includes('413') || message.includes('too large') || message.includes('context')) {
         return { message: t('errors.conversationTooLong'), action: 'clearChat' };
+      }
+      if (message.includes('401') || message.includes('unauthorized')) {
+        // 401 时先尝试重试，Supabase 客户端会自动刷新 token
+        return { message: t('errors.sessionExpired'), action: 'retry' };
       }
       if (message.includes('network') || message.includes('failed to fetch')) {
         return { message: t('errors.networkError'), action: 'retry' };
@@ -311,16 +314,6 @@ export default function Chat() {
             <div className="flex-1">
               <p className="font-medium text-destructive">{t('error')}</p>
               <p className="text-muted-foreground mt-1">{getErrorInfo(error)?.message || error.message}</p>
-              {getErrorInfo(error)?.action === 'reSignIn' && (
-                <Button
-                  variant="outline"
-                  size="small"
-                  onClick={signInWithGoogle}
-                  className="mt-2"
-                >
-                  {t('reSignIn')}
-                </Button>
-              )}
               {getErrorInfo(error)?.action === 'clearChat' && (
                 <Button
                   variant="outline"
