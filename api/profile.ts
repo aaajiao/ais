@@ -4,8 +4,8 @@
  * PUT /api/profile - Update current user's profile
  */
 
-import { verifyAuth, unauthorizedResponse, getJsonBody } from './lib/auth';
-import { getSupabase } from './lib/model-provider';
+import { verifyAuth, unauthorizedResponse, getJsonBody } from './lib/auth.js';
+import { getSupabase } from './lib/model-provider.js';
 
 export const config = {
   runtime: 'edge',

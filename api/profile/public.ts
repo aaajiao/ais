@@ -3,7 +3,7 @@
  * GET /api/profile/public - Returns artist name for login/public pages
  */
 
-import { getSupabase } from '../lib/model-provider';
+import { getSupabase } from '../lib/model-provider.js';
 
 export const config = {
   runtime: 'edge',
