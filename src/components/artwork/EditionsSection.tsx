@@ -1,7 +1,10 @@
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
+import InventoryNumberInput from '@/components/editions/InventoryNumberInput';
+import { useInventoryNumber } from '@/hooks/useInventoryNumber';
 import type { EditionStatus } from '@/lib/database.types';
 import { type EditionData, type NewEditionData, formatEditionNumber } from './types';
 
@@ -116,6 +119,16 @@ function AddEditionForm({
   const { t: tStatus } = useTranslation('status');
   const { t: tCommon } = useTranslation('common');
 
+  const { validation, isChecking, checkNumber } = useInventoryNumber();
+
+  // 监听库存编号变化进行校验
+  const inventoryNumber = newEdition.inventory_number;
+  useEffect(() => {
+    checkNumber(inventoryNumber);
+  }, [inventoryNumber, checkNumber]);
+
+  const isInventoryInvalid = !!newEdition.inventory_number && (!validation.isUnique || isChecking);
+
   return (
     <div className="mb-4 p-4 bg-muted/50 rounded-lg border border-border">
       <h3 className="font-medium mb-3">{t('editionsList.addNew')}</h3>
@@ -164,12 +177,10 @@ function AddEditionForm({
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">{t('editionsList.inventoryNumber')}</label>
-          <input
-            type="text"
+          <InventoryNumberInput
             value={newEdition.inventory_number}
-            onChange={e => onNewEditionChange({ ...newEdition, inventory_number: e.target.value })}
-            placeholder={t('editionsList.inventoryPlaceholder')}
-            className="w-full px-3 py-2 border border-border rounded-lg bg-background focus:ring-2 focus:ring-ring outline-none"
+            onChange={(value) => onNewEditionChange({ ...newEdition, inventory_number: value })}
+            showSuggestion={true}
           />
         </div>
         <div className="md:col-span-2">
@@ -192,7 +203,7 @@ function AddEditionForm({
         </Button>
         <Button
           onClick={onAdd}
-          disabled={addingEdition}
+          disabled={addingEdition || isInventoryInvalid}
         >
           {addingEdition ? t('editionsList.adding') : tCommon('add')}
         </Button>
