@@ -9,32 +9,16 @@ export function estimateTokens(messages: UIMessage[]): number {
   return messages.reduce((total, msg) => {
     let contentLength = 0;
 
-    // 处理不同类型的消息内容
-    if (typeof msg.content === 'string') {
-      contentLength = msg.content.length;
-    } else if (Array.isArray(msg.content)) {
-      // 处理包含多个部分的消息（如文本+工具调用）
-      contentLength = msg.content.reduce((sum, part) => {
-        if (typeof part === 'string') {
-          return sum + part.length;
-        }
-        if ('text' in part && typeof part.text === 'string') {
-          return sum + part.text.length;
-        }
-        // 工具调用等其他类型，估算 JSON 长度
-        return sum + JSON.stringify(part).length;
-      }, 0);
-    } else if (msg.content) {
-      contentLength = JSON.stringify(msg.content).length;
-    }
-
-    // 包含工具调用的消息需要额外计算
+    // 遍历 parts 计算内容长度
     if (msg.parts) {
-      msg.parts.forEach((part) => {
-        if (part.type === 'tool-invocation' || part.type === 'tool-result') {
+      for (const part of msg.parts) {
+        if (part.type === 'text') {
+          contentLength += part.text.length;
+        } else {
+          // 工具调用、推理等其他类型，估算 JSON 长度
           contentLength += JSON.stringify(part).length;
         }
-      });
+      }
     }
 
     // 使用保守估算：3 字符 = 1 token（对中文更准确）

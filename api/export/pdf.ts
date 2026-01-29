@@ -144,7 +144,7 @@ async function handleLinkExport(request: CatalogRequest, res: VercelResponse) {
     date: formatDate(),
   };
 
-  const items = await buildCatalogItemsFromEditions(editions, catalogOptions);
+  const items = await buildCatalogItemsFromEditions(editions as unknown as EditionRow[], catalogOptions);
   return await generateAndSendPDF(items, catalogOptions, link.gallery_name, res);
 }
 
@@ -205,7 +205,7 @@ async function handleCatalogExport(request: CatalogRequest, res: VercelResponse)
     date: formatDate(),
   };
 
-  const items = await buildCatalogItemsFromEditions(editions, catalogOptions);
+  const items = await buildCatalogItemsFromEditions(editions as unknown as EditionRow[], catalogOptions);
   return await generateAndSendPDF(items, catalogOptions, request.locationName, res);
 }
 
