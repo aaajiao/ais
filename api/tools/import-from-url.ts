@@ -36,12 +36,13 @@ export function createImportFromUrlTool(ctx: ToolContext) {
         .from('artworks')
         .select('id, title_en')
         .eq('source_url', url)
-        .is('deleted_at', null)
-        .maybeSingle();
+        .is('deleted_at', null);
 
-      if (existingByUrl) {
-        existingId = existingByUrl.id;
+      if (existingByUrl && existingByUrl.length === 1) {
+        existingId = existingByUrl[0].id;
         console.log('[import_artwork_from_url] Found existing by URL:', existingId);
+      } else if (existingByUrl && existingByUrl.length > 1) {
+        console.log('[import_artwork_from_url] Multiple artworks share this URL, will try title match or create new');
       }
 
       // 3. 如果没有通过 URL 找到，尝试通过标题匹配

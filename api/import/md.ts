@@ -121,9 +121,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             .from('artworks')
             .select('*')
             .eq('source_url', artwork.source_url)
-            .is('deleted_at', null)
-            .single();
-          existing = data;
+            .is('deleted_at', null);
+          if (data && data.length === 1) {
+            existing = data[0];
+          }
         }
 
         // 如果没有 source_url 或没找到，尝试通过标题匹配（仅当只有一个匹配时，且未删除）
@@ -224,9 +225,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             .from('artworks')
             .select('id')
             .eq('source_url', artwork.source_url)
-            .is('deleted_at', null)
-            .single();
-          existing = data;
+            .is('deleted_at', null);
+          if (data && data.length === 1) {
+            existing = data[0];
+          }
         }
         if (!existing && artwork.title_en) {
           const { data } = await supabase

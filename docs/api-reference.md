@@ -392,7 +392,7 @@ AI: [调用 search_history { action: "sold", after: "2025-01-01", before: "2025-
 1. 抓取网页 HTML
 2. 使用 LLM 提取作品信息（使用 `extractionModel`，推荐 Sonnet/GPT-4o）
 3. 选择最佳缩略图 URL
-4. 检查是否已存在（通过 `source_url` 或 `title_en`）
+4. 检查是否已存在（通过 `source_url` 匹配，仅当恰好一个匹配时；或通过 `title_en`）
 5. 创建或更新作品
 
 **返回**
