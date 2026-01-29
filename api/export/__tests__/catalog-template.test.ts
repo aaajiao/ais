@@ -1,4 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// Mock font-loader to avoid fs.readFileSync in tests
+vi.mock('../font-loader.js', () => ({
+  getInlineFontCSS: () => '/* mocked fonts */',
+}));
+
 import { generateCatalogHTML, type CatalogItem, type CatalogOptions } from '../catalog-template';
 
 // --- Test data factories ---
@@ -51,10 +57,10 @@ describe('generateCatalogHTML', () => {
       expect(html).toContain('page-break-after: always');
     });
 
-    it('should include font stack with Chinese fallbacks', () => {
+    it('should include font stack with project fonts', () => {
       const html = generateCatalogHTML([], createOptions());
-      expect(html).toContain('Helvetica Neue');
-      expect(html).toContain('PingFang SC');
+      expect(html).toContain('IBM Plex Sans');
+      expect(html).toContain('Space Mono');
       expect(html).toContain('Noto Sans SC');
     });
   });

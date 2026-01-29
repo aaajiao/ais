@@ -6,6 +6,29 @@
  * 信息丰富 portfolio 排版 + Brutalist Minimalism 美学
  */
 
+import { getInlineFontCSS } from './font-loader.js';
+
+// 与 src/index.css CSS 变量保持同步（亮色模式）
+const PDF_THEME = {
+  // 基础色
+  background: 'oklch(0.85 0.012 265)',       // --background
+  foreground: 'oklch(0.20 0.005 265)',        // --foreground
+  muted: 'oklch(0.40 0.005 265)',             // --muted-foreground
+  subtle: 'oklch(0.55 0.02 265)',             // 辅助文字
+  border: 'oklch(0.77 0.011 265)',            // --border
+  // 状态色
+  statusAvailable: 'oklch(0.52 0.12 145)',    // --status-available (in_studio)
+  statusConsigned: 'oklch(0.60 0.12 85)',     // --status-consigned (at_gallery, gifted)
+  statusMuseum: 'oklch(0.52 0.12 310)',       // --status-museum (at_museum)
+  statusSold: 'oklch(0.52 0.14 25)',          // --status-sold
+  statusTransit: 'oklch(0.52 0.12 250)',      // --status-transit
+  statusInactive: 'oklch(0.55 0.02 265)',     // --status-inactive (lost, damaged)
+  statusProduction: 'oklch(0.52 0.12 290)',   // --status-production
+  // 字体
+  fontBody: "'IBM Plex Sans', 'Noto Sans SC', system-ui, sans-serif",
+  fontDisplay: "'Space Mono', Menlo, monospace",
+};
+
 // 单个作品的 catalog 数据
 export interface CatalogItem {
   titleEn: string;
@@ -43,11 +66,19 @@ export function generateCatalogHTML(
     generateArtworkPage(item, options, index + 1, items.length)
   ).join('');
 
+  // 仅当包含中文标题时加载 Noto Sans SC
+  const hasChinese = items.some(item => item.titleCn);
+  const chineseFontLink = hasChinese
+    ? '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet">'
+    : '';
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+${chineseFontLink}
 <style>
+${getInlineFontCSS()}
 ${getCatalogCSS()}
 </style>
 </head>
@@ -73,9 +104,9 @@ function getCatalogCSS(): string {
 }
 
 body {
-  font-family: "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Noto Sans SC", sans-serif;
-  color: #1a1a1a;
-  background: #ffffff;
+  font-family: ${PDF_THEME.fontBody};
+  color: ${PDF_THEME.foreground};
+  background: ${PDF_THEME.background};
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-print-color-adjust: exact;
@@ -106,24 +137,26 @@ body {
 }
 
 .cover-artist {
+  font-family: ${PDF_THEME.fontDisplay};
   font-size: 32pt;
-  font-weight: 300;
-  letter-spacing: 0.02em;
-  color: #1a1a1a;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: ${PDF_THEME.foreground};
   margin-bottom: 20mm;
 }
 
 .cover-location {
   font-size: 14pt;
-  font-weight: 300;
-  color: #4a4a4a;
+  font-weight: 400;
+  color: ${PDF_THEME.muted};
   margin-bottom: 4mm;
 }
 
 .cover-subtitle {
+  font-family: ${PDF_THEME.fontDisplay};
   font-size: 11pt;
-  font-weight: 300;
-  color: #8a8a8a;
+  font-weight: 400;
+  color: ${PDF_THEME.subtle};
   text-transform: uppercase;
   letter-spacing: 0.08em;
   margin-bottom: 3mm;
@@ -131,8 +164,8 @@ body {
 
 .cover-date {
   font-size: 10pt;
-  font-weight: 300;
-  color: #8a8a8a;
+  font-weight: 400;
+  color: ${PDF_THEME.subtle};
 }
 
 .cover-footer {
@@ -147,14 +180,15 @@ body {
 
 .cover-copyright {
   font-size: 8pt;
-  font-weight: 300;
-  color: #b0b0b0;
+  font-weight: 400;
+  color: ${PDF_THEME.subtle};
 }
 
 .cover-count {
+  font-family: ${PDF_THEME.fontDisplay};
   font-size: 8pt;
-  font-weight: 300;
-  color: #b0b0b0;
+  font-weight: 400;
+  color: ${PDF_THEME.subtle};
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -190,17 +224,18 @@ body {
 }
 
 .artwork-title-en {
+  font-family: ${PDF_THEME.fontDisplay};
   font-size: 16pt;
-  font-weight: 400;
-  color: #1a1a1a;
+  font-weight: 700;
+  color: ${PDF_THEME.foreground};
   margin-bottom: 2mm;
   line-height: 1.2;
 }
 
 .artwork-title-cn {
   font-size: 12pt;
-  font-weight: 300;
-  color: #6a6a6a;
+  font-weight: 400;
+  color: ${PDF_THEME.muted};
   margin-bottom: 6mm;
   line-height: 1.3;
 }
@@ -214,9 +249,10 @@ body {
 }
 
 .meta-label {
+  font-family: ${PDF_THEME.fontDisplay};
   font-size: 8pt;
   font-weight: 400;
-  color: #8a8a8a;
+  color: ${PDF_THEME.subtle};
   text-transform: uppercase;
   letter-spacing: 0.08em;
   padding-top: 0.5mm;
@@ -224,8 +260,8 @@ body {
 
 .meta-value {
   font-size: 10pt;
-  font-weight: 300;
-  color: #4a4a4a;
+  font-weight: 400;
+  color: ${PDF_THEME.muted};
   line-height: 1.4;
 }
 
@@ -241,35 +277,36 @@ body {
   top: -1px;
 }
 
-.status-in_studio { background-color: #5a9a5a; }
-.status-at_gallery { background-color: #9a8a3a; }
-.status-at_museum { background-color: #7a5a9a; }
-.status-in_transit { background-color: #5a7a9a; }
-.status-in_production { background-color: #7a5a9a; }
-.status-sold { background-color: #9a5a5a; }
-.status-gifted { background-color: #9a8a3a; }
-.status-lost, .status-damaged { background-color: #8a8a8a; }
+.status-in_studio { background-color: ${PDF_THEME.statusAvailable}; }
+.status-at_gallery { background-color: ${PDF_THEME.statusConsigned}; }
+.status-at_museum { background-color: ${PDF_THEME.statusMuseum}; }
+.status-in_transit { background-color: ${PDF_THEME.statusTransit}; }
+.status-in_production { background-color: ${PDF_THEME.statusProduction}; }
+.status-sold { background-color: ${PDF_THEME.statusSold}; }
+.status-gifted { background-color: ${PDF_THEME.statusConsigned}; }
+.status-lost, .status-damaged { background-color: ${PDF_THEME.statusInactive}; }
 
 /* Footer */
 .artwork-footer {
   margin-top: auto;
   padding-top: 4mm;
-  border-top: 0.5px solid #e5e5e5;
+  border-top: 0.5px solid ${PDF_THEME.border};
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
 .footer-page {
+  font-family: ${PDF_THEME.fontDisplay};
   font-size: 8pt;
-  font-weight: 300;
-  color: #b0b0b0;
+  font-weight: 400;
+  color: ${PDF_THEME.subtle};
 }
 
 .footer-copyright {
   font-size: 8pt;
-  font-weight: 300;
-  color: #b0b0b0;
+  font-weight: 400;
+  color: ${PDF_THEME.subtle};
 }
 `;
 }

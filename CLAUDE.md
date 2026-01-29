@@ -29,7 +29,7 @@ api/                    # Serverless API
 ├── lib/               # 工具函数（auth, search-utils, artwork-extractor, image-downloader, model-provider, system-prompt）
 ├── tools/             # AI 工具（9 个工具 + types + index）
 ├── import/            # 导入 API（md, migrate-thumbnails, process-image）
-├── export/            # 导出 API（pdf, catalog-template, md, shared）
+├── export/            # 导出 API（pdf, catalog-template, font-loader, md, shared, fonts/）
 ├── links/             # 公开链接 API
 └── view/              # 公开查看 API
 src/

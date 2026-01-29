@@ -326,6 +326,7 @@ async function renderHTMLToPDF(html: string): Promise<ArrayBuffer> {
         '--disable-gpu',
         '--single-process',
         '--font-render-hinting=none',
+        '--force-color-profile=srgb',
       ],
       headless: true,
       defaultViewport: chromium.default.defaultViewport,
@@ -346,6 +347,9 @@ async function renderHTMLToPDF(html: string): Promise<ArrayBuffer> {
       waitUntil: 'networkidle0',
       timeout: 30000,
     });
+
+    // 等待所有字体加载完成（base64 内嵌字体 + CDN 中文字体）
+    await page.evaluate(() => document.fonts.ready);
 
     const pdfBuffer = await page.pdf({
       format: 'A4',

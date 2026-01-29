@@ -425,7 +425,7 @@ AI: 已创建作品「Guard, I...」，已获取缩略图
 POST /api/export/pdf
 ```
 
-使用 Puppeteer + @sparticuz/chromium-min 渲染 HTML → PDF。支持三种入口：
+使用 Puppeteer + @sparticuz/chromium-min 渲染 HTML → PDF。字体使用 IBM Plex Sans + Space Mono（base64 内嵌），中文使用 Noto Sans SC（Google Fonts CDN 按需加载）。颜色使用 OKLCH 值与网站亮色模式保持一致。支持三种入口：
 
 **入口 1: 公开下载（从 Public View 页面）**
 
