@@ -258,6 +258,28 @@ describe('generateCatalogHTML', () => {
     });
   });
 
+  describe('source URL link', () => {
+    it('should show link icon when sourceUrl is provided', () => {
+      const item = createItem({ sourceUrl: 'https://aaajiao.me/works/test' });
+      const html = generateCatalogHTML([item], createOptions());
+      expect(html).toContain('title-link');
+      expect(html).toContain('https://aaajiao.me/works/test');
+      expect(html).toContain('<svg');
+    });
+
+    it('should not show link icon when sourceUrl is not provided', () => {
+      const item = createItem({ sourceUrl: undefined });
+      const html = generateCatalogHTML([item], createOptions());
+      expect(html).not.toContain('<a class="title-link"');
+    });
+
+    it('should escape special characters in sourceUrl', () => {
+      const item = createItem({ sourceUrl: 'https://example.com/art?id=1&name="test"' });
+      const html = generateCatalogHTML([item], createOptions());
+      expect(html).toContain('&amp;name=&quot;test&quot;');
+    });
+  });
+
   describe('image handling', () => {
     it('should include image tag when thumbnailBase64 is provided', () => {
       const item = createItem({ thumbnailBase64: 'data:image/jpeg;base64,abc123' });
