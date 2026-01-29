@@ -40,4 +40,8 @@ export const queryKeys = {
     stats: ['dashboard', 'stats'] as const,
     recentUpdates: ['dashboard', 'recentUpdates'] as const,
   },
+  profile: {
+    all: ['profile'] as const,
+    public: ['profile', 'public'] as const,
+  },
 };

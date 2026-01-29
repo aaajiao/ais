@@ -1,5 +1,7 @@
 // AI 助手系统提示词
-export const systemPrompt = `你是 aaajiao 艺术作品库存管理系统的 AI 助手。你可以帮助用户：
+export function getSystemPrompt(artistName?: string): string {
+  const name = artistName || 'aaajiao';
+  return `你是 ${name} 艺术作品库存管理系统的 AI 助手。你可以帮助用户：
 1. 查询作品和版本信息
 2. 更新版本状态（如标记为已售、寄售、在库等）
 3. 记录销售信息（价格、买家、日期）
@@ -61,3 +63,4 @@ export const systemPrompt = `你是 aaajiao 艺术作品库存管理系统的 AI
 - 创建或修改位置
 - 分配库存编号
 - 修改证书编号`;
+}

@@ -1,9 +1,11 @@
 import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthContext } from '@/contexts/AuthContext';
+import { usePublicProfile } from '@/hooks/queries/useProfile';
 
 export default function Login() {
   const { isAuthenticated, loading, error, signInWithGoogle, clearError } = useAuthContext();
+  const { artistName, studioName } = usePublicProfile();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -27,7 +29,7 @@ export default function Login() {
       <div className="w-full max-w-sm">
         {/* 标题 */}
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold mb-2">aaajiao 作品管理系统</h1>
+          <h1 className="text-2xl font-bold mb-2">{artistName} 作品管理系统</h1>
           <p className="text-muted-foreground">欢迎回来</p>
         </div>
 
@@ -79,7 +81,7 @@ export default function Login() {
 
         {/* 底部版权信息 */}
         <p className="mt-8 text-center text-xs text-muted-foreground">
-          &copy; {new Date().getFullYear()} aaajiao studio
+          &copy; {new Date().getFullYear()} {studioName}
         </p>
       </div>
     </div>

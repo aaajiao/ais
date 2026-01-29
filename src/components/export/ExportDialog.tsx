@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { X, FileText } from 'lucide-react';
 import type { ExportRequest, ExportOptions } from '@/lib/exporters';
 import { useAuthContext } from '@/contexts/AuthContext';
+import { useProfile } from '@/hooks/queries/useProfile';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import EditionSelector from './EditionSelector';
@@ -25,6 +26,7 @@ export default function ExportDialog({
   const { t } = useTranslation('export');
   const { t: tCommon } = useTranslation('common');
   const { session } = useAuthContext();
+  const { artistName } = useProfile();
   const [options, setOptions] = useState<ExportOptions>({
     includePrice: false,
     includeStatus: false,
@@ -74,6 +76,7 @@ export default function ExportDialog({
           isSingleArtwork && editionMode === 'selected' ? selectedEditionIds : undefined,
         format: 'md',
         options,
+        artistName,
       };
 
       const response = await fetch('/api/export/md', {

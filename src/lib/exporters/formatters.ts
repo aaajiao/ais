@@ -94,14 +94,17 @@ export function generateArtworkMarkdown(
 // 生成完整 Markdown 文档
 export function generateFullMarkdown(
   artworksData: ArtworkExportData[],
-  options: ExportOptions
+  options: ExportOptions,
+  artistName?: string
 ): string {
+  const name = artistName || 'aaajiao';
+  const studio = `${name} studio`;
   const lines: string[] = [];
 
   // YAML Frontmatter
   const exportDate = new Date();
   lines.push('---');
-  lines.push('title: "aaajiao Artworks"');
+  lines.push(`title: "${name} Artworks"`);
   lines.push(`exported_at: "${exportDate.toISOString()}"`);
   lines.push(`total_artworks: ${artworksData.length}`);
   lines.push(`include_price: ${options.includePrice}`);
@@ -111,7 +114,7 @@ export function generateFullMarkdown(
   lines.push('');
 
   // 文档头
-  lines.push('# aaajiao Artworks');
+  lines.push(`# ${name} Artworks`);
   lines.push('');
   lines.push(`Exported: ${exportDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`);
   lines.push('');
@@ -127,7 +130,7 @@ export function generateFullMarkdown(
   lines.push('');
   lines.push('---');
   lines.push('');
-  lines.push(`© ${new Date().getFullYear()} aaajiao studio`);
+  lines.push(`© ${new Date().getFullYear()} ${studio}`);
 
   return lines.join('\n');
 }

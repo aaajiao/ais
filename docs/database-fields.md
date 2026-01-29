@@ -14,29 +14,49 @@
 | `edition_files` | 版本附件 | ✅ 完整实现 |
 | `edition_history` | 版本历史 | ✅ 完整实现 |
 | `gallery_links` | 公开分享链接 | ✅ 完整实现 |
-| `users` | 用户信息 | ⏸️ **暂时备用** |
+| `users` | 用户/项目配置 | ✅ 部分使用（name 字段） |
 
 ---
 
-## users 表（暂时备用）
+## users 表
 
 ### 现状说明
 
-`users` 表在数据库 schema 中定义，但**当前未使用**。
+`users` 表用于存储项目配置信息（艺术家名称）。
 
-**认证机制**：系统使用 Supabase Auth + 环境变量 `ALLOWED_EMAILS` 白名单，用户信息直接来自 Supabase Auth 的 `User` 对象，无需自定义用户表。
+**认证机制**：系统使用 Supabase Auth + 环境变量 `ALLOWED_EMAILS` 白名单，用户信息直接来自 Supabase Auth 的 `User` 对象。`users` 表主要用于存储项目级别的配置。
 
 ### 表结构
 
 | 字段 | 类型 | 说明 | 使用状态 |
 |------|------|------|----------|
-| `id` | UUID | 主键 | 未使用 |
-| `email` | TEXT | 邮箱 | 未使用（来自 Supabase Auth） |
-| `name` | TEXT | 姓名 | 未使用（来自 Auth metadata） |
+| `id` | UUID | 主键（对应 Supabase Auth user ID） | ✅ 使用 |
+| `email` | TEXT | 邮箱 | ✅ 使用（upsert 时写入） |
+| `name` | TEXT | 艺术家/项目名称 | ✅ **使用** — 存储项目名称（如 "aaajiao"），studio 名称自动拼接为 `${name} studio` |
 | `role` | ENUM | admin/editor | 未使用 |
 | `status` | ENUM | active/inactive | 未使用 |
 | `last_login` | TIMESTAMP | 最后登录 | 未使用 |
-| `created_at` | TIMESTAMP | 创建时间 | 未使用 |
+| `created_at` | TIMESTAMP | 创建时间 | ✅ 使用 |
+
+### name 字段用途
+
+`name` 字段存储艺术家/项目名称，用于替换全系统中的硬编码品牌信息：
+
+- **导航栏标题**：`{{artistName}} Inventory` / `{{artistName}} 作品管理`
+- **登录页面**：`{{artistName}} 作品管理系统`
+- **PDF Catalog**：封面艺术家名、页脚版权
+- **导出文件名**：`{{artistName}}-artworks-2025-01-28.pdf`
+- **AI 系统提示词**：`你是 {{artistName}} 艺术作品库存管理系统的 AI 助手`
+- **公开链接页脚**：`© 2025 {{artistName}} studio`
+
+**默认值**：未设置时 fallback 为 `"aaajiao"` / `"aaajiao studio"`。
+
+**API 端点**：
+- `GET /api/profile` — 已认证，返回当前用户 name
+- `PUT /api/profile` — 已认证，更新 name（upsert）
+- `GET /api/profile/public` — 无需认证，返回第一个用户的 name（单租户）
+
+**设置 UI**：Settings 页面 → Profile Settings 卡片
 
 ### 未来可能用途
 
@@ -351,3 +371,4 @@ TypeScript 类型定义文件与数据库 schema 的对应关系：
 |------|------|
 | 2025-01-28 | 添加完整数据库表结构文档，说明 users 表暂时备用状态 |
 | 2025-01-28 | 修复 condition_notes 在 EditionInfoCard 的显示，添加 Gallery Links created_at 显示 |
+| 2025-01-29 | 启用 users 表 name 字段存储项目名称，替换全系统硬编码品牌信息 |

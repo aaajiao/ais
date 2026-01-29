@@ -2,10 +2,12 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Lightbulb } from 'lucide-react';
 import { useExport } from './useExport';
+import { useProfile } from '@/hooks/queries/useProfile';
 
 export default function ExportSettings() {
   const { t } = useTranslation('settings');
-  const { exporting, exportJSON, exportArtworksCSV, exportEditionsCSV } = useExport();
+  const { artistName } = useProfile();
+  const { exporting, exportJSON, exportArtworksCSV, exportEditionsCSV } = useExport(artistName);
 
   const handleExportJSON = async () => {
     const result = await exportJSON();

@@ -1,7 +1,7 @@
 import { streamText, stepCountIs, type UIMessage } from 'ai';
 import { verifyAuth, unauthorizedResponse } from './lib/auth.js';
 import { getModel, getSupabase } from './lib/model-provider.js';
-import { systemPrompt } from './lib/system-prompt.js';
+import { getSystemPrompt } from './lib/system-prompt.js';
 import { createTools } from './tools/index.js';
 import { prepareMessagesForModel } from './lib/message-utils.js';
 
@@ -23,7 +23,7 @@ export default async function handler(req: Request) {
     }
 
     const body = await req.json();
-    const { messages: uiMessages, model = 'claude-sonnet-4-5', extractionModel, searchExpansionModel } = body;
+    const { messages: uiMessages, model = 'claude-sonnet-4-5', extractionModel, searchExpansionModel, artistName } = body;
 
     // 2. 安全日志（不记录敏感消息内容）
     const requestSize = JSON.stringify(uiMessages || []).length;
@@ -52,7 +52,7 @@ export default async function handler(req: Request) {
     // 5. 流式对话
     const result = streamText({
       model: selectedModel,
-      system: systemPrompt,
+      system: getSystemPrompt(artistName),
       messages: modelMessages,
       tools,
       stopWhen: stepCountIs(5),

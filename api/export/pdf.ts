@@ -45,6 +45,7 @@ interface CatalogRequest {
     includePrice: boolean;
     includeStatus: boolean;
   };
+  artistName?: string;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -137,15 +138,24 @@ async function handleLinkExport(request: CatalogRequest, res: VercelResponse) {
     return res.status(404).json({ error: 'No editions found at this location' });
   }
 
+  // 获取艺术家名称（从 users 表）
+  const { data: profileData } = await supabase
+    .from('users')
+    .select('name')
+    .limit(1)
+    .single();
+  const artistName = profileData?.name || 'aaajiao';
+
   const catalogOptions: CatalogOptions = {
     locationName: link.gallery_name,
     includePrice: link.show_prices,
     includeStatus: true,
     date: formatDate(),
+    artistName,
   };
 
   const items = await buildCatalogItemsFromEditions(editions as unknown as EditionRow[], catalogOptions);
-  return await generateAndSendPDF(items, catalogOptions, link.gallery_name, res);
+  return await generateAndSendPDF(items, catalogOptions, link.gallery_name, res, artistName);
 }
 
 /**
@@ -198,15 +208,17 @@ async function handleCatalogExport(request: CatalogRequest, res: VercelResponse)
   }
 
   const options = request.options || { includePrice: false, includeStatus: true };
+  const artistName = request.artistName || 'aaajiao';
   const catalogOptions: CatalogOptions = {
     locationName: request.locationName,
     includePrice: options.includePrice,
     includeStatus: options.includeStatus,
     date: formatDate(),
+    artistName,
   };
 
   const items = await buildCatalogItemsFromEditions(editions as unknown as EditionRow[], catalogOptions);
-  return await generateAndSendPDF(items, catalogOptions, request.locationName, res);
+  return await generateAndSendPDF(items, catalogOptions, request.locationName, res, artistName);
 }
 
 /**
@@ -229,11 +241,13 @@ async function handleLegacyExport(request: ExportRequest, res: VercelResponse) {
   }
 
   const options = request.options ?? { includePrice: false, includeStatus: false, includeLocation: false };
+  const artistName = request.artistName || 'aaajiao';
   const catalogOptions: CatalogOptions = {
-    locationName: 'aaajiao',
+    locationName: artistName,
     includePrice: options.includePrice,
     includeStatus: options.includeStatus,
     date: formatDate(),
+    artistName,
   };
 
   const items = await buildCatalogItemsFromArtworkData(artworksData, options);
@@ -241,7 +255,7 @@ async function handleLegacyExport(request: ExportRequest, res: VercelResponse) {
     ? artworksData[0].artwork.title_en
     : 'Artworks';
 
-  return await generateAndSendPDF(items, catalogOptions, locationLabel, res);
+  return await generateAndSendPDF(items, catalogOptions, locationLabel, res, artistName);
 }
 
 // --- Helper functions ---
@@ -284,12 +298,13 @@ async function generateAndSendPDF(
   items: CatalogItem[],
   options: CatalogOptions,
   filenameLabel: string,
-  res: VercelResponse
+  res: VercelResponse,
+  artistName?: string
 ) {
   const html = generateCatalogHTML(items, options);
   const pdfBuffer = await renderHTMLToPDF(html);
 
-  const filename = generatePDFFilename(filenameLabel);
+  const filename = generatePDFFilename(filenameLabel, artistName);
 
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

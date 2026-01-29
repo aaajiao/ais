@@ -11,6 +11,7 @@ import { X, FileDown, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { useAuthContext } from '@/contexts/AuthContext';
+import { useProfile } from '@/hooks/queries/useProfile';
 import type { Link } from '@/hooks/useLinks';
 
 // Public View API 返回的 item 类型
@@ -45,6 +46,7 @@ export default function CatalogDialog({
   const { t } = useTranslation('links');
   const { t: tCommon } = useTranslation('common');
   const { session } = useAuthContext();
+  const { artistName } = useProfile();
 
   const [items, setItems] = useState<ViewItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -139,6 +141,7 @@ export default function CatalogDialog({
             includePrice,
             includeStatus,
           },
+          artistName,
         }),
       });
 

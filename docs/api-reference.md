@@ -18,6 +18,7 @@ POST /api/chat
   model?: string;                  // 聊天模型 ID，默认 claude-sonnet-4-5
   extractionModel?: string;        // URL 导入提取模型（默认使用 model）
   searchExpansionModel?: string;   // 搜索翻译模型（默认 claude-haiku-4-5）
+  artistName?: string;             // 项目名称，用于系统提示词（默认 "aaajiao"）
 }
 ```
 
@@ -491,6 +492,7 @@ POST /api/export/md
     includeStatus: boolean;
     includeLocation: boolean;
   };
+  artistName?: string;  // 项目名称，用于文件名和内容（默认 "aaajiao"）
 }
 ```
 
@@ -582,6 +584,68 @@ GET /api/fetch-title?url=<URL>
 - 使用 `open-graph-scraper` 库
 - 超时设置：5 秒
 - Runtime：Node.js（因库依赖）
+
+---
+
+## Profile API
+
+### 获取用户 Profile
+
+```
+GET /api/profile
+```
+
+需要认证（Bearer token）。返回当前用户的项目名称配置。
+
+**响应**
+
+```typescript
+{
+  name: string | null;
+}
+```
+
+### 更新用户 Profile
+
+```
+PUT /api/profile
+```
+
+需要认证。更新项目名称（upsert 到 `users` 表）。
+
+**请求**
+
+```typescript
+{
+  name: string | null;  // 项目/艺术家名称，null 则清除
+}
+```
+
+**响应**
+
+```typescript
+{
+  name: string | null;
+}
+```
+
+### 获取公开 Profile
+
+```
+GET /api/profile/public
+```
+
+无需认证。返回第一个用户的名称（单租户系统），用于 Login/PublicView 页面品牌展示。
+
+**响应**
+
+```typescript
+{
+  name: string | null;
+}
+```
+
+**缓存**：Cache-Control 60 秒。
 
 ---
 

@@ -13,6 +13,7 @@ import {
   type StorageStatus,
 } from '@/lib/chatStorage';
 import { useAuthContext } from '@/contexts/AuthContext';
+import { useProfile } from '@/hooks/queries/useProfile';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { MessageSquare, Trash2, ArrowUp, AlertCircle, RotateCcw } from 'lucide-react';
@@ -32,6 +33,7 @@ export default function Chat() {
     return '';
   });
   const { session, loading: authLoading } = useAuthContext();
+  const { artistName } = useProfile();
   const [storageWarning, setStorageWarning] = useState<string | null>(null);
 
   // 获取用户选择的模型（现在存储的是完整的模型 ID）
@@ -126,11 +128,12 @@ export default function Chat() {
               model: selectedModel,
               extractionModel: extractionModel || selectedModel,
               searchExpansionModel: searchExpansionModel || '',
+              artistName,
             },
           };
         },
       }),
-    [selectedModel, extractionModel, searchExpansionModel, authenticatedFetch]
+    [selectedModel, extractionModel, searchExpansionModel, artistName, authenticatedFetch]
   );
 
   const {

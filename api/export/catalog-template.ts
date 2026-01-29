@@ -52,6 +52,7 @@ export interface CatalogOptions {
   includePrice: boolean;
   includeStatus: boolean;
   date: string;               // e.g. "January 29, 2026"
+  artistName?: string;        // e.g. "aaajiao" — defaults to "aaajiao"
 }
 
 /**
@@ -333,14 +334,16 @@ body {
 
 function generateCoverPage(options: CatalogOptions, totalItems: number): string {
   const year = new Date().getFullYear();
+  const artist = options.artistName || 'aaajiao';
+  const studio = `${artist} studio`;
   return `
 <div class="page cover">
-  <div class="cover-artist">aaajiao</div>
+  <div class="cover-artist">${escapeHtml(artist)}</div>
   <div class="cover-location">${escapeHtml(options.locationName)}</div>
   <div class="cover-subtitle">Selected Works</div>
   <div class="cover-date">${escapeHtml(options.date)}</div>
   <div class="cover-footer">
-    <span class="cover-copyright">&copy; ${year} aaajiao studio</span>
+    <span class="cover-copyright">&copy; ${year} ${escapeHtml(studio)}</span>
     <span class="cover-count">${totalItems} works</span>
   </div>
 </div>`;
@@ -353,6 +356,7 @@ function generateArtworkPage(
   totalPages: number
 ): string {
   const year = new Date().getFullYear();
+  const studio = `${options.artistName || 'aaajiao'} studio`;
 
   // Build image section
   const imageSection = item.thumbnailBase64
@@ -412,7 +416,7 @@ function generateArtworkPage(
   </div>
   <div class="artwork-footer">
     <span class="footer-page">${pageNum}/${totalPages}</span>
-    <span class="footer-copyright">&copy; ${year} aaajiao studio</span>
+    <span class="footer-copyright">&copy; ${year} ${escapeHtml(studio)}</span>
   </div>
 </div>`;
 }

@@ -33,7 +33,7 @@ export function getDateString(): string {
   return new Date().toISOString().split('T')[0];
 }
 
-export function useExport() {
+export function useExport(artistName: string = 'aaajiao') {
   const [exporting, setExporting] = useState<ExportType>(null);
 
   // 导出 JSON（完整备份）
@@ -57,7 +57,7 @@ export function useExport() {
 
       downloadFile(
         JSON.stringify(data, null, 2),
-        `aaajiao-inventory-backup-${getDateString()}.json`,
+        `${artistName}-inventory-backup-${getDateString()}.json`,
         'application/json'
       );
 
@@ -102,7 +102,7 @@ export function useExport() {
 
       downloadFile(
         csvContent,
-        `aaajiao-artworks-${getDateString()}.csv`,
+        `${artistName}-artworks-${getDateString()}.csv`,
         'text/csv;charset=utf-8'
       );
 
@@ -150,7 +150,7 @@ export function useExport() {
 
       downloadFile(
         csvContent,
-        `aaajiao-editions-${getDateString()}.csv`,
+        `${artistName}-editions-${getDateString()}.csv`,
         'text/csv;charset=utf-8'
       );
 

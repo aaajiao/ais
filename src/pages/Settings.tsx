@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import ModelSettings from '@/components/settings/ModelSettings';
 import ExportSettings from '@/components/settings/ExportSettings';
+import ProfileSettings from '@/components/settings/ProfileSettings';
 import AccountSettings from '@/components/settings/AccountSettings';
 
 export default function Settings() {
@@ -15,6 +16,9 @@ export default function Settings() {
 
       {/* 数据导出 */}
       <ExportSettings />
+
+      {/* 项目信息 */}
+      <ProfileSettings />
 
       {/* 账户信息 */}
       <AccountSettings />

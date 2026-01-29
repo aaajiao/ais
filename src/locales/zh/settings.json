@@ -36,6 +36,15 @@
     "exportError": "导出失败",
     "exportHint": "建议定期导出 JSON 备份，以防数据丢失"
   },
+  "profile": {
+    "title": "项目信息",
+    "artistName": "艺术家 / 项目名称",
+    "hint": "用于 PDF 封面、导出文件名和版权信息。工作室名称将显示为「{{studioName}}」。",
+    "save": "保存",
+    "saving": "保存中...",
+    "saved": "已保存",
+    "error": "保存失败"
+  },
   "account": {
     "title": "账户",
     "notLoggedIn": "未登录",

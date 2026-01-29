@@ -9,6 +9,7 @@ import { NetworkIndicator } from '@/components/ui/NetworkIndicator';
 import { MessageSquare, Sun, Moon, Home, Package, MessageCircle, Settings } from 'lucide-react';
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher';
 import ChatSidebar from './ChatSidebar';
+import { useProfile } from '@/hooks/queries/useProfile';
 
 // 页面宽度配置
 type PageWidthConfig = {
@@ -57,6 +58,7 @@ export default function Layout() {
   const { t } = useTranslation('nav');
   const { user, signOut } = useAuthContext();
   const { resolvedTheme, toggleTheme } = useThemeContext();
+  const { artistName } = useProfile();
   const location = useLocation();
   const [chatSidebarOpen, setChatSidebarOpen] = useState(true);
 
@@ -80,7 +82,7 @@ export default function Layout() {
 
       {/* 移动端顶部工具栏 (iPhone + iPad 竖屏) */}
       <header className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-border">
-        <h1 className="text-lg font-bold tracking-tight">{t('appTitle')}</h1>
+        <h1 className="text-lg font-bold tracking-tight">{t('appTitle', { artistName })}</h1>
         <div className="flex items-center gap-2">
           <LanguageSwitcher />
           <IconButton
@@ -97,7 +99,7 @@ export default function Layout() {
       {/* 桌面端顶部导航 (iPad 横屏 + 桌面) */}
       <header className="hidden lg:flex items-center justify-between px-6 py-4 border-b border-border">
         <div className="flex items-center gap-4 xl:gap-5 2xl:gap-8">
-          <h1 className="text-xl font-bold tracking-tight">{t('appTitle')}</h1>
+          <h1 className="text-xl font-bold tracking-tight">{t('appTitle', { artistName })}</h1>
           <nav className="flex gap-3 xl:gap-4 2xl:gap-6">
             <NavLink
               to="/"

@@ -1,5 +1,5 @@
 {
-  "appTitle": "aaajiao 作品管理",
+  "appTitle": "{{artistName}} 作品管理",
   "home": "首页",
   "artworks": "作品",
   "editions": "版本",

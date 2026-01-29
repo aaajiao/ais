@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { AlertCircle, Lock, Image as ImageIcon, ArrowLeft, FileDown } from 'lucide-react';
 import type { EditionStatus } from '@/lib/types';
+import { usePublicProfile } from '@/hooks/queries/useProfile';
 
 // 公开展示项目类型
 interface PublicViewItem {
@@ -232,6 +233,7 @@ function ArtworkCard({
 export default function PublicView() {
   const { token } = useParams<{ token: string }>();
   const { t, i18n } = useTranslation('publicView');
+  const { studioName } = usePublicProfile();
 
   const [data, setData] = useState<PublicViewData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -459,7 +461,7 @@ export default function PublicView() {
       {/* 底部 */}
       <footer className="border-t border-border py-6">
         <div className="max-w-7xl mx-auto px-6 text-center text-sm text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} aaajiao studio</p>
+          <p>&copy; {new Date().getFullYear()} {studioName}</p>
         </div>
       </footer>
     </div>

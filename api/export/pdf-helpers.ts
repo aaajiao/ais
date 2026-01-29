@@ -149,10 +149,11 @@ export function buildCatalogItemFromArtworkData(
 /**
  * 生成 PDF 文件名
  */
-export function generatePDFFilename(label: string): string {
+export function generatePDFFilename(label: string, prefix?: string): string {
   const dateStr = new Date().toISOString().split('T')[0];
   const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  return `aaajiao-${slug}-${dateStr}.pdf`;
+  const p = prefix || 'aaajiao';
+  return `${p}-${slug}-${dateStr}.pdf`;
 }
 
 /**

@@ -9,6 +9,7 @@ export interface ExportRequest {
   editionIds?: string[];  // 可选：指定导出的版本 ID（仅单作品导出时有效）
   format: 'pdf' | 'md';
   options: ExportOptions;
+  artistName?: string;    // 项目/艺术家名称，默认 "aaajiao"
 }
 
 // 导出选项

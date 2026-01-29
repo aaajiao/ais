@@ -65,7 +65,8 @@ export async function handleMarkdownExport(request: ExportRequest): Promise<{
     includeStatus: false,
     includeLocation: false,
   };
-  const content = generateFullMarkdown(artworksData, options);
+  const artistName = request.artistName || 'aaajiao';
+  const content = generateFullMarkdown(artworksData, options, artistName);
 
   // 生成文件名
   const dateStr = new Date().toISOString().split('T')[0];
@@ -77,10 +78,10 @@ export async function handleMarkdownExport(request: ExportRequest): Promise<{
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
-    filename = `aaajiao-${title}-${dateStr}.md`;
+    filename = `${artistName}-${title}-${dateStr}.md`;
   } else {
     // 多个作品
-    filename = `aaajiao-artworks-${dateStr}.md`;
+    filename = `${artistName}-artworks-${dateStr}.md`;
   }
 
   return { content, filename };

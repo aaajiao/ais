@@ -36,6 +36,15 @@
     "exportError": "Export failed",
     "exportHint": "Regular JSON backups are recommended to prevent data loss"
   },
+  "profile": {
+    "title": "Project",
+    "artistName": "Artist / Project Name",
+    "hint": "Used on PDF covers, export filenames, and copyright. Studio name will be \"{{studioName}}\".",
+    "save": "Save",
+    "saving": "Saving...",
+    "saved": "Saved",
+    "error": "Failed to save"
+  },
   "account": {
     "title": "Account",
     "notLoggedIn": "Not logged in",
