@@ -1,14 +1,5 @@
 {
   "title": "Export {{count}} Artworks",
-  "selectFormat": "Select Format",
-  "pdf": {
-    "name": "PDF",
-    "description": "With images, printable"
-  },
-  "markdown": {
-    "name": "Markdown",
-    "description": "With image links, editable"
-  },
   "selectEditions": "Select Editions",
   "allEditions": "All Editions",
   "selectedEditions": "Select Specific Editions",

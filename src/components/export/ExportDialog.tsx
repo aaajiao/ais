@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, FileText, FileType } from 'lucide-react';
+import { X, FileText } from 'lucide-react';
 import type { ExportRequest, ExportOptions } from '@/lib/exporters';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -15,8 +15,6 @@ interface ExportDialogProps {
   editionTotal?: number | null;  // 作品的版数（用于格式化版本编号）
 }
 
-type ExportFormat = 'pdf' | 'md';
-
 export default function ExportDialog({
   isOpen,
   onClose,
@@ -27,7 +25,6 @@ export default function ExportDialog({
   const { t } = useTranslation('export');
   const { t: tCommon } = useTranslation('common');
   const { session } = useAuthContext();
-  const [format, setFormat] = useState<ExportFormat>('pdf');
   const [options, setOptions] = useState<ExportOptions>({
     includePrice: false,
     includeStatus: false,
@@ -75,11 +72,11 @@ export default function ExportDialog({
         // 仅在单作品且选择特定版本时传递 editionIds
         editionIds:
           isSingleArtwork && editionMode === 'selected' ? selectedEditionIds : undefined,
-        format,
+        format: 'md',
         options,
       };
 
-      const response = await fetch(`/api/export/${format}`, {
+      const response = await fetch('/api/export/md', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -102,7 +99,7 @@ export default function ExportDialog({
 
       // 获取文件名
       const contentDisposition = response.headers.get('Content-Disposition');
-      let filename = `export.${format}`;
+      let filename = 'export.md';
       if (contentDisposition) {
         const match = contentDisposition.match(/filename="(.+)"/);
         if (match) {
@@ -132,9 +129,12 @@ export default function ExportDialog({
       <div className="bg-card border border-border rounded-xl w-full max-w-md shadow-xl max-h-[85dvh] overflow-y-auto">
         {/* 头部 */}
         <div className="flex items-center justify-between p-4 border-b border-border">
-          <h2 className="text-lg font-semibold">
-            {t('title', { count: artworkCount })}
-          </h2>
+          <div className="flex items-center gap-2">
+            <FileText className="w-5 h-5 text-muted-foreground" />
+            <h2 className="text-lg font-semibold">
+              {t('title', { count: artworkCount })}
+            </h2>
+          </div>
           <IconButton
             variant="ghost"
             size="sm"
@@ -147,60 +147,6 @@ export default function ExportDialog({
 
         {/* 内容 */}
         <div className="p-4 space-y-6">
-          {/* 格式选择 */}
-          <div>
-            <label className="block text-sm font-medium mb-3">{t('selectFormat')}</label>
-            <div className="space-y-2">
-              <label
-                className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
-                  format === 'pdf'
-                    ? 'bg-primary/10 border border-primary/30'
-                    : 'hover:bg-muted border border-transparent'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="format"
-                  value="pdf"
-                  checked={format === 'pdf'}
-                  onChange={() => setFormat('pdf')}
-                  className="w-4 h-4 accent-primary"
-                />
-                <FileType className="w-5 h-5 text-red-500" />
-                <div>
-                  <span className="font-medium">{t('pdf.name')}</span>
-                  <span className="text-sm text-muted-foreground ml-2">
-                    {t('pdf.description')}
-                  </span>
-                </div>
-              </label>
-
-              <label
-                className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
-                  format === 'md'
-                    ? 'bg-primary/10 border border-primary/30'
-                    : 'hover:bg-muted border border-transparent'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="format"
-                  value="md"
-                  checked={format === 'md'}
-                  onChange={() => setFormat('md')}
-                  className="w-4 h-4 accent-primary"
-                />
-                <FileText className="w-5 h-5 text-blue-500" />
-                <div>
-                  <span className="font-medium">{t('markdown.name')}</span>
-                  <span className="text-sm text-muted-foreground ml-2">
-                    {t('markdown.description')}
-                  </span>
-                </div>
-              </label>
-            </div>
-          </div>
-
           {/* 版本选择（仅单作品导出时显示） */}
           {isSingleArtwork && (
             <div>

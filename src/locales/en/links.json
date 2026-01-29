@@ -43,5 +43,18 @@
   "deleteConfirm": "Are you sure you want to delete the link for \"{{name}}\"? This action cannot be undone.",
   "deleteSuccess": "Link deleted",
   "deleteError": "Failed to delete link",
-  "createdAt": "Created {{date}}"
+  "createdAt": "Created {{date}}",
+  "generatePDF": "PDF",
+  "catalog": {
+    "title": "Generate PDF Catalog",
+    "loadError": "Failed to load artworks",
+    "noItems": "No artworks at this location",
+    "selectAll": "Select All",
+    "deselectAll": "Deselect All",
+    "includePrice": "Include price information",
+    "includeStatus": "Include edition status",
+    "generate": "Generate PDF",
+    "generating": "Generating...",
+    "generateError": "Failed to generate PDF"
+  }
 }

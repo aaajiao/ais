@@ -22,6 +22,9 @@
     "lost": "遗失",
     "damaged": "损坏"
   },
+  "downloadPDF": "下载 PDF",
+  "downloadingPDF": "生成中...",
+  "downloadPDFError": "PDF 生成失败",
   "errors": {
     "invalidToken": "无效的链接",
     "loadFailed": "加载失败",

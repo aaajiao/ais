@@ -24,6 +24,10 @@ api/__tests__/
 ├── image-downloader.test.ts  # 图片选择逻辑
 └── artwork-extractor.test.ts # HTML 解析、图片提取
 
+api/export/__tests__/
+├── catalog-template.test.ts  # PDF catalog HTML 模板生成
+└── pdf-helpers.test.ts       # PDF 辅助函数（版本标签、数据构建）
+
 api/tools/__tests__/
 └── tool-schemas.test.ts      # AI 工具参数验证
 
@@ -69,7 +73,7 @@ src/test/
 
 ---
 
-## 测试覆盖率（572 个测试）
+## 测试覆盖率（650 个测试）
 
 | 模块 | 测试数 | 覆盖内容 |
 |------|--------|----------|
@@ -94,6 +98,8 @@ src/test/
 | `paginationUtils` | 11 | 游标编码/解码、错误处理 |
 | `import/types` | 10 | 作品 UID 生成 |
 | `useModelSettings` | 9 | 模型 ID 格式化显示 |
+| `catalog-template` | 41 | PDF HTML 模板生成、转义、分页 |
+| `pdf-helpers` | 37 | 版本标签格式化、CatalogItem 构建、文件名 |
 | `utils` | 8 | Tailwind 类名合并 |
 
 ---

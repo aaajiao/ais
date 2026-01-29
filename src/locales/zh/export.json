@@ -1,14 +1,5 @@
 {
   "title": "导出 {{count}} 件作品",
-  "selectFormat": "选择格式",
-  "pdf": {
-    "name": "PDF",
-    "description": "带图，可打印"
-  },
-  "markdown": {
-    "name": "Markdown",
-    "description": "带图链接，可编辑"
-  },
   "selectEditions": "选择版本",
   "allEditions": "全部版本",
   "selectedEditions": "选择特定版本",

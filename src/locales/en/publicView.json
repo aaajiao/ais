@@ -22,6 +22,9 @@
     "lost": "Lost",
     "damaged": "Damaged"
   },
+  "downloadPDF": "Download PDF",
+  "downloadingPDF": "Generating...",
+  "downloadPDFError": "Failed to generate PDF",
   "errors": {
     "invalidToken": "Invalid link",
     "loadFailed": "Failed to load",

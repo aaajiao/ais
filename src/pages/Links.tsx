@@ -21,8 +21,10 @@ import {
   EyeOff,
   ToggleLeft,
   ToggleRight,
+  FileDown,
   X,
 } from 'lucide-react';
+import CatalogDialog from '@/components/export/CatalogDialog';
 
 // 格式化相对时间
 function formatRelativeTime(dateString: string | null, t: (key: string, options?: Record<string, unknown>) => string): string {
@@ -50,6 +52,7 @@ function LinkCard({
   onToggleShowPrices,
   onDelete,
   onPreview,
+  onGeneratePDF,
 }: {
   link: Link;
   onCopy: () => void;
@@ -58,6 +61,7 @@ function LinkCard({
   onToggleShowPrices: () => void;
   onDelete: () => void;
   onPreview: () => void;
+  onGeneratePDF: () => void;
 }) {
   const { t } = useTranslation('links');
   const isActive = link.status === 'active';
@@ -76,6 +80,14 @@ function LinkCard({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <IconButton
+            variant="ghost"
+            size="sm"
+            label={t('generatePDF')}
+            onClick={onGeneratePDF}
+          >
+            <FileDown />
+          </IconButton>
           <IconButton
             variant="ghost"
             size="sm"
@@ -285,6 +297,7 @@ export default function Links() {
   } = useLinks();
 
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [catalogLink, setCatalogLink] = useState<Link | null>(null);
 
   // 复制链接
   const handleCopy = useCallback(
@@ -430,6 +443,7 @@ export default function Links() {
               onToggleShowPrices={() => handleToggleShowPrices(link)}
               onDelete={() => handleDelete(link)}
               onPreview={() => handlePreview(link.token)}
+              onGeneratePDF={() => setCatalogLink(link)}
             />
           ))}
         </div>
@@ -441,6 +455,15 @@ export default function Links() {
         onClose={() => setShowCreateDialog(false)}
         onCreated={refetch}
       />
+
+      {/* PDF Catalog 对话框 */}
+      {catalogLink && (
+        <CatalogDialog
+          isOpen={!!catalogLink}
+          onClose={() => setCatalogLink(null)}
+          link={catalogLink}
+        />
+      )}
     </div>
   );
 }

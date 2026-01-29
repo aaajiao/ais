@@ -340,7 +340,7 @@ AI: [调用 search_history { action: "sold", after: "2025-01-01", before: "2025-
 
 ### export_artworks
 
-导出作品为 PDF 或 Markdown。
+导出作品为 Markdown。PDF 导出已移至 Links 页面的 CatalogDialog。
 
 **参数**
 
@@ -419,18 +419,48 @@ AI: 已创建作品「Guard, I...」，已获取缩略图
 
 ## 导出 API
 
-### PDF 导出
+### PDF Catalog 导出
 
 ```
 POST /api/export/pdf
 ```
 
-**请求**
+使用 Puppeteer + @sparticuz/chromium-min 渲染 HTML → PDF。支持三种入口：
+
+**入口 1: 公开下载（从 Public View 页面）**
+
+```typescript
+{
+  source: 'link';
+  token: string;  // gallery_links token
+}
+```
+
+无需认证，跟随 Link 的 `show_prices` 设置。
+
+**入口 2: 管理端导出（从 Links 页面 CatalogDialog）**
+
+```typescript
+{
+  source: 'catalog';
+  locationName: string;
+  editionIds?: string[];  // 可选，不传则导出全部
+  options: {
+    includePrice: boolean;
+    includeStatus: boolean;
+  };
+}
+```
+
+需要认证（Bearer token）。
+
+**入口 3: Legacy 兼容（artwork-based）**
 
 ```typescript
 {
   scope: 'all' | 'single' | 'selected';
   artworkIds?: string[];
+  format: 'pdf';
   options: {
     includePrice: boolean;
     includeStatus: boolean;
@@ -439,9 +469,11 @@ POST /api/export/pdf
 }
 ```
 
+需要认证。保留向后兼容。
+
 **响应**
 
-`application/pdf` 文件流
+`application/pdf` 文件流，Content-Disposition 包含文件名。
 
 ### Markdown 导出
 
@@ -449,7 +481,20 @@ POST /api/export/pdf
 POST /api/export/md
 ```
 
-参数同上，返回 `text/markdown` 文件流。
+```typescript
+{
+  scope: 'all' | 'single' | 'selected';
+  artworkIds?: string[];
+  format: 'md';
+  options: {
+    includePrice: boolean;
+    includeStatus: boolean;
+    includeLocation: boolean;
+  };
+}
+```
+
+返回 `text/markdown` 文件流。
 
 ---
 

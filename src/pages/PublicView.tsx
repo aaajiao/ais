@@ -8,7 +8,7 @@ import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
-import { AlertCircle, Lock, Image as ImageIcon, ArrowLeft } from 'lucide-react';
+import { AlertCircle, Lock, Image as ImageIcon, ArrowLeft, FileDown } from 'lucide-react';
 import type { EditionStatus } from '@/lib/types';
 
 // 公开展示项目类型
@@ -236,6 +236,7 @@ export default function PublicView() {
   const [data, setData] = useState<PublicViewData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<{ type: string; message: string } | null>(null);
+  const [downloadingPDF, setDownloadingPDF] = useState(false);
 
   // 检测是否从应用内部跳转（管理员预览场景）
   // 只有从同源页面跳转过来时才显示返回按钮
@@ -272,6 +273,44 @@ export default function PublicView() {
       window.history.back();
     } else {
       window.location.href = '/';
+    }
+  };
+
+  // PDF 下载
+  const handleDownloadPDF = async () => {
+    if (!token || downloadingPDF) return;
+
+    setDownloadingPDF(true);
+    try {
+      const response = await fetch('/api/export/pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: 'link', token }),
+      });
+
+      if (!response.ok) {
+        throw new Error(t('downloadPDFError'));
+      }
+
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = 'catalog.pdf';
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="(.+)"/);
+        if (match) filename = match[1];
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('PDF download failed:', err);
+      alert(t('downloadPDFError'));
+    } finally {
+      setDownloadingPDF(false);
     }
   };
 
@@ -376,8 +415,17 @@ export default function PublicView() {
         </div>
       </header>
 
-      {/* 语言切换 */}
-      <div className="max-w-7xl mx-auto px-6 py-4 flex justify-end">
+      {/* 工具栏：语言切换 + PDF 下载 */}
+      <div className="max-w-7xl mx-auto px-6 py-4 flex justify-end gap-2">
+        <Button
+          variant="ghost"
+          size="small"
+          onClick={handleDownloadPDF}
+          disabled={downloadingPDF || data.items.length === 0}
+        >
+          <FileDown className="w-4 h-4" />
+          {downloadingPDF ? t('downloadingPDF') : t('downloadPDF')}
+        </Button>
         <Button
           variant="ghost"
           size="small"

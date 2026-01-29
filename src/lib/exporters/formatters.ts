@@ -4,8 +4,6 @@ import type { ArtworkExportData, ExportOptions } from './index.js';
 import {
   formatEditionInfo,
   formatPrice,
-  formatStatusStats,
-  getLocationNames,
   formatEditionLines,
 } from './index.js';
 
@@ -134,79 +132,3 @@ export function generateFullMarkdown(
   return lines.join('\n');
 }
 
-// PDF 文本数据结构
-export interface PDFArtworkData {
-  titleEn: string;
-  titleCn?: string;
-  year?: string;
-  type?: string;
-  materials?: string;
-  dimensions?: string;
-  duration?: string;
-  editionInfo: string;
-  thumbnailUrl?: string;
-  sourceUrl?: string;
-  // 可选字段（旧版汇总格式，保留向后兼容）
-  price?: string;
-  status?: string;
-  location?: string;
-  // 新版版本明细行
-  editionLines?: string[];
-}
-
-// 准备 PDF 导出数据
-export function preparePDFData(
-  data: ArtworkExportData,
-  options: ExportOptions
-): PDFArtworkData {
-  const { artwork, stats, priceInfo, editions, locations } = data;
-
-  const pdfData: PDFArtworkData = {
-    titleEn: artwork.title_en,
-    titleCn: artwork.title_cn || undefined,
-    year: artwork.year || undefined,
-    type: artwork.type || undefined,
-    materials: artwork.materials || undefined,
-    dimensions: artwork.dimensions || undefined,
-    duration: artwork.duration || undefined,
-    editionInfo: formatEditionInfo(artwork),
-    thumbnailUrl: artwork.thumbnail_url || undefined,
-    sourceUrl: artwork.source_url || undefined,
-  };
-
-  // 版本明细（如果有任何可选信息启用且有版本）
-  if ((options.includeStatus || options.includeLocation || options.includePrice) && editions.length > 0) {
-    pdfData.editionLines = formatEditionLines(editions, artwork, locations, options, 'en');
-  } else {
-    // 无版本时的简化显示（保持旧格式向后兼容）
-    // 可选：价格
-    if (options.includePrice) {
-      if (priceInfo) {
-        pdfData.price = formatPrice(priceInfo.price, priceInfo.currency);
-      } else {
-        pdfData.price = 'Price on request';
-      }
-    }
-
-    // 可选：状态
-    if (options.includeStatus) {
-      if (stats.total > 0) {
-        pdfData.status = formatStatusStats(stats, 'en');
-      } else {
-        pdfData.status = 'No editions';
-      }
-    }
-
-    // 可选：位置
-    if (options.includeLocation) {
-      const locationNames = getLocationNames(editions, locations);
-      if (locationNames.length > 0) {
-        pdfData.location = locationNames.join(', ');
-      } else {
-        pdfData.location = '-';
-      }
-    }
-  }
-
-  return pdfData;
-}

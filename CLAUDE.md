@@ -29,7 +29,7 @@ api/                    # Serverless API
 ├── lib/               # 工具函数（auth, search-utils, artwork-extractor, image-downloader, model-provider, system-prompt）
 ├── tools/             # AI 工具（9 个工具 + types + index）
 ├── import/            # 导入 API（md, migrate-thumbnails, process-image）
-├── export/            # 导出 API（pdf, md, shared）
+├── export/            # 导出 API（pdf, catalog-template, md, shared）
 ├── links/             # 公开链接 API
 └── view/              # 公开查看 API
 src/
@@ -41,7 +41,7 @@ src/
 │   ├── settings/      # 设置（ModelSettings, ExportSettings, AccountSettings, useModelSettings, useExport）
 │   ├── chat/          # 聊天（MessageBubble, EditableConfirmCard, ConfirmDialog, CollapsibleChatHistory）
 │   ├── import/        # 导入（MDImport, UploadStep, PreviewStep, ResultStep, ThumbnailMigration）
-│   ├── export/        # 导出（ExportDialog, EditionSelector）
+│   ├── export/        # 导出（ExportDialog, CatalogDialog, EditionSelector）
 │   ├── locations/     # 位置（LocationItem）
 │   ├── pwa/           # PWA（ReloadPrompt）
 │   └── ui/            # 基础 UI 组件

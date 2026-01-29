@@ -43,5 +43,18 @@
   "deleteConfirm": "确定要删除「{{name}}」的链接吗？此操作无法撤销。",
   "deleteSuccess": "链接已删除",
   "deleteError": "删除链接失败",
-  "createdAt": "创建于{{date}}"
+  "createdAt": "创建于{{date}}",
+  "generatePDF": "PDF",
+  "catalog": {
+    "title": "生成 PDF 目录",
+    "loadError": "加载作品失败",
+    "noItems": "该位置暂无作品",
+    "selectAll": "全选",
+    "deselectAll": "取消全选",
+    "includePrice": "包含价格信息",
+    "includeStatus": "包含版本状态",
+    "generate": "生成 PDF",
+    "generating": "生成中...",
+    "generateError": "生成 PDF 失败"
+  }
 }
