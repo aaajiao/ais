@@ -7,6 +7,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { createT, type Locale } from '../lib/i18n.js';
 
 // 使用 Edge Runtime
 export const config = {
@@ -49,10 +50,12 @@ function handleOptions() {
 
 async function handleGet(request: Request) {
   const supabase = getSupabase();
+  const url = new URL(request.url);
+  const locale = (url.searchParams.get('lang') as Locale) || 'zh';
+  const t = createT(locale);
 
   try {
     // 从 URL 中提取 token
-    const url = new URL(request.url);
     const pathParts = url.pathname.split('/');
     const token = pathParts[pathParts.length - 1];
 
@@ -72,7 +75,7 @@ async function handleGet(request: Request) {
 
     if (linkError || !link) {
       return new Response(
-        JSON.stringify({ error: 'invalid', message: '链接无效或已过期' }),
+        JSON.stringify({ error: 'invalid', message: t('view.invalidLink') }),
         { status: 404, headers: { 'Content-Type': 'application/json' } }
       );
     }
@@ -80,7 +83,7 @@ async function handleGet(request: Request) {
     // 检查链接状态
     if (link.status === 'disabled') {
       return new Response(
-        JSON.stringify({ error: 'disabled', message: '此链接已被禁用' }),
+        JSON.stringify({ error: 'disabled', message: t('view.linkDisabled') }),
         { status: 403, headers: { 'Content-Type': 'application/json' } }
       );
     }
@@ -94,7 +97,7 @@ async function handleGet(request: Request) {
 
     if (locationError || !location) {
       return new Response(
-        JSON.stringify({ error: 'location_not_found', message: '关联的位置不存在' }),
+        JSON.stringify({ error: 'location_not_found', message: t('view.locationNotFound') }),
         { status: 404, headers: { 'Content-Type': 'application/json' } }
       );
     }

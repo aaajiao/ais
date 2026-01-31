@@ -1,11 +1,13 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import type { ToolContext } from './types.js';
+import { createT } from '../lib/i18n.js';
 
 /**
  * 创建生成更新确认卡片工具
  */
 export function createUpdateConfirmationTool(ctx: ToolContext) {
+  const t = createT(ctx.locale);
   return tool({
     description: '生成版本更新的确认卡片，用户必须确认后才能执行更新',
     inputSchema: z.object({
@@ -43,7 +45,7 @@ export function createUpdateConfirmationTool(ctx: ToolContext) {
         .single();
 
       if (error || !edition) {
-        return { error: '找不到该版本' };
+        return { error: t('update.editionNotFound') };
       }
 
       // 返回确认卡片数据

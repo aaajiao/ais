@@ -1,11 +1,13 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import type { ToolContext } from './types.js';
+import { createT } from '../lib/i18n.js';
 
 /**
  * 创建获取统计信息工具
  */
 export function createGetStatisticsTool(ctx: ToolContext) {
+  const t = createT(ctx.locale);
   return tool({
     description: '获取库存统计信息',
     inputSchema: z.object({
@@ -27,7 +29,7 @@ export function createGetStatisticsTool(ctx: ToolContext) {
             total_artworks: 0,
             total_editions: 0,
             status_breakdown: {},
-            message: '数据库中还没有任何作品或版本数据。这是一个空的库存系统，请先添加一些作品数据。'
+            message: t('stats.empty')
           };
         }
 
@@ -61,7 +63,8 @@ export function createGetStatisticsTool(ctx: ToolContext) {
           // Supabase 返回的 locations 可能是对象或数组
           const loc = e.locations as { name: string } | { name: string }[] | null;
           const name = Array.isArray(loc) ? loc[0]?.name : loc?.name;
-          locationCounts[name || '未知'] = (locationCounts[name || '未知'] || 0) + 1;
+          const unknown = t('stats.unknownLocation');
+          locationCounts[name || unknown] = (locationCounts[name || unknown] || 0) + 1;
         });
         return { by_location: locationCounts };
       }

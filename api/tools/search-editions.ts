@@ -2,11 +2,13 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import type { ToolContext } from './types.js';
 import { sanitizeSearchTerm } from '../lib/search-utils.js';
+import { createT } from '../lib/i18n.js';
 
 /**
  * 创建搜索版本工具
  */
 export function createSearchEditionsTool(ctx: ToolContext) {
+  const t = createT(ctx.locale);
   return tool({
     description: '搜索版本，可以按作品名称、状态、位置、版本类型、品相、买家、价格等搜索',
     inputSchema: z.object({
@@ -116,8 +118,8 @@ export function createSearchEditionsTool(ctx: ToolContext) {
         return {
           editions: [],
           message: searchTerms
-            ? `没有找到符合条件的版本（搜索：${searchTerms}）。数据库中可能还没有相关数据。`
-            : '数据库中还没有任何版本数据。请先添加一些作品和版本。'
+            ? t('editions.noResultsWithTerms', { terms: searchTerms })
+            : t('editions.noResultsEmpty')
         };
       }
 
@@ -130,14 +132,14 @@ export function createSearchEditionsTool(ctx: ToolContext) {
       if (result.error) {
         return {
           type: 'content' as const,
-          value: [{ type: 'text' as const, text: `搜索出错: ${result.error}` }],
+          value: [{ type: 'text' as const, text: t('search.error', { error: result.error }) }],
         };
       }
 
       if (!result.editions || result.editions.length === 0) {
         return {
           type: 'content' as const,
-          value: [{ type: 'text' as const, text: result.message || '没有找到符合条件的版本' }],
+          value: [{ type: 'text' as const, text: result.message || t('editions.noMatch') }],
         };
       }
 
@@ -146,7 +148,7 @@ export function createSearchEditionsTool(ctx: ToolContext) {
         type: 'content' as const,
         value: [{
           type: 'text' as const,
-          text: `找到 ${result.editions.length} 个符合条件的版本，结果已显示在界面上供用户查看和点击。`
+          text: t('editions.found', { count: result.editions.length })
         }],
       };
     },

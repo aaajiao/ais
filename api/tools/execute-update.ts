@@ -1,11 +1,13 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import type { ToolContext } from './types.js';
+import { createT } from '../lib/i18n.js';
 
 /**
  * 创建执行版本更新工具
  */
 export function createExecuteUpdateTool(ctx: ToolContext) {
+  const t = createT(ctx.locale);
   return tool({
     description: '执行版本更新（仅在用户确认后调用）',
     inputSchema: z.object({
@@ -32,7 +34,7 @@ export function createExecuteUpdateTool(ctx: ToolContext) {
       const { supabase } = ctx;
 
       if (!confirmed) {
-        return { error: '用户未确认，操作取消' };
+        return { error: t('update.notConfirmed') };
       }
 
       // 获取原始数据用于历史记录
@@ -115,7 +117,7 @@ export function createExecuteUpdateTool(ctx: ToolContext) {
 
       return {
         success: true,
-        message: '更新成功',
+        message: t('update.success'),
         edition: data,
       };
     },

@@ -2,11 +2,13 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import type { ToolContext } from './types.js';
 import { sanitizeSearchTerm, expandSearchQuery } from '../lib/search-utils.js';
+import { createT } from '../lib/i18n.js';
 
 /**
  * 创建搜索作品工具
  */
 export function createSearchArtworksTool(ctx: ToolContext) {
+  const t = createT(ctx.locale);
   return tool({
     description: '搜索艺术作品，可以按标题、年份、类型、材料搜索。支持中英文搜索，系统会自动翻译和扩展搜索词',
     inputSchema: z.object({
@@ -56,8 +58,8 @@ export function createSearchArtworksTool(ctx: ToolContext) {
         return {
           artworks: [],
           message: query
-            ? `没有找到与「${query}」相关的作品。数据库中可能还没有添加作品数据。`
-            : '数据库中还没有任何作品数据。请先添加一些作品。'
+            ? t('search.noResultsWithQuery', { query })
+            : t('search.noResultsEmpty')
         };
       }
 
@@ -70,14 +72,14 @@ export function createSearchArtworksTool(ctx: ToolContext) {
       if (result.error) {
         return {
           type: 'content' as const,
-          value: [{ type: 'text' as const, text: `搜索出错: ${result.error}` }],
+          value: [{ type: 'text' as const, text: t('search.error', { error: result.error }) }],
         };
       }
 
       if (!result.artworks || result.artworks.length === 0) {
         return {
           type: 'content' as const,
-          value: [{ type: 'text' as const, text: result.message || '没有找到相关作品' }],
+          value: [{ type: 'text' as const, text: result.message || t('search.noArtworksFound') }],
         };
       }
 
@@ -86,7 +88,7 @@ export function createSearchArtworksTool(ctx: ToolContext) {
         type: 'content' as const,
         value: [{
           type: 'text' as const,
-          text: `找到 ${result.artworks.length} 件相关作品，结果已显示在界面上供用户查看和点击。`
+          text: t('search.artworksFound', { count: result.artworks.length })
         }],
       };
     },

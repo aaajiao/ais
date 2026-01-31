@@ -99,12 +99,12 @@
     "supportedFields": "Supported fields:",
     "updateRules": "Incremental update rules:",
     "fieldMapping": {
-      "year": "年份 → year",
-      "type": "类型 → type",
-      "dimensions": "尺寸 → dimensions",
-      "materials": "材料 → materials",
-      "duration": "时长 → duration",
-      "link": "链接 → source_url"
+      "year": "Year → year",
+      "type": "Type → type",
+      "dimensions": "Dimensions → dimensions",
+      "materials": "Materials → materials",
+      "duration": "Duration → duration",
+      "link": "Link → source_url"
     },
     "rules": {
       "matchByLinkOrTitle": "Match existing artworks by \"link\" or \"title\"",

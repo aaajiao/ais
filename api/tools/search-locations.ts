@@ -2,11 +2,13 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import type { ToolContext } from './types.js';
 import { sanitizeSearchTerm } from '../lib/search-utils.js';
+import { createT } from '../lib/i18n.js';
 
 /**
  * 创建搜索位置工具
  */
 export function createSearchLocationsTool(ctx: ToolContext) {
+  const t = createT(ctx.locale);
   return tool({
     description: '搜索位置/画廊，可以按名称、城市、类型、国家搜索',
     inputSchema: z.object({
@@ -46,14 +48,14 @@ export function createSearchLocationsTool(ctx: ToolContext) {
       if (result.error) {
         return {
           type: 'content' as const,
-          value: [{ type: 'text' as const, text: `搜索出错: ${result.error}` }],
+          value: [{ type: 'text' as const, text: t('search.error', { error: result.error }) }],
         };
       }
 
       if (!result.locations || result.locations.length === 0) {
         return {
           type: 'content' as const,
-          value: [{ type: 'text' as const, text: '没有找到相关位置' }],
+          value: [{ type: 'text' as const, text: t('locations.noMatch') }],
         };
       }
 
@@ -62,7 +64,7 @@ export function createSearchLocationsTool(ctx: ToolContext) {
         type: 'content' as const,
         value: [{
           type: 'text' as const,
-          text: `找到 ${result.locations.length} 个相关位置，结果已显示在界面上。`
+          text: t('locations.found', { count: result.locations.length })
         }],
       };
     },

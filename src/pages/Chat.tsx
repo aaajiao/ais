@@ -129,11 +129,12 @@ export default function Chat() {
               extractionModel: extractionModel || selectedModel,
               searchExpansionModel: searchExpansionModel || '',
               artistName,
+              locale: i18n.language,
             },
           };
         },
       }),
-    [selectedModel, extractionModel, searchExpansionModel, artistName, authenticatedFetch]
+    [selectedModel, extractionModel, searchExpansionModel, artistName, authenticatedFetch, i18n.language]
   );
 
   const {

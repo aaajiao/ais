@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Locale } from '../lib/i18n.js';
 
 /**
  * 工具执行上下文
@@ -11,4 +12,6 @@ export interface ToolContext {
   searchExpansionModel?: string;
   /** URL 导入内容提取使用的模型 ID */
   extractionModel?: string;
+  /** 用户语言偏好 */
+  locale: Locale;
 }

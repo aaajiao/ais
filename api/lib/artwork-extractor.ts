@@ -6,6 +6,7 @@ import { generateObject } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
+import { createT, type Locale } from './i18n.js';
 
 // 默认提取模型（使用别名）
 const DEFAULT_EXTRACTION_MODEL = 'claude-sonnet-4-5';
@@ -152,7 +153,7 @@ async function fetchPage(url: string): Promise<string> {
   } catch (error) {
     clearTimeout(timeoutId);
     if ((error as Error).name === 'AbortError') {
-      throw new Error('请求超时，请稍后重试');
+      throw new Error('TIMEOUT');
     }
     throw error;
   }
@@ -163,7 +164,8 @@ async function fetchPage(url: string): Promise<string> {
  * @param url - 要提取的网页 URL
  * @param modelId - 可选的模型 ID，支持 Anthropic (claude-*) 和 OpenAI (gpt-*, o1, o3, o4) 模型
  */
-export async function extractArtworkFromUrl(url: string, modelId?: string): Promise<ExtractionResult> {
+export async function extractArtworkFromUrl(url: string, modelId?: string, locale?: Locale): Promise<ExtractionResult> {
+  const t = createT(locale);
   try {
     // 1. 抓取页面
     const html = await fetchPage(url);
@@ -203,7 +205,7 @@ ${cleanedHtml}`,
       return {
         success: false,
         images,
-        error: '无法从页面提取作品标题，请检查 URL 是否正确',
+        error: t('extractor.noTitle'),
       };
     }
 
@@ -213,11 +215,12 @@ ${cleanedHtml}`,
       images,
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : '未知错误';
+    const message = error instanceof Error ? error.message : t('extractor.unknownError');
+    const errorText = message === 'TIMEOUT' ? t('extractor.timeout') : t('extractor.failed', { error: message });
     return {
       success: false,
       images: [],
-      error: `提取失败: ${message}`,
+      error: errorText,
     };
   }
 }

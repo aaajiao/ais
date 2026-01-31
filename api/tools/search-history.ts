@@ -2,11 +2,13 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import type { ToolContext } from './types.js';
 import { sanitizeSearchTerm } from '../lib/search-utils.js';
+import { createT } from '../lib/i18n.js';
 
 /**
  * 创建搜索历史记录工具
  */
 export function createSearchHistoryTool(ctx: ToolContext) {
+  const t = createT(ctx.locale);
   return tool({
     description: '查询版本变更历史，可用于了解销售记录、状态变更等',
     inputSchema: z.object({
@@ -62,13 +64,13 @@ export function createSearchHistoryTool(ctx: ToolContext) {
           } else {
             return {
               history: [],
-              message: `没有找到作品「${artwork_title}」的版本历史记录`,
+              message: t('history.noEditionHistory', { title: artwork_title }),
             };
           }
         } else {
           return {
             history: [],
-            message: `没有找到名为「${artwork_title}」的作品`,
+            message: t('history.noArtworkFound', { title: artwork_title }),
           };
         }
       }
@@ -96,7 +98,7 @@ export function createSearchHistoryTool(ctx: ToolContext) {
       if (!data || data.length === 0) {
         return {
           history: [],
-          message: '没有找到匹配的历史记录',
+          message: t('history.noMatch'),
         };
       }
 

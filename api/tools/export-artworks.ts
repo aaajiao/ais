@@ -2,11 +2,13 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import type { ToolContext } from './types.js';
 import { sanitizeSearchTerm } from '../lib/search-utils.js';
+import { createT } from '../lib/i18n.js';
 
 /**
  * 创建导出作品工具
  */
 export function createExportArtworksTool(ctx: ToolContext) {
+  const t = createT(ctx.locale);
   return tool({
     description: '导出作品为 PDF 或 Markdown 格式',
     inputSchema: z.object({
@@ -38,7 +40,7 @@ export function createExportArtworksTool(ctx: ToolContext) {
         }
 
         if (!artworks || artworks.length === 0) {
-          return { error: `找不到名为「${artwork_title}」的作品` };
+          return { error: t('export.artworkNotFound', { title: artwork_title }) };
         }
 
         // 如果只有一个匹配，直接使用
@@ -49,7 +51,7 @@ export function createExportArtworksTool(ctx: ToolContext) {
           return {
             type: 'multiple_matches',
             matches: artworks.map(a => ({ id: a.id, title: a.title_en })),
-            message: `找到 ${artworks.length} 个匹配的作品，请指定具体的作品名称或使用作品 ID`,
+            message: t('export.multipleMatches', { count: artworks.length }),
           };
         }
       }
@@ -76,7 +78,7 @@ export function createExportArtworksTool(ctx: ToolContext) {
         scope,
         artworkCount: finalArtworkIds.length || '全部',
         exportRequest,
-        message: `已准备好 ${format.toUpperCase()} 导出，点击下方按钮下载`,
+        message: t('export.ready', { format: format.toUpperCase() }),
       };
     },
   });

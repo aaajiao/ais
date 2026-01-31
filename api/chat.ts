@@ -23,7 +23,7 @@ export default async function handler(req: Request) {
     }
 
     const body = await req.json();
-    const { messages: uiMessages, model = 'claude-sonnet-4-5', extractionModel, searchExpansionModel, artistName } = body;
+    const { messages: uiMessages, model = 'claude-sonnet-4-5', extractionModel, searchExpansionModel, artistName, locale = 'zh' } = body;
 
     // 2. 安全日志（不记录敏感消息内容）
     const requestSize = JSON.stringify(uiMessages || []).length;
@@ -44,6 +44,7 @@ export default async function handler(req: Request) {
       supabase,
       extractionModel,
       searchExpansionModel,
+      locale,
     });
 
     // 4. 准备消息：使用 pruneMessages 清理工具调用 + 截断超限消息

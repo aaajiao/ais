@@ -3,11 +3,13 @@ import { z } from 'zod';
 import type { ToolContext } from './types.js';
 import { extractArtworkFromUrl } from '../lib/artwork-extractor.js';
 import { selectBestImage } from '../lib/image-downloader.js';
+import { createT } from '../lib/i18n.js';
 
 /**
  * 创建从 URL 导入作品工具
  */
 export function createImportFromUrlTool(ctx: ToolContext) {
+  const t = createT(ctx.locale);
   return tool({
     description: '从网页 URL 抓取作品信息并自动创建作品。会自动提取标题、年份、类型、尺寸、材料等信息，并获取缩略图 URL。',
     inputSchema: z.object({
@@ -19,11 +21,11 @@ export function createImportFromUrlTool(ctx: ToolContext) {
       console.log('[import_artwork_from_url] Starting import:', url, 'model:', extractionModel || 'default');
 
       // 1. 抓取并解析网页（使用配置的提取模型）
-      const extractResult = await extractArtworkFromUrl(url, extractionModel);
+      const extractResult = await extractArtworkFromUrl(url, extractionModel, ctx.locale);
 
       if (!extractResult.success || !extractResult.artwork) {
         return {
-          error: extractResult.error || '无法从页面提取作品信息',
+          error: extractResult.error || t('import.extractFailed'),
         };
       }
 
@@ -88,7 +90,7 @@ export function createImportFromUrlTool(ctx: ToolContext) {
           .eq('id', existingId);
 
         if (updateError) {
-          return { error: `更新作品失败: ${updateError.message}` };
+          return { error: t('import.updateFailed', { error: updateError.message }) };
         }
 
         artworkId = existingId;
@@ -103,7 +105,7 @@ export function createImportFromUrlTool(ctx: ToolContext) {
           .single();
 
         if (insertError || !newArtwork) {
-          return { error: `创建作品失败: ${insertError?.message || '未知错误'}` };
+          return { error: t('import.createFailed', { error: insertError?.message || t('import.unknownError') }) };
         }
 
         artworkId = newArtwork.id;
@@ -122,8 +124,8 @@ export function createImportFromUrlTool(ctx: ToolContext) {
       }
 
       // 7. 返回结果
-      const actionText = action === 'created' ? '已创建' : '已更新';
-      const thumbnailText = bestImage ? '，已获取缩略图' : '';
+      const thumbnailText = bestImage ? t('import.withThumbnail') : '';
+      const messageKey = action === 'created' ? 'import.created' : 'import.updated';
 
       return {
         success: true,
@@ -131,7 +133,7 @@ export function createImportFromUrlTool(ctx: ToolContext) {
         artwork_id: artworkId,
         artwork_title: artwork.title_en,
         has_thumbnail: !!bestImage,
-        message: `${actionText}作品「${artwork.title_en}」${thumbnailText}`,
+        message: t(messageKey, { title: artwork.title_en, thumbnail: thumbnailText }),
       };
     },
   });
