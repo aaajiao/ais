@@ -9,16 +9,15 @@ export default function ProfileSettings() {
   const { name, isLoading } = useProfile();
   const updateProfile = useUpdateProfile();
   const [inputValue, setInputValue] = useState('');
+  const [initialized, setInitialized] = useState(false);
   const [saved, setSaved] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const initializedRef = useRef(false);
 
-  useEffect(() => {
-    if (name !== null && name !== undefined && !initializedRef.current) {
-      setInputValue(name);
-      initializedRef.current = true;
-    }
-  }, [name]);
+  // Sync initial value from profile query (during render, not in effect)
+  if (name != null && !initialized) {
+    setInitialized(true);
+    setInputValue(name);
+  }
 
   const saveValue = useCallback((value: string) => {
     const trimmed = value.trim();

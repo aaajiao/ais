@@ -11,6 +11,9 @@ import {
 } from '../pdf-helpers';
 import type { ArtworkExportData, ExportOptions } from '../../../src/lib/exporters/index';
 import type { CatalogOptions } from '../catalog-template';
+import type { Artwork, Edition } from '../../../src/lib/types';
+
+type EditionWithArtwork = EditionRow & { artwork: NonNullable<EditionRow['artwork']> };
 
 // --- Test data factories ---
 
@@ -79,42 +82,42 @@ describe('STATUS_LABELS', () => {
 describe('formatEditionLabel', () => {
   it('should return "Unique" for unique edition type', () => {
     const edition = createEdition({ edition_type: 'unique', artwork: createArtwork({ is_unique: true }) });
-    expect(formatEditionLabel(edition as any)).toBe('Unique');
+    expect(formatEditionLabel(edition as EditionWithArtwork)).toBe('Unique');
   });
 
   it('should return "Unique" when artwork is_unique is true regardless of edition_type', () => {
     const edition = createEdition({ edition_type: 'numbered', artwork: createArtwork({ is_unique: true }) });
-    expect(formatEditionLabel(edition as any)).toBe('Unique');
+    expect(formatEditionLabel(edition as EditionWithArtwork)).toBe('Unique');
   });
 
   it('should format AP edition with number', () => {
     const edition = createEdition({ edition_type: 'ap', edition_number: 1, artwork: createArtwork({ ap_total: 2 }) });
-    expect(formatEditionLabel(edition as any)).toBe('AP 1/2');
+    expect(formatEditionLabel(edition as EditionWithArtwork)).toBe('AP 1/2');
   });
 
   it('should format AP edition without total', () => {
     const edition = createEdition({ edition_type: 'ap', edition_number: 1, artwork: createArtwork({ ap_total: null }) });
-    expect(formatEditionLabel(edition as any)).toBe('AP 1');
+    expect(formatEditionLabel(edition as EditionWithArtwork)).toBe('AP 1');
   });
 
   it('should format AP edition without number', () => {
     const edition = createEdition({ edition_type: 'ap', edition_number: null });
-    expect(formatEditionLabel(edition as any)).toBe('AP');
+    expect(formatEditionLabel(edition as EditionWithArtwork)).toBe('AP');
   });
 
   it('should format numbered edition', () => {
     const edition = createEdition({ edition_type: 'numbered', edition_number: 3, artwork: createArtwork({ edition_total: 10 }) });
-    expect(formatEditionLabel(edition as any)).toBe('3/10');
+    expect(formatEditionLabel(edition as EditionWithArtwork)).toBe('3/10');
   });
 
   it('should format numbered edition without total', () => {
     const edition = createEdition({ edition_type: 'numbered', edition_number: 3, artwork: createArtwork({ edition_total: null }) });
-    expect(formatEditionLabel(edition as any)).toBe('3');
+    expect(formatEditionLabel(edition as EditionWithArtwork)).toBe('3');
   });
 
   it('should return empty string when no number', () => {
     const edition = createEdition({ edition_type: 'numbered', edition_number: null, artwork: createArtwork({ is_unique: false }) });
-    expect(formatEditionLabel(edition as any)).toBe('');
+    expect(formatEditionLabel(edition as EditionWithArtwork)).toBe('');
   });
 });
 
@@ -236,7 +239,7 @@ describe('buildCatalogItemFromArtworkData', () => {
         edition_total: 3,
         ap_total: 1,
         is_unique: false,
-      } as any,
+      } as unknown as Artwork,
       editions: [],
       locations: new Map(),
       stats: { total: 0, inStock: 0, onLoan: 0, sold: 0, other: 0 },
@@ -261,7 +264,7 @@ describe('buildCatalogItemFromArtworkData', () => {
 
   it('should include status from first edition when includeStatus is true', () => {
     const data = createArtworkExportData({
-      editions: [{ status: 'at_gallery' } as any],
+      editions: [{ status: 'at_gallery' } as unknown as Edition],
     });
     const item = buildCatalogItemFromArtworkData(data, { ...defaultOptions, includeStatus: true });
     expect(item.status).toBe('On Loan');

@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import type { TFunction } from 'i18next';
 import type { EditionHistory } from './historyTypes';
+import type { HistoryAction } from '@/lib/database.types';
 import {
   formatDateTime,
   formatRelativeTime,
@@ -384,7 +385,7 @@ describe('historyUtils', () => {
 
     it('falls back to notes or action for unknown action', () => {
       const item = createMockHistoryItem({
-        action: 'unknown_action' as any,
+        action: 'unknown_action' as unknown as HistoryAction,
         notes: '自定义备注',
       });
       const result = getDescription(item, t, tStatus);

@@ -12,11 +12,6 @@ export const config = {
   maxDuration: 10,
 };
 
-interface FetchTitleResponse {
-  title: string | null;
-  error?: string;
-}
-
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse
