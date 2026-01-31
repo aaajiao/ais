@@ -66,7 +66,7 @@ export const FileListItem = memo(function FileListItem({
       </div>
 
       {/* 操作按钮 */}
-      <div className="flex items-center gap-1 ml-auto">
+      <div className="flex items-center gap-1 max-lg:w-full max-lg:justify-end lg:ml-auto">
         {/* 查看：图片用 Eye（弹窗预览），非图片用 ExternalLink（新标签打开） */}
         <IconButton
           variant="ghost"
