@@ -54,15 +54,27 @@ export default function FileList({
     return signedUrl || file.file_url;
   }, []);
 
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
   // 打开文件
   const handleOpen = useCallback(
     async (file: EditionFile) => {
-      const url = await getFileUrl(file);
       if (file.file_type === 'image') {
+        // 图片：overlay 弹窗预览，全平台一致
+        const url = await getFileUrl(file);
         setPreviewUrl(url);
         setPreviewFile(file);
       } else {
-        window.open(url, '_blank');
+        // 非图片：动态 <a> 标签打开，比 window.open 更可靠
+        // 不受 popup blocker 影响，PWA standalone 兼容
+        const url = await getFileUrl(file);
+        const a = document.createElement('a');
+        a.href = url;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
       }
     },
     [getFileUrl]
@@ -71,14 +83,35 @@ export default function FileList({
   // 下载文件
   const handleDownload = useCallback(
     async (file: EditionFile) => {
-      const url = await getFileUrl(file);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = file.file_name || 'download';
-      link.target = '_blank';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      setDownloadingId(file.id);
+      try {
+        // fetch 文件转 blob，生成同源 blob URL
+        // 跨域 URL 的 download 属性会被所有浏览器忽略，blob URL 是同源的所以生效
+        const url = await getFileUrl(file);
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = file.file_name || 'download';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+      } catch {
+        // CORS 失败时 fallback：Supabase ?download 参数强制 Content-Disposition: attachment
+        const url = await getFileUrl(file);
+        const downloadUrl = url + (url.includes('?') ? '&' : '?')
+          + 'download=' + encodeURIComponent(file.file_name || 'download');
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } finally {
+        setDownloadingId(null);
+      }
     },
     [getFileUrl]
   );
@@ -184,6 +217,7 @@ export default function FileList({
               confirmDeleteId={confirmDeleteId}
               setConfirmDeleteId={setConfirmDeleteId}
               deletingId={deletingId}
+              downloadingId={downloadingId}
               formatDate={formatDate}
             />
           ))}

@@ -27,6 +27,7 @@
     "confirmDeleteMessage": "Are you sure you want to delete this file? This action cannot be undone.",
     "deleting": "Deleting...",
     "deleteFailed": "Failed to delete file",
+    "downloading": "Downloading...",
     "preview": "Preview"
   },
   "upload": {

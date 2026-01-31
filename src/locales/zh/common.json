@@ -27,6 +27,7 @@
     "confirmDeleteMessage": "确定要删除这个文件吗？此操作无法撤销。",
     "deleting": "删除中...",
     "deleteFailed": "删除文件失败",
+    "downloading": "下载中...",
     "preview": "预览"
   },
   "upload": {

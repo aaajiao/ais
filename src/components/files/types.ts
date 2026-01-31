@@ -38,6 +38,7 @@ export interface FileListItemProps extends FileItemBaseProps {
   confirmDeleteId: string | null;
   setConfirmDeleteId: (id: string | null) => void;
   deletingId: string | null;
+  downloadingId: string | null;
   formatDate: (dateStr: string) => string;
 }
 
