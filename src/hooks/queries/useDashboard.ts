@@ -30,6 +30,8 @@ export interface RecentUpdate {
   date: string;
   editionId?: string;
   artworkId?: string;
+  editionType?: string;
+  editionNumber?: number | null;
 }
 
 async function fetchDashboardStats(): Promise<DashboardStats> {
@@ -92,21 +94,17 @@ async function fetchRecentUpdates(): Promise<RecentUpdate[]> {
 
   return recentEditions.map((edition) => {
     const artwork = edition.artwork_id ? artworksMap[edition.artwork_id] : null;
-    const editionLabel =
-      edition.edition_type === 'unique'
-        ? '独版'
-        : edition.edition_type === 'ap'
-          ? `AP${edition.edition_number || ''}`
-          : `${edition.edition_number || '?'}`;
 
     return {
       id: edition.id,
       type: 'edition' as const,
-      title: artwork ? `${artwork.title_en} - ${editionLabel}` : editionLabel,
+      title: artwork?.title_en || '',
       status: edition.status as EditionStatus,
       date: edition.updated_at,
       editionId: edition.id,
       artworkId: edition.artwork_id,
+      editionType: edition.edition_type,
+      editionNumber: edition.edition_number,
     };
   });
 }

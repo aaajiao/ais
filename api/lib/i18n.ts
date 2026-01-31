@@ -171,6 +171,12 @@ const messages: Record<string, Record<Locale, string>> = {
     zh: '关联的位置不存在',
     en: 'Associated location does not exist',
   },
+
+  // === edition labels ===
+  'edition.unique': {
+    zh: '独版',
+    en: 'Unique',
+  },
 };
 
 /**

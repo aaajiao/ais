@@ -178,7 +178,7 @@ async function handleGet(request: Request) {
       // 格式化版本编号（如 "2/3" 或 "AP 1/2" 或 "Unique"）
       let editionLabel = '';
       if (edition.edition_type === 'unique' || artwork.is_unique) {
-        editionLabel = 'Unique';
+        editionLabel = t('edition.unique');
       } else if (edition.edition_type === 'ap') {
         if (edition.edition_number && artwork.ap_total) {
           editionLabel = `AP ${edition.edition_number}/${artwork.ap_total}`;

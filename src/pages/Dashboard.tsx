@@ -12,6 +12,7 @@ export default function Dashboard() {
   const { t: tStatus } = useTranslation('status');
   const { t: tNav } = useTranslation('nav');
   const { t: tCommon } = useTranslation('common');
+  const { t: tEditions } = useTranslation('editions');
 
   const [expanded, setExpanded] = useState(false);
 
@@ -247,7 +248,16 @@ export default function Dashboard() {
                 <div className="flex items-center gap-3">
                   <StatusIndicator status={update.status} size="md" />
                   <div>
-                    <p className="font-medium">{update.title}</p>
+                    <p className="font-medium">{(() => {
+                      if (!update.editionType) return update.title;
+                      const editionLabel =
+                        update.editionType === 'unique'
+                          ? tEditions('unique')
+                          : update.editionType === 'ap'
+                            ? `AP${update.editionNumber || ''}`
+                            : `${update.editionNumber || '?'}`;
+                      return update.title ? `${update.title} - ${editionLabel}` : editionLabel;
+                    })()}</p>
                     <p className="text-xs text-muted-foreground uppercase tracking-wider">
                       {tStatus(update.status)}
                     </p>
