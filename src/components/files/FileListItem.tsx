@@ -29,7 +29,7 @@ export const FileListItem = memo(function FileListItem({
   const isDownloading = downloadingId === file.id;
 
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors cursor-pointer" onClick={() => onOpen(file)}>
       {/* 缩略图+文件信息 */}
       <div className="flex items-center gap-3 flex-1 min-w-0">
         {/* 缩略图或图标 */}
@@ -66,7 +66,7 @@ export const FileListItem = memo(function FileListItem({
       </div>
 
       {/* 操作按钮 */}
-      <div className="flex items-center gap-1 max-lg:w-full max-lg:justify-end lg:ml-auto">
+      <div className="flex items-center gap-1 max-lg:w-full max-lg:justify-end lg:ml-auto" onClick={e => e.stopPropagation()}>
         {/* 查看：图片用 Eye（弹窗预览），非图片用 ExternalLink（新标签打开） */}
         <IconButton
           variant="ghost"
