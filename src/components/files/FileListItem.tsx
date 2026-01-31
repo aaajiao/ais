@@ -46,9 +46,9 @@ export const FileListItem = memo(function FileListItem({
           <div className="text-sm font-medium truncate">
             {file.file_name || t('files.unnamed')}
           </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0 text-xs text-muted-foreground">
             {file.file_size && <span>{formatFileSize(file.file_size)}</span>}
-            <span>·</span>
+            {file.file_size && <span>·</span>}
             <span>{formatDate(file.created_at)}</span>
             {file.source_type === 'link' && (
               <>

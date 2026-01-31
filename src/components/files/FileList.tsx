@@ -64,17 +64,32 @@ export default function FileList({
         const url = await getFileUrl(file);
         setPreviewUrl(url);
         setPreviewFile(file);
-      } else {
-        // 非图片：动态 <a> 标签打开，比 window.open 更可靠
-        // 不受 popup blocker 影响，PWA standalone 兼容
-        const url = await getFileUrl(file);
+        return;
+      }
+      // 外部链接：URL 已知，无需 async，同步打开不受 popup blocker 影响
+      if (file.source_type === 'link') {
         const a = document.createElement('a');
-        a.href = url;
+        a.href = file.file_url;
         a.target = '_blank';
         a.rel = 'noopener noreferrer';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+        return;
+      }
+      // 上传文件：需要 async 获取签名 URL
+      // 同步预开窗口保留用户手势上下文（Safari popup blocker 要求）
+      const newWindow = window.open('', '_blank');
+      try {
+        const url = await getFileUrl(file);
+        if (newWindow && !newWindow.closed) {
+          newWindow.location.href = url;
+        } else {
+          // fallback：窗口被拦截，使用当前页面导航
+          window.location.href = url;
+        }
+      } catch {
+        newWindow?.close();
       }
     },
     [getFileUrl]
