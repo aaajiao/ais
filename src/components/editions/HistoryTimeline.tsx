@@ -100,7 +100,7 @@ export default function HistoryTimeline({
     } finally {
       setSaving(false);
     }
-  }, [noteText, editionId, onHistoryAdded, t]);
+  }, [noteText, editionId, onHistoryAdded, t, queryClient]);
 
   // Toggle merged group expansion (using functional setState)
   const toggleMergedExpand = useCallback((mergedId: string) => {

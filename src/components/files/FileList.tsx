@@ -176,7 +176,7 @@ export default function FileList({
         setDeletingId(null);
       }
     },
-    [deletingId, editionId, onDelete, t]
+    [deletingId, editionId, onDelete, t, queryClient]
   );
 
   // 关闭预览

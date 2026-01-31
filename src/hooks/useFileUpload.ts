@@ -199,6 +199,7 @@ export function useFileUpload(options: UseFileUploadOptions) {
     generateFilePath,
     onError,
     updateFileStatus,
+    queryClient,
   ]);
 
   // 批量上传文件

@@ -232,7 +232,7 @@ export default function ExternalLinkDialog({
     } finally {
       setSaving(false);
     }
-  }, [url, linkName, description, fileType, editionId, validateUrl, extractFallbackName, onLinkAdded, handleClose, t]);
+  }, [url, linkName, description, fileType, editionId, validateUrl, extractFallbackName, onLinkAdded, handleClose, t, queryClient]);
 
   // 键盘事件
   useEffect(() => {
