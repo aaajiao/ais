@@ -24,8 +24,8 @@ const messages: Record<string, Record<Locale, string>> = {
     en: 'No matching artworks found',
   },
   'search.artworksFound': {
-    zh: '找到 {count} 件相关作品，结果已显示在界面上供用户查看和点击。',
-    en: 'Found {count} matching artworks. Results are displayed on the interface for the user to browse.',
+    zh: '找到 {count} 件相关作品：',
+    en: 'Found {count} matching artworks:',
   },
 
   // === search-editions ===
@@ -42,8 +42,8 @@ const messages: Record<string, Record<Locale, string>> = {
     en: 'No matching editions found',
   },
   'editions.found': {
-    zh: '找到 {count} 个符合条件的版本，结果已显示在界面上供用户查看和点击。',
-    en: 'Found {count} matching editions. Results are displayed on the interface for the user to browse.',
+    zh: '找到 {count} 个符合条件的版本：',
+    en: 'Found {count} matching editions:',
   },
 
   // === search-locations ===
@@ -52,8 +52,8 @@ const messages: Record<string, Record<Locale, string>> = {
     en: 'No matching locations found',
   },
   'locations.found': {
-    zh: '找到 {count} 个相关位置，结果已显示在界面上。',
-    en: 'Found {count} matching locations. Results are displayed on the interface.',
+    zh: '找到 {count} 个相关位置：',
+    en: 'Found {count} matching locations:',
   },
 
   // === search-history ===

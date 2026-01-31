@@ -41,9 +41,9 @@ export function createSearchLocationsTool(ctx: ToolContext) {
 
       return { locations: data || [] };
     },
-    // 控制返回给模型的内容，避免模型重复描述搜索结果
+    // 控制返回给模型的内容：包含 ID 和关键标识字段，以便后续工具调用
     toModelOutput({ output }) {
-      const result = output as { locations?: Array<unknown>; error?: string };
+      const result = output as { locations?: Array<Record<string, unknown>>; error?: string };
 
       if (result.error) {
         return {
@@ -59,12 +59,21 @@ export function createSearchLocationsTool(ctx: ToolContext) {
         };
       }
 
-      // 只告诉模型找到了多少结果，详情由前端渲染
+      const summary = result.locations.map((loc: Record<string, unknown>) => {
+        const parts = [
+          `id: ${loc.id}`,
+          loc.name ? `name: ${loc.name}` : null,
+          loc.city ? `city: ${loc.city}` : null,
+          loc.type ? `type: ${loc.type}` : null,
+        ].filter(Boolean).join(', ');
+        return `- ${parts}`;
+      }).join('\n');
+
       return {
         type: 'content' as const,
         value: [{
           type: 'text' as const,
-          text: t('locations.found', { count: result.locations.length })
+          text: `${t('locations.found', { count: result.locations.length })}\n${summary}`
         }],
       };
     },

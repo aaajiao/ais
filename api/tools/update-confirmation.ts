@@ -17,7 +17,7 @@ export function createUpdateConfirmationTool(ctx: ToolContext) {
         location_id: z.string().optional().describe('新位置 ID'),
         sale_price: z.number().optional().describe('销售价格'),
         sale_currency: z.string().optional().describe('货币'),
-        buyer_name: z.string().optional().describe('买家名称'),
+        buyer_name: z.string().optional().describe('买家名称（仅 sold 状态，gifted 请用 notes）'),
         sold_at: z.string().optional().describe('销售日期'),
         notes: z.string().optional().describe('备注'),
         condition: z.enum(['excellent', 'good', 'fair', 'poor', 'damaged']).optional().describe('品相'),

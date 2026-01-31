@@ -17,7 +17,7 @@ export function createExecuteUpdateTool(ctx: ToolContext) {
         location_id: z.string().optional(),
         sale_price: z.number().optional(),
         sale_currency: z.string().optional(),
-        buyer_name: z.string().optional(),
+        buyer_name: z.string().optional().describe('买家名称（仅 sold 状态，gifted 请用 notes）'),
         sold_at: z.string().optional(),
         notes: z.string().optional(),
         condition: z.enum(['excellent', 'good', 'fair', 'poor', 'damaged']).optional(),

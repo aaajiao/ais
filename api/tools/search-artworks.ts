@@ -65,9 +65,9 @@ export function createSearchArtworksTool(ctx: ToolContext) {
 
       return { artworks };
     },
-    // 控制返回给模型的内容，避免模型重复描述搜索结果
+    // 控制返回给模型的内容：包含 ID 和关键标识字段，以便后续工具调用
     toModelOutput({ output }) {
-      const result = output as { artworks?: Array<{ title_en: string }>; message?: string; error?: string };
+      const result = output as { artworks?: Array<Record<string, unknown>>; message?: string; error?: string };
 
       if (result.error) {
         return {
@@ -83,12 +83,22 @@ export function createSearchArtworksTool(ctx: ToolContext) {
         };
       }
 
-      // 只告诉模型找到了多少结果，详情由前端渲染
+      const summary = result.artworks.map((a: Record<string, unknown>) => {
+        const parts = [
+          `id: ${a.id}`,
+          a.title_en || a.title_cn ? `title: ${a.title_en || a.title_cn}` : null,
+          a.year ? `year: ${a.year}` : null,
+          a.type ? `type: ${a.type}` : null,
+          a.is_unique ? 'unique' : null,
+        ].filter(Boolean).join(', ');
+        return `- ${parts}`;
+      }).join('\n');
+
       return {
         type: 'content' as const,
         value: [{
           type: 'text' as const,
-          text: t('search.artworksFound', { count: result.artworks.length })
+          text: `${t('search.artworksFound', { count: result.artworks.length })}\n${summary}`
         }],
       };
     },

@@ -125,9 +125,9 @@ export function createSearchEditionsTool(ctx: ToolContext) {
 
       return { editions };
     },
-    // 控制返回给模型的内容，避免模型重复描述搜索结果
+    // 控制返回给模型的内容：包含 ID 和关键标识字段，以便后续工具调用
     toModelOutput({ output }) {
-      const result = output as { editions?: Array<unknown>; message?: string; error?: string };
+      const result = output as { editions?: Array<Record<string, unknown>>; message?: string; error?: string };
 
       if (result.error) {
         return {
@@ -143,12 +143,26 @@ export function createSearchEditionsTool(ctx: ToolContext) {
         };
       }
 
-      // 只告诉模型找到了多少结果，详情由前端渲染
+      const summary = result.editions.map((e: Record<string, unknown>) => {
+        const artwork = e.artworks as Record<string, unknown> | null;
+        const location = e.locations as Record<string, unknown> | null;
+        const parts = [
+          `id: ${e.id}`,
+          artwork?.title_en || artwork?.title_cn ? `artwork: ${artwork?.title_en || artwork?.title_cn}` : null,
+          e.edition_number != null ? `#${e.edition_number}/${artwork?.edition_total || '?'}` : null,
+          e.edition_type ? `type: ${e.edition_type}` : null,
+          e.status ? `status: ${e.status}` : null,
+          location?.name ? `location: ${location.name}` : null,
+          e.inventory_number ? `inv: ${e.inventory_number}` : null,
+        ].filter(Boolean).join(', ');
+        return `- ${parts}`;
+      }).join('\n');
+
       return {
         type: 'content' as const,
         value: [{
           type: 'text' as const,
-          text: t('editions.found', { count: result.editions.length })
+          text: `${t('editions.found', { count: result.editions.length })}\n${summary}`
         }],
       };
     },

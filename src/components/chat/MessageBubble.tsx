@@ -1,8 +1,10 @@
-import { useState, useCallback, useMemo, memo } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import type { UIMessage } from 'ai';
 import EditableConfirmCard, { type ConfirmCardData } from './EditableConfirmCard';
+import { invalidateOnEditionEdit } from '@/lib/cacheInvalidation';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
 import type { EditionStatus } from '@/lib/database.types';
 import { Loader2, CheckCircle, XCircle, Undo2, ChevronRight } from 'lucide-react';
@@ -119,11 +121,33 @@ function ToolResult({
   onConfirmUpdate?: (data: ConfirmCardData) => Promise<void>;
 }) {
   const { t } = useTranslation('chat');
+  const queryClient = useQueryClient();
   const toolName = getToolName(toolPart);
   const { state, output, errorText } = toolPart;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [cancelled, setCancelled] = useState(false);
+  const invalidatedRef = useRef(false);
+
+  // AI 更新版本成功后，失效相关缓存
+  useEffect(() => {
+    if (
+      !invalidatedRef.current &&
+      (state === 'output' || state === 'output-available') &&
+      output?.success &&
+      toolName === 'execute_edition_update'
+    ) {
+      const edition = output.edition as Record<string, unknown> | undefined;
+      if (edition?.id && edition?.artwork_id) {
+        invalidatedRef.current = true;
+        invalidateOnEditionEdit(
+          queryClient,
+          String(edition.id),
+          String(edition.artwork_id)
+        );
+      }
+    }
+  }, [state, output, toolName, queryClient]);
 
   // 处理确认
   const handleConfirm = useCallback(async (data: ConfirmCardData) => {
