@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { supabase, insertIntoTable, updateTable, type LocationsInsert, type LocationsUpdate } from '@/lib/supabase';
+import { supabase, insertIntoTable, updateTable, getCurrentUserId, type LocationsInsert, type LocationsUpdate } from '@/lib/supabase';
 import type { LocationType } from '@/lib/database.types';
 
 export interface Location {
@@ -149,6 +149,7 @@ export function useLocations() {
   const createLocation = useCallback(async (
     data: CreateLocationData
   ): Promise<Location> => {
+    const userId = await getCurrentUserId();
     const insertData: LocationsInsert = {
       name: data.name,
       type: data.type,
@@ -158,6 +159,7 @@ export function useLocations() {
       address: data.address || null,
       contact: data.contact || null,
       notes: data.notes || null,
+      user_id: userId,
     };
     const { data: newLocation, error: createError } = await insertIntoTable('locations', insertData);
 

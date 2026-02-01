@@ -21,8 +21,8 @@ export function createSearchArtworksTool(ctx: ToolContext) {
     execute: async ({ query, year, type, materials, is_unique }) => {
       const { supabase, searchExpansionModel } = ctx;
 
-      // 排除已删除的作品
-      let queryBuilder = supabase.from('artworks').select('*').is('deleted_at', null);
+      // 排除已删除的作品，限定当前用户
+      let queryBuilder = supabase.from('artworks').select('*').eq('user_id', ctx.userId).is('deleted_at', null);
 
       if (query) {
         const sanitized = sanitizeSearchTerm(query);

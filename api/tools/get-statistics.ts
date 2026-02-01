@@ -17,9 +17,12 @@ export function createGetStatisticsTool(ctx: ToolContext) {
       const { supabase } = ctx;
 
       if (type === 'overview') {
-        // 排除已删除的作品
-        const { data: artworks } = await supabase.from('artworks').select('id').is('deleted_at', null);
-        const { data: editions } = await supabase.from('editions').select('id, status');
+        // 排除已删除的作品，限定当前用户
+        const { data: artworks } = await supabase.from('artworks').select('id').eq('user_id', ctx.userId).is('deleted_at', null);
+        const artworkIds = artworks?.map(a => a.id) || [];
+        const { data: editions } = artworkIds.length > 0
+          ? await supabase.from('editions').select('id, status').in('artwork_id', artworkIds)
+          : { data: [] as { id: string; status: string }[] };
 
         const totalArtworks = artworks?.length || 0;
         const totalEditions = editions?.length || 0;
@@ -46,7 +49,11 @@ export function createGetStatisticsTool(ctx: ToolContext) {
       }
 
       if (type === 'by_status') {
-        const { data: editions } = await supabase.from('editions').select('status');
+        const { data: userArtworks } = await supabase.from('artworks').select('id').eq('user_id', ctx.userId).is('deleted_at', null);
+        const userArtworkIds = userArtworks?.map(a => a.id) || [];
+        const { data: editions } = userArtworkIds.length > 0
+          ? await supabase.from('editions').select('status').in('artwork_id', userArtworkIds)
+          : { data: [] as { status: string }[] };
         const statusCounts: Record<string, number> = {};
         editions?.forEach(e => {
           statusCounts[e.status] = (statusCounts[e.status] || 0) + 1;
@@ -55,9 +62,11 @@ export function createGetStatisticsTool(ctx: ToolContext) {
       }
 
       if (type === 'by_location') {
-        const { data: editions } = await supabase
-          .from('editions')
-          .select('location_id, locations (name)');
+        const { data: locArtworks } = await supabase.from('artworks').select('id').eq('user_id', ctx.userId).is('deleted_at', null);
+        const locArtworkIds = locArtworks?.map(a => a.id) || [];
+        const { data: editions } = locArtworkIds.length > 0
+          ? await supabase.from('editions').select('location_id, locations (name)').in('artwork_id', locArtworkIds)
+          : { data: [] as { location_id: string | null; locations: { name: string } | { name: string }[] | null }[] };
         const locationCounts: Record<string, number> = {};
         editions?.forEach(e => {
           // Supabase 返回的 locations 可能是对象或数组

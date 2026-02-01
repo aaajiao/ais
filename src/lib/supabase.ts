@@ -30,6 +30,13 @@ export const supabase = createClient<Database>(
   }
 );
 
+// 辅助函数：获取当前认证用户 ID
+export async function getCurrentUserId(): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+  return user.id;
+}
+
 // 辅助函数：获取存储文件的公开 URL
 export function getPublicUrl(bucket: string, path: string): string {
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);

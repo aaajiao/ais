@@ -83,6 +83,7 @@ export interface Database {
           address: string | null;
           contact: string | null;
           notes: string | null;
+          user_id: string;
           created_at: string;
         };
         Insert: {
@@ -95,6 +96,7 @@ export interface Database {
           address?: string | null;
           contact?: string | null;
           notes?: string | null;
+          user_id: string;
           created_at?: string;
         };
         Update: {
@@ -107,6 +109,7 @@ export interface Database {
           address?: string | null;
           contact?: string | null;
           notes?: string | null;
+          user_id?: string;
           created_at?: string;
         };
       };
@@ -161,6 +164,7 @@ export interface Database {
           ap_total: number | null;
           is_unique: boolean;
           notes: string | null;
+          user_id: string;
           created_at: string;
           updated_at: string;
           deleted_at: string | null;
@@ -180,6 +184,7 @@ export interface Database {
           ap_total?: number | null;
           is_unique?: boolean;
           notes?: string | null;
+          user_id: string;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -199,6 +204,7 @@ export interface Database {
           ap_total?: number | null;
           is_unique?: boolean;
           notes?: string | null;
+          user_id?: string;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;

@@ -32,12 +32,13 @@ export function createImportFromUrlTool(ctx: ToolContext) {
       const { artwork, images } = extractResult;
       console.log('[import_artwork_from_url] Extracted:', artwork.title_en);
 
-      // 2. 检查是否已存在（通过 source_url）
+      // 2. 检查是否已存在（通过 source_url，限定当前用户）
       let existingId: string | null = null;
       const { data: existingByUrl } = await supabase
         .from('artworks')
         .select('id, title_en')
         .eq('source_url', url)
+        .eq('user_id', ctx.userId)
         .is('deleted_at', null);
 
       if (existingByUrl && existingByUrl.length === 1) {
@@ -53,6 +54,7 @@ export function createImportFromUrlTool(ctx: ToolContext) {
           .from('artworks')
           .select('id, source_url')
           .eq('title_en', artwork.title_en)
+          .eq('user_id', ctx.userId)
           .is('deleted_at', null);
 
         if (existingByTitle && existingByTitle.length === 1) {
@@ -75,6 +77,7 @@ export function createImportFromUrlTool(ctx: ToolContext) {
         materials: artwork.materials,
         duration: artwork.duration,
         source_url: url,
+        user_id: ctx.userId,
         updated_at: new Date().toISOString(),
       };
 

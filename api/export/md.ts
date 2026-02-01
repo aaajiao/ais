@@ -21,7 +21,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const requestData = req.body as ExportRequest;
-    const { content, filename } = await handleMarkdownExport(requestData);
+    const { content, filename } = await handleMarkdownExport(requestData, authResult.userId!);
 
     // 设置响应头并发送文本内容
     res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
@@ -35,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 }
 
 // 处理导出请求（内部函数）
-export async function handleMarkdownExport(request: ExportRequest): Promise<{
+export async function handleMarkdownExport(request: ExportRequest, userId?: string): Promise<{
   content: string;
   filename: string;
 }> {
@@ -52,8 +52,8 @@ export async function handleMarkdownExport(request: ExportRequest): Promise<{
   }
   // scope === 'all' 时不传 artworkIds，获取全部
 
-  // 获取数据（支持版本过滤）
-  const artworksData = await fetchArtworkExportData(supabase, artworkIds, request.editionIds);
+  // 获取数据（支持版本过滤，限定用户）
+  const artworksData = await fetchArtworkExportData(supabase, artworkIds, request.editionIds, userId);
 
   if (artworksData.length === 0) {
     throw new Error('No artworks found');

@@ -66,14 +66,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!authResult.success) {
         return res.status(401).json({ error: authResult.error || 'Unauthorized' });
       }
-      return await handleCatalogExport(body as CatalogRequest, res);
+      return await handleCatalogExport(body as CatalogRequest, authResult.userId!, res);
     } else {
       // 兼容旧的 artwork 维度导出 — 需要认证
       const authResult = await verifyAuth(req);
       if (!authResult.success) {
         return res.status(401).json({ error: authResult.error || 'Unauthorized' });
       }
-      return await handleLegacyExport(body as ExportRequest, res);
+      return await handleLegacyExport(body as ExportRequest, authResult.userId!, res);
     }
   } catch (error) {
     console.error('[PDF Export] Error:', error);
@@ -161,7 +161,7 @@ async function handleLinkExport(request: CatalogRequest, res: VercelResponse) {
 /**
  * 从 Links 管理页选择性导出
  */
-async function handleCatalogExport(request: CatalogRequest, res: VercelResponse) {
+async function handleCatalogExport(request: CatalogRequest, userId: string, res: VercelResponse) {
   if (!request.locationName) {
     return res.status(400).json({ error: 'locationName is required' });
   }
@@ -224,7 +224,7 @@ async function handleCatalogExport(request: CatalogRequest, res: VercelResponse)
 /**
  * 兼容旧的 artwork 维度导出
  */
-async function handleLegacyExport(request: ExportRequest, res: VercelResponse) {
+async function handleLegacyExport(request: ExportRequest, userId: string, res: VercelResponse) {
   const supabase = getSupabaseClient();
 
   let artworkIds: string[] | undefined;
@@ -235,7 +235,7 @@ async function handleLegacyExport(request: ExportRequest, res: VercelResponse) {
     artworkIds = request.artworkIds;
   }
 
-  const artworksData = await fetchArtworkExportData(supabase, artworkIds, request.editionIds);
+  const artworksData = await fetchArtworkExportData(supabase, artworkIds, request.editionIds, userId);
   if (artworksData.length === 0) {
     return res.status(404).json({ error: 'No artworks found' });
   }

@@ -19,7 +19,7 @@ export function createSearchLocationsTool(ctx: ToolContext) {
     execute: async ({ query, type, country }) => {
       const { supabase } = ctx;
 
-      let queryBuilder = supabase.from('locations').select('*');
+      let queryBuilder = supabase.from('locations').select('*').eq('user_id', ctx.userId);
 
       if (query) {
         const sanitized = sanitizeSearchTerm(query);

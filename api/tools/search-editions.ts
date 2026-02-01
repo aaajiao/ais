@@ -48,19 +48,21 @@ export function createSearchEditionsTool(ctx: ToolContext) {
         const { data: artworks } = await supabase
           .from('artworks')
           .select('id')
+          .eq('user_id', ctx.userId)
           .is('deleted_at', null)
           .or(`title_en.ilike.%${sanitized}%,title_cn.ilike.%${sanitized}%`);
         artworkIds = artworks?.map(a => a.id) || [];
       }
 
-      // 搜索版本
+      // 搜索版本（限定当前用户的作品）
       let queryBuilder = supabase
         .from('editions')
         .select(`
           *,
-          artworks (id, title_en, title_cn, year, edition_total),
+          artworks!inner (id, title_en, title_cn, year, edition_total, user_id),
           locations (id, name, city)
-        `);
+        `)
+        .eq('artworks.user_id', ctx.userId);
 
       if (artworkIds.length > 0) {
         queryBuilder = queryBuilder.in('artwork_id', artworkIds);

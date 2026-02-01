@@ -24,10 +24,14 @@ export type SupabaseClient = ReturnType<typeof getSupabaseClient>;
 export async function fetchArtworkExportData(
   supabase: SupabaseClient,
   artworkIds?: string[],
-  editionIds?: string[]  // 可选：指定导出的版本 ID
+  editionIds?: string[],  // 可选：指定导出的版本 ID
+  userId?: string,  // 限定用户
 ): Promise<ArtworkExportData[]> {
-  // 获取作品（排除已删除的）
+  // 获取作品（排除已删除的，限定当前用户）
   let artworksQuery = supabase.from('artworks').select('*').is('deleted_at', null);
+  if (userId) {
+    artworksQuery = artworksQuery.eq('user_id', userId);
+  }
   if (artworkIds && artworkIds.length > 0) {
     artworksQuery = artworksQuery.in('id', artworkIds);
   }

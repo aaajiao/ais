@@ -37,12 +37,18 @@ export function createExecuteUpdateTool(ctx: ToolContext) {
         return { error: t('update.notConfirmed') };
       }
 
-      // 获取原始数据用于历史记录
+      // 获取原始数据用于历史记录，并验证所有权
       const { data: originalEdition } = await supabase
         .from('editions')
-        .select('*')
+        .select('*, artworks!inner(user_id)')
         .eq('id', edition_id)
         .single();
+
+      // 验证版本属于当前用户
+      const artworkOwner = (originalEdition as Record<string, unknown>)?.artworks as { user_id: string } | null;
+      if (!originalEdition || artworkOwner?.user_id !== ctx.userId) {
+        return { error: t('update.editionNotFound') };
+      }
 
       // 构建更新数据，处理字段映射 (sold_at -> sale_date)
       const updateData: Record<string, unknown> = {
@@ -94,6 +100,7 @@ export function createExecuteUpdateTool(ctx: ToolContext) {
           price: updates.sale_price || null,
           currency: updates.sale_currency || null,
           notes: '通过 AI 助手更新',
+          created_by: ctx.userId,
         });
       } else if (updates.location_id && updates.location_id !== originalEdition?.location_id) {
         // 位置变更
@@ -103,6 +110,7 @@ export function createExecuteUpdateTool(ctx: ToolContext) {
           from_location: originalEdition?.location_id || null,
           to_location: updates.location_id,
           notes: '通过 AI 助手更新',
+          created_by: ctx.userId,
         });
       }
 
@@ -112,6 +120,7 @@ export function createExecuteUpdateTool(ctx: ToolContext) {
           edition_id,
           action: 'condition_update',
           notes: `品相从 ${originalEdition?.condition || '未设置'} 更新为 ${updates.condition}。通过 AI 助手更新。`,
+          created_by: ctx.userId,
         });
       }
 

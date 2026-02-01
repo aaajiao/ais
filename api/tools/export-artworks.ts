@@ -27,10 +27,11 @@ export function createExportArtworksTool(ctx: ToolContext) {
 
       if (artwork_title && finalArtworkIds.length === 0) {
         const sanitized = sanitizeSearchTerm(artwork_title);
-        // 排除已删除的作品
+        // 排除已删除的作品，限定当前用户
         const { data: artworks, error } = await supabase
           .from('artworks')
           .select('id, title_en')
+          .eq('user_id', ctx.userId)
           .is('deleted_at', null)
           .or(`title_en.ilike.%${sanitized}%,title_cn.ilike.%${sanitized}%`)
           .limit(5);

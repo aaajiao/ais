@@ -6,7 +6,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase, insertIntoTable, type EditionHistoryInsert } from '@/lib/supabase';
+import { supabase, insertIntoTable, getCurrentUserId, type EditionHistoryInsert } from '@/lib/supabase';
 import { queryKeys } from '@/lib/queryKeys';
 import { Button } from '@/components/ui/button';
 import { ScrollText } from 'lucide-react';
@@ -72,10 +72,12 @@ export default function HistoryTimeline({
     setSaving(true);
 
     try {
+      const userId = await getCurrentUserId();
       const insertData: EditionHistoryInsert = {
         edition_id: editionId,
         action: 'condition_update',
         notes: noteText.trim(),
+        created_by: userId,
       };
       const { data, error } = await insertIntoTable('edition_history', insertData);
 

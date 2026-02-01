@@ -5,7 +5,7 @@
 
 import { useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase, uploadFile, deleteFile, insertIntoTable, insertIntoTableNoReturn, type EditionFilesInsert, type EditionHistoryInsert } from '@/lib/supabase';
+import { supabase, uploadFile, deleteFile, insertIntoTable, insertIntoTableNoReturn, getCurrentUserId, type EditionFilesInsert, type EditionHistoryInsert } from '@/lib/supabase';
 import { queryKeys } from '@/lib/queryKeys';
 import {
   compressImage,
@@ -143,6 +143,7 @@ export function useFileUpload(options: UseFileUploadOptions) {
       // 创建数据库记录
       const fileType = metadata?.fileType ?? detectFileType(file) as FileType;
       const fileName = metadata?.displayName ?? file.name;
+      const userId = await getCurrentUserId();
       const insertData: EditionFilesInsert = {
         edition_id: editionId,
         source_type: 'upload',
@@ -152,6 +153,7 @@ export function useFileUpload(options: UseFileUploadOptions) {
         file_size: finalSize,
         description: metadata?.description ?? null,
         sort_order: 0,
+        created_by: userId,
       };
       const { data: dbRecord, error: dbError } = await insertIntoTable('edition_files', insertData);
 
@@ -168,6 +170,7 @@ export function useFileUpload(options: UseFileUploadOptions) {
         edition_id: editionId,
         action: 'file_added',
         notes: `添加文件: ${fileName}`,
+        created_by: userId,
       };
       await insertIntoTableNoReturn('edition_history', historyData);
 

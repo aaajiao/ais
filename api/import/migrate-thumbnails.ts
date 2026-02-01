@@ -61,10 +61,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const body: MigrateRequest = req.body || {};
     const { dryRun = false, artworkIds } = body;
 
-    // 查询需要迁移的作品（有 thumbnail_url 且是外部 URL）
+    // 查询需要迁移的作品（有 thumbnail_url 且是外部 URL，限定当前用户）
     let query = supabase
       .from('artworks')
       .select('id, title_en, title_cn, thumbnail_url')
+      .eq('user_id', authResult.userId!)
       .not('thumbnail_url', 'is', null);
 
     // 如果指定了作品 ID，只处理这些作品

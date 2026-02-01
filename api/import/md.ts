@@ -114,13 +114,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       };
 
       for (const artwork of body.artworks) {
-        // 通过 source_url 匹配已有作品（只匹配未删除的）
+        // 通过 source_url 匹配已有作品（只匹配未删除的，限定当前用户）
         let existing = null;
         if (artwork.source_url) {
           const { data } = await supabase
             .from('artworks')
             .select('*')
             .eq('source_url', artwork.source_url)
+            .eq('user_id', authResult.userId!)
             .is('deleted_at', null);
           if (data && data.length === 1) {
             existing = data[0];
@@ -134,6 +135,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             .from('artworks')
             .select('*')
             .eq('title_en', artwork.title_en)
+            .eq('user_id', authResult.userId!)
             .is('deleted_at', null);
           // 只有当恰好有一个匹配时才使用，避免同名作品冲突
           if (data && data.length === 1) {
@@ -218,13 +220,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     for (const artwork of body.artworks) {
       try {
-        // 通过 source_url 或标题匹配已有作品（只匹配未删除的）
+        // 通过 source_url 或标题匹配已有作品（只匹配未删除的，限定当前用户）
         let existing = null;
         if (artwork.source_url) {
           const { data } = await supabase
             .from('artworks')
             .select('id')
             .eq('source_url', artwork.source_url)
+            .eq('user_id', authResult.userId!)
             .is('deleted_at', null);
           if (data && data.length === 1) {
             existing = data[0];
@@ -235,6 +238,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             .from('artworks')
             .select('id, source_url')
             .eq('title_en', artwork.title_en)
+            .eq('user_id', authResult.userId!)
             .is('deleted_at', null);
           // 只有当恰好有一个匹配时才使用，避免同名作品冲突
           if (data && data.length === 1) {
@@ -263,6 +267,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               duration: artwork.duration,
               source_url: artwork.source_url,
               thumbnail_url: artwork.thumbnail_url,
+              user_id: authResult.userId!,
             })
             .select('id')
             .single();

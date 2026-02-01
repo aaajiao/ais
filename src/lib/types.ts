@@ -69,6 +69,7 @@ export interface Location {
   address?: string;
   contact?: string;
   notes?: string;
+  user_id: string;
   created_at: string;
 }
 
@@ -101,6 +102,7 @@ export interface Artwork {
   ap_total?: number;
   is_unique?: boolean;
   notes?: string;
+  user_id: string;
   created_at: string;
   updated_at: string;
 }

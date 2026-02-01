@@ -57,10 +57,11 @@ async function handleGet(request: Request) {
   const supabase = getSupabase();
 
   try {
-    // 获取所有链接
+    // 获取当前用户的链接
     const { data: links, error } = await supabase
       .from('gallery_links')
       .select('*')
+      .eq('created_by', auth.userId!)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -161,7 +162,7 @@ async function handlePost(request: Request) {
       );
     }
 
-    // 创建链接（不设置 created_by，避免外键约束问题）
+    // 创建链接
     const { data: link, error } = await supabase
       .from('gallery_links')
       .insert({
@@ -170,6 +171,7 @@ async function handlePost(request: Request) {
         status: 'active',
         show_prices: body.show_prices ?? true,
         access_count: 0,
+        created_by: auth.userId!,
       })
       .select()
       .single();
@@ -232,11 +234,12 @@ async function handlePatch(request: Request) {
       );
     }
 
-    // 更新链接
+    // 更新链接（验证所有权）
     const { data: link, error } = await supabase
       .from('gallery_links')
       .update(updates)
       .eq('id', body.id)
+      .eq('created_by', auth.userId!)
       .select()
       .single();
 
@@ -281,11 +284,12 @@ async function handleDelete(request: Request) {
       );
     }
 
-    // 删除链接
+    // 删除链接（验证所有权）
     const { error } = await supabase
       .from('gallery_links')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('created_by', auth.userId!);
 
     if (error) {
       console.error('[links] Failed to delete link:', error);

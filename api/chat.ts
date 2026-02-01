@@ -42,6 +42,7 @@ export default async function handler(req: Request) {
 
     const tools = createTools({
       supabase,
+      userId: auth.userId!,
       extractionModel,
       searchExpansionModel,
       locale,

@@ -5,7 +5,7 @@
 import { useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
-import { insertIntoTable, insertIntoTableNoReturn, updateTable, type EditionFilesInsert, type EditionHistoryInsert } from '@/lib/supabase';
+import { insertIntoTable, insertIntoTableNoReturn, updateTable, getCurrentUserId, type EditionFilesInsert, type EditionHistoryInsert } from '@/lib/supabase';
 import { queryKeys } from '@/lib/queryKeys';
 import { detectLinkType } from '@/lib/imageCompressor';
 import type { FileType, FileSourceType } from '@/lib/database.types';
@@ -196,6 +196,7 @@ export default function ExternalLinkDialog({
       const fileName = linkName.trim() || extractFallbackName(trimmedUrl);
 
       // 创建数据库记录
+      const userId = await getCurrentUserId();
       const insertData: EditionFilesInsert = {
         edition_id: editionId,
         source_type: 'link',
@@ -205,6 +206,7 @@ export default function ExternalLinkDialog({
         file_size: null,
         description: description.trim() || null,
         sort_order: 0,
+        created_by: userId,
       };
       const { data, error: dbError } = await insertIntoTable('edition_files', insertData);
 
@@ -215,6 +217,7 @@ export default function ExternalLinkDialog({
         edition_id: editionId,
         action: 'file_added',
         notes: `External link added: ${fileName}`,
+        created_by: userId,
       };
       await insertIntoTableNoReturn('edition_history', historyData);
 

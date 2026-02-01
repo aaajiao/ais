@@ -30,13 +30,14 @@ export function createSearchHistoryTool(ctx: ToolContext) {
         .from('edition_history')
         .select(`
           *,
-          editions (
+          editions!inner (
             id,
             edition_number,
             edition_type,
-            artworks (id, title_en, title_cn)
+            artworks!inner (id, title_en, title_cn, user_id)
           )
         `)
+        .eq('editions.artworks.user_id', ctx.userId)
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -50,6 +51,7 @@ export function createSearchHistoryTool(ctx: ToolContext) {
         const { data: artworks } = await supabase
           .from('artworks')
           .select('id')
+          .eq('user_id', ctx.userId)
           .is('deleted_at', null)
           .or(`title_en.ilike.%${sanitized}%,title_cn.ilike.%${sanitized}%`);
 

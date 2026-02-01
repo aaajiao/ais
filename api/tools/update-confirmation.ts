@@ -33,15 +33,16 @@ export function createUpdateConfirmationTool(ctx: ToolContext) {
     execute: async ({ edition_id, updates, reason }) => {
       const { supabase } = ctx;
 
-      // 获取当前版本信息
+      // 获取当前版本信息（验证所有权）
       const { data: edition, error } = await supabase
         .from('editions')
         .select(`
           *,
-          artworks (title_en, title_cn, edition_total),
+          artworks!inner (title_en, title_cn, edition_total, user_id),
           locations (name)
         `)
         .eq('id', edition_id)
+        .eq('artworks.user_id', ctx.userId)
         .single();
 
       if (error || !edition) {

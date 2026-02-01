@@ -69,6 +69,7 @@ CREATE TABLE locations (
   address TEXT,
   contact TEXT,
   notes TEXT,
+  user_id UUID NOT NULL REFERENCES auth.users(id),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -102,6 +103,7 @@ CREATE TABLE artworks (
   ap_total INTEGER,
   is_unique BOOLEAN DEFAULT FALSE,
   notes TEXT,
+  user_id UUID NOT NULL REFERENCES auth.users(id),
   deleted_at TIMESTAMPTZ DEFAULT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -178,6 +180,7 @@ CREATE INDEX idx_artworks_title_en ON artworks(title_en);
 CREATE INDEX idx_artworks_year ON artworks(year);
 CREATE INDEX idx_artworks_active ON artworks(created_at DESC) WHERE deleted_at IS NULL;
 CREATE INDEX idx_artworks_deleted ON artworks(deleted_at DESC) WHERE deleted_at IS NOT NULL;
+CREATE INDEX idx_artworks_user_id ON artworks(user_id);
 
 -- Editions
 CREATE INDEX idx_editions_artwork_id ON editions(artwork_id);
@@ -195,6 +198,7 @@ CREATE INDEX idx_edition_history_created_at ON edition_history(created_at);
 -- Locations
 CREATE INDEX idx_locations_name ON locations(name);
 CREATE INDEX idx_locations_type ON locations(type);
+CREATE INDEX idx_locations_user_id ON locations(user_id);
 
 -- Gallery Links
 CREATE INDEX idx_gallery_links_token ON gallery_links(token);
@@ -223,27 +227,30 @@ CREATE TRIGGER editions_updated_at
   EXECUTE FUNCTION update_updated_at();
 
 -- Auto-record status/location changes
+-- SECURITY DEFINER: trigger 需要读取 locations 表，且在 RLS 环境下需要权限
+-- auth.uid() 在前端 session 时返回用户 ID，service key 时返回 NULL
 CREATE OR REPLACE FUNCTION record_edition_status_change()
 RETURNS TRIGGER AS $$
 BEGIN
   IF OLD.status IS DISTINCT FROM NEW.status THEN
-    INSERT INTO edition_history (edition_id, action, from_status, to_status)
-    VALUES (NEW.id, 'status_change', OLD.status::TEXT, NEW.status::TEXT);
+    INSERT INTO edition_history (edition_id, action, from_status, to_status, created_by)
+    VALUES (NEW.id, 'status_change', OLD.status::TEXT, NEW.status::TEXT, auth.uid());
   END IF;
 
   IF OLD.location_id IS DISTINCT FROM NEW.location_id THEN
-    INSERT INTO edition_history (edition_id, action, from_location, to_location)
+    INSERT INTO edition_history (edition_id, action, from_location, to_location, created_by)
     VALUES (
       NEW.id,
       'location_change',
       (SELECT name FROM locations WHERE id = OLD.location_id),
-      (SELECT name FROM locations WHERE id = NEW.location_id)
+      (SELECT name FROM locations WHERE id = NEW.location_id),
+      auth.uid()
     );
   END IF;
 
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE TRIGGER editions_status_change
   AFTER UPDATE ON editions
@@ -253,6 +260,8 @@ CREATE TRIGGER editions_status_change
 -- =====================================================
 -- ROW LEVEL SECURITY
 -- =====================================================
+-- 使用 (SELECT auth.uid()) 子查询包装，性能优化（缓存每语句一次）
+-- 参考: Supabase 官方文档 RLS Performance Best Practices
 
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE locations ENABLE ROW LEVEL SECURITY;
@@ -262,69 +271,93 @@ ALTER TABLE editions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE edition_files ENABLE ROW LEVEL SECURITY;
 ALTER TABLE edition_history ENABLE ROW LEVEL SECURITY;
 
--- Authenticated users: full access
-CREATE POLICY "Authenticated users can read all" ON users
-  FOR SELECT TO authenticated USING (true);
+-- Force RLS even for table owners
+ALTER TABLE users FORCE ROW LEVEL SECURITY;
+ALTER TABLE locations FORCE ROW LEVEL SECURITY;
+ALTER TABLE gallery_links FORCE ROW LEVEL SECURITY;
+ALTER TABLE artworks FORCE ROW LEVEL SECURITY;
+ALTER TABLE editions FORCE ROW LEVEL SECURITY;
+ALTER TABLE edition_files FORCE ROW LEVEL SECURITY;
+ALTER TABLE edition_history FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY "Authenticated users can read locations" ON locations
-  FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Authenticated users can insert locations" ON locations
-  FOR INSERT TO authenticated WITH CHECK (true);
-CREATE POLICY "Authenticated users can update locations" ON locations
-  FOR UPDATE TO authenticated USING (true);
-CREATE POLICY "Authenticated users can delete locations" ON locations
-  FOR DELETE TO authenticated USING (true);
+-- === users: 只能读写自己的 profile ===
+CREATE POLICY "Users can read own profile" ON users
+  FOR SELECT TO authenticated USING (id = (SELECT auth.uid()));
+CREATE POLICY "Users can update own profile" ON users
+  FOR UPDATE TO authenticated USING (id = (SELECT auth.uid()));
 
-CREATE POLICY "Authenticated users can read gallery_links" ON gallery_links
-  FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Authenticated users can insert gallery_links" ON gallery_links
-  FOR INSERT TO authenticated WITH CHECK (true);
-CREATE POLICY "Authenticated users can update gallery_links" ON gallery_links
-  FOR UPDATE TO authenticated USING (true);
-CREATE POLICY "Authenticated users can delete gallery_links" ON gallery_links
-  FOR DELETE TO authenticated USING (true);
+-- === artworks: 基于 user_id 隔离 ===
+CREATE POLICY "Users can read own artworks" ON artworks
+  FOR SELECT TO authenticated USING (user_id = (SELECT auth.uid()));
+CREATE POLICY "Users can insert own artworks" ON artworks
+  FOR INSERT TO authenticated WITH CHECK (user_id = (SELECT auth.uid()));
+CREATE POLICY "Users can update own artworks" ON artworks
+  FOR UPDATE TO authenticated USING (user_id = (SELECT auth.uid()));
+CREATE POLICY "Users can delete own artworks" ON artworks
+  FOR DELETE TO authenticated USING (user_id = (SELECT auth.uid()));
 
-CREATE POLICY "Authenticated users can read artworks" ON artworks
-  FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Authenticated users can insert artworks" ON artworks
-  FOR INSERT TO authenticated WITH CHECK (true);
-CREATE POLICY "Authenticated users can update artworks" ON artworks
-  FOR UPDATE TO authenticated USING (true);
-CREATE POLICY "Authenticated users can delete artworks" ON artworks
-  FOR DELETE TO authenticated USING (true);
+-- === editions: 通过 artworks FK 推导所有权 ===
+CREATE POLICY "Users can read own editions" ON editions
+  FOR SELECT TO authenticated
+  USING (EXISTS (SELECT 1 FROM artworks WHERE artworks.id = editions.artwork_id AND artworks.user_id = (SELECT auth.uid())));
+CREATE POLICY "Users can insert own editions" ON editions
+  FOR INSERT TO authenticated
+  WITH CHECK (EXISTS (SELECT 1 FROM artworks WHERE artworks.id = editions.artwork_id AND artworks.user_id = (SELECT auth.uid())));
+CREATE POLICY "Users can update own editions" ON editions
+  FOR UPDATE TO authenticated
+  USING (EXISTS (SELECT 1 FROM artworks WHERE artworks.id = editions.artwork_id AND artworks.user_id = (SELECT auth.uid())));
+CREATE POLICY "Users can delete own editions" ON editions
+  FOR DELETE TO authenticated
+  USING (EXISTS (SELECT 1 FROM artworks WHERE artworks.id = editions.artwork_id AND artworks.user_id = (SELECT auth.uid())));
 
-CREATE POLICY "Authenticated users can read editions" ON editions
-  FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Authenticated users can insert editions" ON editions
-  FOR INSERT TO authenticated WITH CHECK (true);
-CREATE POLICY "Authenticated users can update editions" ON editions
-  FOR UPDATE TO authenticated USING (true);
-CREATE POLICY "Authenticated users can delete editions" ON editions
-  FOR DELETE TO authenticated USING (true);
+-- === edition_files: 通过 editions → artworks 两级 join ===
+CREATE POLICY "Users can read own edition_files" ON edition_files
+  FOR SELECT TO authenticated
+  USING (EXISTS (SELECT 1 FROM editions e JOIN artworks a ON a.id = e.artwork_id WHERE e.id = edition_files.edition_id AND a.user_id = (SELECT auth.uid())));
+CREATE POLICY "Users can insert own edition_files" ON edition_files
+  FOR INSERT TO authenticated
+  WITH CHECK (EXISTS (SELECT 1 FROM editions e JOIN artworks a ON a.id = e.artwork_id WHERE e.id = edition_files.edition_id AND a.user_id = (SELECT auth.uid())));
+CREATE POLICY "Users can update own edition_files" ON edition_files
+  FOR UPDATE TO authenticated
+  USING (EXISTS (SELECT 1 FROM editions e JOIN artworks a ON a.id = e.artwork_id WHERE e.id = edition_files.edition_id AND a.user_id = (SELECT auth.uid())));
+CREATE POLICY "Users can delete own edition_files" ON edition_files
+  FOR DELETE TO authenticated
+  USING (EXISTS (SELECT 1 FROM editions e JOIN artworks a ON a.id = e.artwork_id WHERE e.id = edition_files.edition_id AND a.user_id = (SELECT auth.uid())));
 
-CREATE POLICY "Authenticated users can read edition_files" ON edition_files
-  FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Authenticated users can insert edition_files" ON edition_files
-  FOR INSERT TO authenticated WITH CHECK (true);
-CREATE POLICY "Authenticated users can update edition_files" ON edition_files
-  FOR UPDATE TO authenticated USING (true);
-CREATE POLICY "Authenticated users can delete edition_files" ON edition_files
-  FOR DELETE TO authenticated USING (true);
+-- === edition_history: 通过 editions → artworks 两级 join ===
+CREATE POLICY "Users can read own edition_history" ON edition_history
+  FOR SELECT TO authenticated
+  USING (EXISTS (SELECT 1 FROM editions e JOIN artworks a ON a.id = e.artwork_id WHERE e.id = edition_history.edition_id AND a.user_id = (SELECT auth.uid())));
+CREATE POLICY "Users can insert own edition_history" ON edition_history
+  FOR INSERT TO authenticated
+  WITH CHECK (EXISTS (SELECT 1 FROM editions e JOIN artworks a ON a.id = e.artwork_id WHERE e.id = edition_history.edition_id AND a.user_id = (SELECT auth.uid())));
 
-CREATE POLICY "Authenticated users can read edition_history" ON edition_history
-  FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Authenticated users can insert edition_history" ON edition_history
-  FOR INSERT TO authenticated WITH CHECK (true);
+-- === locations: 基于 user_id 隔离 ===
+CREATE POLICY "Users can read own locations" ON locations
+  FOR SELECT TO authenticated USING (user_id = (SELECT auth.uid()));
+CREATE POLICY "Users can insert own locations" ON locations
+  FOR INSERT TO authenticated WITH CHECK (user_id = (SELECT auth.uid()));
+CREATE POLICY "Users can update own locations" ON locations
+  FOR UPDATE TO authenticated USING (user_id = (SELECT auth.uid()));
+CREATE POLICY "Users can delete own locations" ON locations
+  FOR DELETE TO authenticated USING (user_id = (SELECT auth.uid()));
 
--- Anonymous users: gallery portal access
-CREATE POLICY "Anyone can read gallery_links by token" ON gallery_links
+-- === gallery_links: 基于 created_by 隔离 ===
+CREATE POLICY "Users can read own gallery_links" ON gallery_links
+  FOR SELECT TO authenticated USING (created_by = (SELECT auth.uid()));
+CREATE POLICY "Users can insert own gallery_links" ON gallery_links
+  FOR INSERT TO authenticated WITH CHECK (created_by = (SELECT auth.uid()));
+CREATE POLICY "Users can update own gallery_links" ON gallery_links
+  FOR UPDATE TO authenticated USING (created_by = (SELECT auth.uid()));
+CREATE POLICY "Users can delete own gallery_links" ON gallery_links
+  FOR DELETE TO authenticated USING (created_by = (SELECT auth.uid()));
+
+-- Anonymous: 仅 active gallery links（公开链接 token 查询用）
+CREATE POLICY "Anon can read active gallery_links" ON gallery_links
   FOR SELECT TO anon USING (status = 'active');
 
-CREATE POLICY "Gallery portal can read artworks" ON artworks
-  FOR SELECT TO anon USING (true);
-
-CREATE POLICY "Gallery portal can read editions" ON editions
-  FOR SELECT TO anon USING (true);
+-- NOTE: 不再给 anon 角色 artworks/editions 的访问权限
+-- 公开画廊 API (/api/view/[token]) 使用 service key 绕过 RLS
 
 -- =====================================================
 -- STORAGE BUCKETS
@@ -400,9 +433,11 @@ USING (bucket_id = 'edition-files');
 -- INITIAL DATA
 -- =====================================================
 
-INSERT INTO locations (name, type, city, country) VALUES
-  ('Berlin Studio', 'studio', 'Berlin', 'Germany'),
-  ('Berlin Warehouse', 'studio', 'Berlin', 'Germany');
+-- NOTE: 初始数据需要提供 user_id（auth.users 中第一个用户的 ID）
+-- 部署时替换 <AUTH_USER_ID> 为实际值
+-- INSERT INTO locations (name, type, city, country, user_id) VALUES
+--   ('Berlin Studio', 'studio', 'Berlin', 'Germany', '<AUTH_USER_ID>'),
+--   ('Berlin Warehouse', 'studio', 'Berlin', 'Germany', '<AUTH_USER_ID>');
 
 -- =====================================================
 -- COMMENTS

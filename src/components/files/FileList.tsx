@@ -11,6 +11,7 @@ import {
   getSignedUrl,
   deleteFile,
   insertIntoTableNoReturn,
+  getCurrentUserId,
   type EditionHistoryInsert,
 } from '@/lib/supabase';
 import { queryKeys } from '@/lib/queryKeys';
@@ -151,10 +152,12 @@ export default function FileList({
 
         if (error) throw error;
 
+        const userId = await getCurrentUserId();
         const historyData: EditionHistoryInsert = {
           edition_id: editionId,
           action: 'file_deleted',
           notes: `Deleted file: ${file.file_name || 'Unnamed file'}`,
+          created_by: userId,
         };
         await insertIntoTableNoReturn('edition_history', historyData);
 
