@@ -15,6 +15,7 @@ interface LocationPickerProps {
   disabled?: boolean;
   placeholder?: string;
   className?: string;
+  refreshKey?: number;
 }
 
 // 位置类型图标
@@ -32,6 +33,7 @@ export default function LocationPicker({
   disabled = false,
   placeholder,
   className = '',
+  refreshKey,
 }: LocationPickerProps) {
   const { t } = useTranslation('common');
   const [isOpen, setIsOpen] = useState(false);
@@ -49,10 +51,18 @@ export default function LocationPicker({
     searchLocations,
     getLocationById,
     typeLabels,
+    refetch,
   } = useLocations();
 
   // locations is used internally by searchLocations
   void _locations;
+
+  // 当 refreshKey 变化时重新加载位置列表（新建位置后触发）
+  useEffect(() => {
+    if (refreshKey) {
+      refetch();
+    }
+  }, [refreshKey, refetch]);
 
   // 当前选中的位置
   const selectedLocation = value ? getLocationById(value) : null;

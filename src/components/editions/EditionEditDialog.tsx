@@ -86,6 +86,7 @@ export default function EditionEditDialog({
   // 创建位置对话框状态
   const [showCreateLocation, setShowCreateLocation] = useState(false);
   const [createLocationInitialName, setCreateLocationInitialName] = useState('');
+  const [locationRefreshKey, setLocationRefreshKey] = useState(0);
 
   // 获取同作品的兄弟版本，用于 slot 约束
   const { data: siblingEditions = [] } = useEditionsByArtwork(edition?.artwork_id);
@@ -188,6 +189,7 @@ export default function EditionEditDialog({
     if (formData) {
       setFormData({ ...formData, location_id: location.id });
     }
+    setLocationRefreshKey(prev => prev + 1);
     setShowCreateLocation(false);
   }, [formData]);
 
@@ -287,6 +289,7 @@ export default function EditionEditDialog({
                   setCreateLocationInitialName(initialName);
                   setShowCreateLocation(true);
                 }}
+                refreshKey={locationRefreshKey}
               />
             </div>
 
