@@ -239,6 +239,81 @@ export function validateNumberFormat(
 }
 
 /**
+ * 根据用户输入的前缀，建议下一个可用编号
+ * 如输入 "AAJ-2025-"，返回 "AAJ-2025-004"
+ */
+export function suggestNextNumberForPrefix(
+  prefix: string,
+  existingNumbers: string[]
+): string | null {
+  if (!prefix) return null;
+
+  const upperPrefix = prefix.toUpperCase();
+
+  // 找到所有以该前缀开头的编号
+  const matched = existingNumbers
+    .filter(n => n && n.toUpperCase().startsWith(upperPrefix));
+
+  // 提取序号部分
+  const sequences: { value: number; digits: number }[] = [];
+  for (const num of matched) {
+    const suffix = num.slice(prefix.length);
+    const seqMatch = /^(\d+)$/.exec(suffix);
+    if (seqMatch) {
+      sequences.push({
+        value: parseInt(seqMatch[1], 10),
+        digits: seqMatch[1].length,
+      });
+    }
+  }
+
+  // 推断序号位数（从匹配编号推断，默认 3 位）
+  const seqDigits = sequences.length > 0
+    ? Math.max(...sequences.map(s => s.digits))
+    : 3;
+
+  // 计算下一个序号
+  const maxSeq = sequences.length > 0
+    ? Math.max(...sequences.map(s => s.value))
+    : 0;
+  const nextSeq = maxSeq + 1;
+
+  return prefix + nextSeq.toString().padStart(seqDigits, '0');
+}
+
+/**
+ * 从一个被占用的完整编号出发，找到下一个可用编号
+ * 如 "AAJ-2025-003" 已占用 → 返回 "AAJ-2025-004"（若 004 也占则继续找 005…）
+ */
+export function suggestNextAvailable(
+  number: string,
+  existingNumbers: string[],
+  excludeNumber?: string
+): string | null {
+  if (!number || !number.trim()) return null;
+
+  // 分离前缀和尾部序号：AAJ-2025-003 → prefix="AAJ-2025-", seq="003"
+  const match = /^(.*?)(\d+)$/.exec(number);
+  if (!match) return null;
+
+  const prefix = match[1];
+  const seqStr = match[2];
+  const seqDigits = seqStr.length;
+  let currentSeq = parseInt(seqStr, 10);
+
+  // 从当前序号 +1 开始递增，找到第一个可用的（最多检查 100 个）
+  for (let i = 0; i < 100; i++) {
+    currentSeq++;
+    const candidate = prefix + currentSeq.toString().padStart(seqDigits, '0');
+    if (isNumberUnique(candidate, existingNumbers, excludeNumber)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+/**
  * 检查编号是否唯一
  */
 export function isNumberUnique(

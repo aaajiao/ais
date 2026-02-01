@@ -95,6 +95,7 @@
     "loading": "Loading...",
     "placeholder": "Enter inventory number...",
     "duplicate": "This number already exists",
+    "duplicateWithSuggestion": "Already exists, try",
     "suggestion": "Suggested next number:",
     "pattern": "Format: {{pattern}}",
     "existingCount": "({{count}} existing)",

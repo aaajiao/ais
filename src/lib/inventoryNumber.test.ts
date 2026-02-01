@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   analyzeNumberPattern,
   suggestNextNumber,
+  suggestNextNumberForPrefix,
+  suggestNextAvailable,
   validateNumberFormat,
   isNumberUnique,
 } from './inventoryNumber';
@@ -266,5 +268,97 @@ describe('isNumberUnique', () => {
     it('should still detect duplicates with other numbers', () => {
       expect(isNumberUnique('AAJ-2024-002', ['AAJ-2024-001', 'AAJ-2024-002'], 'AAJ-2024-001')).toBe(false);
     });
+  });
+});
+
+describe('suggestNextNumberForPrefix', () => {
+  it('should return null for empty prefix', () => {
+    expect(suggestNextNumberForPrefix('', ['AAJ-2024-001'])).toBeNull();
+  });
+
+  it('should suggest 001 when no numbers match prefix', () => {
+    expect(suggestNextNumberForPrefix('AAJ-2025-', ['AAJ-2024-001'])).toBe('AAJ-2025-001');
+  });
+
+  it('should suggest next sequence for matching prefix', () => {
+    const existing = ['AAJ-2025-001', 'AAJ-2025-002', 'AAJ-2025-003'];
+    expect(suggestNextNumberForPrefix('AAJ-2025-', existing)).toBe('AAJ-2025-004');
+  });
+
+  it('should find max sequence even when numbers are out of order', () => {
+    const existing = ['AAJ-2025-005', 'AAJ-2025-001', 'AAJ-2025-010'];
+    expect(suggestNextNumberForPrefix('AAJ-2025-', existing)).toBe('AAJ-2025-011');
+  });
+
+  it('should be case insensitive', () => {
+    const existing = ['AAJ-2025-001', 'AAJ-2025-002'];
+    expect(suggestNextNumberForPrefix('aaj-2025-', existing)).toBe('aaj-2025-003');
+  });
+
+  it('should work with slash separators', () => {
+    const existing = ['AAJ/2025/001', 'AAJ/2025/002'];
+    expect(suggestNextNumberForPrefix('AAJ/2025/', existing)).toBe('AAJ/2025/003');
+  });
+
+  it('should preserve digit padding from existing numbers', () => {
+    const existing = ['AAJ-2025-0001', 'AAJ-2025-0002'];
+    expect(suggestNextNumberForPrefix('AAJ-2025-', existing)).toBe('AAJ-2025-0003');
+  });
+
+  it('should only match numbers with purely numeric suffix', () => {
+    const existing = ['AAJ-2025-001', 'AAJ-2025-abc'];
+    expect(suggestNextNumberForPrefix('AAJ-2025-', existing)).toBe('AAJ-2025-002');
+  });
+});
+
+describe('suggestNextAvailable', () => {
+  it('should return null for empty input', () => {
+    expect(suggestNextAvailable('', ['AAJ-2025-001'])).toBeNull();
+  });
+
+  it('should return null for input without trailing digits', () => {
+    expect(suggestNextAvailable('AAJ-', ['AAJ-2025-001'])).toBeNull();
+  });
+
+  it('should suggest next number when current is taken', () => {
+    const existing = ['AAJ-2025-003'];
+    expect(suggestNextAvailable('AAJ-2025-003', existing)).toBe('AAJ-2025-004');
+  });
+
+  it('should skip over consecutive taken numbers', () => {
+    const existing = ['AAJ-2025-003', 'AAJ-2025-004', 'AAJ-2025-005'];
+    expect(suggestNextAvailable('AAJ-2025-003', existing)).toBe('AAJ-2025-006');
+  });
+
+  it('should preserve zero padding', () => {
+    const existing = ['AAJ-2025-0003'];
+    expect(suggestNextAvailable('AAJ-2025-0003', existing)).toBe('AAJ-2025-0004');
+  });
+
+  it('should work with pure numeric format', () => {
+    const existing = ['001', '002'];
+    // 002 is also taken, so next available is 003
+    expect(suggestNextAvailable('001', existing)).toBe('003');
+  });
+
+  it('should skip taken pure numeric numbers', () => {
+    const existing = ['001', '002', '003'];
+    expect(suggestNextAvailable('001', existing)).toBe('004');
+  });
+
+  it('should work with AAJ-NNN format', () => {
+    const existing = ['AAJ-005', 'AAJ-006'];
+    expect(suggestNextAvailable('AAJ-005', existing)).toBe('AAJ-007');
+  });
+
+  it('should respect excludeNumber parameter', () => {
+    const existing = ['AAJ-2025-003', 'AAJ-2025-004'];
+    // Exclude 004, so 004 should be available
+    expect(suggestNextAvailable('AAJ-2025-003', existing, 'AAJ-2025-004')).toBe('AAJ-2025-004');
+  });
+
+  it('should be case insensitive when checking existing numbers', () => {
+    const existing = ['aaj-2025-003', 'AAJ-2025-004'];
+    expect(suggestNextAvailable('AAJ-2025-003', existing)).toBe('AAJ-2025-005');
   });
 });

@@ -7,6 +7,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import {
   suggestNextNumber,
+  suggestNextNumberForPrefix,
+  suggestNextAvailable,
   isNumberUnique,
   validateNumberFormat,
   analyzeNumberPattern,
@@ -32,6 +34,7 @@ export function useInventoryNumber(options: UseInventoryNumberOptions = {}) {
   // 存储 edition ID 到编号的映射，用于编辑时排除当前版本
   const [editionNumberMap, setEditionNumberMap] = useState<Map<string, string>>(new Map());
   const [suggestion, setSuggestion] = useState<NumberSuggestion | null>(null);
+  const [prefixSuggestion, setPrefixSuggestion] = useState<string | null>(null);
   const [pattern, setPattern] = useState<NumberPattern | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isChecking, setIsChecking] = useState(false);
@@ -99,6 +102,7 @@ export function useInventoryNumber(options: UseInventoryNumberOptions = {}) {
     // 空编号不需要校验
     if (!number || !number.trim()) {
       setValidation({ isUnique: true, isValidFormat: true });
+      setPrefixSuggestion(null);
       setIsChecking(false);
       return;
     }
@@ -118,11 +122,25 @@ export function useInventoryNumber(options: UseInventoryNumberOptions = {}) {
       // 检查格式
       const formatResult = validateNumberFormat(number, pattern || undefined);
 
+      // 前缀建议 or 重复建议
+      let nextAvailable: string | null = null;
+      if (!isUnique) {
+        // 编号重复：找下一个可用编号
+        nextAvailable = suggestNextAvailable(number, existingNumbers, excludeNumber);
+        setPrefixSuggestion(nextAvailable);
+      } else if (number.endsWith('-') || number.endsWith('/')) {
+        // 前缀输入：建议下一个序号
+        const suggested = suggestNextNumberForPrefix(number, existingNumbers);
+        setPrefixSuggestion(suggested);
+      } else {
+        setPrefixSuggestion(null);
+      }
+
       setValidation({
         isUnique,
         isValidFormat: formatResult.valid,
         message: !isUnique
-          ? '此编号已存在'
+          ? (nextAvailable || undefined)  // 把推荐编号作为 message 传给 UI
           : formatResult.message,
       });
 
@@ -165,6 +183,11 @@ export function useInventoryNumber(options: UseInventoryNumberOptions = {}) {
     return suggestion?.nextNumber || null;
   }, [suggestion]);
 
+  // 应用前缀建议的编号
+  const applyPrefixSuggestion = useCallback((): string | null => {
+    return prefixSuggestion;
+  }, [prefixSuggestion]);
+
   // 刷新数据
   const refresh = useCallback(() => {
     fetchExistingNumbers();
@@ -174,6 +197,7 @@ export function useInventoryNumber(options: UseInventoryNumberOptions = {}) {
     // 状态
     existingNumbers,
     suggestion,
+    prefixSuggestion,
     pattern,
     isLoading,
     isChecking,
@@ -183,6 +207,7 @@ export function useInventoryNumber(options: UseInventoryNumberOptions = {}) {
     checkNumber,
     checkNumberSync,
     applySuggestion,
+    applyPrefixSuggestion,
     refresh,
   };
 }

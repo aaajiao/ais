@@ -31,11 +31,13 @@ export default function InventoryNumberInput({
 
   const {
     suggestion,
+    prefixSuggestion,
     isLoading,
     isChecking,
     validation,
     checkNumber,
     applySuggestion,
+    applyPrefixSuggestion,
   } = useInventoryNumber({
     excludeEditionId: editionId,
   });
@@ -55,6 +57,19 @@ export default function InventoryNumberInput({
       setShowSuggestionPopup(false);
     }
   }, [applySuggestion, onChange]);
+
+  // 应用前缀建议
+  const handleApplyPrefixSuggestion = useCallback(() => {
+    const suggested = applyPrefixSuggestion();
+    if (suggested) {
+      onChange(suggested);
+    }
+  }, [applyPrefixSuggestion, onChange]);
+
+  // Ghost text: 前缀建议中超出当前输入的部分
+  const ghostSuffix = prefixSuggestion && value && prefixSuggestion.startsWith(value)
+    ? prefixSuggestion.slice(value.length)
+    : null;
 
   // 获取状态图标类型
   type StatusIconType = 'loading' | 'error' | 'warning' | 'success' | null;
@@ -79,10 +94,26 @@ export default function InventoryNumberInput({
     <div className={`relative ${className}`}>
       {/* 输入框 */}
       <div className="relative">
+        {/* Ghost text overlay */}
+        {ghostSuffix && isFocused && (
+          <div
+            className="absolute inset-0 px-3 py-2 pointer-events-none flex items-center"
+            aria-hidden="true"
+          >
+            <span className="invisible font-mono">{value}</span>
+            <span className="text-muted-foreground/40 font-mono">{ghostSuffix}</span>
+          </div>
+        )}
         <input
           type="text"
           value={value}
           onChange={e => onChange(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Tab' && ghostSuffix) {
+              e.preventDefault();
+              handleApplyPrefixSuggestion();
+            }
+          }}
           onFocus={() => {
             setIsFocused(true);
             if (showSuggestion && !value && suggestion?.nextNumber) {
@@ -100,8 +131,10 @@ export default function InventoryNumberInput({
             w-full px-3 py-2 pr-10 bg-background border rounded-lg
             focus:outline-none focus:ring-2
             disabled:opacity-50 disabled:cursor-not-allowed
+            font-mono
             ${getStatusColor() || 'border-border focus:ring-primary/50'}
           `}
+          style={{ background: 'transparent', position: 'relative' }}
         />
 
         {/* 状态图标 */}
@@ -122,13 +155,27 @@ export default function InventoryNumberInput({
       </div>
 
       {/* 状态信息 */}
-      {value && (validation.message || !validation.isUnique) && (
-        <div
-          className={`text-xs mt-1 ${
-            !validation.isUnique ? 'text-red-500' : 'text-yellow-500'
-          }`}
-        >
-          {validation.message || (!validation.isUnique ? t('inventoryNumber.duplicate') : '')}
+      {value && !validation.isUnique && (
+        <div className="text-xs mt-1 text-red-500">
+          {prefixSuggestion ? (
+            <>
+              {t('inventoryNumber.duplicateWithSuggestion')}{' '}
+              <button
+                type="button"
+                onClick={handleApplyPrefixSuggestion}
+                className="font-mono font-medium text-primary hover:underline"
+              >
+                {prefixSuggestion}
+              </button>
+            </>
+          ) : (
+            t('inventoryNumber.duplicate')
+          )}
+        </div>
+      )}
+      {value && validation.isUnique && validation.message && (
+        <div className="text-xs mt-1 text-yellow-500">
+          {validation.message}
         </div>
       )}
 
@@ -157,8 +204,22 @@ export default function InventoryNumberInput({
         </div>
       )}
 
-      {/* 建议链接（输入框下方） */}
-      {showSuggestion && suggestion?.nextNumber && value && isFocused && (
+      {/* 前缀建议链接（输入框下方，按 Tab 接受） */}
+      {prefixSuggestion && isFocused && (
+        <div className="text-xs text-muted-foreground mt-1">
+          <button
+            onClick={handleApplyPrefixSuggestion}
+            className="text-primary hover:underline"
+            type="button"
+          >
+            {prefixSuggestion}
+          </button>
+          <span className="ml-1 opacity-60">← Tab</span>
+        </div>
+      )}
+
+      {/* 全局建议链接（输入框下方） */}
+      {showSuggestion && suggestion?.nextNumber && value && isFocused && !prefixSuggestion && (
         <div className="text-xs text-muted-foreground mt-1">
           <button
             onClick={handleApplySuggestion}

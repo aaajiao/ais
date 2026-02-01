@@ -80,7 +80,7 @@ src/test/
 | `editionStatus` | 93 | 状态流转验证、终态检查、位置需求 |
 | `cacheInvalidation` | 43 | 缓存失效函数、query key 层级 |
 | `imageCompressor` | 40 | 文件类型检测、链接类型识别 |
-| `inventoryNumber` | 37 | 模式检测、编号生成、验证 |
+| `inventoryNumber` | 55 | 模式检测、编号生成、前缀建议、重复推荐、验证 |
 | `md-parser` | 33 | 标题解析、字段提取、图片提取 |
 | `artwork-extractor` | 31 | HTML 图片提取、HTML 清理 |
 | `historyUtils` | 30 | 历史合并、相对时间、描述生成 |

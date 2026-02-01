@@ -95,6 +95,7 @@
     "loading": "加载中...",
     "placeholder": "输入库存编号...",
     "duplicate": "此编号已存在",
+    "duplicateWithSuggestion": "已存在，建议使用",
     "suggestion": "建议的下一个编号:",
     "pattern": "格式: {{pattern}}",
     "existingCount": "(已有 {{count}} 个)",
