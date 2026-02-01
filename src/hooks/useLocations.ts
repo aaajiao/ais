@@ -17,6 +17,7 @@ export interface Location {
   address: string | null;
   contact: string | null;
   notes: string | null;
+  user_id: string;
   created_at: string;
 }
 
