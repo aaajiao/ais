@@ -54,7 +54,6 @@ describe('generateCatalogHTML', () => {
       const html = generateCatalogHTML([], createOptions());
       expect(html).toContain('@page');
       expect(html).toContain('size: A4');
-      expect(html).toContain('page-break-after: always');
     });
 
     it('should include font stack with project fonts', () => {

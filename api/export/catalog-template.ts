@@ -119,12 +119,7 @@ body {
   width: 210mm;
   height: 297mm;
   position: relative;
-  page-break-after: always;
   overflow: hidden;
-}
-
-.page:last-child {
-  page-break-after: auto;
 }
 
 /* Cover Page */
