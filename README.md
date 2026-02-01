@@ -52,7 +52,7 @@ ALLOWED_EMAILS=
 ## Documentation
 
 - `CLAUDE.md` - Development guide
-- `docs/database-deployment.md` - Database setup for new projects
+- `docs/database.md` - Database schema, deployment, and field reference
 - `docs/local-dev.md` - Local development setup
 - `docs/api-reference.md` - AI tools and API endpoints
 - `docs/style-guide.md` - UI/UX design specification

@@ -50,7 +50,7 @@ ALLOWED_EMAILS=
 ## 文档
 
 - `CLAUDE.md` - 项目开发指南
-- `docs/database-deployment.md` - 数据库部署指南
+- `docs/database.md` - 数据库部署、字段说明、RLS
 - `docs/local-dev.md` - 本地开发说明
 - `docs/api-reference.md` - AI 工具和 API 端点
 - `docs/style-guide.md` - UI/UX 设计规范

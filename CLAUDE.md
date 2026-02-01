@@ -101,7 +101,7 @@ CONTEXT7_API_KEY=xxx                # Context7 API（获取最新库文档）
 - `editions` / `edition_files` / `edition_history` 通过 FK 链继承 `artworks.user_id`
 - `gallery_links` 使用 `created_by` 字段
 - 后端 API 使用 service key 绕过 RLS，代码中手动过滤（`ToolContext.userId`）
-- 迁移文件：`supabase/migrations/001_add_user_id_and_rls.sql`
+- 迁移文件（已归档）：`supabase/migrations/archived/001_add_user_id_and_rls.sql`
 
 ## Edition Status Flow
 
@@ -146,9 +146,8 @@ bunx supabase gen types typescript --project-id <id> > src/lib/database.types.ts
 | [docs/testing.md](docs/testing.md) | 测试指南 |
 | [docs/md-import.md](docs/md-import.md) | Markdown 导入逻辑 |
 | [docs/public-links.md](docs/public-links.md) | 公开链接功能 |
-| [docs/database-fields.md](docs/database-fields.md) | 数据库字段说明 |
+| [docs/database.md](docs/database.md) | 数据库部署、字段说明、RLS |
 | [docs/api-reference.md](docs/api-reference.md) | API 参考 |
-| [docs/database-deployment.md](docs/database-deployment.md) | 数据库部署指南 |
 | [docs/project-summary.md](docs/project-summary.md) | 项目总结 |
 | [docs/claude-code-skills.md](docs/claude-code-skills.md) | Claude Code Skills 配置指南 |
 

@@ -1,44 +1,112 @@
-# 数据库字段与 UI 对应关系
+# 数据库
 
-本文档说明数据库各表字段的用途、UI 暴露情况及设计决策。
+## 部署指南
+
+### 全新部署
+
+#### 1. 创建 Supabase 项目
+
+访问 [supabase.com](https://supabase.com) → New Project
+
+#### 2. 执行 Schema 脚本
+
+Supabase Dashboard → SQL Editor → New Query:
+
+1. 复制 `supabase/schema.sql` 的内容
+2. 点击 Run 执行
+
+#### 3. 配置 Google OAuth
+
+Dashboard → Authentication → Providers → Google:
+
+1. 启用 Google provider
+2. 在 [Google Cloud Console](https://console.cloud.google.com/apis/credentials) 创建 OAuth 凭据
+3. 填入 Client ID 和 Secret
+4. 设置回调 URL: `https://<project-ref>.supabase.co/auth/v1/callback`
+
+#### 4. 获取 API 密钥
+
+Dashboard → Settings → API:
+
+| 字段 | 环境变量 |
+|------|----------|
+| Project URL | `VITE_SUPABASE_URL` |
+| anon public | `VITE_SUPABASE_ANON_KEY` |
+| service_role | `SUPABASE_SERVICE_KEY` |
+
+### 验证
+
+执行 schema 后检查：
+
+| 项目 | 预期 |
+|------|------|
+| 数据表 | 7 个 (users, locations, gallery_links, artworks, editions, edition_files, edition_history) |
+| Storage Buckets | 2 个 (thumbnails, edition-files) |
+| RLS | 所有表已启用 |
+
+在 Dashboard → Table Editor 和 Storage 中确认。
+
+### 数据结构
+
+```
+artworks (作品)
+  └── editions (版本)
+        ├── edition_files (附件)
+        └── edition_history (历史)
+
+locations (位置)
+  └── gallery_links (公开链接)
+
+users (用户)
+```
+
+### 注意事项
+
+- `thumbnails` bucket 公开访问（作品缩略图）
+- `edition-files` bucket 需要认证
+- 所有表启用 Row Level Security
+- 认证用户有完整 CRUD 权限
+- 匿名用户只能访问公开链接
 
 ---
 
-## 数据库表概览
+## 字段与 UI 对应关系
+
+### 数据库表概览
 
 | 表名 | 用途 | 状态 |
 |------|------|------|
-| `artworks` | 作品信息 | ✅ 完整实现 |
-| `editions` | 版本信息 | ✅ 完整实现 |
-| `locations` | 位置/机构 | ✅ 完整实现 |
-| `edition_files` | 版本附件 | ✅ 完整实现 |
-| `edition_history` | 版本历史 | ✅ 完整实现 |
-| `gallery_links` | 公开分享链接 | ✅ 完整实现 |
-| `users` | 用户/项目配置 | ✅ 部分使用（name 字段） |
+| `artworks` | 作品信息 | 完整实现 |
+| `editions` | 版本信息 | 完整实现 |
+| `locations` | 位置/机构 | 完整实现 |
+| `edition_files` | 版本附件 | 完整实现 |
+| `edition_history` | 版本历史 | 完整实现 |
+| `gallery_links` | 公开分享链接 | 完整实现 |
+| `users` | 用户/项目配置 | 部分使用（name 字段） |
 
 ---
 
-## users 表
+### users 表
 
-### 现状说明
+#### 现状说明
 
 `users` 表用于存储项目配置信息（艺术家名称）。
 
 **认证机制**：系统使用 Supabase Auth + 环境变量 `ALLOWED_EMAILS` 白名单，用户信息直接来自 Supabase Auth 的 `User` 对象。`users` 表主要用于存储项目级别的配置。
 
-### 表结构
+#### 表结构
 
 | 字段 | 类型 | 说明 | 使用状态 |
 |------|------|------|----------|
-| `id` | UUID | 主键（对应 Supabase Auth user ID） | ✅ 使用 |
-| `email` | TEXT | 邮箱 | ✅ 使用（upsert 时写入） |
-| `name` | TEXT | 艺术家/项目名称 | ✅ **使用** — 存储项目名称（如 "aaajiao"），studio 名称自动拼接为 `${name} studio` |
+| `id` | UUID | 主键（对应 Supabase Auth user ID） | 使用 |
+| `email` | TEXT | 邮箱 | 使用（upsert 时写入） |
+| `name` | TEXT | 艺术家/项目名称 | **使用** — 存储项目名称（如 "aaajiao"），studio 名称自动拼接为 `${name} studio` |
 | `role` | ENUM | admin/editor | 未使用 |
 | `status` | ENUM | active/inactive | 未使用 |
 | `last_login` | TIMESTAMP | 最后登录 | 未使用 |
-| `created_at` | TIMESTAMP | 创建时间 | ✅ 使用 |
+| `created_at` | TIMESTAMP | 创建时间 | 使用 |
 
-### name 字段用途
+#### name 字段用途
 
 `name` 字段存储艺术家/项目名称，用于替换全系统中的硬编码品牌信息：
 
@@ -58,14 +126,7 @@
 
 **设置 UI**：Settings 页面 → Profile Settings 卡片
 
-### 未来可能用途
-
-- **用户偏好设置**：主题、语言、默认模型等
-- **浏览历史**：最近查看的作品/版本
-- **操作审计**：记录用户操作（`created_by` 字段已启用自动填充）
-- **权限控制**：基于角色的功能限制
-
-### created_by 字段说明
+#### created_by 字段说明
 
 以下表已有 `created_by` 字段（TEXT 类型，无外键）：
 - `edition_history.created_by` - 操作记录者
@@ -76,7 +137,7 @@
 
 ---
 
-## artworks 表
+### artworks 表
 
 | 字段 | 类型 | UI 位置 | 说明 |
 |------|------|---------|------|
@@ -101,7 +162,7 @@
 
 ---
 
-## locations 表
+### locations 表
 
 | 字段 | 类型 | UI 位置 | 说明 |
 |------|------|---------|------|
@@ -119,7 +180,7 @@
 
 ---
 
-## edition_files 表
+### edition_files 表
 
 | 字段 | 类型 | UI 位置 | 说明 |
 |------|------|---------|------|
@@ -137,7 +198,7 @@
 
 ---
 
-## edition_history 表
+### edition_history 表
 
 | 字段 | 类型 | UI 位置 | 说明 |
 |------|------|---------|------|
@@ -155,7 +216,7 @@
 | `created_at` | TIMESTAMP | 历史时间线 | 操作时间 |
 | `created_by` | TEXT | 历史时间线 | 创建者 user ID（自动填充，UI 已支持显示） |
 
-### history_action 枚举
+#### history_action 枚举
 
 | 值 | 说明 |
 |------|------|
@@ -172,7 +233,7 @@
 
 ---
 
-## gallery_links 表
+### gallery_links 表
 
 | 字段 | 类型 | UI 位置 | 说明 |
 |------|------|---------|------|
@@ -188,9 +249,9 @@
 
 ---
 
-## editions 表
+### editions 表
 
-### 版本基本信息
+#### 版本基本信息
 
 | 字段 | 类型 | UI 位置 | 说明 |
 |------|------|---------|------|
@@ -202,27 +263,18 @@
 | `status` | ENUM | 编辑对话框 | 见下方状态说明 |
 | `notes` | TEXT | 编辑对话框 | 备注信息 |
 
-### 位置与存储
+#### 位置与存储
 
 | 字段 | 类型 | UI 位置 | 说明 |
 |------|------|---------|------|
 | `location_id` | UUID | 编辑对话框 | **机构/地点**（关联 locations 表） |
 | `storage_detail` | TEXT | 状态与存储（可折叠） | **该地点内的具体位置** |
 
-### 设计说明
-
-`location_id` 和 `storage_detail` 是**层级关系**，不是重复：
-
+`location_id` 和 `storage_detail` 是**层级关系**：
 - `location_id` = 在哪个机构（如：Berlin Warehouse、Gallery XYZ）
 - `storage_detail` = 该机构内的具体位置（如：仓库A，架子3）
 
-示例：一件作品在 "Berlin Warehouse"（location_id），具体放在 "二楼，架子3"（storage_detail）。
-
-### 借出/展览信息
-
-两种不同场景使用独立的日期字段：
-
-### 借出信息（at_gallery 状态）
+#### 借出信息（at_gallery 状态）
 
 用于作品借给画廊或藏家的场景。
 
@@ -231,7 +283,7 @@
 | `consignment_start` | DATE | 借出日期 | 作品借出的日期 |
 | `consignment_end` | DATE | 预计归还 | 预计归还的日期 |
 
-### 展览信息（at_museum 状态）
+#### 展览信息（at_museum 状态）
 
 用于作品参加展览的场景。
 
@@ -240,19 +292,13 @@
 | `loan_start` | DATE | 展期开始 | 展览开始日期 |
 | `loan_end` | DATE | 展期结束 | 展览结束日期 |
 
-### 弃用字段
+#### 弃用字段
 
 | 字段 | 说明 |
 |------|------|
 | `loan_institution` | **已弃用**，借展机构通过 `location_id` 指定 |
 
-### 设计说明
-
-- **at_gallery（借展中）**：借给画廊或藏家，关注"什么时候借出"和"什么时候还"
-- **at_museum（展览中）**：参加展览，关注"展览什么时候开始"和"什么时候结束"
-- **in_transit（运输中）**：不显示日期字段
-
-### 销售信息
+#### 销售信息
 
 | 字段 | 类型 | UI 位置 | 显示条件 |
 |------|------|---------|----------|
@@ -261,24 +307,22 @@
 | `sale_date` | DATE | 编辑对话框 | 状态为 sold 时显示 |
 | `buyer_name` | TEXT | 编辑对话框 | 状态为 sold 时显示 |
 
-### 文档信息
+#### 文档信息
 
 | 字段 | 类型 | UI 位置 | 说明 |
 |------|------|---------|------|
 | `certificate_number` | TEXT | 文档信息区块 | 证书编号（COA） |
 
-### 作品状态
+#### 作品状态
 
 | 字段 | 类型 | UI 位置 | 说明 |
 |------|------|---------|------|
 | `condition` | ENUM | 状态与存储（可折叠） | excellent/good/fair/poor/damaged |
 | `condition_notes` | TEXT | 状态与存储（可折叠） | 状态详细说明 |
 
-### condition 默认值
+新建版本时 `condition` 默认为 `excellent`。查看模式下，仅当状态非 `excellent` 时才显示。
 
-新建版本时 `condition` 默认为 `excellent`。查看模式下，仅当状态非 `excellent` 时才显示，避免信息冗余。
-
-### 版本状态流转
+#### 版本状态流转
 
 ```
 in_production → in_studio → at_gallery / at_museum / in_transit
@@ -298,32 +342,19 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 | `lost` | 遗失 | 已遗失（终态） |
 | `damaged` | 损坏 | 已损坏（终态） |
 
-### UI 区块结构
+#### UI 区块结构
 
 版本编辑对话框分为以下区块：
 
-1. **基本信息**（始终显示）
-   - 版本类型、版本号、状态、位置、库存编号
-
-2. **价格信息**（始终显示）
-   - 价格、币种
-   - 售出日期、买家（仅 sold 状态）
-
+1. **基本信息**（始终显示）— 版本类型、版本号、状态、位置、库存编号
+2. **价格信息**（始终显示）— 价格、币种；售出日期、买家（仅 sold 状态）
 3. **备注**（始终显示）
+4. **借出信息**（仅 at_gallery 状态显示）— 借出日期、预计归还
+5. **展览信息**（仅 at_museum 状态显示）— 展期开始、展期结束
+6. **文档信息**（始终显示）— 证书编号
+7. **状态与存储**（可折叠）— 作品状态、状态备注、存储位置
 
-4. **借出信息**（仅 at_gallery 状态显示）
-   - 借出日期、预计归还
-
-5. **展览信息**（仅 at_museum 状态显示）
-   - 展期开始、展期结束
-
-6. **文档信息**（始终显示）
-   - 证书编号
-
-7. **状态与存储**（可折叠）
-   - 作品状态、状态备注、存储位置
-
-### 时间戳
+#### 时间戳
 
 | 字段 | 说明 |
 |------|------|
@@ -334,18 +365,12 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 
 ## 类型定义同步
 
-TypeScript 类型定义文件与数据库 schema 的对应关系：
-
 | 文件 | 用途 |
 |------|------|
 | `src/lib/database.types.ts` | 由 Supabase CLI 自动生成，与数据库完全同步 |
 | `src/lib/types.ts` | 应用层类型定义，手动维护 |
 
-**重要**：`types.ts` 中的 `Edition` 接口已与数据库同步，包含所有字段：
-- `consignment_start`, `consignment_end` - 借出日期范围
-- `loan_start`, `loan_end` - 展览日期范围
-- `storage_detail` - 存储位置详情
-- `condition_notes` - 品相备注
+`types.ts` 中的 `Edition` 接口已与数据库同步，包含所有字段。
 
 ---
 
@@ -385,7 +410,7 @@ TypeScript 类型定义文件与数据库 schema 的对应关系：
 - 后端 API 使用 service key 绕过 RLS，代码中手动添加 `user_id` 过滤
 - 软删除不在 RLS 中强制，Trash 页面需要读取已删除数据
 - `(SELECT auth.uid())` 子查询模式用于性能优化（每条语句只计算一次）
-- 迁移文件：`supabase/migrations/001_add_user_id_and_rls.sql`
+- 迁移文件归档：`supabase/migrations/archived/001_add_user_id_and_rls.sql`
 
 ---
 
@@ -397,3 +422,4 @@ TypeScript 类型定义文件与数据库 schema 的对应关系：
 | 2025-01-28 | 修复 condition_notes 在 EditionInfoCard 的显示，添加 Gallery Links created_at 显示 |
 | 2025-01-29 | 启用 users 表 name 字段存储项目名称，替换全系统硬编码品牌信息 |
 | 2025-02-01 | 实现 RLS 用户隔离：artworks/locations 添加 user_id 列，启用 created_by 自动填充，所有表强制 RLS |
+| 2025-02-01 | 合并 database-deployment.md 和 database-fields.md 为统一文档；迁移文件归档到 archived/ |

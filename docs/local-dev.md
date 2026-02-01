@@ -5,7 +5,7 @@
 - [Bun](https://bun.sh/) v1.0+
 - [Vercel CLI](https://vercel.com/docs/cli) v30+
 - [Git](https://git-scm.com/)
-- 已部署的 Supabase 项目（见 `docs/database-deployment.md`）
+- 已部署的 Supabase 项目（见 `docs/database.md`）
 
 ```bash
 # 安装 Vercel CLI（如未安装）
