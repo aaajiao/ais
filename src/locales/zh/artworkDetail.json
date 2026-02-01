@@ -55,7 +55,8 @@
     "inventoryPlaceholder": "AAJ-2025-001",
     "notes": "备注",
     "noEditions": "暂无版本数据，点击上方按钮添加",
-    "adding": "添加中..."
+    "adding": "添加中...",
+    "allAdded": "所有版本已添加完毕。"
   },
   "close": "关闭",
   "saving": "保存中...",

@@ -6,7 +6,9 @@ export {
   type NewEditionData,
   type ArtworkData,
   type EditionData,
+  type EditionSlot,
   initFormDataFromArtwork,
   formatEditionNumber,
-  createDefaultNewEdition,
+  getAvailableEditionSlots,
+  createNewEditionFromSlot,
 } from './types';

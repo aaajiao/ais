@@ -55,7 +55,8 @@
     "inventoryPlaceholder": "AAJ-2025-001",
     "notes": "Notes",
     "noEditions": "No editions yet. Click the button above to add one.",
-    "adding": "Adding..."
+    "adding": "Adding...",
+    "allAdded": "All editions have been added."
   },
   "close": "Close",
   "saving": "Saving...",

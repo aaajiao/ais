@@ -16,7 +16,8 @@ import {
   type ArtworkFormData,
   type NewEditionData,
   initFormDataFromArtwork,
-  createDefaultNewEdition,
+  getAvailableEditionSlots,
+  createNewEditionFromSlot,
 } from '@/components/artwork';
 
 export default function ArtworkDetail() {
@@ -50,7 +51,13 @@ export default function ArtworkDetail() {
   const [showAddEdition, setShowAddEdition] = useState(false);
   const [addingEdition, setAddingEdition] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
-  const [newEdition, setNewEdition] = useState<NewEditionData>(createDefaultNewEdition(0));
+  const [newEdition, setNewEdition] = useState<NewEditionData>({
+    edition_type: 'numbered',
+    edition_number: 1,
+    status: 'in_studio',
+    inventory_number: '',
+    notes: '',
+  });
 
   const loading = artworkLoading || editionsLoading;
 
@@ -136,8 +143,12 @@ export default function ArtworkDetail() {
       // Invalidate and refetch editions
       await invalidateOnEditionCreate(queryClient, id);
 
-      // 重置表单
-      setNewEdition(createDefaultNewEdition(editions.length + 1));
+      // 重置表单：选下一个可用 slot
+      const updatedEditions = [...editions, { id: '', edition_type: newEdition.edition_type, edition_number: newEdition.edition_number, status: newEdition.status, inventory_number: newEdition.inventory_number || null }];
+      const nextSlots = getAvailableEditionSlots(artwork.edition_total ?? null, artwork.ap_total ?? null, artwork.is_unique ?? null, updatedEditions);
+      if (nextSlots.length > 0) {
+        setNewEdition(createNewEditionFromSlot(nextSlots[0]));
+      }
       setShowAddEdition(false);
     } catch (err) {
       console.error('Add edition failed:', err);
@@ -275,10 +286,20 @@ export default function ArtworkDetail() {
       <EditionsSection
         editions={editions}
         editionTotal={artwork.edition_total}
+        apTotal={artwork.ap_total}
+        isUnique={artwork.is_unique}
         showAddEdition={showAddEdition}
         addingEdition={addingEdition}
         newEdition={newEdition}
-        onShowAddEdition={setShowAddEdition}
+        onShowAddEdition={(show) => {
+          if (show) {
+            const slots = getAvailableEditionSlots(artwork.edition_total ?? null, artwork.ap_total ?? null, artwork.is_unique ?? null, editions);
+            if (slots.length > 0) {
+              setNewEdition(createNewEditionFromSlot(slots[0]));
+            }
+          }
+          setShowAddEdition(show);
+        }}
         onNewEditionChange={setNewEdition}
         onAddEdition={handleAddEdition}
       />

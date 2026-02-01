@@ -89,12 +89,68 @@ export function formatEditionNumber(
 }
 
 /**
- * 创建默认的新版本数据
+ * 版本槽位（用于下拉选择）
  */
-export function createDefaultNewEdition(existingEditionsCount: number): NewEditionData {
+export interface EditionSlot {
+  /** 下拉显示文本："1", "2", "AP1", "Unique" */
+  label: string;
+  /** 用于 select value 的唯一键："numbered:1", "ap:1", "unique:0" */
+  value: string;
+  edition_type: 'numbered' | 'ap' | 'unique';
+  edition_number: number;
+}
+
+/**
+ * 根据作品配额和已有版本，生成可选的版本槽位列表
+ */
+export function getAvailableEditionSlots(
+  editionTotal: number | null,
+  apTotal: number | null,
+  isUnique: boolean | null,
+  existingEditions: EditionData[]
+): EditionSlot[] {
+  const slots: EditionSlot[] = [];
+
+  if (isUnique) {
+    const hasUnique = existingEditions.some(e => e.edition_type === 'unique');
+    if (!hasUnique) {
+      slots.push({ label: 'Unique', value: 'unique:0', edition_type: 'unique', edition_number: 0 });
+    }
+    return slots;
+  }
+
+  // Numbered slots
+  const existingNumbered = new Set(
+    existingEditions.filter(e => e.edition_type === 'numbered').map(e => e.edition_number)
+  );
+  for (let i = 1; i <= (editionTotal || 0); i++) {
+    if (!existingNumbered.has(i)) {
+      slots.push({ label: String(i), value: `numbered:${i}`, edition_type: 'numbered', edition_number: i });
+    }
+  }
+
+  // AP slots
+  const existingAp = new Set(
+    existingEditions.filter(e => e.edition_type === 'ap').map(e => e.edition_number)
+  );
+  const apCount = apTotal || 0;
+  for (let i = 1; i <= apCount; i++) {
+    if (!existingAp.has(i)) {
+      const label = apCount === 1 ? 'AP' : `AP${i}`;
+      slots.push({ label, value: `ap:${i}`, edition_type: 'ap', edition_number: i });
+    }
+  }
+
+  return slots;
+}
+
+/**
+ * 从槽位创建新版本数据
+ */
+export function createNewEditionFromSlot(slot: EditionSlot): NewEditionData {
   return {
-    edition_type: 'numbered',
-    edition_number: existingEditionsCount + 1,
+    edition_type: slot.edition_type,
+    edition_number: slot.edition_number,
     status: 'in_studio',
     inventory_number: '',
     notes: '',

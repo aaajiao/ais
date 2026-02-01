@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   initFormDataFromArtwork,
   formatEditionNumber,
-  createDefaultNewEdition,
+  getAvailableEditionSlots,
+  createNewEditionFromSlot,
 } from './types';
 
 describe('initFormDataFromArtwork', () => {
@@ -154,34 +155,110 @@ describe('formatEditionNumber', () => {
   });
 });
 
-describe('createDefaultNewEdition', () => {
-  it('should create default edition data with edition_number = count + 1', () => {
-    const result = createDefaultNewEdition(0);
+describe('getAvailableEditionSlots', () => {
+  it('should generate numbered slots based on edition_total', () => {
+    const slots = getAvailableEditionSlots(3, 0, false, []);
+
+    expect(slots).toEqual([
+      { label: '1', value: 'numbered:1', edition_type: 'numbered', edition_number: 1 },
+      { label: '2', value: 'numbered:2', edition_type: 'numbered', edition_number: 2 },
+      { label: '3', value: 'numbered:3', edition_type: 'numbered', edition_number: 3 },
+    ]);
+  });
+
+  it('should include AP slots when ap_total is set', () => {
+    const slots = getAvailableEditionSlots(2, 1, false, []);
+
+    expect(slots).toHaveLength(3);
+    expect(slots[2]).toEqual({ label: 'AP', value: 'ap:1', edition_type: 'ap', edition_number: 1 });
+  });
+
+  it('should label AP slots with numbers when ap_total > 1', () => {
+    const slots = getAvailableEditionSlots(1, 2, false, []);
+
+    expect(slots).toHaveLength(3);
+    expect(slots[1]).toEqual({ label: 'AP1', value: 'ap:1', edition_type: 'ap', edition_number: 1 });
+    expect(slots[2]).toEqual({ label: 'AP2', value: 'ap:2', edition_type: 'ap', edition_number: 2 });
+  });
+
+  it('should filter out already added editions', () => {
+    const existing = [
+      { id: '1', edition_type: 'numbered', edition_number: 2, status: 'in_studio' as const, inventory_number: null },
+    ];
+    const slots = getAvailableEditionSlots(3, 0, false, existing);
+
+    expect(slots).toHaveLength(2);
+    expect(slots.map(s => s.label)).toEqual(['1', '3']);
+  });
+
+  it('should filter out already added AP editions', () => {
+    const existing = [
+      { id: '1', edition_type: 'ap', edition_number: 1, status: 'in_studio' as const, inventory_number: null },
+    ];
+    const slots = getAvailableEditionSlots(0, 2, false, existing);
+
+    expect(slots).toHaveLength(1);
+    expect(slots[0].label).toBe('AP2');
+  });
+
+  it('should return single Unique slot for unique artworks', () => {
+    const slots = getAvailableEditionSlots(null, null, true, []);
+
+    expect(slots).toEqual([
+      { label: 'Unique', value: 'unique:0', edition_type: 'unique', edition_number: 0 },
+    ]);
+  });
+
+  it('should return empty for unique artwork that already has edition', () => {
+    const existing = [
+      { id: '1', edition_type: 'unique', edition_number: null, status: 'in_studio' as const, inventory_number: null },
+    ];
+    const slots = getAvailableEditionSlots(null, null, true, existing);
+
+    expect(slots).toHaveLength(0);
+  });
+
+  it('should return empty when all editions are added', () => {
+    const existing = [
+      { id: '1', edition_type: 'numbered', edition_number: 1, status: 'in_studio' as const, inventory_number: null },
+      { id: '2', edition_type: 'numbered', edition_number: 2, status: 'in_studio' as const, inventory_number: null },
+    ];
+    const slots = getAvailableEditionSlots(2, 0, false, existing);
+
+    expect(slots).toHaveLength(0);
+  });
+
+  it('should handle null edition_total and ap_total', () => {
+    const slots = getAvailableEditionSlots(null, null, false, []);
+
+    expect(slots).toHaveLength(0);
+  });
+});
+
+describe('createNewEditionFromSlot', () => {
+  it('should create NewEditionData from a numbered slot', () => {
+    const slot = { label: '3', value: 'numbered:3', edition_type: 'numbered' as const, edition_number: 3 };
+    const result = createNewEditionFromSlot(slot);
 
     expect(result).toEqual({
       edition_type: 'numbered',
-      edition_number: 1,
+      edition_number: 3,
       status: 'in_studio',
       inventory_number: '',
       notes: '',
     });
   });
 
-  it('should increment edition_number based on existing count', () => {
-    const result = createDefaultNewEdition(5);
+  it('should create NewEditionData from an AP slot', () => {
+    const slot = { label: 'AP1', value: 'ap:1', edition_type: 'ap' as const, edition_number: 1 };
+    const result = createNewEditionFromSlot(slot);
 
-    expect(result.edition_number).toBe(6);
-  });
-
-  it('should always use in_studio as default status', () => {
-    const result = createDefaultNewEdition(10);
-
-    expect(result.status).toBe('in_studio');
-  });
-
-  it('should always use numbered as default edition_type', () => {
-    const result = createDefaultNewEdition(3);
-
-    expect(result.edition_type).toBe('numbered');
+    expect(result).toEqual({
+      edition_type: 'ap',
+      edition_number: 1,
+      status: 'in_studio',
+      inventory_number: '',
+      notes: '',
+    });
   });
 });
