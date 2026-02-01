@@ -83,10 +83,7 @@ ${getInlineFontCSS()}
 ${getCatalogCSS()}
 </style>
 </head>
-<body>
-${coverPage}
-${artworkPages}
-</body>
+<body>${coverPage}${artworkPages}</body>
 </html>`;
 }
 
@@ -112,6 +109,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
+  font-size: 0;
 }
 
 /* Page Layout */
@@ -119,7 +117,12 @@ body {
   width: 210mm;
   height: 297mm;
   position: relative;
-  overflow: hidden;
+  font-size: 10pt;
+}
+
+.page + .page {
+  break-before: page;
+  page-break-before: always;
 }
 
 /* Cover Page */
@@ -129,7 +132,6 @@ body {
   justify-content: center;
   align-items: flex-start;
   padding: 40mm 30mm;
-  height: 100%;
 }
 
 .cover-artist {
@@ -194,7 +196,6 @@ body {
   padding: 20mm 15mm 25mm 15mm;
   display: flex;
   flex-direction: column;
-  height: 100%;
 }
 
 /* Image Area */
@@ -331,8 +332,7 @@ function generateCoverPage(options: CatalogOptions, totalItems: number): string 
   const year = new Date().getFullYear();
   const artist = options.artistName || 'aaajiao';
   const studio = `${artist} studio`;
-  return `
-<div class="page cover">
+  return `<div class="page cover">
   <div class="cover-artist">${escapeHtml(artist)}</div>
   <div class="cover-location">${escapeHtml(options.locationName)}</div>
   <div class="cover-subtitle">Selected Works</div>
@@ -399,8 +399,7 @@ function generateArtworkPage(
     metaRows.push(metaRow('Price', item.price));
   }
 
-  return `
-<div class="page artwork-page">
+  return `<div class="page artwork-page">
   ${imageSection}
   <div class="artwork-info">
     <div class="artwork-title-en">${escapeHtml(item.titleEn)}${item.sourceUrl ? ` <a class="title-link" href="${escapeHtml(item.sourceUrl)}" target="_blank"><svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>` : ''}</div>
