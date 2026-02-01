@@ -3,11 +3,13 @@
  * 完全独立的组件，内部管理表单状态和保存逻辑
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { invalidateOnEditionEdit } from '@/lib/cacheInvalidation';
+import { useEditionsByArtwork } from '@/hooks/queries/useEditions';
+import { getAvailableEditionSlots } from '@/components/artwork/types';
 import type { EditionStatus, CurrencyType, ConditionType, Database } from '@/lib/database.types';
 
 import { Button } from '@/components/ui/button';
@@ -52,7 +54,7 @@ interface EditionFormData {
 
 // 版本数据类型（包含关联数据）
 type Edition = Database['public']['Tables']['editions']['Row'] & {
-  artwork?: { title_en: string; edition_total: number | null } | null;
+  artwork?: { title_en: string; edition_total: number | null; ap_total: number | null; is_unique: boolean | null } | null;
   location?: { name: string } | null;
 };
 
@@ -84,6 +86,26 @@ export default function EditionEditDialog({
   // 创建位置对话框状态
   const [showCreateLocation, setShowCreateLocation] = useState(false);
   const [createLocationInitialName, setCreateLocationInitialName] = useState('');
+
+  // 获取同作品的兄弟版本，用于 slot 约束
+  const { data: siblingEditions = [] } = useEditionsByArtwork(edition?.artwork_id);
+
+  // 计算可选的版本槽位（排除当前版本自身，因为它正在被编辑）
+  const availableSlots = useMemo(() => {
+    if (!edition?.artwork) return [];
+    const otherEditions = siblingEditions
+      .filter(e => e.id !== edition.id)
+      .map(e => ({ id: e.id, edition_type: e.edition_type, edition_number: e.edition_number, status: e.status, inventory_number: e.inventory_number }));
+    return getAvailableEditionSlots(
+      edition.artwork.edition_total,
+      edition.artwork.ap_total,
+      edition.artwork.is_unique,
+      otherEditions
+    );
+  }, [edition, siblingEditions]);
+
+  // slot 模式：有配额信息时用下拉
+  const hasSlots = availableSlots.length > 0;
 
   // 初始化表单数据
   useEffect(() => {
@@ -186,35 +208,57 @@ export default function EditionEditDialog({
           )}
 
           <div className="space-y-4">
-            {/* 版本类型 */}
-            <div>
-              <label className="block text-sm font-medium mb-1">{t('editDialog.editionType')}</label>
-              <select
-                value={formData.edition_type}
-                onChange={(e) => setFormData({ ...formData, edition_type: e.target.value as 'numbered' | 'ap' | 'unique' })}
-                className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option value="numbered">{t('editDialog.numbered')}</option>
-                <option value="ap">{t('editDialog.ap')}</option>
-                <option value="unique">{t('editDialog.unique')}</option>
-              </select>
-            </div>
-
-            {/* 版本号（非独版时显示） */}
-            {formData.edition_type !== 'unique' && (
+            {/* 版本号（slot 下拉或自由输入 fallback） */}
+            {hasSlots ? (
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  {formData.edition_type === 'ap' ? t('editDialog.apNumber') : t('editDialog.editionNumber')}
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={formData.edition_number || ''}
-                  onChange={(e) => setFormData({ ...formData, edition_number: e.target.value ? parseInt(e.target.value) : null })}
+                <label className="block text-sm font-medium mb-1">{t('editDialog.editionNumber')}</label>
+                <select
+                  value={`${formData.edition_type}:${formData.edition_number ?? 0}`}
+                  onChange={(e) => {
+                    const slot = availableSlots.find(s => s.value === e.target.value);
+                    if (slot) {
+                      setFormData({ ...formData, edition_type: slot.edition_type, edition_number: slot.edition_number });
+                    }
+                  }}
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder={t('editDialog.numberPlaceholder')}
-                />
+                >
+                  {availableSlots.map(slot => (
+                    <option key={slot.value} value={slot.value}>
+                      {slot.label}
+                    </option>
+                  ))}
+                </select>
               </div>
+            ) : (
+              <>
+                <div>
+                  <label className="block text-sm font-medium mb-1">{t('editDialog.editionType')}</label>
+                  <select
+                    value={formData.edition_type}
+                    onChange={(e) => setFormData({ ...formData, edition_type: e.target.value as 'numbered' | 'ap' | 'unique' })}
+                    className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="numbered">{t('editDialog.numbered')}</option>
+                    <option value="ap">{t('editDialog.ap')}</option>
+                    <option value="unique">{t('editDialog.unique')}</option>
+                  </select>
+                </div>
+                {formData.edition_type !== 'unique' && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      {formData.edition_type === 'ap' ? t('editDialog.apNumber') : t('editDialog.editionNumber')}
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={formData.edition_number || ''}
+                      onChange={(e) => setFormData({ ...formData, edition_number: e.target.value ? parseInt(e.target.value) : null })}
+                      className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      placeholder={t('editDialog.numberPlaceholder')}
+                    />
+                  </div>
+                )}
+              </>
             )}
 
             {/* 状态 */}

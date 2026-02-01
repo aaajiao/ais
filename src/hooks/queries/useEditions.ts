@@ -17,7 +17,7 @@ type Location = Database['public']['Tables']['locations']['Row'];
 interface EditionQueryResult extends Edition {
   artwork: Pick<
     Artwork,
-    'id' | 'title_en' | 'title_cn' | 'thumbnail_url' | 'edition_total' | 'deleted_at'
+    'id' | 'title_en' | 'title_cn' | 'thumbnail_url' | 'edition_total' | 'ap_total' | 'is_unique' | 'deleted_at'
   > | null;
   location: Pick<Location, 'id' | 'name' | 'address' | 'contact' | 'notes'> | null;
 }
@@ -25,7 +25,7 @@ interface EditionQueryResult extends Edition {
 export interface EditionWithDetails extends Edition {
   artwork?: Pick<
     Artwork,
-    'id' | 'title_en' | 'title_cn' | 'thumbnail_url' | 'edition_total'
+    'id' | 'title_en' | 'title_cn' | 'thumbnail_url' | 'edition_total' | 'ap_total' | 'is_unique'
   > | null;
   location?: Pick<Location, 'id' | 'name' | 'address' | 'contact' | 'notes'> | null;
 }
@@ -45,7 +45,7 @@ export async function fetchEditionsPaginated(params: {
     .select(
       `
       *,
-      artwork:artworks!left(id, title_en, title_cn, thumbnail_url, edition_total, deleted_at),
+      artwork:artworks!left(id, title_en, title_cn, thumbnail_url, edition_total, ap_total, is_unique, deleted_at),
       location:locations!left(id, name, address, contact, notes)
     `
     )
@@ -108,6 +108,8 @@ export async function fetchEditionsPaginated(params: {
           title_cn: item.artwork.title_cn,
           thumbnail_url: item.artwork.thumbnail_url,
           edition_total: item.artwork.edition_total,
+          ap_total: item.artwork.ap_total,
+          is_unique: item.artwork.is_unique,
         }
       : null,
     location: item.location,
@@ -189,7 +191,7 @@ export async function fetchEditionDetail(
     .select(
       `
       *,
-      artwork:artworks!left(id, title_en, title_cn, thumbnail_url, edition_total, deleted_at),
+      artwork:artworks!left(id, title_en, title_cn, thumbnail_url, edition_total, ap_total, is_unique, deleted_at),
       location:locations!left(id, name, address, contact, notes)
     `
     )
@@ -215,6 +217,8 @@ export async function fetchEditionDetail(
           title_cn: rawData.artwork.title_cn,
           thumbnail_url: rawData.artwork.thumbnail_url,
           edition_total: rawData.artwork.edition_total,
+          ap_total: rawData.artwork.ap_total,
+          is_unique: rawData.artwork.is_unique,
         }
       : null,
     location: rawData.location,
