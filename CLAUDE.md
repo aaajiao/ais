@@ -18,7 +18,8 @@ bun run test:run      # 运行测试（使用 vitest）
 - **UI**: shadcn/ui + Lucide icons + react-i18next
 - **Data**: TanStack React Query + Virtual + IndexedDB 离线缓存
 - **Backend**: Vercel Functions + Supabase (PostgreSQL)
-- **AI**: Vercel AI SDK + Claude/GPT
+- **AI**: Vercel AI SDK + Claude/GPT + streamdown（流式 Markdown 渲染）
+- **PDF**: Puppeteer + @sparticuz/chromium-min
 
 ## Project Structure
 
@@ -26,11 +27,14 @@ bun run test:run      # 运行测试（使用 vitest）
 api/                    # Serverless API
 ├── chat.ts            # AI 聊天入口
 ├── models.ts          # 可用模型列表
-├── lib/               # 工具函数（auth, search-utils, artwork-extractor, image-downloader, model-provider, system-prompt）
-├── tools/             # AI 工具（9 个工具 + types + index）
+├── fetch-title.ts     # URL 标题抓取（OG metadata）
+├── profile.ts         # 用户资料 API
+├── lib/               # 工具函数（auth, search-utils, artwork-extractor, image-downloader, model-provider, system-prompt, i18n, message-utils）
+├── tools/             # AI 工具（10 个工具 + types + index）
 ├── import/            # 导入 API（md, migrate-thumbnails, process-image）
-├── export/            # 导出 API（pdf, catalog-template, font-loader, md, shared, fonts/）
+├── export/            # 导出 API（pdf, pdf-helpers, catalog-template, font-loader, md, shared, fonts/）
 ├── links/             # 公开链接 API
+├── profile/           # 公开资料 API（public）
 └── view/              # 公开查看 API
 src/
 ├── components/        # UI 组件（按功能模块化）
@@ -39,14 +43,23 @@ src/
 │   ├── editions/      # 版本管理（HistoryTimeline, HistoryEntry, EditionInfoCard, EditionEditDialog, LocationDialog, historyUtils, editionDetailUtils）
 │   ├── files/         # 文件管理（FileList, FileListItem, FileGridItem, FilePreviewModal, ImageThumbnail）
 │   ├── settings/      # 设置（ModelSettings, ExportSettings, AccountSettings, useModelSettings, useExport）
-│   ├── chat/          # 聊天（MessageBubble, EditableConfirmCard, ConfirmDialog, CollapsibleChatHistory）
+│   ├── chat/          # 聊天（MessageBubble, MemoizedMarkdown, EditableConfirmCard, ConfirmDialog, CollapsibleChatHistory）
 │   ├── import/        # 导入（MDImport, UploadStep, PreviewStep, ResultStep, ThumbnailMigration）
 │   ├── export/        # 导出（ExportDialog, CatalogDialog, EditionSelector）
 │   ├── locations/     # 位置（LocationItem）
 │   ├── pwa/           # PWA（ReloadPrompt）
 │   └── ui/            # 基础 UI 组件
-├── hooks/queries/     # React Query hooks
-├── lib/               # 工具、类型、Supabase
+├── hooks/             # 自定义 hooks
+│   ├── queries/       # React Query hooks
+│   ├── useAuth.ts     # 认证
+│   ├── useFileUpload.ts    # 文件上传
+│   ├── useInfiniteVirtualList.ts  # 虚拟列表
+│   ├── useInventoryNumber.ts      # 库存编号智能补全
+│   ├── useLinks.ts    # 画廊链接
+│   ├── useLocations.ts     # 位置管理
+│   ├── useNetworkStatus.ts # 网络状态
+│   └── useTheme.ts    # 主题
+├── lib/               # 工具、类型、Supabase、exporters/
 ├── locales/           # i18n 翻译
 ├── pages/             # 路由页面（13 个）
 └── test/              # 测试工具和 mocks
@@ -62,6 +75,8 @@ docs/                   # 详细文档
 | `src/lib/queryKeys.ts` | 查询键工厂 |
 | `api/tools/index.ts` | AI 工具注册 |
 | `api/lib/system-prompt.ts` | AI 系统提示词（中文） |
+| `src/lib/inventoryNumber.ts` | 库存编号智能补全逻辑 |
+| `src/components/chat/MemoizedMarkdown.tsx` | Streamdown Markdown 渲染 |
 
 ## Environment Variables
 
@@ -133,6 +148,8 @@ bunx supabase gen types typescript --project-id <id> > src/lib/database.types.ts
 | [docs/public-links.md](docs/public-links.md) | 公开链接功能 |
 | [docs/database-fields.md](docs/database-fields.md) | 数据库字段说明 |
 | [docs/api-reference.md](docs/api-reference.md) | API 参考 |
+| [docs/database-deployment.md](docs/database-deployment.md) | 数据库部署指南 |
+| [docs/project-summary.md](docs/project-summary.md) | 项目总结 |
 | [docs/claude-code-skills.md](docs/claude-code-skills.md) | Claude Code Skills 配置指南 |
 
 ## Claude Code Skills
