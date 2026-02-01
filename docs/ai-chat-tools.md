@@ -28,6 +28,7 @@
 
 - "找所有用磁铁的作品" → materials 搜索 + AI 查询扩展
 - "所有 AP 版本" → edition_type 过滤
+- "XXX 画廊有哪些作品" / "在北京的作品" / "在德国的版本" → location 搜索（匹配名称、城市、国家）
 - "品相为差的版本" → condition 过滤
 - "某某买的作品" → buyer_name 搜索
 - "售价超过 10000 的版本" → price_min 搜索

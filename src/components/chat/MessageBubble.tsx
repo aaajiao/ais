@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import type { UIMessage } from 'ai';
 import EditableConfirmCard, { type ConfirmCardData } from './EditableConfirmCard';
+import { StreamdownMarkdown } from './MemoizedMarkdown';
 import { invalidateOnEditionEdit } from '@/lib/cacheInvalidation';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
 import type { EditionStatus } from '@/lib/database.types';
@@ -84,9 +85,15 @@ const MessageBubble = memo(function MessageBubble({ message, onConfirmUpdate }: 
       >
         {/* 消息内容 */}
         {textContent && (
-          <div className="whitespace-pre-wrap break-words">
-            {textContent}
-          </div>
+          isUser ? (
+            <div className="whitespace-pre-wrap break-words">
+              {textContent}
+            </div>
+          ) : (
+            <div className="break-words text-sm leading-snug">
+              <StreamdownMarkdown content={textContent} />
+            </div>
+          )
         )}
 
         {/* 工具调用结果 */}

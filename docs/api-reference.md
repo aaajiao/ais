@@ -115,7 +115,7 @@ AI: [调用 search_artworks { materials: "磁铁" }]
 | `artwork_title` | string | 否 | 作品标题 |
 | `edition_number` | number | 否 | 版本号 |
 | `status` | string | 否 | 状态（见下方状态列表） |
-| `location` | string | 否 | 位置名称或城市 |
+| `location` | string | 否 | 位置名称、城市或国家 |
 | `edition_type` | enum | 否 | 版本类型：`numbered` / `ap` / `unique` |
 | `condition` | enum | 否 | 品相：`excellent` / `good` / `fair` / `poor` / `damaged` |
 | `inventory_number` | string | 否 | 库存编号 |

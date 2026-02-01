@@ -54,6 +54,24 @@ export function createSearchEditionsTool(ctx: ToolContext) {
         artworkIds = artworks?.map(a => a.id) || [];
       }
 
+      // 预查询位置 ID（按名称、城市、国家匹配）
+      let locationIds: string[] = [];
+      if (location) {
+        const sanitized = sanitizeSearchTerm(location);
+        const { data: locations } = await supabase
+          .from('locations')
+          .select('id')
+          .eq('user_id', ctx.userId)
+          .or(`name.ilike.%${sanitized}%,city.ilike.%${sanitized}%,country.ilike.%${sanitized}%`);
+        locationIds = locations?.map(l => l.id) || [];
+        if (locationIds.length === 0) {
+          return {
+            editions: [],
+            message: t('editions.noResultsWithTerms', { terms: location })
+          };
+        }
+      }
+
       // 搜索版本（限定当前用户的作品）
       let queryBuilder = supabase
         .from('editions')
@@ -66,6 +84,9 @@ export function createSearchEditionsTool(ctx: ToolContext) {
 
       if (artworkIds.length > 0) {
         queryBuilder = queryBuilder.in('artwork_id', artworkIds);
+      }
+      if (locationIds.length > 0) {
+        queryBuilder = queryBuilder.in('location_id', locationIds);
       }
       if (edition_number !== undefined) {
         queryBuilder = queryBuilder.eq('edition_number', edition_number);
@@ -100,20 +121,15 @@ export function createSearchEditionsTool(ctx: ToolContext) {
         queryBuilder = queryBuilder.lte('sale_date', sold_before);
       }
 
-      const { data, error } = await queryBuilder.limit(20);
+      // 位置查询时提高限制，确保返回完整结果
+      const queryLimit = location ? 50 : 20;
+      const { data, error } = await queryBuilder.limit(queryLimit);
 
       if (error) {
         return { error: error.message };
       }
 
-      // 如果指定了位置，进行过滤
-      let editions = data || [];
-      if (location) {
-        editions = editions.filter(e =>
-          e.locations?.name?.toLowerCase().includes(location.toLowerCase()) ||
-          e.locations?.city?.toLowerCase().includes(location.toLowerCase())
-        );
-      }
+      const editions = data || [];
 
       if (editions.length === 0) {
         const searchTerms = [artwork_title, status, location].filter(Boolean).join('、');
