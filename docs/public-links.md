@@ -47,6 +47,14 @@
 
 ---
 
+## 权限与隔离
+
+- 每个公开链接由创建者拥有（`created_by = auth.uid()`）
+- 用户只能管理自己创建的链接（RLS + API 层双重验证）
+- 公开查看页面通过 service key 绕过 RLS，匿名用户可访问 `status = 'active'` 的链接
+
+---
+
 ## 关键文件
 
 - `api/links/index.ts` - 链接 CRUD API

@@ -162,11 +162,24 @@ aaajiao-inventory/
 │   ├── lib/               # 工具函数和类型
 │   └── locales/           # i18n 翻译
 ├── public/                 # 静态资源
-├── supabase/              # 数据库 schema
+├── supabase/              # 数据库 schema + 迁移文件
 ├── .vercel/               # Vercel 项目链接（自动生成）
 ├── .env.local             # 本地环境变量（自动生成）
 └── vercel-dev.json        # 本地开发配置
 ```
+
+## 数据库迁移
+
+数据库变更通过 `supabase/migrations/` 目录管理。在 Supabase Dashboard → SQL Editor 中手动执行：
+
+```bash
+# 查看待执行的迁移文件
+ls supabase/migrations/
+```
+
+**部署顺序**：先部署代码（确保写入包含 user_id），再执行数据库迁移（添加 RLS 策略）。
+
+---
 
 ## 常见问题
 

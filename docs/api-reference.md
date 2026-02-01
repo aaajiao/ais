@@ -705,3 +705,17 @@ new_tool: tool({
 - 邮箱白名单验证（`ALLOWED_EMAILS`）
 - SQL 注入防护：搜索词自动转义特殊字符
 - 修改操作需要用户确认（确认卡片机制）
+
+### RLS 数据隔离
+
+所有表启用 `FORCE ROW LEVEL SECURITY`，用户只能访问自己的数据：
+
+| 表 | 隔离方式 |
+|----|---------|
+| `artworks` / `locations` | `user_id = auth.uid()` |
+| `editions` / `edition_files` / `edition_history` | 通过 FK 链继承 `artworks.user_id` |
+| `gallery_links` | `created_by = auth.uid()` |
+
+**前端**（anon key）：RLS 自动过滤，无需代码处理。
+
+**后端 API**（service key，绕过 RLS）：代码中手动添加 `.eq('user_id', userId)` 过滤。AI 工具通过 `ToolContext.userId` 传递当前用户 ID。

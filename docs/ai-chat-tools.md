@@ -53,6 +53,19 @@
 
 ---
 
+## 用户数据隔离
+
+所有 AI 工具的搜索和修改操作自动隔离为当前用户的数据：
+
+- `ToolContext` 包含 `userId` 字段（来自 `auth.uid()`）
+- 所有搜索工具添加 `.eq('user_id', ctx.userId)` 过滤
+- 写入操作自动设置 `user_id` / `created_by`
+- 修改操作先验证 artwork 所有权再执行
+
+**关键文件**：`api/tools/types.ts`（`ToolContext` 接口）、`api/chat.ts`（传入 userId）
+
+---
+
 ## 修改能力
 
 ### AI 可修改的字段（需确认）

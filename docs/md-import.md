@@ -31,6 +31,14 @@
 
 ---
 
+## 用户隔离
+
+- 导入的作品自动设置 `user_id = auth.uid()`（当前登录用户）
+- 查重匹配（source_url / title_en）也限定为当前用户的数据
+- 缩略图迁移同样限定用户范围
+
+---
+
 ## 关键文件
 
 - `api/import/md.ts` - Markdown 导入 API

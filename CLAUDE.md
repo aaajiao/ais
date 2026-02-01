@@ -81,6 +81,13 @@ CONTEXT7_API_KEY=xxx                # Context7 API（获取最新库文档）
 
 **Soft Delete**: `artworks` 使用 `deleted_at` 字段，所有查询必须添加 `.is('deleted_at', null)`
 
+**RLS 用户隔离**: 所有表启用 `FORCE ROW LEVEL SECURITY`，基于 `user_id` / `created_by` 隔离数据：
+- `artworks` / `locations` 表有 `user_id` 列（`= auth.uid()`）
+- `editions` / `edition_files` / `edition_history` 通过 FK 链继承 `artworks.user_id`
+- `gallery_links` 使用 `created_by` 字段
+- 后端 API 使用 service key 绕过 RLS，代码中手动过滤（`ToolContext.userId`）
+- 迁移文件：`supabase/migrations/001_add_user_id_and_rls.sql`
+
 ## Edition Status Flow
 
 ```

@@ -62,7 +62,7 @@
 
 - **用户偏好设置**：主题、语言、默认模型等
 - **浏览历史**：最近查看的作品/版本
-- **操作审计**：记录用户操作（目前 `created_by` 字段存在但未填充）
+- **操作审计**：记录用户操作（`created_by` 字段已启用自动填充）
 - **权限控制**：基于角色的功能限制
 
 ### created_by 字段说明
@@ -72,7 +72,7 @@
 - `edition_files.created_by` - 文件上传者
 - `gallery_links.created_by` - 链接创建者
 
-**当前状态**：字段存在，UI 已支持显示（见 `HistoryEntry.tsx`），但写入时未填充数据。
+**当前状态**：字段已启用自动填充 `auth.uid()`，所有写入操作（前端 + AI 工具 + API）均设置此字段。UI 已支持显示（见 `HistoryEntry.tsx`）。RLS 策略使用 `created_by` 进行 `gallery_links` 的所有权验证。
 
 ---
 
@@ -94,6 +94,7 @@
 | `ap_total` | INT | 作品编辑 | AP 版总数 |
 | `is_unique` | BOOL | 作品编辑 | 是否独版 |
 | `notes` | TEXT | 作品编辑 | 备注 |
+| `user_id` | UUID | - | 所有者（RLS 隔离，关联 `auth.users`） |
 | `deleted_at` | TIMESTAMP | - | 软删除标记 |
 | `created_at` | TIMESTAMP | - | 创建时间 |
 | `updated_at` | TIMESTAMP | - | 更新时间 |
@@ -113,6 +114,7 @@
 | `address` | TEXT | 位置对话框（高级） | 地址 |
 | `contact` | TEXT | 位置对话框（高级） | 联系方式 |
 | `notes` | TEXT | 位置对话框（高级） | 备注 |
+| `user_id` | UUID | - | 所有者（RLS 隔离，关联 `auth.users`） |
 | `created_at` | TIMESTAMP | - | 创建时间 |
 
 ---
@@ -131,7 +133,7 @@
 | `description` | TEXT | 文件列表 | 描述 |
 | `sort_order` | INT | - | 排序 |
 | `created_at` | TIMESTAMP | 文件列表 | 创建时间 |
-| `created_by` | TEXT | - | **未填充** |
+| `created_by` | TEXT | - | 创建者 user ID（自动填充） |
 
 ---
 
@@ -151,7 +153,7 @@
 | `currency` | TEXT | 历史时间线 | 币种 |
 | `notes` | TEXT | 历史时间线 | 备注 |
 | `created_at` | TIMESTAMP | 历史时间线 | 操作时间 |
-| `created_by` | TEXT | 历史时间线 | **未填充**（UI 已支持显示） |
+| `created_by` | TEXT | 历史时间线 | 创建者 user ID（自动填充，UI 已支持显示） |
 
 ### history_action 枚举
 
@@ -182,7 +184,7 @@
 | `last_accessed` | TIMESTAMP | 链接页面 | 最后访问 |
 | `access_count` | INT | 链接页面 | 访问次数 |
 | `created_at` | TIMESTAMP | 链接页面 | 创建时间 |
-| `created_by` | TEXT | - | **未填充** |
+| `created_by` | TEXT | - | 创建者 user ID（自动填充） |
 
 ---
 
@@ -365,6 +367,28 @@ TypeScript 类型定义文件与数据库 schema 的对应关系：
 
 ---
 
+## RLS 用户隔离
+
+所有表启用 `FORCE ROW LEVEL SECURITY`，基于用户所有权隔离数据：
+
+| 表 | RLS 策略 | 说明 |
+|---|---|---|
+| `users` | `id = auth.uid()` | 只能访问自己的 profile |
+| `artworks` | `user_id = auth.uid()` | 直接所有权 |
+| `locations` | `user_id = auth.uid()` | 直接所有权 |
+| `editions` | 通过 `artworks.user_id` 继承 | FK 链验证 |
+| `edition_files` | 通过 `editions → artworks.user_id` 继承 | 两级 FK 链 |
+| `edition_history` | 通过 `editions → artworks.user_id` 继承 | 两级 FK 链 |
+| `gallery_links` | `created_by = auth.uid()` | 创建者所有权 |
+
+**注意**：
+- 后端 API 使用 service key 绕过 RLS，代码中手动添加 `user_id` 过滤
+- 软删除不在 RLS 中强制，Trash 页面需要读取已删除数据
+- `(SELECT auth.uid())` 子查询模式用于性能优化（每条语句只计算一次）
+- 迁移文件：`supabase/migrations/001_add_user_id_and_rls.sql`
+
+---
+
 ## 更新日志
 
 | 日期 | 变更 |
@@ -372,3 +396,4 @@ TypeScript 类型定义文件与数据库 schema 的对应关系：
 | 2025-01-28 | 添加完整数据库表结构文档，说明 users 表暂时备用状态 |
 | 2025-01-28 | 修复 condition_notes 在 EditionInfoCard 的显示，添加 Gallery Links created_at 显示 |
 | 2025-01-29 | 启用 users 表 name 字段存储项目名称，替换全系统硬编码品牌信息 |
+| 2025-02-01 | 实现 RLS 用户隔离：artworks/locations 添加 user_id 列，启用 created_by 自动填充，所有表强制 RLS |

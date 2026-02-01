@@ -27,6 +27,16 @@
 
 ---
 
+## created_by 字段
+
+所有历史记录自动填充 `created_by` 字段（`auth.uid()`）：
+- 前端写入：`HistoryTimeline.tsx`、`useFileUpload.ts`、`ExternalLinkDialog.tsx`、`FileList.tsx`
+- AI 工具写入：`execute-update.ts`（传入 `ctx.userId`）
+- DB Trigger 写入：`record_edition_status_change()`（`SECURITY DEFINER`，调用 `auth.uid()`）
+- RLS 通过 `editions → artworks.user_id` 两级 FK 链验证所有权
+
+---
+
 ## 相关文件
 
 - `src/hooks/queries/useEditionHistory.ts` - 历史查询 Hook
