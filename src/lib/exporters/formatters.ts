@@ -24,7 +24,7 @@ export function generateArtworkMarkdown(
 
   // 缩略图
   if (artwork.thumbnail_url) {
-    lines.push(`![${artwork.title_en}](${artwork.thumbnail_url})`);
+    lines.push(`<img src="${artwork.thumbnail_url}" alt="${artwork.title_en}" />`);
     lines.push('');
   }
 
@@ -49,14 +49,22 @@ export function generateArtworkMarkdown(
   const editionInfo = formatEditionInfo(artwork);
   lines.push(`**Edition**: ${editionInfo}`);
 
+  // 作品备注
+  if (options.includeDetails && artwork.notes) {
+    lines.push(`**Notes**: ${artwork.notes}`);
+  }
+
   // 版本明细（如果有任何可选信息启用）
-  if (options.includeStatus || options.includeLocation || options.includePrice) {
+  if (options.includeStatus || options.includeLocation || options.includePrice || options.includeDetails) {
     if (editions.length > 0) {
       lines.push('');
       lines.push('**Edition Details**:');
       const editionLines = formatEditionLines(editions, artwork, locations, options, 'en');
-      editionLines.forEach(line => {
-        lines.push(`- ${line}`);
+      editionLines.forEach(({ main, details }) => {
+        lines.push(`- ${main}`);
+        details.forEach(detail => {
+          lines.push(`  ${detail}`);
+        });
       });
     } else {
       // 无版本时的简化显示
@@ -110,6 +118,7 @@ export function generateFullMarkdown(
   lines.push(`include_price: ${options.includePrice}`);
   lines.push(`include_status: ${options.includeStatus}`);
   lines.push(`include_location: ${options.includeLocation}`);
+  lines.push(`include_details: ${options.includeDetails}`);
   lines.push('---');
   lines.push('');
 

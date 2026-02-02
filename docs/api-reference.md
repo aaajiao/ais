@@ -491,10 +491,14 @@ POST /api/export/md
     includePrice: boolean;
     includeStatus: boolean;
     includeLocation: boolean;
+    includeDetails: boolean;  // 详细信息（品相、买家、寄售、借展、备注等）
   };
   artistName?: string;  // 项目名称，用于文件名和内容（默认 "aaajiao"）
 }
 ```
+
+`includeDetails` 控制以下字段输出：condition、buyer_name、sale_date、consignment、loan、storage_detail、edition notes。
+inventory_number 和 certificate_number 始终输出（不受选项控制）。
 
 返回 `text/markdown` 文件流。
 

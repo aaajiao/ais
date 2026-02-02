@@ -7,6 +7,8 @@
   "priceInfo": "价格信息",
   "statusDetails": "版本状态详情（在库/寄售/已售）",
   "locationInfo": "位置信息",
+  "detailInfo": "详细信息（品相、买家、寄售、借展、备注等）",
+  "formatLabel": "Markdown (.md)",
   "backupHint": "完整数据备份请前往「设置」页面",
   "exporting": "导出中...",
   "export": "导出",

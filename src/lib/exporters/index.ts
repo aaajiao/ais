@@ -17,6 +17,7 @@ export interface ExportOptions {
   includePrice: boolean;
   includeStatus: boolean;
   includeLocation: boolean;
+  includeDetails: boolean;
 }
 
 // 导出用的作品数据（包含版本统计）
@@ -164,15 +165,16 @@ const STATUS_LABELS: Record<EditionStatus, { zh: string; en: string }> = {
   damaged: { zh: '损坏', en: 'Damaged' },
 };
 
-// 格式化单个版本的显示文本
+// 格式化单个版本的显示文本（主行 + 详情子行）
 export function formatEditionLine(
   edition: Edition,
   artwork: Artwork,
   locations: Map<string, Location>,
   options: ExportOptions,
   lang: 'zh' | 'en' = 'zh'
-): string {
+): { main: string; details: string[] } {
   const parts: string[] = [];
+  const details: string[] = [];
 
   // 1. 版本编号
   let editionLabel: string;
@@ -185,6 +187,11 @@ export function formatEditionLine(
     editionLabel = `${edition.edition_number || '?'}/${artwork.edition_total || '?'}`;
   }
   parts.push(editionLabel);
+
+  // 库存编号（始终输出）
+  if (edition.inventory_number) {
+    parts.push(edition.inventory_number);
+  }
 
   // 2. 位置（如果选项启用且有位置）
   if (options.includeLocation && edition.location_id) {
@@ -210,19 +217,57 @@ export function formatEditionLine(
     parts.push(formatPrice(edition.sale_price, edition.sale_currency));
   }
 
-  return parts.join(', ');
+  // 证书编号（始终输出）
+  if (edition.certificate_number) {
+    details.push(`Certificate: ${edition.certificate_number}`);
+  }
+
+  // 5. 详细信息（如果选项启用）
+  if (options.includeDetails) {
+    if (edition.condition) {
+      const conditionText = edition.condition_notes
+        ? `${edition.condition} — ${edition.condition_notes}`
+        : edition.condition;
+      details.push(`Condition: ${conditionText}`);
+    }
+    if (edition.buyer_name) {
+      details.push(`Buyer: ${edition.buyer_name}`);
+    }
+    if (edition.sale_date) {
+      details.push(`Sale Date: ${edition.sale_date}`);
+    }
+    if (edition.consignment_start || edition.consignment_end) {
+      const range = [edition.consignment_start, edition.consignment_end].filter(Boolean).join(' ~ ');
+      details.push(`Consignment: ${range}`);
+    }
+    if (edition.loan_start || edition.loan_end || edition.loan_institution) {
+      const loanParts: string[] = [];
+      if (edition.loan_institution) loanParts.push(edition.loan_institution);
+      const range = [edition.loan_start, edition.loan_end].filter(Boolean).join(' ~ ');
+      if (range) loanParts.push(range);
+      if (loanParts.length > 0) details.push(`Loan: ${loanParts.join(', ')}`);
+    }
+    if (options.includeLocation && edition.storage_detail) {
+      details.push(`Storage: ${edition.storage_detail}`);
+    }
+    if (edition.notes) {
+      details.push(`Notes: ${edition.notes}`);
+    }
+  }
+
+  return { main: parts.join(', '), details };
 }
 
-// 格式化所有版本为行数组
+// 格式化所有版本为行数组（每个元素包含主行和详情子行）
 export function formatEditionLines(
   editions: Edition[],
   artwork: Artwork,
   locations: Map<string, Location>,
   options: ExportOptions,
   lang: 'zh' | 'en' = 'zh'
-): string[] {
+): { main: string; details: string[] }[] {
   if (editions.length === 0) {
-    return [lang === 'zh' ? '无版本信息' : 'No editions'];
+    return [{ main: lang === 'zh' ? '无版本信息' : 'No editions', details: [] }];
   }
 
   // 按版本类型和编号排序

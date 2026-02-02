@@ -31,6 +31,7 @@ export default function ExportDialog({
     includePrice: false,
     includeStatus: false,
     includeLocation: false,
+    includeDetails: false,
   });
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -134,9 +135,12 @@ export default function ExportDialog({
         <div className="flex items-center justify-between p-4 border-b border-border">
           <div className="flex items-center gap-2">
             <FileText className="w-5 h-5 text-muted-foreground" />
-            <h2 className="text-lg font-semibold">
-              {t('title', { count: artworkCount })}
-            </h2>
+            <div>
+              <h2 className="text-lg font-semibold">
+                {t('title', { count: artworkCount })}
+              </h2>
+              <p className="text-xs text-muted-foreground">{t('formatLabel')}</p>
+            </div>
           </div>
           <IconButton
             variant="ghost"
@@ -203,6 +207,18 @@ export default function ExportDialog({
                   className="w-4 h-4 accent-primary"
                 />
                 <span>{t('locationInfo')}</span>
+              </label>
+
+              <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={options.includeDetails}
+                  onChange={(e) =>
+                    setOptions({ ...options, includeDetails: e.target.checked })
+                  }
+                  className="w-4 h-4 accent-primary"
+                />
+                <span>{t('detailInfo')}</span>
               </label>
             </div>
           </div>

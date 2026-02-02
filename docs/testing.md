@@ -40,7 +40,9 @@ src/lib/
 ├── inventoryNumber.test.ts   # 模式分析、编号生成
 ├── md-parser.test.ts         # 导入用 Markdown 解析
 ├── editionStatus.test.ts     # 版本状态流转验证
-└── cacheInvalidation.test.ts # 缓存失效逻辑
+├── cacheInvalidation.test.ts # 缓存失效逻辑
+└── exporters/
+    └── exporters.test.ts     # MD 导出格式化（版本行、作品 Markdown、完整文档）
 
 src/hooks/queries/
 ├── useEditions.test.ts       # Edition hooks 和过滤逻辑
@@ -100,6 +102,7 @@ src/test/
 | `useModelSettings` | 9 | 模型 ID 格式化显示 |
 | `catalog-template` | 41 | PDF HTML 模板生成、转义、分页 |
 | `pdf-helpers` | 37 | 版本标签格式化、CatalogItem 构建、文件名 |
+| `exporters` | 36 | MD 导出格式化（版本行、详情字段、作品 Markdown、完整文档） |
 | `utils` | 8 | Tailwind 类名合并 |
 
 ---

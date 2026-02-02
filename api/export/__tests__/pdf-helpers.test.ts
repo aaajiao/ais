@@ -251,6 +251,7 @@ describe('buildCatalogItemFromArtworkData', () => {
     includePrice: false,
     includeStatus: false,
     includeLocation: false,
+    includeDetails: false,
   };
 
   it('should build item from artwork data', () => {
