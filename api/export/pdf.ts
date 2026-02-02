@@ -240,7 +240,7 @@ async function handleLegacyExport(request: ExportRequest, userId: string, res: V
     return res.status(404).json({ error: 'No artworks found' });
   }
 
-  const options = request.options ?? { includePrice: false, includeStatus: false, includeLocation: false };
+  const options = request.options ?? { includePrice: false, includeStatus: false, includeLocation: false, includeDetails: false };
   const artistName = request.artistName || 'aaajiao';
   const catalogOptions: CatalogOptions = {
     locationName: artistName,

@@ -64,6 +64,7 @@ export async function handleMarkdownExport(request: ExportRequest, userId?: stri
     includePrice: false,
     includeStatus: false,
     includeLocation: false,
+    includeDetails: false,
   };
   const artistName = request.artistName || 'aaajiao';
   const content = generateFullMarkdown(artworksData, options, artistName);
