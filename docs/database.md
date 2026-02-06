@@ -40,7 +40,7 @@ Dashboard → Settings → API:
 
 | 项目 | 预期 |
 |------|------|
-| 数据表 | 7 个 (users, locations, gallery_links, artworks, editions, edition_files, edition_history) |
+| 数据表 | 8 个 (users, locations, gallery_links, artworks, editions, edition_files, edition_history, api_keys) |
 | Storage Buckets | 2 个 (thumbnails, edition-files) |
 | RLS | 所有表已启用 |
 
@@ -58,6 +58,7 @@ locations (位置)
   └── gallery_links (公开链接)
 
 users (用户)
+  └── api_keys (外部 API 密钥)
 ```
 
 ### 注意事项
@@ -82,6 +83,7 @@ users (用户)
 | `edition_files` | 版本附件 | 完整实现 |
 | `edition_history` | 版本历史 | 完整实现 |
 | `gallery_links` | 公开分享链接 | 完整实现 |
+| `api_keys` | 外部 API 密钥 | 完整实现 |
 | `users` | 用户/项目配置 | 部分使用（name 字段） |
 
 ---
@@ -249,6 +251,36 @@ users (用户)
 
 ---
 
+### api_keys 表
+
+外部 API 密钥，用于允许外部 AI 代理通过结构化查询端点只读访问库存数据。
+
+| 字段 | 类型 | UI 位置 | 说明 |
+|------|------|---------|------|
+| `id` | UUID | - | 主键 |
+| `user_id` | UUID | - | 所有者（RLS 隔离，关联 `auth.users`） |
+| `name` | TEXT | 设置页面 | Key 名称（用户自定义） |
+| `key_prefix` | TEXT | 设置页面 | 前 8 字符，用于 UI 展示（如 `ak_a1b2...`） |
+| `key_hash` | TEXT | - | SHA-256 哈希，明文永不存储 |
+| `permissions` | TEXT[] | - | 权限列表，默认 `['read']` |
+| `last_used_at` | TIMESTAMPTZ | 设置页面 | 最后使用时间 |
+| `request_count` | INT | 设置页面 | 请求次数 |
+| `revoked_at` | TIMESTAMPTZ | 设置页面 | 撤销时间，NULL = 有效 |
+| `created_at` | TIMESTAMPTZ | 设置页面 | 创建时间 |
+
+**索引**：
+- `idx_api_keys_key_hash` — 按 key_hash 查询（验证 API Key）
+- `idx_api_keys_user_active` — 按 user_id 查询活跃 key（`WHERE revoked_at IS NULL`）
+
+**限制**：每用户最多 5 个活跃 key。
+
+**安全**：
+- API Key 明文永不存储，只存 SHA-256 哈希
+- 明文 key 仅在创建时返回一次
+- 外部端点只暴露 5 个只读 AI 工具
+
+---
+
 ### editions 表
 
 #### 版本基本信息
@@ -405,12 +437,13 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 | `edition_files` | 通过 `editions → artworks.user_id` 继承 | 两级 FK 链 |
 | `edition_history` | 通过 `editions → artworks.user_id` 继承 | 两级 FK 链 |
 | `gallery_links` | `created_by = auth.uid()` | 创建者所有权 |
+| `api_keys` | `user_id = auth.uid()` | 直接所有权 |
 
 **注意**：
 - 后端 API 使用 service key 绕过 RLS，代码中手动添加 `user_id` 过滤
 - 软删除不在 RLS 中强制，Trash 页面需要读取已删除数据
 - `(SELECT auth.uid())` 子查询模式用于性能优化（每条语句只计算一次）
-- 迁移文件归档：`supabase/migrations/archived/001_add_user_id_and_rls.sql`
+- 迁移文件归档：`supabase/migrations/archived/001_add_user_id_and_rls.sql`、`002_add_api_keys.sql`
 
 ---
 
@@ -423,3 +456,4 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 | 2025-01-29 | 启用 users 表 name 字段存储项目名称，替换全系统硬编码品牌信息 |
 | 2025-02-01 | 实现 RLS 用户隔离：artworks/locations 添加 user_id 列，启用 created_by 自动填充，所有表强制 RLS |
 | 2025-02-01 | 合并 database-deployment.md 和 database-fields.md 为统一文档；迁移文件归档到 archived/ |
+| 2025-02-06 | 添加 api_keys 表（外部 API Key 管理），支持外部 AI 代理只读查询库存数据 |

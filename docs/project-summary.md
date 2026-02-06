@@ -61,6 +61,12 @@
 - 价格可见性控制
 - 访问统计
 
+### 外部 API
+- API Key 管理（生成/撤销/删除）
+- 结构化查询端点（5 个只读工具）
+- Schema 端点（参数定义自动生成）
+- 支持外部 AI 代理访问库存数据
+
 ### 用户体验
 - PWA（可安装、Service Worker）
 - 离线优先（IndexedDB 缓存）
@@ -86,7 +92,7 @@ Vercel Functions (无服务器 API)
     │
     ▼
 Supabase
-    ├── PostgreSQL (7 个表)
+    ├── PostgreSQL (8 个表)
     ├── Storage (thumbnails, edition-files)
     └── Auth (Google OAuth + 邮箱白名单)
 ```
@@ -102,6 +108,7 @@ Supabase
 | locations | 位置 |
 | users | 用户 |
 | gallery_links | 公开链接 |
+| api_keys | 外部 API 密钥 |
 
 ## 设计系统
 

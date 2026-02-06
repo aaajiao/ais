@@ -703,9 +703,165 @@ new_tool: tool({
 
 ---
 
+## API Key 管理 API
+
+管理外部 API Key，用于允许外部 AI 代理通过结构化查询端点只读访问库存数据。
+
+### 列出 API Key
+
+```
+GET /api/keys
+```
+
+需要认证（Bearer token）。返回当前用户的所有 API Key（不含 key_hash）。
+
+**响应**
+
+```typescript
+{
+  keys: ApiKey[];  // name, key_prefix, permissions, last_used_at, request_count, revoked_at, created_at
+}
+```
+
+### 创建 API Key
+
+```
+POST /api/keys
+```
+
+需要认证。生成新的 API Key。每用户最多 5 个活跃 key。
+
+**请求**
+
+```typescript
+{
+  name: string;  // Key 名称
+}
+```
+
+**响应**
+
+```typescript
+{
+  key: ApiKey;       // Key 元信息
+  rawKey: string;    // 明文 Key（仅返回一次，格式：ak_<32 hex chars>）
+}
+```
+
+### 撤销 API Key
+
+```
+PATCH /api/keys
+```
+
+需要认证。设置 `revoked_at`，Key 立即失效。
+
+**请求**
+
+```typescript
+{
+  id: string;  // Key ID
+}
+```
+
+### 删除 API Key
+
+```
+DELETE /api/keys
+```
+
+需要认证。永久删除 Key 记录。
+
+**请求**
+
+```typescript
+{
+  id: string;  // Key ID
+}
+```
+
+---
+
+## 外部查询 API
+
+允许外部 AI 代理通过 API Key 只读查询库存数据。详细文档见 [docs/external-api.md](external-api.md)。
+
+### 结构化查询
+
+```
+POST /api/external/v1/query
+```
+
+通过 API Key 认证，执行只读查询。
+
+**认证**
+
+```
+X-API-Key: ak_xxx
+// 或
+Authorization: Bearer ak_xxx
+```
+
+**请求**
+
+```typescript
+{
+  action: string;   // 查询操作（见下方可用操作）
+  params: object;   // 操作参数（各操作的 schema 与 AI 工具一致）
+  locale?: string;  // 语言（en/zh，默认 en）
+}
+```
+
+**可用操作**（5 个只读工具）
+
+| 操作 | 说明 |
+|------|------|
+| `search_artworks` | 搜索作品 |
+| `search_editions` | 搜索版本 |
+| `search_locations` | 搜索位置 |
+| `search_history` | 查询历史 |
+| `get_statistics` | 获取统计 |
+
+**响应**
+
+```typescript
+{
+  success: true;
+  action: string;
+  data: object;     // 工具执行结果
+  meta: {
+    timestamp: string;
+    request_id: string;
+  };
+}
+```
+
+**错误响应**
+
+| HTTP 状态码 | 说明 |
+|-------------|------|
+| 401 | API Key 无效或已撤销 |
+| 403 | 操作不在只读白名单内 |
+| 400 | 参数验证失败 |
+
+**CORS**：`Access-Control-Allow-Origin: *`，支持跨域请求。
+
+### Schema 查询
+
+```
+GET /api/external/v1/schema
+```
+
+无需认证。返回所有可用操作的参数定义，方便外部 AI 理解可用功能。
+
+**缓存**：`Cache-Control: public, max-age=3600`
+
+---
+
 ## 安全性
 
-- 所有 API（除公开链接）需要 Supabase 认证
+- 所有 API（除公开链接和外部查询 API）需要 Supabase 认证
+- 外部查询 API 使用 API Key 认证（`X-API-Key` 或 `Authorization: Bearer ak_xxx`）
 - 邮箱白名单验证（`ALLOWED_EMAILS`）
 - SQL 注入防护：搜索词自动转义特殊字符
 - 修改操作需要用户确认（确认卡片机制）
@@ -719,7 +875,17 @@ new_tool: tool({
 | `artworks` / `locations` | `user_id = auth.uid()` |
 | `editions` / `edition_files` / `edition_history` | 通过 FK 链继承 `artworks.user_id` |
 | `gallery_links` | `created_by = auth.uid()` |
+| `api_keys` | `user_id = auth.uid()` |
 
 **前端**（anon key）：RLS 自动过滤，无需代码处理。
 
 **后端 API**（service key，绕过 RLS）：代码中手动添加 `.eq('user_id', userId)` 过滤。AI 工具通过 `ToolContext.userId` 传递当前用户 ID。
+
+### 外部 API Key 安全
+
+- API Key 明文永不存储，只存 SHA-256 哈希
+- 明文 Key 仅在创建时返回一次
+- 外部端点只暴露 5 个只读工具，无写入路径
+- 已撤销 key 即时失效（每次请求查 DB 验证）
+- 数据隔离：通过 `ToolContext.userId` 手动过滤（与内部 AI 聊天端点一致）
+- 每用户最多 5 个活跃 key

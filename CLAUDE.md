@@ -29,8 +29,10 @@ api/                    # Serverless API
 ├── models.ts          # 可用模型列表
 ├── fetch-title.ts     # URL 标题抓取（OG metadata）
 ├── profile.ts         # 用户资料 API
-├── lib/               # 工具函数（auth, search-utils, artwork-extractor, image-downloader, model-provider, system-prompt, i18n, message-utils）
-├── tools/             # AI 工具（10 个工具 + types + index）
+├── lib/               # 工具函数（auth, api-key-auth, search-utils, artwork-extractor, image-downloader, model-provider, system-prompt, i18n, message-utils）
+├── tools/             # AI 工具（10 个工具 + types + index + createReadOnlyTools）
+├── keys/              # API Key 管理 API（CRUD）
+├── external/          # 外部查询 API（v1/query, v1/schema）
 ├── import/            # 导入 API（md, migrate-thumbnails, process-image）
 ├── export/            # 导出 API（pdf, pdf-helpers, catalog-template, font-loader, md, shared, fonts/）
 ├── links/             # 公开链接 API
@@ -42,7 +44,7 @@ src/
 │   ├── artworks/      # 作品列表（FilterPanel, SelectionToolbar, ArtworkListCard, useArtworksSelection）
 │   ├── editions/      # 版本管理（HistoryTimeline, HistoryEntry, EditionInfoCard, EditionEditDialog, LocationDialog, historyUtils, editionDetailUtils）
 │   ├── files/         # 文件管理（FileList, FileListItem, FileGridItem, FilePreviewModal, ImageThumbnail）
-│   ├── settings/      # 设置（ModelSettings, ExportSettings, AccountSettings, useModelSettings, useExport）
+│   ├── settings/      # 设置（ModelSettings, ExportSettings, ApiKeySettings, AccountSettings, useModelSettings, useExport）
 │   ├── chat/          # 聊天（MessageBubble, MemoizedMarkdown, EditableConfirmCard, ConfirmDialog, CollapsibleChatHistory）
 │   ├── import/        # 导入（MDImport, UploadStep, PreviewStep, ResultStep, ThumbnailMigration）
 │   ├── export/        # 导出（ExportDialog, CatalogDialog, EditionSelector）
@@ -55,6 +57,7 @@ src/
 │   ├── useFileUpload.ts    # 文件上传
 │   ├── useInfiniteVirtualList.ts  # 虚拟列表
 │   ├── useInventoryNumber.ts      # 库存编号智能补全
+│   ├── useApiKeys.ts  # API Key 管理
 │   ├── useLinks.ts    # 画廊链接
 │   ├── useLocations.ts     # 位置管理
 │   ├── useNetworkStatus.ts # 网络状态
@@ -73,7 +76,8 @@ docs/                   # 详细文档
 | `src/lib/types.ts` | 应用类型定义 |
 | `src/lib/queryClient.ts` | React Query 配置（离线优先） |
 | `src/lib/queryKeys.ts` | 查询键工厂 |
-| `api/tools/index.ts` | AI 工具注册 |
+| `api/tools/index.ts` | AI 工具注册 + createReadOnlyTools 导出 |
+| `api/lib/api-key-auth.ts` | 外部 API Key 生成、哈希、验证 |
 | `api/lib/system-prompt.ts` | AI 系统提示词（中文） |
 | `src/lib/inventoryNumber.ts` | 库存编号智能补全逻辑 |
 | `src/components/chat/MemoizedMarkdown.tsx` | Streamdown Markdown 渲染 |
@@ -92,7 +96,7 @@ CONTEXT7_API_KEY=xxx                # Context7 API（获取最新库文档）
 
 ## Database
 
-核心表：`artworks`、`editions`、`edition_files`、`edition_history`、`locations`、`users`、`gallery_links`
+核心表：`artworks`、`editions`、`edition_files`、`edition_history`、`locations`、`users`、`gallery_links`、`api_keys`
 
 **Soft Delete**: `artworks` 使用 `deleted_at` 字段，所有查询必须添加 `.is('deleted_at', null)`
 
@@ -100,8 +104,9 @@ CONTEXT7_API_KEY=xxx                # Context7 API（获取最新库文档）
 - `artworks` / `locations` 表有 `user_id` 列（`= auth.uid()`）
 - `editions` / `edition_files` / `edition_history` 通过 FK 链继承 `artworks.user_id`
 - `gallery_links` 使用 `created_by` 字段
+- `api_keys` 表有 `user_id` 列（`= auth.uid()`）
 - 后端 API 使用 service key 绕过 RLS，代码中手动过滤（`ToolContext.userId`）
-- 迁移文件（已归档）：`supabase/migrations/archived/001_add_user_id_and_rls.sql`
+- 迁移文件（已归档）：`supabase/migrations/archived/001_add_user_id_and_rls.sql`、`002_add_api_keys.sql`
 
 ## Edition Status Flow
 
@@ -148,6 +153,7 @@ bunx supabase gen types typescript --project-id <id> > src/lib/database.types.ts
 | [docs/public-links.md](docs/public-links.md) | 公开链接功能 |
 | [docs/database.md](docs/database.md) | 数据库部署、字段说明、RLS |
 | [docs/api-reference.md](docs/api-reference.md) | API 参考 |
+| [docs/external-api.md](docs/external-api.md) | 外部 API（API Key 结构化查询） |
 | [docs/project-summary.md](docs/project-summary.md) | 项目总结 |
 | [docs/claude-code-skills.md](docs/claude-code-skills.md) | Claude Code Skills 配置指南 |
 
