@@ -27,4 +27,29 @@ export function createTools(ctx: ToolContext) {
   };
 }
 
+/**
+ * 创建只读 AI 工具（用于外部 API）
+ * @param ctx 工具执行上下文
+ */
+export function createReadOnlyTools(ctx: ToolContext) {
+  return {
+    search_artworks: createSearchArtworksTool(ctx),
+    search_editions: createSearchEditionsTool(ctx),
+    search_locations: createSearchLocationsTool(ctx),
+    search_history: createSearchHistoryTool(ctx),
+    get_statistics: createGetStatisticsTool(ctx),
+  };
+}
+
+/** 只读工具名称列表 */
+export const READ_ONLY_ACTIONS = [
+  'search_artworks',
+  'search_editions',
+  'search_locations',
+  'search_history',
+  'get_statistics',
+] as const;
+
+export type ReadOnlyAction = typeof READ_ONLY_ACTIONS[number];
+
 export type { ToolContext } from './types.js';

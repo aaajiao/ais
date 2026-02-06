@@ -73,6 +73,18 @@ export interface Location {
   created_at: string;
 }
 
+// API 密钥
+export interface ApiKey {
+  id: string;
+  name: string;
+  key_prefix: string;
+  permissions: string[];
+  last_used_at: string | null;
+  request_count: number;
+  revoked_at: string | null;
+  created_at: string;
+}
+
 // 画廊链接
 export interface GalleryLink {
   id: string;

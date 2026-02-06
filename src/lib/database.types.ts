@@ -43,6 +43,44 @@ export type GalleryLinkStatus = 'active' | 'disabled';
 export interface Database {
   public: {
     Tables: {
+      api_keys: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          key_prefix: string;
+          key_hash: string;
+          permissions: string[];
+          last_used_at: string | null;
+          request_count: number;
+          revoked_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          key_prefix: string;
+          key_hash: string;
+          permissions?: string[];
+          last_used_at?: string | null;
+          request_count?: number;
+          revoked_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          key_prefix?: string;
+          key_hash?: string;
+          permissions?: string[];
+          last_used_at?: string | null;
+          request_count?: number;
+          revoked_at?: string | null;
+          created_at?: string;
+        };
+      };
       users: {
         Row: {
           id: string;
