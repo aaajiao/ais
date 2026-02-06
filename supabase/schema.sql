@@ -73,6 +73,20 @@ CREATE TABLE locations (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- API Keys (external AI access)
+CREATE TABLE api_keys (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id),
+  name TEXT NOT NULL,
+  key_prefix TEXT NOT NULL,
+  key_hash TEXT NOT NULL,
+  permissions TEXT[] NOT NULL DEFAULT ARRAY['read'],
+  last_used_at TIMESTAMPTZ,
+  request_count INTEGER NOT NULL DEFAULT 0,
+  revoked_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Gallery Links (public sharing)
 CREATE TABLE gallery_links (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -200,6 +214,10 @@ CREATE INDEX idx_locations_name ON locations(name);
 CREATE INDEX idx_locations_type ON locations(type);
 CREATE INDEX idx_locations_user_id ON locations(user_id);
 
+-- API Keys
+CREATE INDEX idx_api_keys_key_hash ON api_keys(key_hash);
+CREATE INDEX idx_api_keys_user_active ON api_keys(user_id) WHERE revoked_at IS NULL;
+
 -- Gallery Links
 CREATE INDEX idx_gallery_links_token ON gallery_links(token);
 
@@ -265,6 +283,7 @@ CREATE TRIGGER editions_status_change
 
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE locations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE api_keys ENABLE ROW LEVEL SECURITY;
 ALTER TABLE gallery_links ENABLE ROW LEVEL SECURITY;
 ALTER TABLE artworks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE editions ENABLE ROW LEVEL SECURITY;
@@ -274,6 +293,7 @@ ALTER TABLE edition_history ENABLE ROW LEVEL SECURITY;
 -- Force RLS even for table owners
 ALTER TABLE users FORCE ROW LEVEL SECURITY;
 ALTER TABLE locations FORCE ROW LEVEL SECURITY;
+ALTER TABLE api_keys FORCE ROW LEVEL SECURITY;
 ALTER TABLE gallery_links FORCE ROW LEVEL SECURITY;
 ALTER TABLE artworks FORCE ROW LEVEL SECURITY;
 ALTER TABLE editions FORCE ROW LEVEL SECURITY;
@@ -341,6 +361,12 @@ CREATE POLICY "Users can update own locations" ON locations
   FOR UPDATE TO authenticated USING (user_id = (SELECT auth.uid()));
 CREATE POLICY "Users can delete own locations" ON locations
   FOR DELETE TO authenticated USING (user_id = (SELECT auth.uid()));
+
+-- === api_keys: 基于 user_id 隔离 ===
+CREATE POLICY "Users manage own api_keys" ON api_keys
+  FOR ALL TO authenticated
+  USING (user_id = (SELECT auth.uid()))
+  WITH CHECK (user_id = (SELECT auth.uid()));
 
 -- === gallery_links: 基于 created_by 隔离 ===
 CREATE POLICY "Users can read own gallery_links" ON gallery_links
@@ -445,6 +471,7 @@ USING (bucket_id = 'edition-files');
 
 COMMENT ON TABLE users IS 'User accounts';
 COMMENT ON TABLE locations IS 'Storage and gallery locations';
+COMMENT ON TABLE api_keys IS 'External API keys for AI agents';
 COMMENT ON TABLE gallery_links IS 'Public sharing links';
 COMMENT ON TABLE artworks IS 'Artwork metadata';
 COMMENT ON TABLE editions IS 'Individual edition instances';
