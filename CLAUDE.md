@@ -123,6 +123,17 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 - **Styling**: TailwindCSS + shadcn/ui 组件
 - **Icons**: Lucide React，不用 emoji
 
+## Verification
+
+修改代码后必须通过验证才算完成：
+
+| 修改类型 | 验证命令 |
+|----------|----------|
+| 任何源码 (.ts/.tsx) | `bun run lint` |
+| 逻辑改动 | `bun run test:run` |
+| 构建相关 | `bun run build` |
+| 数据库查询 | 确认包含 `.is('deleted_at', null)` 和 `userId` 过滤 |
+
 ## Common Tasks
 
 ### 添加新页面
@@ -160,9 +171,7 @@ bunx supabase gen types typescript --project-id <id> > src/lib/database.types.ts
 ## Claude Code Skills
 
 已安装技能（`.claude/skills/`）：
-- **react-best-practices** - React/Next.js 性能优化
-- **postgres-best-practices** - PostgreSQL 最佳实践
 - **context7** - 获取最新库文档（需要设置 `CONTEXT7_API_KEY` 环境变量）
 - **ai-sdk** - Vercel AI SDK 文档
 - **frontend-design** - 前端设计技能
-- **skill-creator** - 创建 Claude Code skills 的指南和工具
+- **postgres-best-practices** - PostgreSQL 最佳实践

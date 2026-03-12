@@ -1,17 +1,23 @@
 ---
 name: context7
-description: Retrieve up-to-date documentation for software libraries, frameworks, and components via the Context7 API. Use when looking up documentation for any programming library or framework, finding code examples for specific APIs or features, verifying correct usage of library functions, or obtaining current information about library APIs that may have changed since training.
+description: Retrieve up-to-date documentation for software libraries via Context7 API. Use when looking up library docs, finding code examples, or verifying correct API usage.
 ---
 
 # Context7
 
 Fetch current documentation for software libraries via Context7 API.
 
-## Setup
+## Activation Triggers
 
-API key stored in `.env.local` as `CONTEXT7_API_KEY`. Read the key value directly and use it in curl commands.
+Use this skill when:
+- Setup/configuration questions (e.g., "How do I configure Next.js middleware?")
+- Code involving libraries (e.g., "Write a Prisma query for...")
+- API references (e.g., "What are the Supabase auth methods?")
+- Specific frameworks: React, Vite, TailwindCSS, TanStack Query, shadcn/ui, etc.
 
 ## Usage
+
+API key stored in `.env.local` as `CONTEXT7_API_KEY`. Read the key value directly and use it in curl commands.
 
 **Important**: Use curl commands directly with the API key value (not shell variables). This ensures permission rules like `Bash(curl:*)` can match and auto-execute.
 
@@ -27,10 +33,11 @@ curl -s -H "Authorization: Bearer <API_KEY>" "https://context7.com/api/v2/libs/s
 curl -s -H "Authorization: Bearer <API_KEY>" "https://context7.com/api/v2/context?libraryId=LIBRARY_ID&query=TOPIC&type=txt"
 ```
 
-## Notes
+## Best Practices
 
-- Read API key from `.env.local` and substitute directly into commands
-- Do NOT use `export`, `source`, or `${}` variable expansion - these create complex commands that won't match permission rules
+- Pass the user's complete question as the query parameter for improved relevance
+- When users specify versions ("React 19"), prioritize matching version-specific library IDs
+- Favor official packages over community alternatives
 - Use `type=txt` for readable output
 - URL-encode spaces as `+` or `%20`
 - Common library IDs: `/websites/react_dev`, `/vitejs/vite`, `/tailwindlabs/tailwindcss.com`, `/tanstack/query`, `/shadcn-ui/ui`
