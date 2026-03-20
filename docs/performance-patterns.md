@@ -54,6 +54,16 @@ React Query 提供：
 - `src/hooks/useNetworkStatus.ts` - 网络状态 hook
 - `src/components/ui/NetworkIndicator.tsx` - 离线横幅
 
+### 网络状态检测
+
+`useNetworkStatus` 使用三层检测机制确保离线横幅及时消失：
+
+1. **`online`/`offline` 事件** — 浏览器原生事件，主要检测手段
+2. **`visibilitychange` 事件** — 用户切回页面时同步 `navigator.onLine`，补偿原生事件漏触发
+3. **30 秒轮询** — 兜底机制，即使页面始终在前台也能检测到恢复
+
+> 注意：`navigator.onLine` 只检测网络接口是否连接，不验证实际互联网可达性。
+
 ### 设计决策
 
 **只读离线模式**：用户可以在离线时浏览缓存数据，但编辑需要网络连接。这简化了心智模型并避免同步冲突。
