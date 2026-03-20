@@ -59,7 +59,7 @@ React Query 提供：
 `useNetworkStatus` 使用多层检测机制，不依赖 `navigator.onLine` 判断恢复：
 
 1. **`online`/`offline` 事件** — 浏览器原生事件，快速响应断网/恢复
-2. **`visibilitychange` + fetch 探测** — 切回页面时 `fetch /api/models` 验证真实连通性
+2. **`visibilitychange` + fetch 探测** — 切回页面时 `fetch /api/health` 验证真实连通性
 3. **离线时立即探测 + 15s 轮询** — 进入离线状态立即验证，之后每 15 秒重试
 4. **5 秒超时** — `AbortController` 防止探测请求挂起
 
