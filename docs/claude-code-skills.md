@@ -4,16 +4,36 @@
 
 ## 已安装的 Skills
 
-位置：`.claude/skills/`
+位置：`.agents/skills/`（通过 symlink 链接到 `.claude/skills/`）
+
+| Skill | 来源 | 用途 |
+|-------|------|------|
+| ai-sdk | vercel/ai | Vercel AI SDK 文档与指导 |
+| frontend-design | anthropics/skills | 前端界面设计 |
+| supabase-postgres-best-practices | supabase/agent-skills | PostgreSQL 最佳实践 |
+
+全局技能（`~/.claude/skills/`）：
 
 | Skill | 用途 |
 |-------|------|
-| react-best-practices | React/Next.js 性能优化 |
-| postgres-best-practices | PostgreSQL 最佳实践 |
 | context7 | 获取最新库文档 |
-| ai-sdk | Vercel AI SDK 文档 |
-| frontend-design | 前端设计技能 |
-| skill-creator | 创建新 skill 的指南 |
+
+## 安装与更新 Skill
+
+使用 [skills.sh](https://skills.sh/) 查找技能，通过 `npx skills add` 安装：
+
+```bash
+# 安装到项目（默认）
+npx skills add https://github.com/<owner>/<repo> --skill <name>
+
+# 自动确认（跳过交互）
+npx skills add https://github.com/<owner>/<repo> --skill <name> -y
+
+# 安装到全局
+npx skills add https://github.com/<owner>/<repo> --skill <name> -y -g
+```
+
+安装后会自动创建 symlink 到 `.claude/skills/`，Claude Code 可直接使用。
 
 ## 权限配置
 
@@ -56,45 +76,6 @@
 "Bash(curl:*)"      // 匹配所有 curl 开头的命令
 "Bash(curl -s *)"   // 匹配 curl -s 开头的命令
 ```
-
-### Skill 脚本的最佳实践
-
-1. **避免复杂的 shell 变量展开**
-   - 不要在命令中使用 `${}`, `$()`, `source`, `export`
-   - 直接读取配置值并替换到命令中
-
-2. **使用简单的命令结构**
-   - 让命令能被 `Bash(command:*)` 规则匹配
-   - 复杂逻辑放在脚本文件中，但调用时保持命令简单
-
-3. **示例：Context7 的正确用法**
-   ```bash
-   # 正确 - 直接使用 API key 值
-   curl -s -H "Authorization: Bearer ctx7sk-xxx" "https://..."
-
-   # 错误 - 使用变量展开
-   export KEY=xxx && curl -s -H "Authorization: Bearer $KEY" "https://..."
-   ```
-
-## 添加新 Skill
-
-1. 使用 skill-creator 初始化：
-   ```bash
-   python3 .claude/skills/skill-creator/scripts/init_skill.py <name> --path .claude/skills
-   ```
-
-2. 编辑 `SKILL.md`，确保命令简单直接
-
-3. 在 `settings.local.json` 添加权限：
-   ```json
-   "Skill(<name>)",
-   "Skill(<name>:*)"
-   ```
-
-4. 验证 skill：
-   ```bash
-   python3 .claude/skills/skill-creator/scripts/quick_validate.py .claude/skills/<name>
-   ```
 
 ## 调试权限问题
 

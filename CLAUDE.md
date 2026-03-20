@@ -170,7 +170,7 @@ bunx supabase gen types typescript --project-id <id> > src/lib/database.types.ts
 
 ## Claude Code Skills
 
-已安装技能（`.claude/skills/`）：
-- **ai-sdk** - Vercel AI SDK 文档
-- **frontend-design** - 前端设计技能
-- **postgres-best-practices** - PostgreSQL 最佳实践
+已安装技能（`.agents/skills/` → symlink 到 `.claude/skills/`）：
+- **ai-sdk** - Vercel AI SDK 文档与指导
+- **frontend-design** - 前端界面设计
+- **supabase-postgres-best-practices** - PostgreSQL 最佳实践

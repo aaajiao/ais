@@ -1,13 +1,20 @@
----
-name: supabase-postgres-best-practices
-description: Postgres performance optimization and best practices from Supabase. Use this skill when writing, reviewing, or optimizing Postgres queries, schema designs, or database configurations.
-license: MIT
-metadata:
-  author: supabase
-  version: "1.0.0"
----
-
 # Supabase Postgres Best Practices
+
+## Structure
+
+```
+supabase-postgres-best-practices/
+  SKILL.md       # Main skill file - read this first
+  AGENTS.md      # This navigation guide
+  CLAUDE.md      # Symlink to AGENTS.md
+  references/    # Detailed reference files
+```
+
+## Usage
+
+1. Read `SKILL.md` for the main skill instructions
+2. Browse `references/` for detailed documentation on specific topics
+3. Reference files are loaded on-demand - read only what you need
 
 Comprehensive performance optimization guide for Postgres, maintained by Supabase. Contains rules across 8 categories, prioritized by impact to guide automated query optimization and schema design.
 
@@ -39,9 +46,9 @@ Reference these guidelines when:
 Read individual rule files for detailed explanations and SQL examples:
 
 ```
-rules/query-missing-indexes.md
-rules/schema-partial-indexes.md
-rules/_sections.md
+references/query-missing-indexes.md
+references/schema-partial-indexes.md
+references/_sections.md
 ```
 
 Each rule file contains:
@@ -52,6 +59,10 @@ Each rule file contains:
 - Additional context and references
 - Supabase-specific notes (when applicable)
 
-## Full Compiled Document
+## References
 
-For the complete guide with all rules expanded: `AGENTS.md`
+- https://www.postgresql.org/docs/current/
+- https://supabase.com/docs
+- https://wiki.postgresql.org/wiki/Performance_Optimization
+- https://supabase.com/docs/guides/database/overview
+- https://supabase.com/docs/guides/auth/row-level-security
