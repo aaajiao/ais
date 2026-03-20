@@ -52,9 +52,14 @@ export function useNetworkStatus() {
     };
   }, []);
 
-  // 离线时启动轮询探测，在线时停止
+  // 离线时：立即探测一次 + 启动轮询；在线时停止
   useEffect(() => {
     if (!isOnline) {
+      // 立即验证，不等第一个 interval
+      checkConnectivity().then((online) => {
+        if (online) setIsOnline(true);
+      });
+
       intervalRef.current = setInterval(() => {
         checkConnectivity().then((online) => {
           if (online) setIsOnline(true);

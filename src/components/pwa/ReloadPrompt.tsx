@@ -8,11 +8,11 @@ export function ReloadPrompt() {
     updateServiceWorker,
   } = useRegisterSW({
     onRegisteredSW(_swUrl, r) {
-      // Check for updates every hour
+      // Check for updates every 5 minutes
       if (r) {
         setInterval(() => {
           r.update()
-        }, 60 * 60 * 1000)
+        }, 5 * 60 * 1000)
       }
     }
   })
