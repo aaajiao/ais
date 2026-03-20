@@ -11,11 +11,16 @@ const PING_INTERVAL = 15_000; // 离线时每 15 秒探测一次
 
 async function checkConnectivity(): Promise<boolean> {
   try {
+    // 用 AbortController 设置 5 秒超时，避免长时间挂起
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5_000);
     const resp = await fetch('/api/models', {
-      method: 'HEAD',
       cache: 'no-store',
+      signal: controller.signal,
     });
-    return resp.ok;
+    clearTimeout(timeout);
+    // 任何 HTTP 响应（包括 4xx/5xx）都说明网络可达
+    return resp.status > 0;
   } catch {
     return false;
   }
