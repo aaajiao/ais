@@ -14,7 +14,7 @@ async function checkConnectivity(): Promise<boolean> {
     // 用 AbortController 设置 5 秒超时，避免长时间挂起
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5_000);
-    const resp = await fetch('/api/models', {
+    const resp = await fetch('/api/health', {
       cache: 'no-store',
       signal: controller.signal,
     });

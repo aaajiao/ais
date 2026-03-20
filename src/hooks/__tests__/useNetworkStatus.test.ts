@@ -123,7 +123,7 @@ describe('useNetworkStatus', () => {
 
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      '/api/models',
+      '/api/health',
       expect.objectContaining({ cache: 'no-store' }),
     );
   });
