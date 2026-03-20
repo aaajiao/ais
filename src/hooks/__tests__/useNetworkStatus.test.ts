@@ -111,7 +111,7 @@ describe('useNetworkStatus', () => {
 
   it('应该在卸载时清理事件监听和定时器', () => {
     const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
-    const clearIntervalSpy = vi.spyOn(global, 'clearInterval');
+    const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval');
 
     const { unmount } = renderHook(() => useNetworkStatus());
     unmount();
