@@ -40,6 +40,14 @@ Icon?
 # Claude Code local settings
 .claude/*.local.*
 
+# Agent skills (installed via npx skills add, regenerated from skills-lock.json)
+.agents/skills/
+.agent/skills/
+.claude/skills/
+
+# Supacode
+supacode.json
+
 # Redundant lock files (using bun.lock)
 package-lock.json
 yarn.lock
