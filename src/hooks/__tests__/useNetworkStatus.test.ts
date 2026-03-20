@@ -20,6 +20,8 @@ describe('useNetworkStatus', () => {
     vi.restoreAllMocks();
   });
 
+  // --- 初始状态 ---
+
   it('应该返回初始在线状态', () => {
     const { result } = renderHook(() => useNetworkStatus());
     expect(result.current.isOnline).toBe(true);
@@ -32,6 +34,8 @@ describe('useNetworkStatus', () => {
     expect(result.current.isOnline).toBe(false);
     expect(result.current.isOffline).toBe(true);
   });
+
+  // --- 浏览器事件 ---
 
   it('应该响应 offline 事件', () => {
     const { result } = renderHook(() => useNetworkStatus());
@@ -56,11 +60,12 @@ describe('useNetworkStatus', () => {
     expect(result.current.isOnline).toBe(true);
   });
 
+  // --- visibilitychange 探测 ---
+
   it('应该在页面可见时通过 fetch 验证连通性', async () => {
     onLineSpy.mockReturnValue(false);
     const { result } = renderHook(() => useNetworkStatus());
 
-    // 模拟 fetch 成功（网络已恢复）
     vi.mocked(globalThis.fetch).mockResolvedValue(
       new Response(null, { status: 200 }),
     );
@@ -74,7 +79,6 @@ describe('useNetworkStatus', () => {
       document.dispatchEvent(new Event('visibilitychange'));
     });
 
-    // flush promise
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
@@ -97,7 +101,6 @@ describe('useNetworkStatus', () => {
       document.dispatchEvent(new Event('visibilitychange'));
     });
 
-    // 给 promise 时间 resolve
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
@@ -105,17 +108,57 @@ describe('useNetworkStatus', () => {
     expect(result.current.isOnline).toBe(false);
   });
 
-  it('离线时应通过轮询探测恢复', async () => {
+  // --- 离线时立即探测 ---
+
+  it('进入离线状态时应立即 fetch 探测', async () => {
+    onLineSpy.mockReturnValue(false);
+    vi.mocked(globalThis.fetch).mockClear();
+
+    renderHook(() => useNetworkStatus());
+
+    // mount 后立即触发一次 fetch
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      '/api/models',
+      expect.objectContaining({ cache: 'no-store' }),
+    );
+  });
+
+  it('立即探测成功应恢复在线', async () => {
     onLineSpy.mockReturnValue(false);
     const { result } = renderHook(() => useNetworkStatus());
     expect(result.current.isOnline).toBe(false);
 
-    // 模拟网络恢复
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(result.current.isOnline).toBe(true);
+  });
+
+  // --- 轮询探测 ---
+
+  it('离线时应通过 15s 轮询探测恢复', async () => {
+    onLineSpy.mockReturnValue(false);
+    // 初始探测失败
+    vi.mocked(globalThis.fetch).mockRejectedValue(new Error('Network error'));
+
+    const { result } = renderHook(() => useNetworkStatus());
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.isOnline).toBe(false);
+
+    // 网络恢复
     vi.mocked(globalThis.fetch).mockResolvedValue(
       new Response(null, { status: 200 }),
     );
 
-    // 15 秒后轮询探测
     await act(async () => {
       await vi.advanceTimersByTimeAsync(15_000);
     });
@@ -131,11 +174,65 @@ describe('useNetworkStatus', () => {
       await vi.advanceTimersByTimeAsync(30_000);
     });
 
-    // 在线状态不应发起 fetch 探测
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
-  it('应该在卸载时清理', () => {
+  // --- HTTP 状态码判断 ---
+
+  it('4xx/5xx 响应也应判定为在线（网络可达）', async () => {
+    onLineSpy.mockReturnValue(false);
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(null, { status: 500 }),
+    );
+
+    const { result } = renderHook(() => useNetworkStatus());
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(result.current.isOnline).toBe(true);
+  });
+
+  it('405 响应也应判定为在线', async () => {
+    onLineSpy.mockReturnValue(false);
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response('Method not allowed', { status: 405 }),
+    );
+
+    const { result } = renderHook(() => useNetworkStatus());
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(result.current.isOnline).toBe(true);
+  });
+
+  // --- 超时处理 ---
+
+  it('fetch 超时应判定为离线', async () => {
+    onLineSpy.mockReturnValue(false);
+    // 模拟永不 resolve 的请求（会被 AbortController 取消）
+    vi.mocked(globalThis.fetch).mockImplementation(
+      () => new Promise((_, reject) => {
+        // 模拟 abort 触发 reject
+        setTimeout(() => reject(new DOMException('Aborted', 'AbortError')), 5_000);
+      }),
+    );
+
+    const { result } = renderHook(() => useNetworkStatus());
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+
+    expect(result.current.isOnline).toBe(false);
+  });
+
+  // --- 清理 ---
+
+  it('应该在卸载时清理事件监听和定时器', () => {
     const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
 
     const { unmount } = renderHook(() => useNetworkStatus());

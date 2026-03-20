@@ -56,13 +56,16 @@ React Query 提供：
 
 ### 网络状态检测
 
-`useNetworkStatus` 使用三层检测机制确保离线横幅及时消失：
+`useNetworkStatus` 使用多层检测机制，不依赖 `navigator.onLine` 判断恢复：
 
-1. **`online`/`offline` 事件** — 浏览器原生事件，主要检测手段
-2. **`visibilitychange` 事件** — 用户切回页面时同步 `navigator.onLine`，补偿原生事件漏触发
-3. **30 秒轮询** — 兜底机制，即使页面始终在前台也能检测到恢复
+1. **`online`/`offline` 事件** — 浏览器原生事件，快速响应断网/恢复
+2. **`visibilitychange` + fetch 探测** — 切回页面时 `fetch /api/models` 验证真实连通性
+3. **离线时立即探测 + 15s 轮询** — 进入离线状态立即验证，之后每 15 秒重试
+4. **5 秒超时** — `AbortController` 防止探测请求挂起
 
-> 注意：`navigator.onLine` 只检测网络接口是否连接，不验证实际互联网可达性。
+**判定逻辑**：收到任何 HTTP 响应（含 4xx/5xx）即判定在线（网络可达），只有 fetch 抛异常（网络不通/超时）才判定离线。在线时不轮询，零开销。
+
+> 注意：`navigator.onLine` 只检测网络接口是否连接，不验证实际互联网可达性，仅用于初始值和快速离线检测。
 
 ### 设计决策
 
