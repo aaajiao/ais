@@ -1,273 +1,522 @@
-import { describe, it, expect, vi } from 'vitest';
-import { queryKeys } from '@/lib/queryKeys';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock supabase
+interface ChainCall {
+  method: string;
+  args: unknown[];
+}
+
+interface BuilderState {
+  table: string;
+  calls: ChainCall[];
+}
+
+const builderRegistry: BuilderState[] = [];
+let nextResponse: { data: unknown; error: unknown; count?: number | null } = {
+  data: [],
+  error: null,
+  count: null,
+};
+
+function setNextResponse(response: {
+  data?: unknown;
+  error?: unknown;
+  count?: number | null;
+}) {
+  nextResponse = {
+    data: response.data ?? null,
+    error: response.error ?? null,
+    count: response.count ?? null,
+  };
+}
+
+const TERMINAL_METHODS = new Set(['single', 'maybeSingle', 'csv']);
+
+function createBuilder(state: BuilderState): unknown {
+  const handler: ProxyHandler<object> = {
+    get(_target, prop: string | symbol) {
+      if (prop === 'then') {
+        return (
+          onFulfilled: (value: unknown) => unknown,
+          onRejected?: (reason: unknown) => unknown
+        ) => {
+          const result = {
+            data: nextResponse.data,
+            error: nextResponse.error,
+            count: nextResponse.count,
+          };
+          try {
+            return Promise.resolve(onFulfilled(result));
+          } catch (err) {
+            if (onRejected) return Promise.resolve(onRejected(err));
+            return Promise.reject(err);
+          }
+        };
+      }
+      if (typeof prop === 'symbol') return undefined;
+      return (...args: unknown[]) => {
+        state.calls.push({ method: prop, args });
+        if (TERMINAL_METHODS.has(prop)) {
+          const data = Array.isArray(nextResponse.data)
+            ? nextResponse.data[0] ?? null
+            : nextResponse.data;
+          return Promise.resolve({
+            data,
+            error: nextResponse.error,
+          });
+        }
+        return proxy;
+      };
+    },
+  };
+  const proxy = new Proxy({}, handler);
+  return proxy;
+}
+
+const fromMock = vi.fn((table: string) => {
+  const state: BuilderState = { table, calls: [] };
+  builderRegistry.push(state);
+  return createBuilder(state);
+});
+
 vi.mock('@/lib/supabase', () => ({
   supabase: {
-    from: vi.fn(() => ({
-      select: vi.fn(() => ({
-        order: vi.fn(() => ({
-          order: vi.fn(() => ({
-            or: vi.fn(() => ({
-              limit: vi.fn(() => Promise.resolve({ data: [], error: null })),
-            })),
-            limit: vi.fn(() => Promise.resolve({ data: [], error: null })),
-          })),
-        })),
-        eq: vi.fn(() => ({
-          single: vi.fn(() => Promise.resolve({ data: null, error: null })),
-        })),
-      })),
-    })),
+    from: (table: string) => fromMock(table),
   },
 }));
 
-describe('useEditions query keys', () => {
-  describe('queryKeys.editions', () => {
-    it('should have correct all key', () => {
-      expect(queryKeys.editions.all).toEqual(['editions']);
-    });
+import {
+  fetchEditionsPaginated,
+  fetchEditionStatusCounts,
+  fetchEditionDetail,
+  fetchEditionHistory,
+  fetchEditionFiles,
+  fetchEditionsByArtwork,
+  useEditionStatusCounts,
+  useEditionDetail,
+  useEditionHistory,
+  useEditionsByArtwork,
+} from './useEditions';
+import { renderHookWithClient, waitFor } from '@/test/test-utils';
 
-    it('should generate correct list key with filters', () => {
-      const filters = { status: 'in_studio' as const, search: 'test' };
-      expect(queryKeys.editions.list(filters)).toEqual(['editions', 'list', filters]);
-    });
+const baseEditionRow = {
+  id: 'e1',
+  artwork_id: 'a1',
+  inventory_number: 'AAJ-2024-001',
+  edition_type: 'numbered' as const,
+  edition_number: 1,
+  status: 'in_studio' as const,
+  location_id: 'l1',
+  storage_detail: null,
+  condition: 'excellent',
+  condition_notes: null,
+  sale_price: null,
+  sale_currency: null,
+  sale_date: null,
+  buyer_name: null,
+  consignment_start: null,
+  loan_institution: null,
+  loan_end: null,
+  certificate_number: null,
+  notes: null,
+  created_at: '2024-01-01T00:00:00Z',
+  updated_at: '2024-01-01T00:00:00Z',
+  artwork: {
+    id: 'a1',
+    title_en: 'Test',
+    title_cn: '测试',
+    thumbnail_url: null,
+    edition_total: 3,
+    ap_total: 0,
+    is_unique: false,
+    deleted_at: null,
+  },
+  location: {
+    id: 'l1',
+    name: 'Studio',
+    address: null,
+    contact: null,
+    notes: null,
+  },
+};
 
-    it('should generate correct detail key', () => {
-      expect(queryKeys.editions.detail('edition-123')).toEqual([
-        'editions',
-        'detail',
-        'edition-123',
-      ]);
-    });
+function lastBuilder(): BuilderState {
+  return builderRegistry[builderRegistry.length - 1];
+}
 
-    it('should generate correct byArtwork key', () => {
-      expect(queryKeys.editions.byArtwork('artwork-123')).toEqual([
-        'editions',
-        'byArtwork',
-        'artwork-123',
-      ]);
-    });
+beforeEach(() => {
+  builderRegistry.length = 0;
+  fromMock.mockClear();
+  setNextResponse({ data: [], error: null, count: null });
+});
 
-    it('should generate correct infinite key with filters', () => {
-      const filters = { status: 'sold' as const };
-      expect(queryKeys.editions.infinite(filters)).toEqual([
-        'editions',
-        'infinite',
-        filters,
-      ]);
-    });
+describe('fetchEditionsPaginated', () => {
+  it('查询 editions 表并 join artworks/locations', async () => {
+    setNextResponse({ data: [baseEditionRow] });
 
-    it('should generate correct history key', () => {
-      expect(queryKeys.editions.history('edition-123')).toEqual([
-        'editions',
-        'history',
-        'edition-123',
-      ]);
-    });
+    const result = await fetchEditionsPaginated({ pageParam: null });
 
-    it('should generate correct files key', () => {
-      expect(queryKeys.editions.files('edition-123')).toEqual([
-        'editions',
-        'files',
-        'edition-123',
-      ]);
-    });
+    const builder = lastBuilder();
+    expect(builder.table).toBe('editions');
+
+    const selectCall = builder.calls.find((c) => c.method === 'select');
+    expect(String(selectCall?.args[0])).toContain('artwork:artworks!left');
+    expect(String(selectCall?.args[0])).toContain('location:locations!left');
+
+    const limitCall = builder.calls.find((c) => c.method === 'limit');
+    expect(limitCall?.args[0]).toBe(51);
+
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0].artwork?.title_en).toBe('Test');
   });
 
-  describe('query key uniqueness', () => {
-    it('should generate unique keys for different edition IDs', () => {
-      const key1 = queryKeys.editions.detail('edition-1');
-      const key2 = queryKeys.editions.detail('edition-2');
+  it('清理结果时移除 artwork.deleted_at 字段', async () => {
+    setNextResponse({ data: [baseEditionRow] });
 
-      expect(key1).not.toEqual(key2);
-    });
-
-    it('should generate unique keys for different filters', () => {
-      const key1 = queryKeys.editions.list({ status: 'in_studio' as const });
-      const key2 = queryKeys.editions.list({ status: 'sold' as const });
-
-      expect(key1).not.toEqual(key2);
-    });
-
-    it('should generate same keys for same filters', () => {
-      const filters = { status: 'in_studio' as const, search: 'test' };
-      const key1 = queryKeys.editions.list(filters);
-      const key2 = queryKeys.editions.list(filters);
-
-      expect(key1).toEqual(key2);
-    });
+    const result = await fetchEditionsPaginated({ pageParam: null });
+    expect(result.data[0].artwork).not.toHaveProperty('deleted_at');
   });
 
-  describe('query key hierarchy', () => {
-    it('editions.all should be prefix for all edition keys', () => {
-      const allKey = queryKeys.editions.all;
-      const detailKey = queryKeys.editions.detail('test');
-      const historyKey = queryKeys.editions.history('test');
-
-      expect(detailKey[0]).toBe(allKey[0]);
-      expect(historyKey[0]).toBe(allKey[0]);
+  it('过滤掉关联了软删除作品的版本', async () => {
+    setNextResponse({
+      data: [
+        baseEditionRow,
+        {
+          ...baseEditionRow,
+          id: 'e2',
+          artwork: { ...baseEditionRow.artwork, deleted_at: '2024-02-01' },
+        },
+      ],
     });
 
-    it('invalidating editions.all should match all edition queries', () => {
-      const matchFn = (key: readonly unknown[]) =>
-        key[0] === queryKeys.editions.all[0];
+    const result = await fetchEditionsPaginated({ pageParam: null });
 
-      expect(matchFn(queryKeys.editions.detail('test'))).toBe(true);
-      expect(matchFn(queryKeys.editions.history('test'))).toBe(true);
-      expect(matchFn(queryKeys.editions.files('test'))).toBe(true);
-      expect(matchFn(queryKeys.editions.byArtwork('test'))).toBe(true);
+    expect(result.data.map((e) => e.id)).toEqual(['e1']);
+  });
+
+  it('保留 artwork 为 null 的版本', async () => {
+    setNextResponse({
+      data: [{ ...baseEditionRow, id: 'e3', artwork: null }],
     });
+
+    const result = await fetchEditionsPaginated({ pageParam: null });
+
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0].artwork).toBeNull();
+  });
+
+  it('在 status filter 不为 all 时调用 eq("status", ...)', async () => {
+    setNextResponse({ data: [baseEditionRow] });
+
+    await fetchEditionsPaginated({
+      pageParam: null,
+      filters: { status: 'sold' },
+    });
+
+    const builder = lastBuilder();
+    const eqCall = builder.calls.find(
+      (c) => c.method === 'eq' && c.args[0] === 'status'
+    );
+    expect(eqCall).toBeDefined();
+    expect(eqCall?.args[1]).toBe('sold');
+  });
+
+  it('status=all 时不调用 eq("status",...)', async () => {
+    setNextResponse({ data: [baseEditionRow] });
+
+    await fetchEditionsPaginated({
+      pageParam: null,
+      filters: { status: 'all' },
+    });
+
+    const builder = lastBuilder();
+    const eqStatus = builder.calls.find(
+      (c) => c.method === 'eq' && c.args[0] === 'status'
+    );
+    expect(eqStatus).toBeUndefined();
+  });
+
+  it('search 过滤匹配 inventory_number/title/location.name (客户端)', async () => {
+    setNextResponse({
+      data: [
+        baseEditionRow,
+        {
+          ...baseEditionRow,
+          id: 'e2',
+          inventory_number: 'XYZ-2024-001',
+          artwork: {
+            ...baseEditionRow.artwork,
+            title_en: 'Different',
+            title_cn: '不同',
+          },
+        },
+      ],
+    });
+
+    const result = await fetchEditionsPaginated({
+      pageParam: null,
+      filters: { search: 'xyz' },
+    });
+
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0].id).toBe('e2');
+  });
+
+  it('hasMore=true 当返回多于 pageSize', async () => {
+    const rows = Array.from({ length: 51 }, (_, i) => ({
+      ...baseEditionRow,
+      id: `e${i}`,
+    }));
+    setNextResponse({ data: rows });
+
+    const result = await fetchEditionsPaginated({ pageParam: null });
+
+    expect(result.hasMore).toBe(true);
+    expect(result.data).toHaveLength(50);
+    expect(result.nextCursor).not.toBeNull();
+  });
+
+  it('在 supabase 错误时抛出', async () => {
+    setNextResponse({ data: null, error: { message: 'fail' } });
+
+    await expect(
+      fetchEditionsPaginated({ pageParam: null })
+    ).rejects.toMatchObject({ message: 'fail' });
   });
 });
 
-describe('Edition status filtering', () => {
-  const mockEditions = [
-    { id: '1', status: 'in_studio', artwork: { deleted_at: null } },
-    { id: '2', status: 'sold', artwork: { deleted_at: null } },
-    { id: '3', status: 'in_studio', artwork: { deleted_at: '2024-01-01' } }, // soft deleted
-    { id: '4', status: 'at_gallery', artwork: null }, // no artwork
-  ];
-
-  it('should filter out editions with soft-deleted artworks', () => {
-    const filtered = mockEditions.filter(
-      (edition) => !edition.artwork || edition.artwork.deleted_at === null
-    );
-
-    expect(filtered).toHaveLength(3);
-    expect(filtered.map((e) => e.id)).toEqual(['1', '2', '4']);
-  });
-
-  it('should keep editions with null artwork', () => {
-    const filtered = mockEditions.filter(
-      (edition) => !edition.artwork || edition.artwork.deleted_at === null
-    );
-
-    expect(filtered.find((e) => e.id === '4')).toBeDefined();
-  });
-
-  it('should not include editions with deleted artworks', () => {
-    const filtered = mockEditions.filter(
-      (edition) => !edition.artwork || edition.artwork.deleted_at === null
-    );
-
-    expect(filtered.find((e) => e.id === '3')).toBeUndefined();
-  });
-});
-
-describe('Edition status counts', () => {
-  it('should count editions by status correctly', () => {
-    const editions = [
-      { status: 'in_studio', artwork: { deleted_at: null } },
-      { status: 'in_studio', artwork: { deleted_at: null } },
-      { status: 'sold', artwork: { deleted_at: null } },
-      { status: 'at_gallery', artwork: { deleted_at: null } },
-      { status: 'in_studio', artwork: { deleted_at: '2024-01-01' } }, // should be excluded
-    ];
-
-    // Filter valid editions
-    const validEditions = editions.filter(
-      (e) => !e.artwork || e.artwork.deleted_at === null
-    );
-
-    // Count by status
-    const counts: Record<string, number> = {
-      all: validEditions.length,
-      in_studio: 0,
-      sold: 0,
-      at_gallery: 0,
-    };
-
-    validEditions.forEach((edition) => {
-      if (edition.status in counts) {
-        counts[edition.status]++;
-      }
+describe('fetchEditionStatusCounts', () => {
+  it('按状态统计且排除软删除作品的版本', async () => {
+    setNextResponse({
+      data: [
+        { status: 'in_studio', artwork: { deleted_at: null } },
+        { status: 'in_studio', artwork: { deleted_at: null } },
+        { status: 'sold', artwork: { deleted_at: null } },
+        { status: 'at_gallery', artwork: null },
+        { status: 'in_studio', artwork: { deleted_at: '2024-01-01' } },
+      ],
     });
+
+    const counts = await fetchEditionStatusCounts();
 
     expect(counts.all).toBe(4);
     expect(counts.in_studio).toBe(2);
     expect(counts.sold).toBe(1);
     expect(counts.at_gallery).toBe(1);
+    expect(counts.in_production).toBe(0);
+  });
+
+  it('包含所有 EditionStatus key', async () => {
+    setNextResponse({ data: [] });
+
+    const counts = await fetchEditionStatusCounts();
+
+    expect(Object.keys(counts).sort()).toEqual(
+      [
+        'all',
+        'in_production',
+        'in_studio',
+        'at_gallery',
+        'at_museum',
+        'in_transit',
+        'sold',
+        'gifted',
+        'lost',
+        'damaged',
+      ].sort()
+    );
+  });
+
+  it('错误时抛出', async () => {
+    setNextResponse({ data: null, error: { message: 'oops' } });
+    await expect(fetchEditionStatusCounts()).rejects.toMatchObject({
+      message: 'oops',
+    });
   });
 });
 
-describe('Edition search filtering', () => {
-  const mockEditions = [
-    {
-      id: '1',
-      inventory_number: 'AAJ-2024-001',
-      artwork: { title_en: 'Test Artwork', title_cn: '测试作品' },
-      location: { name: 'Studio A' },
-    },
-    {
-      id: '2',
-      inventory_number: 'AAJ-2024-002',
-      artwork: { title_en: 'Another Work', title_cn: '另一作品' },
-      location: { name: 'Gallery B' },
-    },
-    {
-      id: '3',
-      inventory_number: 'XYZ-2024-001',
-      artwork: { title_en: 'Third Piece', title_cn: '第三件' },
-      location: { name: 'Museum C' },
-    },
-  ];
+describe('fetchEditionDetail', () => {
+  it('应用 eq(id) 并使用 single()', async () => {
+    setNextResponse({ data: baseEditionRow });
 
-  it('should filter by English title', () => {
-    const searchLower = 'test'.toLowerCase();
-    const filtered = mockEditions.filter(
-      (edition) =>
-        edition.artwork?.title_en?.toLowerCase().includes(searchLower)
-    );
+    const detail = await fetchEditionDetail('e1');
 
-    expect(filtered).toHaveLength(1);
-    expect(filtered[0].id).toBe('1');
+    expect(detail?.id).toBe('e1');
+    const builder = lastBuilder();
+    const eq = builder.calls.find((c) => c.method === 'eq');
+    expect(eq?.args).toEqual(['id', 'e1']);
+
+    const single = builder.calls.find((c) => c.method === 'single');
+    expect(single).toBeDefined();
   });
 
-  it('should filter by Chinese title', () => {
-    const searchLower = '另一'.toLowerCase();
-    const filtered = mockEditions.filter(
-      (edition) =>
-        edition.artwork?.title_cn?.toLowerCase().includes(searchLower)
-    );
+  it('当 artwork 已软删除时返回 null', async () => {
+    setNextResponse({
+      data: {
+        ...baseEditionRow,
+        artwork: { ...baseEditionRow.artwork, deleted_at: '2024-02-01' },
+      },
+    });
 
-    expect(filtered).toHaveLength(1);
-    expect(filtered[0].id).toBe('2');
+    const detail = await fetchEditionDetail('e1');
+    expect(detail).toBeNull();
   });
 
-  it('should filter by inventory number', () => {
-    const searchLower = 'xyz'.toLowerCase();
-    const filtered = mockEditions.filter(
-      (edition) =>
-        edition.inventory_number?.toLowerCase().includes(searchLower)
-    );
+  it('错误时抛出', async () => {
+    setNextResponse({ data: null, error: { message: 'fail' } });
+    await expect(fetchEditionDetail('e1')).rejects.toMatchObject({
+      message: 'fail',
+    });
+  });
+});
 
-    expect(filtered).toHaveLength(1);
-    expect(filtered[0].id).toBe('3');
+describe('fetchEditionHistory', () => {
+  it('按 edition_id eq 过滤并按 created_at desc 排序', async () => {
+    setNextResponse({
+      data: [
+        {
+          id: 'h1',
+          edition_id: 'e1',
+          action: 'status_change',
+          created_at: '2024-01-02T00:00:00Z',
+        },
+      ],
+    });
+
+    const history = await fetchEditionHistory('e1');
+    expect(history).toHaveLength(1);
+
+    const builder = lastBuilder();
+    expect(builder.table).toBe('edition_history');
+
+    const eq = builder.calls.find((c) => c.method === 'eq');
+    expect(eq?.args).toEqual(['edition_id', 'e1']);
+
+    const order = builder.calls.find((c) => c.method === 'order');
+    expect(order?.args[0]).toBe('created_at');
+    expect(order?.args[1]).toEqual({ ascending: false });
   });
 
-  it('should filter by location name', () => {
-    const searchLower = 'gallery'.toLowerCase();
-    const filtered = mockEditions.filter(
-      (edition) =>
-        edition.location?.name?.toLowerCase().includes(searchLower)
-    );
+  it('null data 时返回空数组', async () => {
+    setNextResponse({ data: null });
+    expect(await fetchEditionHistory('e1')).toEqual([]);
+  });
+});
 
-    expect(filtered).toHaveLength(1);
-    expect(filtered[0].id).toBe('2');
+describe('fetchEditionFiles', () => {
+  it('按 edition_id 过滤', async () => {
+    setNextResponse({ data: [] });
+    await fetchEditionFiles('e1');
+
+    const builder = lastBuilder();
+    expect(builder.table).toBe('edition_files');
+
+    const eq = builder.calls.find((c) => c.method === 'eq');
+    expect(eq?.args).toEqual(['edition_id', 'e1']);
+  });
+});
+
+describe('fetchEditionsByArtwork', () => {
+  it('按 artwork_id 过滤并按 edition_number 升序', async () => {
+    setNextResponse({
+      data: [
+        { ...baseEditionRow, edition_number: 1 },
+        { ...baseEditionRow, id: 'e2', edition_number: 2 },
+      ],
+    });
+
+    const result = await fetchEditionsByArtwork('a1');
+    expect(result).toHaveLength(2);
+
+    const builder = lastBuilder();
+    expect(builder.table).toBe('editions');
+
+    const eq = builder.calls.find((c) => c.method === 'eq');
+    expect(eq?.args).toEqual(['artwork_id', 'a1']);
+
+    const order = builder.calls.find((c) => c.method === 'order');
+    expect(order?.args[0]).toBe('edition_number');
+    expect(order?.args[1]).toEqual({ ascending: true });
+  });
+});
+
+describe('useEditionStatusCounts hook', () => {
+  it('成功后返回 counts 对象', async () => {
+    setNextResponse({
+      data: [
+        { status: 'in_studio', artwork: { deleted_at: null } },
+        { status: 'sold', artwork: { deleted_at: null } },
+      ],
+    });
+
+    const { result } = renderHookWithClient(() => useEditionStatusCounts());
+
+    await waitFor(() => result.current.isSuccess);
+
+    expect(result.current.data?.all).toBe(2);
+    expect(result.current.data?.in_studio).toBe(1);
+    expect(result.current.data?.sold).toBe(1);
+  });
+});
+
+describe('useEditionDetail hook', () => {
+  it('id 为 undefined 时不查询', () => {
+    const { result } = renderHookWithClient(() => useEditionDetail(undefined));
+    expect(result.current.fetchStatus).toBe('idle');
+    expect(fromMock).not.toHaveBeenCalled();
   });
 
-  it('should match multiple fields', () => {
-    const searchLower = 'aaj-2024'.toLowerCase();
-    const filtered = mockEditions.filter(
-      (edition) =>
-        edition.artwork?.title_en?.toLowerCase().includes(searchLower) ||
-        edition.artwork?.title_cn?.toLowerCase().includes(searchLower) ||
-        edition.inventory_number?.toLowerCase().includes(searchLower) ||
-        edition.location?.name?.toLowerCase().includes(searchLower)
-    );
+  it('查询并返回 edition 详情', async () => {
+    setNextResponse({ data: baseEditionRow });
 
-    expect(filtered).toHaveLength(2);
-    expect(filtered.map((e) => e.id).sort()).toEqual(['1', '2']);
+    const { result } = renderHookWithClient(() => useEditionDetail('e1'));
+    await waitFor(() => result.current.isSuccess);
+
+    expect(result.current.data?.id).toBe('e1');
+  });
+});
+
+describe('useEditionHistory hook', () => {
+  it('editionId 为 undefined 时不查询', () => {
+    const { result } = renderHookWithClient(() =>
+      useEditionHistory(undefined)
+    );
+    expect(result.current.fetchStatus).toBe('idle');
+  });
+
+  it('返回历史记录数组', async () => {
+    setNextResponse({
+      data: [
+        {
+          id: 'h1',
+          edition_id: 'e1',
+          action: 'status_change',
+          created_at: '2024-01-01T00:00:00Z',
+        },
+      ],
+    });
+
+    const { result } = renderHookWithClient(() => useEditionHistory('e1'));
+    await waitFor(() => result.current.isSuccess);
+    expect(result.current.data).toHaveLength(1);
+  });
+});
+
+describe('useEditionsByArtwork hook', () => {
+  it('artworkId 为 undefined 时不查询', () => {
+    const { result } = renderHookWithClient(() =>
+      useEditionsByArtwork(undefined)
+    );
+    expect(result.current.fetchStatus).toBe('idle');
+  });
+
+  it('返回作品下版本列表', async () => {
+    setNextResponse({
+      data: [{ ...baseEditionRow }, { ...baseEditionRow, id: 'e2' }],
+    });
+
+    const { result } = renderHookWithClient(() => useEditionsByArtwork('a1'));
+    await waitFor(() => result.current.isSuccess);
+
+    expect(result.current.data).toHaveLength(2);
   });
 });
