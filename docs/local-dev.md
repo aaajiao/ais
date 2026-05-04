@@ -41,7 +41,8 @@ bun start
 | `bun start` | 完整 Vercel 环境（前端 + API，端口 3000）**推荐** |
 | `bun run dev` | 仅 Vite 前端（端口 5173，无 API） |
 | `bun run dev:api` | 仅 API 服务器（端口 3000） |
-| `bun run build` | 构建生产版本 |
+| `bun run build` | 构建生产版本（含 typecheck） |
+| `bun run typecheck` | 仅 TypeScript 类型检查（比 build 快，不打包） |
 | `bun run preview` | 预览生产构建 |
 | `bun run lint` | ESLint 代码检查 |
 
