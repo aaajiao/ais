@@ -23,7 +23,7 @@ export default async function handler(req: Request) {
     }
 
     const body = await req.json();
-    const { messages: uiMessages, model = 'claude-sonnet-4-5', extractionModel, searchExpansionModel, artistName, locale = 'zh' } = body;
+    const { messages: uiMessages, model = 'claude-sonnet-4-6', extractionModel, searchExpansionModel, artistName, locale = 'zh' } = body;
 
     // 2. 安全日志（不记录敏感消息内容）
     const requestSize = JSON.stringify(uiMessages || []).length;

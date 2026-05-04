@@ -15,7 +15,7 @@ POST /api/chat
 ```typescript
 {
   messages: UIMessage[];           // 对话历史
-  model?: string;                  // 聊天模型 ID，默认 claude-sonnet-4-5
+  model?: string;                  // 聊天模型 ID，默认 claude-sonnet-4-6
   extractionModel?: string;        // URL 导入提取模型（默认使用 model）
   searchExpansionModel?: string;   // 搜索翻译模型（默认 claude-haiku-4-5）
   artistName?: string;             // 项目名称，用于系统提示词（默认 "aaajiao"）
@@ -28,7 +28,8 @@ POST /api/chat
 
 | 别名 | 完整快照版本 | 说明 |
 |------|-------------|------|
-| `claude-sonnet-4-5` | `claude-sonnet-4-5-20250929` | Claude Sonnet 4.5（默认） |
+| `claude-sonnet-4-6` | `claude-sonnet-4-6-20251015` | Claude Sonnet 4.6（默认） |
+| `claude-sonnet-4-5` | `claude-sonnet-4-5-20250929` | Claude Sonnet 4.5 |
 | `claude-opus-4-5` | `claude-opus-4-5-20251101` | Claude Opus 4.5 |
 | `claude-haiku-4-5` | `claude-haiku-4-5-20251001` | Claude Haiku 4.5 |
 | `gpt-4o` | — | GPT-4o |
@@ -44,7 +45,7 @@ POST /api/chat
 
 | 用途 | 参数 | localStorage Key | 默认值 |
 |------|------|------------------|--------|
-| 对话 | `model` | `ai-model` | `claude-sonnet-4-5` |
+| 对话 | `model` | `ai-model` | `claude-sonnet-4-6` |
 | URL 导入提取 | `extractionModel` | `extraction-model` | 使用对话模型 |
 | 搜索翻译 | `searchExpansionModel` | `search-expansion-model` | `claude-haiku-4-5` |
 

@@ -165,8 +165,8 @@ export default function ModelSettings() {
               hint={t('ai.backgroundModelHint')}
               selectedModel={extractionModel}
               selectedModelInfo={extractionModelInfo}
-              mainModelName={selectedModelInfo?.name || selectedModel || 'Claude Sonnet 4.5'}
-              defaultLabel={t('ai.usingMainModel', { modelName: selectedModelInfo?.name || selectedModel || 'Claude Sonnet 4.5' })}
+              mainModelName={selectedModelInfo?.name || selectedModel || 'Claude Sonnet 4.6'}
+              defaultLabel={t('ai.usingMainModel', { modelName: selectedModelInfo?.name || selectedModel || 'Claude Sonnet 4.6' })}
               models={models}
               descLang={descLang}
               onModelChange={handleExtractionModelChange}

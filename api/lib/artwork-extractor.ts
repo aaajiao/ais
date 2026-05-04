@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { createT, type Locale } from './i18n.js';
 
 // 默认提取模型（使用别名）
-const DEFAULT_EXTRACTION_MODEL = 'claude-sonnet-4-5';
+const DEFAULT_EXTRACTION_MODEL = 'claude-sonnet-4-6';
 
 /**
  * 根据模型 ID 获取对应的 provider 实例
