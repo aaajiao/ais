@@ -443,7 +443,7 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 - 后端 API 使用 service key 绕过 RLS，代码中手动添加 `user_id` 过滤
 - 软删除不在 RLS 中强制，Trash 页面需要读取已删除数据
 - `(SELECT auth.uid())` 子查询模式用于性能优化（每条语句只计算一次）
-- 迁移文件归档：`supabase/migrations/archived/001_add_user_id_and_rls.sql`、`002_add_api_keys.sql`
+- 迁移文件归档：`supabase/migrations/archived/001_add_user_id_and_rls.sql`、`002_add_api_keys.sql`、`003_fix_edition_history_double_write.sql`
 
 ---
 
@@ -457,3 +457,4 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 | 2025-02-01 | 实现 RLS 用户隔离：artworks/locations 添加 user_id 列，启用 created_by 自动填充，所有表强制 RLS |
 | 2025-02-01 | 合并 database-deployment.md 和 database-fields.md 为统一文档；迁移文件归档到 archived/ |
 | 2025-02-06 | 添加 api_keys 表（外部 API Key 管理），支持外部 AI 代理只读查询库存数据 |
+| 2026-05-04 | 修复 `edition_history` 双写：触发器 `record_edition_status_change` 在 `auth.uid() IS NULL`（service key）时跳过，由后端代码自行写带富字段的历史。前端 anon key 路径不变。Migration 003 |

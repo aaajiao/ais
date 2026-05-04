@@ -32,8 +32,19 @@
 所有历史记录自动填充 `created_by` 字段（`auth.uid()`）：
 - 前端写入：`HistoryTimeline.tsx`、`useFileUpload.ts`、`ExternalLinkDialog.tsx`、`FileList.tsx`
 - AI 工具写入：`execute-update.ts`（传入 `ctx.userId`）
-- DB Trigger 写入：`record_edition_status_change()`（`SECURITY DEFINER`，调用 `auth.uid()`）
+- DB Trigger 写入：`record_edition_status_change()`（`SECURITY DEFINER`）
 - RLS 通过 `editions → artworks.user_id` 两级 FK 链验证所有权
+
+### 写入路径与去重
+
+`record_edition_status_change` 触发器在 `auth.uid() IS NULL`（service key 上下文）时直接返回，不写历史。这样：
+
+| 路径 | 触发器 | 显式 insert | 结果 |
+|------|--------|-------------|------|
+| 前端 anon key | ✅ 写入 | ❌ | 1 行（`status_change` / `location_change`） |
+| AI 工具 service key | ⏭️ 跳过 | ✅ 写入 | 1 行（带富字段：`sold` / `consigned` / `returned` / `condition_update` + `price`、`buyer_name` 等） |
+
+历史上 AI 路径会同时触发器写一行 + 显式写一行，每次更新落 2 行历史。修复见 `supabase/migrations/archived/003_fix_edition_history_double_write.sql`。
 
 ---
 

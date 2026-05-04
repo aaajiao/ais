@@ -106,7 +106,7 @@ CONTEXT7_API_KEY=xxx                # Context7 API（获取最新库文档）
 - `gallery_links` 使用 `created_by` 字段
 - `api_keys` 表有 `user_id` 列（`= auth.uid()`）
 - 后端 API 使用 service key 绕过 RLS，代码中手动过滤（`ToolContext.userId`）
-- 迁移文件（已归档）：`supabase/migrations/archived/001_add_user_id_and_rls.sql`、`002_add_api_keys.sql`
+- 迁移文件（已归档）：`supabase/migrations/archived/001_add_user_id_and_rls.sql`、`002_add_api_keys.sql`、`003_fix_edition_history_double_write.sql`
 
 ## Edition Status Flow
 
