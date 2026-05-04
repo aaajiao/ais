@@ -399,5 +399,3 @@ export default function LocationDialog({
   );
 }
 
-// 为了向后兼容，导出旧名称
-export { LocationDialog as CreateLocationDialog };

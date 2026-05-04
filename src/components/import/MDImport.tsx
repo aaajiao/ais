@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { parseAndValidateMDFile, type ParsedArtwork } from '@/lib/md-parser';
-import { useAuthContext } from '@/contexts/AuthContext';
+import { useAuthContext } from '@/contexts/useAuthContext';
 import UploadStep from './UploadStep';
 import PreviewStep from './PreviewStep';
 import ResultStep from './ResultStep';

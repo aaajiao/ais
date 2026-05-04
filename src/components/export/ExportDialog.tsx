@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, FileText } from 'lucide-react';
 import type { ExportRequest, ExportOptions } from '@/lib/exporters';
-import { useAuthContext } from '@/contexts/AuthContext';
+import { useAuthContext } from '@/contexts/useAuthContext';
 import { useProfile } from '@/hooks/queries/useProfile';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';

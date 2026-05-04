@@ -130,6 +130,7 @@ export function useInfiniteVirtualList<T>({
   }, [items, groupBy, groupLabelFn, getItemId]);
 
   // Setup virtualizer
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual returns non-memoizable functions; React Compiler skip is intentional.
   const virtualizer = useVirtualizer({
     count: flattenedItems.length + (hasNextPage ? 1 : 0), // +1 for loading indicator
     getScrollElement: () => parentRef.current,

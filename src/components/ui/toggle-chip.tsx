@@ -95,4 +95,4 @@ function ToggleChip({
   )
 }
 
-export { ToggleChip, toggleChipVariants }
+export { ToggleChip }

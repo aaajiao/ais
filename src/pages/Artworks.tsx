@@ -5,13 +5,17 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { useDebounce } from 'use-debounce';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
+import { Plus } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import ExportDialog from '@/components/export/ExportDialog';
 import ListEndIndicator from '@/components/ui/ListEndIndicator';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { queryKeys } from '@/lib/queryKeys';
+import { useAuth } from '@/hooks/useAuth';
+import { invalidateOnArtworkCreate } from '@/lib/cacheInvalidation';
 import {
   useArtworksQueryFn,
   useArtworksTotalCount,
@@ -29,6 +33,11 @@ import {
   useArtworksSelection,
   type FilterStatus,
 } from '@/components/artworks';
+import {
+  ArtworkEditForm,
+  createEmptyArtworkFormData,
+  type ArtworkFormData,
+} from '@/components/artwork';
 import { Button } from '@/components/ui/button';
 
 // 骨架屏组件（静态提升）
@@ -63,9 +72,20 @@ const LoadingSkeleton = (
 
 export default function Artworks() {
   const { t, i18n } = useTranslation('artworks');
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [filter, setFilter] = useState<FilterStatus>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery] = useDebounce(searchQuery, 300);
+
+  // 添加作品对话框
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [addFormData, setAddFormData] = useState<ArtworkFormData>(() =>
+    createEmptyArtworkFormData()
+  );
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   // 批量选择状态
   const {
@@ -144,6 +164,67 @@ export default function Artworks() {
       selectAll(items.map((a) => a.id));
     }
   }, [selectedIds.size, items, selectAll, deselectAll]);
+
+  // 打开/关闭添加对话框
+  const openAddDialog = useCallback(() => {
+    setAddFormData(createEmptyArtworkFormData());
+    setCreateError(null);
+    setShowAddDialog(true);
+  }, []);
+
+  const closeAddDialog = useCallback(() => {
+    if (creating) return;
+    setShowAddDialog(false);
+    setCreateError(null);
+  }, [creating]);
+
+  // 创建作品
+  const handleCreateArtwork = useCallback(async () => {
+    if (!user || !addFormData.title_en.trim()) return;
+
+    try {
+      setCreating(true);
+      setCreateError(null);
+
+      const insertData = {
+        title_en: addFormData.title_en.trim(),
+        title_cn: addFormData.title_cn.trim() || null,
+        year: addFormData.year.trim() || null,
+        type: addFormData.type.trim() || null,
+        materials: addFormData.materials.trim() || null,
+        dimensions: addFormData.dimensions.trim() || null,
+        duration: addFormData.duration.trim() || null,
+        edition_total: addFormData.is_unique ? null : (addFormData.edition_total || null),
+        ap_total: addFormData.is_unique ? null : (addFormData.ap_total || null),
+        is_unique: addFormData.is_unique,
+        source_url: addFormData.source_url.trim() || null,
+        thumbnail_url: addFormData.thumbnail_url.trim() || null,
+        notes: addFormData.notes.trim() || null,
+        user_id: user.id,
+      };
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: newArtwork, error: insertError } = await (supabase as any)
+        .from('artworks')
+        .insert(insertData)
+        .select('id')
+        .single();
+
+      if (insertError) throw insertError;
+
+      await invalidateOnArtworkCreate(queryClient);
+      setShowAddDialog(false);
+
+      if (newArtwork?.id) {
+        navigate(`/artworks/${newArtwork.id}`);
+      }
+    } catch (err) {
+      console.error('Create artwork failed:', err);
+      setCreateError(err instanceof Error ? err.message : 'Failed to create artwork');
+    } finally {
+      setCreating(false);
+    }
+  }, [user, addFormData, queryClient, navigate]);
 
   // 批量删除（软删除）
   const handleBatchDelete = useCallback(async () => {
@@ -242,18 +323,47 @@ export default function Artworks() {
         </div>
       )}
 
+      {/* 添加作品对话框 */}
+      {showAddDialog && (
+        <div className="modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pb-[--spacing-modal-bottom]">
+          <div className="modal-content bg-card border border-border rounded-xl p-6 max-w-2xl w-full max-h-[85dvh] overflow-y-auto">
+            <h3 className="text-lg font-semibold mb-4">{t('addArtwork')}</h3>
+            {createError && (
+              <div className="mb-4 bg-destructive/10 border border-destructive/20 rounded-xl p-3 text-destructive text-sm">
+                {createError}
+              </div>
+            )}
+            <ArtworkEditForm
+              formData={addFormData}
+              saving={creating}
+              onFormChange={setAddFormData}
+              onSave={handleCreateArtwork}
+              onCancel={closeAddDialog}
+            />
+          </div>
+        </div>
+      )}
+
       {/* 标题和批量操作按钮 */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-page-title">{t('title')}</h1>
-        <SelectionToolbar
-          selectMode={selectMode}
-          selectedCount={selectedIds.size}
-          totalCount={items.length}
-          onToggleSelectMode={toggleSelectMode}
-          onSelectAll={handleSelectAll}
-          onExport={() => setShowExportDialog(true)}
-          onDelete={() => setShowDeleteConfirm(true)}
-        />
+        <div className="flex items-center gap-2">
+          {!selectMode && (
+            <Button size="small" onClick={openAddDialog}>
+              <Plus />
+              <span>{t('addArtwork')}</span>
+            </Button>
+          )}
+          <SelectionToolbar
+            selectMode={selectMode}
+            selectedCount={selectedIds.size}
+            totalCount={items.length}
+            onToggleSelectMode={toggleSelectMode}
+            onSelectAll={handleSelectAll}
+            onExport={() => setShowExportDialog(true)}
+            onDelete={() => setShowDeleteConfirm(true)}
+          />
+        </div>
       </div>
 
       {/* 筛选标签 */}

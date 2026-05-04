@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { X, FileDown, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
-import { useAuthContext } from '@/contexts/AuthContext';
+import { useAuthContext } from '@/contexts/useAuthContext';
 import { useProfile } from '@/hooks/queries/useProfile';
 import type { Link } from '@/hooks/useLinks';
 

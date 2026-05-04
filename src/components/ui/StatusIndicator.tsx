@@ -92,17 +92,3 @@ export function StatusIndicator({
   );
 }
 
-// 导出配置供其他组件使用
-export { STATUS_CONFIG };
-export type { StatusConfig };
-
-// 辅助函数：获取状态标签（需要在 React 组件中使用）
-// 注意：这个函数返回翻译 key，实际使用时需要配合 useTranslation
-export function getStatusLabel(status: EditionStatus): string {
-  return status;
-}
-
-// 辅助函数：获取状态颜色
-export function getStatusColor(status: EditionStatus): string {
-  return STATUS_CONFIG[status]?.color || 'var(--muted-foreground)';
-}

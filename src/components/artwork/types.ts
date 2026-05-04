@@ -76,6 +76,27 @@ export function initFormDataFromArtwork(artwork: ArtworkData): ArtworkFormData {
 }
 
 /**
+ * 创建空白表单数据（用于新建作品）
+ */
+export function createEmptyArtworkFormData(): ArtworkFormData {
+  return {
+    title_en: '',
+    title_cn: '',
+    year: '',
+    type: '',
+    materials: '',
+    dimensions: '',
+    duration: '',
+    edition_total: 0,
+    ap_total: 0,
+    is_unique: false,
+    source_url: '',
+    thumbnail_url: '',
+    notes: '',
+  };
+}
+
+/**
  * 格式化版本号显示
  */
 export function formatEditionNumber(

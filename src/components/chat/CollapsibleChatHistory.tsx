@@ -74,6 +74,7 @@ export default function CollapsibleChatHistory({
   }, [messageGroups, expandedDates]);
 
   // 虚拟滚动配置
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual returns non-memoizable functions; React Compiler skip is intentional.
   const virtualizer = useVirtualizer({
     count: flattenedItems.length,
     getScrollElement: () => parentRef.current,

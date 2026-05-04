@@ -12,7 +12,7 @@ import {
   getChatTimestamp,
   type StorageStatus,
 } from '@/lib/chatStorage';
-import { useAuthContext } from '@/contexts/AuthContext';
+import { useAuthContext } from '@/contexts/useAuthContext';
 import { useProfile } from '@/hooks/queries/useProfile';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';

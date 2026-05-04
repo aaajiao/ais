@@ -8,6 +8,7 @@ export {
   type EditionData,
   type EditionSlot,
   initFormDataFromArtwork,
+  createEmptyArtworkFormData,
   formatEditionNumber,
   getAvailableEditionSlots,
   createNewEditionFromSlot,

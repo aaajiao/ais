@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useAuthContext } from '@/contexts/AuthContext';
-import { useThemeContext } from '@/contexts/ThemeContext';
+import { useAuthContext } from '@/contexts/useAuthContext';
+import { useThemeContext } from '@/contexts/useThemeContext';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { NetworkIndicator } from '@/components/ui/NetworkIndicator';

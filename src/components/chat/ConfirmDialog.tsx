@@ -126,23 +126,3 @@ export default function ConfirmDialog({
     </div>
   );
 }
-
-// 简单的确认钩子
-export function useConfirmDialog() {
-  const confirm = (options: {
-    title: string;
-    message: string;
-    confirmText?: string;
-    cancelText?: string;
-    variant?: 'default' | 'danger';
-  }): Promise<boolean> => {
-    return new Promise((resolve) => {
-      // 这里可以用全局状态管理或者 context 来实现
-      // 简化实现：直接使用 window.confirm
-      const result = window.confirm(`${options.title}\n\n${options.message}`);
-      resolve(result);
-    });
-  };
-
-  return { confirm };
-}

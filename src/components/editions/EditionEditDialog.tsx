@@ -15,7 +15,7 @@ import type { EditionStatus, CurrencyType, ConditionType, Database } from '@/lib
 import { Button } from '@/components/ui/button';
 import InventoryNumberInput from './InventoryNumberInput';
 import LocationPicker from './LocationPicker';
-import CreateLocationDialog from './CreateLocationDialog';
+import CreateLocationDialog from './LocationDialog';
 
 // 状态选项
 const STATUS_OPTIONS: EditionStatus[] = [

@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useAuthContext } from '@/contexts/AuthContext';
+import { useAuthContext } from '@/contexts/useAuthContext';
 import { Button } from '@/components/ui/button';
 import { Loader2, ImageIcon, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 

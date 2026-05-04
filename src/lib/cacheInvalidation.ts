@@ -75,6 +75,18 @@ export const invalidateOnEditionDelete = async (
 };
 
 /**
+ * 创建作品后的缓存失效
+ * 影响：作品列表、仪表板
+ */
+export const invalidateOnArtworkCreate = async (queryClient: QueryClient) => {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: queryKeys.artworks.all }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.stats }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.recentUpdates }),
+  ]);
+};
+
+/**
  * 删除作品（软删除）或恢复作品后的缓存失效
  * 影响：所有作品缓存、版本列表、版本统计、仪表板
  */

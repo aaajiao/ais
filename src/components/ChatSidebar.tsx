@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import MessageBubble from '@/components/chat/MessageBubble';
 import { saveChatHistory, loadChatHistory, clearChatHistory, getChatTimestamp } from '@/lib/chatStorage';
-import { useAuthContext } from '@/contexts/AuthContext';
+import { useAuthContext } from '@/contexts/useAuthContext';
 import { IconButton } from '@/components/ui/icon-button';
 import { Trash2, X, MessageSquare, ArrowUp } from 'lucide-react';
 
