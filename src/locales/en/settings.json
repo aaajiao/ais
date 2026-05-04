@@ -17,7 +17,7 @@
     "resetToDefault": "Reset to default",
     "backgroundModelHint": "Used for extracting info when importing artworks from web pages. Claude Sonnet is recommended for structured data extraction. GPT-4o also works well.",
     "searchExpansionModel": "Search Translation Model",
-    "usingDefaultFastModel": "Currently using default fast model (Claude 3.5 Haiku)",
+    "usingDefaultFastModel": "Currently using default fast model (Claude Haiku 4.5)",
     "searchExpansionModelHint": "Used for translating Chinese search terms to English. Defaults to Haiku for speed and low cost. Choose a larger model for more accurate translation."
   },
   "export": {

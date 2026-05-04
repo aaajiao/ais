@@ -17,7 +17,7 @@
     "resetToDefault": "恢复默认",
     "backgroundModelHint": "用于从网页导入作品时提取信息。Claude Sonnet 推荐用于结构化数据提取，GPT-4o 也表现良好。",
     "searchExpansionModel": "搜索翻译模型",
-    "usingDefaultFastModel": "当前使用默认快速模型（Claude 3.5 Haiku）",
+    "usingDefaultFastModel": "当前使用默认快速模型（Claude Haiku 4.5）",
     "searchExpansionModelHint": "用于将中文搜索词翻译为英文。默认使用 Haiku，速度快成本低。如需更准确的翻译可选择更大模型。"
   },
   "export": {

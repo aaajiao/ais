@@ -43,7 +43,7 @@
 
 1. `expandSearchQuery()` 使用 `generateText` + `Output.object()` 翻译和扩展查询
 2. 使用可配置的"搜索翻译模型"（设置 > AI 模型 > 高级选项）
-3. 默认使用 Claude 3.5 Haiku（快速、低成本）
+3. 默认使用 Claude Haiku 4.5（快速、低成本）
 4. 生成多个搜索变体，包括翻译、单复数形式和同义词
 
 **示例**："磁铁" → `["magnet", "magnets", "magnetic"]`
