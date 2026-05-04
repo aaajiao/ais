@@ -246,10 +246,19 @@ CREATE TRIGGER editions_updated_at
 
 -- Auto-record status/location changes
 -- SECURITY DEFINER: trigger 需要读取 locations 表，且在 RLS 环境下需要权限
--- auth.uid() 在前端 session 时返回用户 ID，service key 时返回 NULL
+--
+-- auth.uid() 行为：
+-- - 前端 session（anon key）→ 返回用户 ID，trigger 写入历史
+-- - 后端 service key → 返回 NULL，trigger 跳过；后端代码（api/tools/execute-update.ts）
+--   会显式写带富字段（action='sold'/'consigned' 等、price、buyer_name）的历史行
+-- 这样避免前后端路径双写历史，且后端可以保留更精细的审计信息
 CREATE OR REPLACE FUNCTION record_edition_status_change()
 RETURNS TRIGGER AS $$
 BEGIN
+  IF auth.uid() IS NULL THEN
+    RETURN NEW;
+  END IF;
+
   IF OLD.status IS DISTINCT FROM NEW.status THEN
     INSERT INTO edition_history (edition_id, action, from_status, to_status, created_by)
     VALUES (NEW.id, 'status_change', OLD.status::TEXT, NEW.status::TEXT, auth.uid());
