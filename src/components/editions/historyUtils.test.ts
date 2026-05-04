@@ -101,17 +101,14 @@ describe('historyUtils', () => {
 
     it('returns "X months ago" for 30-364 days', () => {
       const t = createMockT({ 'relativeTime.monthsAgo': '{{count}}个月前' });
-      const twoMonthsAgo = new Date();
-      twoMonthsAgo.setDate(twoMonthsAgo.getDate() - 60);
+      const twoMonthsAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
       const result = formatRelativeTime(twoMonthsAgo.toISOString(), t);
       expect(result).toBe('2个月前');
     });
 
     it('returns "X years ago" for 365+ days', () => {
       const t = createMockT({ 'relativeTime.yearsAgo': '{{count}}年前' });
-      const oneYearAgo = new Date();
-      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-      oneYearAgo.setDate(oneYearAgo.getDate() - 1); // Ensure > 365 days
+      const oneYearAgo = new Date(Date.now() - 366 * 24 * 60 * 60 * 1000);
       const result = formatRelativeTime(oneYearAgo.toISOString(), t);
       expect(result).toBe('1年前');
     });
