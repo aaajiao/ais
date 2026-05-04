@@ -120,7 +120,7 @@ describe('EditionEditDialog', () => {
     expect(screen.queryByText('编辑版本')).not.toBeInTheDocument();
   });
 
-  it('打开时渲染所有 9 个状态选项', () => {
+  it('in_studio 状态：仅渲染当前状态 + 合法转换目标（不含 in_production）', () => {
     renderWithClient(
       <EditionEditDialog
         isOpen
@@ -136,8 +136,8 @@ describe('EditionEditDialog', () => {
     ) as HTMLSelectElement;
     expect(statusSelect).toBeDefined();
     const optionValues = Array.from(statusSelect.options).map((o) => o.value);
+    // in_studio 可以转：at_gallery / at_museum / in_transit / sold / gifted / lost / damaged
     expect(optionValues).toEqual([
-      'in_production',
       'in_studio',
       'at_gallery',
       'at_museum',
@@ -147,6 +147,44 @@ describe('EditionEditDialog', () => {
       'lost',
       'damaged',
     ]);
+    expect(optionValues).not.toContain('in_production');
+  });
+
+  it('终态（sold）：状态下拉只有当前状态，不能转出', () => {
+    renderWithClient(
+      <EditionEditDialog
+        isOpen
+        edition={makeEdition({ artwork: null, status: 'sold' })}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />
+    );
+
+    const statusSelect = screen.getAllByRole('combobox').find(
+      (el) => (el as HTMLSelectElement).value === 'sold'
+    ) as HTMLSelectElement;
+    expect(statusSelect).toBeDefined();
+    const optionValues = Array.from(statusSelect.options).map((o) => o.value);
+    expect(optionValues).toEqual(['sold']);
+  });
+
+  it('in_production 状态：只能转 in_studio 或 damaged', () => {
+    renderWithClient(
+      <EditionEditDialog
+        isOpen
+        edition={makeEdition({ artwork: null, status: 'in_production' })}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />
+    );
+
+    const statusSelect = screen.getAllByRole('combobox').find(
+      (el) => (el as HTMLSelectElement).value === 'in_production'
+    ) as HTMLSelectElement;
+    const optionValues = Array.from(statusSelect.options).map((o) => o.value);
+    expect(optionValues).toEqual(['in_production', 'in_studio', 'damaged']);
+    expect(optionValues).not.toContain('sold');
+    expect(optionValues).not.toContain('at_gallery');
   });
 
   it('修改状态后保存，向 supabase.editions.update 传入新状态', async () => {

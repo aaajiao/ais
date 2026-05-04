@@ -10,25 +10,13 @@ import { supabase } from '@/lib/supabase';
 import { invalidateOnEditionEdit } from '@/lib/cacheInvalidation';
 import { useEditionsByArtwork } from '@/hooks/queries/useEditions';
 import { getAvailableEditionSlots } from '@/components/artwork/types';
+import { getValidNextStatuses } from '@/lib/editionStatus';
 import type { EditionStatus, CurrencyType, ConditionType, Database } from '@/lib/database.types';
 
 import { Button } from '@/components/ui/button';
 import InventoryNumberInput from './InventoryNumberInput';
 import LocationPicker from './LocationPicker';
 import CreateLocationDialog from './LocationDialog';
-
-// 状态选项
-const STATUS_OPTIONS: EditionStatus[] = [
-  'in_production',
-  'in_studio',
-  'at_gallery',
-  'at_museum',
-  'in_transit',
-  'sold',
-  'gifted',
-  'lost',
-  'damaged',
-];
 
 // 编辑表单数据类型
 interface EditionFormData {
@@ -90,6 +78,13 @@ export default function EditionEditDialog({
 
   // 获取同作品的兄弟版本，用于 slot 约束
   const { data: siblingEditions = [] } = useEditionsByArtwork(edition?.artwork_id);
+
+  // 状态选项：当前状态 + 合法的下一步状态
+  // 终态（sold/gifted/lost/damaged）只能保留为自身，不允许转出
+  const statusOptions = useMemo<EditionStatus[]>(() => {
+    if (!edition) return [];
+    return [edition.status, ...getValidNextStatuses(edition.status)];
+  }, [edition]);
 
   // 计算可选的版本槽位（排除当前版本自身，因为它正在被编辑）
   const availableSlots = useMemo(() => {
@@ -271,7 +266,7 @@ export default function EditionEditDialog({
                 onChange={(e) => setFormData({ ...formData, status: e.target.value as EditionStatus })}
                 className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               >
-                {STATUS_OPTIONS.map((status) => (
+                {statusOptions.map((status) => (
                   <option key={status} value={status}>
                     {tStatus(status)}
                   </option>
