@@ -82,6 +82,11 @@ export function createExecuteUpdateTool(ctx: ToolContext) {
       }
 
       // 记录历史 - 使用正确的枚举值和字段
+      //
+      // 重要：这里的显式 insert 与 DB 触发器 record_edition_status_change
+      // 是绑定的——触发器在 auth.uid() IS NULL（service key 上下文）时跳过，
+      // 必须由这里写入历史。删除任何一边都会导致 AI 更新落 0 行历史。
+      // 见 supabase/migrations/archived/003_fix_edition_history_double_write.sql
       if (updates.status && updates.status !== originalEdition?.status) {
         // 根据状态变更类型选择正确的 action 枚举值
         let historyAction: string = 'status_change';
