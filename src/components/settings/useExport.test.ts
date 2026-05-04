@@ -1,4 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// Stub supabase before useExport's transitive imports construct a real client.
+// Without this the test file fails to load in CI (no .env.local → supabaseUrl 为空 → createClient throws).
+vi.mock('@/lib/supabase', () => ({
+  supabase: { from: () => ({ select: () => Promise.resolve({ data: [], error: null }) }) },
+}));
+
 import { formatCSVRow, getDateString, downloadFile } from './useExport';
 
 describe('useExport utilities', () => {
