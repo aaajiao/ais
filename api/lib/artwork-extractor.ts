@@ -2,7 +2,7 @@
  * Artwork Extractor - 使用 LLM 从网页 HTML 中提取作品信息
  */
 
-import { generateObject } from 'ai';
+import { generateText, Output } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
@@ -68,7 +68,7 @@ export function extractImageUrls(html: string): string[] {
 
   // 匹配 <img> 标签的 src 属性
   const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
-  let match;
+  let match: RegExpExecArray | null;
 
   while ((match = imgRegex.exec(html)) !== null) {
     const src = match[1];
@@ -177,9 +177,9 @@ export async function extractArtworkFromUrl(url: string, modelId?: string, local
     const cleanedHtml = cleanHtml(html);
 
     // 4. 使用 LLM 提取结构化数据
-    const { object } = await generateObject({
+    const result = await generateText({
       model: getModel(modelId),
-      schema: artworkSchema,
+      output: Output.object({ schema: artworkSchema }),
       system: `你是一个艺术作品信息提取专家。从给定的网页 HTML 内容中提取作品信息。
 
 提取规则：
@@ -200,8 +200,10 @@ HTML 内容:
 ${cleanedHtml}`,
     });
 
+    const object = result.output;
+
     // 5. 验证必要字段
-    if (!object.title_en || object.title_en.trim() === '') {
+    if (!object || !object.title_en || object.title_en.trim() === '') {
       return {
         success: false,
         images,
