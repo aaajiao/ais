@@ -17,8 +17,8 @@ const stubCtx: ToolContext = {
   locale: 'zh',
 };
 
-function getInputSchema(t: ReturnType<typeof createSearchArtworksTool>) {
-  return (t as unknown as { inputSchema: { safeParse: (v: unknown) => { success: boolean } } }).inputSchema;
+function getInputSchema(t: unknown) {
+  return (t as { inputSchema: { safeParse: (v: unknown) => { success: boolean } } }).inputSchema;
 }
 
 describe('search_artworks schema', () => {
