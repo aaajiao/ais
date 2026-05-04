@@ -129,9 +129,9 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 
 | 修改类型 | 验证命令 |
 |----------|----------|
-| 任何源码 (.ts/.tsx) | `bun run lint` |
+| 任何源码 (.ts/.tsx) | `bun run lint` + `bun run typecheck` |
 | 逻辑改动 | `bun run test:run` |
-| 构建相关 | `bun run build` |
+| 构建相关 | `bun run build`（包含 typecheck，比单跑慢） |
 | 数据库查询 | 确认包含 `.is('deleted_at', null)` 和 `userId` 过滤 |
 
 ## Common Tasks

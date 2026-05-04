@@ -9,6 +9,7 @@
     "start": "vercel dev --local-config vercel-dev.json",
     "dev:api": "bunx tsx server.ts",
     "build": "tsc -b && vite build",
+    "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
