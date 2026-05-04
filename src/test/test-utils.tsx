@@ -1,6 +1,16 @@
 import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { renderHook, type RenderHookOptions } from '@testing-library/react';
+import {
+  render,
+  renderHook,
+  type RenderHookOptions,
+  type RenderOptions,
+} from '@testing-library/react';
+import i18n from '@/locales';
+
+if (i18n.language !== 'zh') {
+  void i18n.changeLanguage('zh');
+}
 
 /**
  * Creates a fresh QueryClient for testing
@@ -72,4 +82,19 @@ export async function waitFor(
     }
     await new Promise(resolve => setTimeout(resolve, interval));
   }
+}
+
+export function renderWithClient(
+  ui: ReactNode,
+  options?: Omit<RenderOptions, 'wrapper'> & { queryClient?: QueryClient }
+) {
+  const { queryClient, ...renderOptions } = options || {};
+  const client = queryClient || createTestQueryClient();
+  return {
+    ...render(ui, {
+      wrapper: createWrapper(client),
+      ...renderOptions,
+    }),
+    queryClient: client,
+  };
 }
