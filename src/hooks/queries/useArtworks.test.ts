@@ -1,365 +1,419 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { queryKeys } from '@/lib/queryKeys';
-import { getArtworkMainStatus } from './useArtworks';
 
-// Mock supabase
+interface ChainCall {
+  method: string;
+  args: unknown[];
+}
+
+interface BuilderState {
+  table: string;
+  calls: ChainCall[];
+}
+
+const builderRegistry: BuilderState[] = [];
+let nextResponse: { data: unknown; error: unknown; count?: number | null } = {
+  data: [],
+  error: null,
+  count: null,
+};
+
+function setNextResponse(response: {
+  data?: unknown;
+  error?: unknown;
+  count?: number | null;
+}) {
+  nextResponse = {
+    data: response.data ?? null,
+    error: response.error ?? null,
+    count: response.count ?? null,
+  };
+}
+
+const TERMINAL_METHODS = new Set(['single', 'maybeSingle', 'csv']);
+
+function createBuilder(state: BuilderState): unknown {
+  const handler: ProxyHandler<object> = {
+    get(_target, prop: string | symbol) {
+      if (prop === 'then') {
+        return (
+          onFulfilled: (value: unknown) => unknown,
+          onRejected?: (reason: unknown) => unknown
+        ) => {
+          const result = {
+            data: nextResponse.data,
+            error: nextResponse.error,
+            count: nextResponse.count,
+          };
+          try {
+            return Promise.resolve(onFulfilled(result));
+          } catch (err) {
+            if (onRejected) return Promise.resolve(onRejected(err));
+            return Promise.reject(err);
+          }
+        };
+      }
+      if (typeof prop === 'symbol') return undefined;
+      return (...args: unknown[]) => {
+        state.calls.push({ method: prop, args });
+        if (TERMINAL_METHODS.has(prop)) {
+          const data = Array.isArray(nextResponse.data)
+            ? nextResponse.data[0] ?? null
+            : nextResponse.data;
+          return Promise.resolve({
+            data,
+            error: nextResponse.error,
+          });
+        }
+        return proxy;
+      };
+    },
+  };
+  const proxy = new Proxy({}, handler);
+  return proxy;
+}
+
+const fromMock = vi.fn((table: string) => {
+  const state: BuilderState = { table, calls: [] };
+  builderRegistry.push(state);
+  return createBuilder(state);
+});
+
 vi.mock('@/lib/supabase', () => ({
   supabase: {
-    from: vi.fn(() => ({
-      select: vi.fn(() => ({
-        is: vi.fn(() => ({
-          order: vi.fn(() => ({
-            order: vi.fn(() => ({
-              or: vi.fn(() => ({
-                limit: vi.fn(() => Promise.resolve({ data: [], error: null })),
-              })),
-              limit: vi.fn(() => Promise.resolve({ data: [], error: null })),
-            })),
-          })),
-          single: vi.fn(() => Promise.resolve({ data: null, error: null })),
-        })),
-        eq: vi.fn(() => ({
-          is: vi.fn(() => ({
-            single: vi.fn(() => Promise.resolve({ data: null, error: null })),
-          })),
-        })),
-      })),
-    })),
+    from: (table: string) => fromMock(table),
   },
 }));
 
-describe('useArtworks query keys', () => {
-  describe('queryKeys.artworks', () => {
-    it('should have correct all key', () => {
-      expect(queryKeys.artworks.all).toEqual(['artworks']);
+import {
+  fetchArtworksPaginated,
+  fetchArtworksTotalCount,
+  fetchArtworkDetail,
+  useArtworksTotalCount,
+  useArtworkDetail,
+  getArtworkMainStatus,
+} from './useArtworks';
+import { renderHookWithClient, waitFor } from '@/test/test-utils';
+
+const sampleArtworkRow = {
+  id: 'a1',
+  title_en: 'Digital Dreams',
+  title_cn: '数字梦境',
+  year: '2024',
+  type: 'Installation',
+  materials: null,
+  dimensions: null,
+  duration: null,
+  thumbnail_url: null,
+  edition_total: 3,
+  ap_total: 0,
+  is_unique: false,
+  notes: null,
+  source_url: null,
+  deleted_at: null,
+  created_at: '2024-01-01T00:00:00Z',
+  updated_at: '2024-01-01T00:00:00Z',
+  user_id: 'u1',
+};
+
+function lastBuilder(): BuilderState {
+  return builderRegistry[builderRegistry.length - 1];
+}
+
+beforeEach(() => {
+  builderRegistry.length = 0;
+  fromMock.mockClear();
+  setNextResponse({ data: [], error: null, count: null });
+});
+
+describe('fetchArtworksPaginated', () => {
+  it('查询 artworks 表并应用 deleted_at IS NULL 过滤', async () => {
+    setNextResponse({
+      data: [{ ...sampleArtworkRow, editions: [] }],
     });
 
-    it('should generate correct list key with filters', () => {
-      const filters = { status: 'in_studio' as const, search: 'test' };
-      expect(queryKeys.artworks.list(filters)).toEqual(['artworks', 'list', filters]);
+    const result = await fetchArtworksPaginated({ pageParam: null });
+
+    const builder = lastBuilder();
+    expect(builder.table).toBe('artworks');
+
+    const isCall = builder.calls.find((c) => c.method === 'is');
+    expect(isCall).toBeDefined();
+    expect(isCall?.args).toEqual(['deleted_at', null]);
+
+    const limitCall = builder.calls.find((c) => c.method === 'limit');
+    expect(limitCall).toBeDefined();
+    expect(limitCall?.args[0]).toBe(51);
+
+    expect(result.data).toHaveLength(1);
+    expect(result.hasMore).toBe(false);
+  });
+
+  it('对每个作品计算 stats 字段', async () => {
+    setNextResponse({
+      data: [
+        {
+          ...sampleArtworkRow,
+          editions: [
+            { id: 'e1', status: 'in_studio' },
+            { id: 'e2', status: 'in_studio' },
+            { id: 'e3', status: 'at_gallery' },
+            { id: 'e4', status: 'sold' },
+          ],
+        },
+      ],
     });
 
-    it('should generate correct detail key', () => {
-      expect(queryKeys.artworks.detail('artwork-123')).toEqual([
-        'artworks',
-        'detail',
-        'artwork-123',
-      ]);
-    });
+    const result = await fetchArtworksPaginated({ pageParam: null });
 
-    it('should generate correct infinite key with filters', () => {
-      const filters = { status: 'sold' as const };
-      expect(queryKeys.artworks.infinite(filters)).toEqual([
-        'artworks',
-        'infinite',
-        filters,
-      ]);
+    expect(result.data[0].stats).toEqual({
+      total: 4,
+      inStudio: 2,
+      atGallery: 1,
+      sold: 1,
     });
   });
 
-  describe('query key uniqueness', () => {
-    it('should generate unique keys for different artwork IDs', () => {
-      const key1 = queryKeys.artworks.detail('artwork-1');
-      const key2 = queryKeys.artworks.detail('artwork-2');
+  it('当返回多于 pageSize 时设置 hasMore=true', async () => {
+    const rows = Array.from({ length: 51 }, (_, i) => ({
+      ...sampleArtworkRow,
+      id: `a${i}`,
+      editions: [],
+    }));
+    setNextResponse({ data: rows });
 
-      expect(key1).not.toEqual(key2);
+    const result = await fetchArtworksPaginated({ pageParam: null });
+
+    expect(result.hasMore).toBe(true);
+    expect(result.data).toHaveLength(50);
+    expect(result.nextCursor).not.toBeNull();
+  });
+
+  it('应用 status 过滤 (客户端筛选)', async () => {
+    setNextResponse({
+      data: [
+        {
+          ...sampleArtworkRow,
+          id: 'a1',
+          editions: [{ id: 'e1', status: 'in_studio' }],
+        },
+        {
+          ...sampleArtworkRow,
+          id: 'a2',
+          editions: [{ id: 'e2', status: 'sold' }],
+        },
+      ],
     });
 
-    it('should generate unique keys for different filters', () => {
-      const key1 = queryKeys.artworks.list({ status: 'in_studio' as const });
-      const key2 = queryKeys.artworks.list({ status: 'sold' as const });
-
-      expect(key1).not.toEqual(key2);
+    const result = await fetchArtworksPaginated({
+      pageParam: null,
+      filters: { status: 'sold' },
     });
 
-    it('should generate same keys for same filters', () => {
-      const filters = { status: 'in_studio' as const, search: 'test' };
-      const key1 = queryKeys.artworks.list(filters);
-      const key2 = queryKeys.artworks.list(filters);
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0].id).toBe('a2');
+  });
 
-      expect(key1).toEqual(key2);
+  it('应用 search 过滤 (匹配 title_en/title_cn/year/type)', async () => {
+    setNextResponse({
+      data: [
+        {
+          ...sampleArtworkRow,
+          id: 'a1',
+          title_en: 'Digital Dreams',
+          editions: [],
+        },
+        {
+          ...sampleArtworkRow,
+          id: 'a2',
+          title_en: 'Urban Landscape',
+          editions: [],
+        },
+      ],
+    });
+
+    const result = await fetchArtworksPaginated({
+      pageParam: null,
+      filters: { search: 'digital' },
+    });
+
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0].id).toBe('a1');
+  });
+
+  it('在游标存在时应用 OR 条件', async () => {
+    setNextResponse({ data: [] });
+    const cursor = btoa(
+      JSON.stringify({ timestamp: '2024-01-01T00:00:00Z', id: 'a1' })
+    );
+
+    await fetchArtworksPaginated({ pageParam: cursor });
+
+    const builder = lastBuilder();
+    const orCall = builder.calls.find((c) => c.method === 'or');
+    expect(orCall).toBeDefined();
+    expect(String(orCall?.args[0])).toContain('created_at.lt');
+  });
+
+  it('在 supabase 错误时抛出', async () => {
+    setNextResponse({ data: null, error: { message: 'boom' } });
+
+    await expect(
+      fetchArtworksPaginated({ pageParam: null })
+    ).rejects.toMatchObject({ message: 'boom' });
+  });
+});
+
+describe('fetchArtworksTotalCount', () => {
+  it('使用 head:true count:exact 选项', async () => {
+    setNextResponse({ data: null, count: 42 });
+
+    const total = await fetchArtworksTotalCount();
+
+    expect(total).toBe(42);
+    const builder = lastBuilder();
+    expect(builder.table).toBe('artworks');
+
+    const selectCall = builder.calls.find((c) => c.method === 'select');
+    expect(selectCall?.args[1]).toEqual({ count: 'exact', head: true });
+
+    const isCall = builder.calls.find((c) => c.method === 'is');
+    expect(isCall?.args).toEqual(['deleted_at', null]);
+  });
+
+  it('count 为 null 时返回 0', async () => {
+    setNextResponse({ data: null, count: null });
+    expect(await fetchArtworksTotalCount()).toBe(0);
+  });
+
+  it('错误时抛出', async () => {
+    setNextResponse({ data: null, error: { message: 'fail' }, count: null });
+    await expect(fetchArtworksTotalCount()).rejects.toMatchObject({
+      message: 'fail',
+    });
+  });
+});
+
+describe('fetchArtworkDetail', () => {
+  it('应用 eq(id) 和 deleted_at IS NULL', async () => {
+    setNextResponse({ data: { ...sampleArtworkRow, editions: [] } });
+
+    const detail = await fetchArtworkDetail('a1');
+
+    expect(detail).not.toBeNull();
+    const builder = lastBuilder();
+    const eqCall = builder.calls.find((c) => c.method === 'eq');
+    expect(eqCall?.args).toEqual(['id', 'a1']);
+
+    const isCall = builder.calls.find((c) => c.method === 'is');
+    expect(isCall?.args).toEqual(['deleted_at', null]);
+  });
+
+  it('PGRST116 错误码返回 null', async () => {
+    setNextResponse({
+      data: null,
+      error: { code: 'PGRST116', message: 'not found' },
+    });
+
+    const result = await fetchArtworkDetail('missing');
+    expect(result).toBeNull();
+  });
+
+  it('其它错误抛出', async () => {
+    setNextResponse({ data: null, error: { code: 'OTHER', message: 'oops' } });
+    await expect(fetchArtworkDetail('a1')).rejects.toMatchObject({
+      code: 'OTHER',
     });
   });
 
-  describe('query key hierarchy', () => {
-    it('artworks.all should be prefix for all artwork keys', () => {
-      const allKey = queryKeys.artworks.all;
-      const detailKey = queryKeys.artworks.detail('test');
-      const listKey = queryKeys.artworks.list({});
-
-      expect(detailKey[0]).toBe(allKey[0]);
-      expect(listKey[0]).toBe(allKey[0]);
+  it('返回值带 stats', async () => {
+    setNextResponse({
+      data: {
+        ...sampleArtworkRow,
+        editions: [
+          { id: 'e1', status: 'in_studio' },
+          { id: 'e2', status: 'sold' },
+        ],
+      },
     });
 
-    it('invalidating artworks.all should match all artwork queries', () => {
-      const matchFn = (key: readonly unknown[]) =>
-        key[0] === queryKeys.artworks.all[0];
-
-      expect(matchFn(queryKeys.artworks.detail('test'))).toBe(true);
-      expect(matchFn(queryKeys.artworks.list({}))).toBe(true);
-      expect(matchFn(queryKeys.artworks.infinite({}))).toBe(true);
+    const detail = await fetchArtworkDetail('a1');
+    expect(detail?.stats).toEqual({
+      total: 2,
+      inStudio: 1,
+      atGallery: 0,
+      sold: 1,
     });
+  });
+});
+
+describe('useArtworksTotalCount hook', () => {
+  it('成功时返回 count', async () => {
+    setNextResponse({ data: null, count: 7 });
+
+    const { result } = renderHookWithClient(() => useArtworksTotalCount());
+
+    expect(result.current.isLoading).toBe(true);
+    await waitFor(() => result.current.isSuccess);
+
+    expect(result.current.data).toBe(7);
+  });
+
+  it('count key 形如 ["artworks","count"]', () => {
+    expect([...queryKeys.artworks.all, 'count']).toEqual(['artworks', 'count']);
+  });
+});
+
+describe('useArtworkDetail hook', () => {
+  it('id 为 undefined 时不发起查询', () => {
+    const { result } = renderHookWithClient(() => useArtworkDetail(undefined));
+
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.fetchStatus).toBe('idle');
+    expect(fromMock).not.toHaveBeenCalled();
+  });
+
+  it('id 存在时发起查询并返回详情', async () => {
+    setNextResponse({ data: { ...sampleArtworkRow, editions: [] } });
+
+    const { result } = renderHookWithClient(() => useArtworkDetail('a1'));
+
+    await waitFor(() => result.current.isSuccess);
+
+    expect(result.current.data?.id).toBe('a1');
+    expect(result.current.data?.stats.total).toBe(0);
   });
 });
 
 describe('getArtworkMainStatus', () => {
-  it('should return null for empty editions array', () => {
+  it('空版本数组返回 null', () => {
     expect(getArtworkMainStatus([])).toBeNull();
   });
 
-  it('should prioritize at_gallery status', () => {
-    const editions = [
-      { status: 'in_studio' as const },
-      { status: 'at_gallery' as const },
-      { status: 'sold' as const },
-    ];
-    expect(getArtworkMainStatus(editions)).toBe('at_gallery');
+  it('优先级 at_gallery > in_studio > sold', () => {
+    expect(
+      getArtworkMainStatus([
+        { status: 'in_studio' },
+        { status: 'at_gallery' },
+        { status: 'sold' },
+      ])
+    ).toBe('at_gallery');
+
+    expect(
+      getArtworkMainStatus([{ status: 'in_studio' }, { status: 'sold' }])
+    ).toBe('in_studio');
+
+    expect(
+      getArtworkMainStatus([{ status: 'sold' }, { status: 'gifted' }])
+    ).toBe('sold');
   });
 
-  it('should prioritize in_studio when no at_gallery', () => {
-    const editions = [
-      { status: 'in_studio' as const },
-      { status: 'sold' as const },
-      { status: 'in_production' as const },
-    ];
-    expect(getArtworkMainStatus(editions)).toBe('in_studio');
-  });
-
-  it('should prioritize sold when no at_gallery or in_studio', () => {
-    const editions = [
-      { status: 'sold' as const },
-      { status: 'gifted' as const },
-      { status: 'lost' as const },
-    ];
-    expect(getArtworkMainStatus(editions)).toBe('sold');
-  });
-
-  it('should return first status when none of priority statuses exist', () => {
-    const editions = [
-      { status: 'in_production' as const },
-      { status: 'in_transit' as const },
-    ];
-    expect(getArtworkMainStatus(editions)).toBe('in_production');
-  });
-
-  it('should handle single edition', () => {
-    const editions = [{ status: 'at_museum' as const }];
-    expect(getArtworkMainStatus(editions)).toBe('at_museum');
-  });
-});
-
-describe('Artwork stats calculation', () => {
-  const calculateStats = (editions: { status: string }[]) => ({
-    total: editions.length,
-    inStudio: editions.filter((e) => e.status === 'in_studio').length,
-    atGallery: editions.filter((e) => e.status === 'at_gallery').length,
-    sold: editions.filter((e) => e.status === 'sold').length,
-  });
-
-  it('should calculate correct stats for mixed editions', () => {
-    const editions = [
-      { status: 'in_studio' },
-      { status: 'in_studio' },
-      { status: 'at_gallery' },
-      { status: 'sold' },
-      { status: 'sold' },
-      { status: 'sold' },
-    ];
-
-    const stats = calculateStats(editions);
-
-    expect(stats.total).toBe(6);
-    expect(stats.inStudio).toBe(2);
-    expect(stats.atGallery).toBe(1);
-    expect(stats.sold).toBe(3);
-  });
-
-  it('should handle empty editions', () => {
-    const stats = calculateStats([]);
-
-    expect(stats.total).toBe(0);
-    expect(stats.inStudio).toBe(0);
-    expect(stats.atGallery).toBe(0);
-    expect(stats.sold).toBe(0);
-  });
-
-  it('should handle editions with no tracked statuses', () => {
-    const editions = [
-      { status: 'in_production' },
-      { status: 'in_transit' },
-      { status: 'damaged' },
-    ];
-
-    const stats = calculateStats(editions);
-
-    expect(stats.total).toBe(3);
-    expect(stats.inStudio).toBe(0);
-    expect(stats.atGallery).toBe(0);
-    expect(stats.sold).toBe(0);
-  });
-});
-
-describe('Artwork search filtering', () => {
-  const mockArtworks = [
-    {
-      id: '1',
-      title_en: 'Digital Dreams',
-      title_cn: '数字梦境',
-      year: '2024',
-      type: 'Installation',
-    },
-    {
-      id: '2',
-      title_en: 'Urban Landscape',
-      title_cn: '城市风景',
-      year: '2023',
-      type: 'Photography',
-    },
-    {
-      id: '3',
-      title_en: 'Abstract Form',
-      title_cn: '抽象形态',
-      year: '2024',
-      type: 'Sculpture',
-    },
-  ];
-
-  it('should filter by English title', () => {
-    const searchLower = 'digital'.toLowerCase();
-    const filtered = mockArtworks.filter(
-      (artwork) =>
-        artwork.title_en?.toLowerCase().includes(searchLower)
-    );
-
-    expect(filtered).toHaveLength(1);
-    expect(filtered[0].id).toBe('1');
-  });
-
-  it('should filter by Chinese title', () => {
-    const searchLower = '城市'.toLowerCase();
-    const filtered = mockArtworks.filter(
-      (artwork) =>
-        artwork.title_cn?.toLowerCase().includes(searchLower)
-    );
-
-    expect(filtered).toHaveLength(1);
-    expect(filtered[0].id).toBe('2');
-  });
-
-  it('should filter by year', () => {
-    const searchLower = '2024';
-    const filtered = mockArtworks.filter(
-      (artwork) =>
-        artwork.year?.includes(searchLower)
-    );
-
-    expect(filtered).toHaveLength(2);
-    expect(filtered.map((a) => a.id).sort()).toEqual(['1', '3']);
-  });
-
-  it('should filter by type', () => {
-    const searchLower = 'photo'.toLowerCase();
-    const filtered = mockArtworks.filter(
-      (artwork) =>
-        artwork.type?.toLowerCase().includes(searchLower)
-    );
-
-    expect(filtered).toHaveLength(1);
-    expect(filtered[0].id).toBe('2');
-  });
-
-  it('should match multiple fields', () => {
-    const searchLower = 'form'.toLowerCase();
-    const filtered = mockArtworks.filter(
-      (artwork) =>
-        artwork.title_en?.toLowerCase().includes(searchLower) ||
-        artwork.title_cn?.toLowerCase().includes(searchLower) ||
-        artwork.year?.includes(searchLower) ||
-        artwork.type?.toLowerCase().includes(searchLower)
-    );
-
-    expect(filtered).toHaveLength(1);
-    expect(filtered[0].id).toBe('3');
-  });
-});
-
-describe('Artwork status filtering', () => {
-  const mockArtworks = [
-    {
-      id: '1',
-      editions: [{ status: 'in_studio' }, { status: 'sold' }],
-    },
-    {
-      id: '2',
-      editions: [{ status: 'at_gallery' }],
-    },
-    {
-      id: '3',
-      editions: [{ status: 'sold' }, { status: 'sold' }],
-    },
-    {
-      id: '4',
-      editions: [],
-    },
-  ];
-
-  it('should filter artworks with editions matching status', () => {
-    const statusToFilter = 'at_gallery';
-    const filtered = mockArtworks.filter((artwork) =>
-      artwork.editions.some((e) => e.status === statusToFilter)
-    );
-
-    expect(filtered).toHaveLength(1);
-    expect(filtered[0].id).toBe('2');
-  });
-
-  it('should find artworks with any matching edition', () => {
-    const statusToFilter = 'in_studio';
-    const filtered = mockArtworks.filter((artwork) =>
-      artwork.editions.some((e) => e.status === statusToFilter)
-    );
-
-    expect(filtered).toHaveLength(1);
-    expect(filtered[0].id).toBe('1');
-  });
-
-  it('should find artworks with sold editions', () => {
-    const statusToFilter = 'sold';
-    const filtered = mockArtworks.filter((artwork) =>
-      artwork.editions.some((e) => e.status === statusToFilter)
-    );
-
-    expect(filtered).toHaveLength(2);
-    expect(filtered.map((a) => a.id).sort()).toEqual(['1', '3']);
-  });
-
-  it('should exclude artworks with no editions when filtering by status', () => {
-    const statusToFilter = 'in_studio';
-    const filtered = mockArtworks.filter((artwork) =>
-      artwork.editions.some((e) => e.status === statusToFilter)
-    );
-
-    expect(filtered.find((a) => a.id === '4')).toBeUndefined();
-  });
-});
-
-describe('Soft delete filtering', () => {
-  const mockArtworks = [
-    { id: '1', title_en: 'Active Artwork', deleted_at: null },
-    { id: '2', title_en: 'Deleted Artwork', deleted_at: '2024-01-01T00:00:00Z' },
-    { id: '3', title_en: 'Another Active', deleted_at: null },
-  ];
-
-  it('should filter out soft-deleted artworks', () => {
-    const filtered = mockArtworks.filter((artwork) => artwork.deleted_at === null);
-
-    expect(filtered).toHaveLength(2);
-    expect(filtered.map((a) => a.id).sort()).toEqual(['1', '3']);
-  });
-
-  it('should not include deleted artwork', () => {
-    const filtered = mockArtworks.filter((artwork) => artwork.deleted_at === null);
-
-    expect(filtered.find((a) => a.id === '2')).toBeUndefined();
+  it('无优先状态时返回首个状态', () => {
+    expect(
+      getArtworkMainStatus([
+        { status: 'in_production' },
+        { status: 'in_transit' },
+      ])
+    ).toBe('in_production');
   });
 });
