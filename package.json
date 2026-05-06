@@ -18,9 +18,9 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.23",
-    "@ai-sdk/openai": "^3.0.18",
-    "@ai-sdk/react": "^3.0.51",
+    "@ai-sdk/anthropic": "^3.0.75",
+    "@ai-sdk/openai": "^3.0.61",
+    "@ai-sdk/react": "^3.0.177",
     "@radix-ui/react-select": "^2.2.6",
     "@radix-ui/react-slot": "^1.2.4",
     "@sparticuz/chromium-min": "^133.0.0",
@@ -29,7 +29,7 @@
     "@tanstack/react-query-devtools": "^5.91.2",
     "@tanstack/react-query-persist-client": "^5.90.22",
     "@tanstack/react-virtual": "^3.13.18",
-    "ai": "^6.0.49",
+    "ai": "^6.0.175",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dotenv": "^17.2.3",
