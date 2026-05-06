@@ -3,6 +3,13 @@ import { z } from 'zod';
 import type { ToolContext } from './types.js';
 import { sanitizeSearchTerm } from '../lib/search-utils.js';
 import { createT } from '../lib/i18n.js';
+import { normalizeString, normalizeEnum } from '../lib/normalize-filters.js';
+
+const HISTORY_ACTIONS = [
+  'created', 'status_change', 'location_change',
+  'sold', 'consigned', 'returned', 'condition_update',
+  'file_added', 'file_deleted', 'number_assigned',
+] as const;
 
 /**
  * 创建搜索历史记录工具
@@ -12,18 +19,22 @@ export function createSearchHistoryTool(ctx: ToolContext) {
   return tool({
     description: '查询版本变更历史，可用于了解销售记录、状态变更等',
     inputSchema: z.object({
-      edition_id: z.string().optional().describe('版本 ID'),
-      artwork_title: z.string().optional().describe('作品标题'),
-      action: z.enum([
-        'created', 'status_change', 'location_change',
-        'sold', 'consigned', 'returned', 'condition_update',
-        'file_added', 'file_deleted', 'number_assigned'
-      ]).optional().describe('操作类型'),
-      after: z.string().optional().describe('起始日期 (YYYY-MM-DD)'),
-      before: z.string().optional().describe('结束日期 (YYYY-MM-DD)'),
-      related_party: z.string().optional().describe('相关方（买家/机构）'),
+      edition_id: z.string().nullable().optional().describe('版本 ID'),
+      artwork_title: z.string().nullable().optional().describe('作品标题'),
+      action: z.enum(HISTORY_ACTIONS).nullable().optional().describe('操作类型'),
+      after: z.string().nullable().optional().describe('起始日期 (YYYY-MM-DD)'),
+      before: z.string().nullable().optional().describe('结束日期 (YYYY-MM-DD)'),
+      related_party: z.string().nullable().optional().describe('相关方（买家/机构）'),
     }),
-    execute: async ({ edition_id, artwork_title, action, after, before, related_party }) => {
+    execute: async (raw) => {
+      const r = raw as Record<string, unknown>;
+      const edition_id = normalizeString(r.edition_id);
+      const artwork_title = normalizeString(r.artwork_title);
+      const action = normalizeEnum(r.action, HISTORY_ACTIONS);
+      const after = normalizeString(r.after);
+      const before = normalizeString(r.before);
+      const related_party = normalizeString(r.related_party);
+
       const { supabase } = ctx;
 
       let queryBuilder = supabase

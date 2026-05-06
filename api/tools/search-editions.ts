@@ -3,6 +3,14 @@ import { z } from 'zod';
 import type { ToolContext } from './types.js';
 import { sanitizeSearchTerm } from '../lib/search-utils.js';
 import { createT } from '../lib/i18n.js';
+import {
+  normalizeString,
+  normalizeNumber,
+  normalizeEnum,
+} from '../lib/normalize-filters.js';
+
+const EDITION_TYPES = ['numbered', 'ap', 'unique'] as const;
+const CONDITIONS = ['excellent', 'good', 'fair', 'poor', 'damaged'] as const;
 
 /**
  * 创建搜索版本工具
@@ -18,33 +26,34 @@ USE THIS WHEN the user mentions:
 - A specific edition number, edition type (numbered/ap/unique), condition, or inventory number.
 Examples: "什么作品在 london" → location:"London"; "Pace Gallery 有哪些版本" → location:"Pace Gallery"; "已售的版本" → status:"sold"; "某某买的作品" → buyer_name:"某某".`,
     inputSchema: z.object({
-      artwork_title: z.string().optional().describe('作品标题'),
-      edition_number: z.number().optional().describe('版本号'),
-      status: z.string().optional().describe('状态'),
-      location: z.string().optional().describe('Location filter — matches against location name, city, OR country (e.g. "London", "北京", "Pace Gallery", "UCCA", "Germany"). Pass the place string the user mentioned.'),
-      edition_type: z.enum(['numbered', 'ap', 'unique']).optional().describe('版本类型'),
-      condition: z.enum(['excellent', 'good', 'fair', 'poor', 'damaged']).optional().describe('品相'),
-      inventory_number: z.string().optional().describe('库存编号'),
-      buyer_name: z.string().optional().describe('买家名称'),
-      price_min: z.number().optional().describe('最低价格'),
-      price_max: z.number().optional().describe('最高价格'),
-      sold_after: z.string().optional().describe('售出日期起始 (YYYY-MM-DD)'),
-      sold_before: z.string().optional().describe('售出日期结束 (YYYY-MM-DD)'),
+      artwork_title: z.string().nullable().optional().describe('作品标题'),
+      edition_number: z.number().nullable().optional().describe('版本号'),
+      status: z.string().nullable().optional().describe('状态'),
+      location: z.string().nullable().optional().describe('Location filter — matches against location name, city, OR country (e.g. "London", "北京", "Pace Gallery", "UCCA", "Germany"). Pass the place string the user mentioned.'),
+      edition_type: z.enum(EDITION_TYPES).nullable().optional().describe('版本类型'),
+      condition: z.enum(CONDITIONS).nullable().optional().describe('品相'),
+      inventory_number: z.string().nullable().optional().describe('库存编号'),
+      buyer_name: z.string().nullable().optional().describe('买家名称'),
+      price_min: z.number().nullable().optional().describe('最低价格'),
+      price_max: z.number().nullable().optional().describe('最高价格'),
+      sold_after: z.string().nullable().optional().describe('售出日期起始 (YYYY-MM-DD)'),
+      sold_before: z.string().nullable().optional().describe('售出日期结束 (YYYY-MM-DD)'),
     }),
-    execute: async ({
-      artwork_title,
-      edition_number,
-      status,
-      location,
-      edition_type,
-      condition,
-      inventory_number,
-      buyer_name,
-      price_min,
-      price_max,
-      sold_after,
-      sold_before,
-    }) => {
+    execute: async (raw) => {
+      const r = raw as Record<string, unknown>;
+      const artwork_title = normalizeString(r.artwork_title);
+      const edition_number = normalizeNumber(r.edition_number);
+      const status = normalizeString(r.status);
+      const location = normalizeString(r.location);
+      const edition_type = normalizeEnum(r.edition_type, EDITION_TYPES);
+      const condition = normalizeEnum(r.condition, CONDITIONS);
+      const inventory_number = normalizeString(r.inventory_number);
+      const buyer_name = normalizeString(r.buyer_name);
+      const price_min = normalizeNumber(r.price_min);
+      const price_max = normalizeNumber(r.price_max);
+      const sold_after = normalizeString(r.sold_after);
+      const sold_before = normalizeString(r.sold_before);
+
       const { supabase } = ctx;
 
       // 先搜索作品（排除已删除的）

@@ -43,6 +43,13 @@ describe('chat integration — per-provider system prompt contract (v1.2.4)', ()
       expect(prompt).not.toMatch(/USE search_editions DIRECTLY/);
       expect(prompt).not.toMatch(/DO NOT call search_locations first/i);
     });
+
+    it('does NOT contain the openai null-instruction (parity guard)', () => {
+      // The "Pass null for unused parameters" rule is OpenAI-only — Anthropic
+      // path must remain byte-identical to v1.2.3 (Sonnet behavior is locked).
+      expect(prompt).not.toMatch(/Pass\s+`?null`?\s+for any tool parameter/i);
+      expect(prompt).not.toMatch(/DO NOT use empty string/);
+    });
   });
 
   describe('openai path uses tool preambles + english + few-shot', () => {
@@ -73,6 +80,18 @@ describe('chat integration — per-provider system prompt contract (v1.2.4)', ()
 
     it('uses condition→action markdown table (key style differentiator)', () => {
       expect(prompt).toMatch(/\|\s*If the user mentions/);
+    });
+
+    it('explicitly instructs to use null for unused parameters (v1.3.1 strict-mode fix)', () => {
+      // Regression guard for the OpenAI strict structured outputs bug:
+      // GPT was filling optional fields with type defaults ('', 0, first enum value)
+      // because @ai-sdk/openai's JSON schema does not mark .optional() as nullable.
+      // Prompt-level fix: tell GPT explicitly that null = unset.
+      expect(prompt).toMatch(/Pass\s+`?null`?/);
+      expect(prompt).toMatch(/DO NOT use empty string|DO NOT use\s+`?""`?|DO NOT use\s+`?0`?/);
+      // The reverse example must show what NOT to do (default-padded call)
+      expect(prompt).toMatch(/edition_type:\s*['"]unique['"]/);
+      expect(prompt).toMatch(/edition_number:\s*0/);
     });
   });
 

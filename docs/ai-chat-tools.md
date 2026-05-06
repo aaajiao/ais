@@ -406,3 +406,63 @@ export function createMyTool(ctx: ToolContext) {
   });
 }
 ```
+
+## OpenAI strict mode schema 兼容性
+
+**自 v1.3.x 起**，所有 AI 工具必须按 OpenAI strict structured outputs 模式编写 schema 与 execute 入口。
+
+根因：`@ai-sdk/openai` 走 Responses API + structured outputs strict mode，要求 schema 里所有字段在响应中出现。Vercel AI SDK 把 `z.X.optional()` 转 JSON schema 时**没有**标记为 nullable，于是 GPT-5 给每个 optional 字段塞类型默认值（string `''` / number `0` / enum 第一个值或某个有效值），把 search 工具的过滤器全部触发，归零所有结果。Sonnet 路径不受影响，因为 Anthropic 不强制 strict 模式。
+
+详见 [CLAUDE.md → Common Pitfalls](../CLAUDE.md#common-pitfalls) 的 "OpenAI strict structured outputs 强制 optional 字段填类型默认值" 一条。
+
+### 三层防御（缺一不可）
+
+**L1 — schema 层**：所有 optional inputSchema 字段必须用 `.nullable().optional()`，不是单纯的 `.optional()`。OpenAI 看到 null 合法就会主动返回 null 而不是默认值。
+
+```typescript
+// 错
+inputSchema: z.object({
+  location: z.string().optional(),
+  edition_number: z.number().optional(),
+  edition_type: z.enum(['ap', 'numbered', 'unique']).optional(),
+})
+
+// 对
+inputSchema: z.object({
+  location: z.string().nullable().optional(),
+  edition_number: z.number().nullable().optional(),
+  edition_type: z.enum(['ap', 'numbered', 'unique']).nullable().optional(),
+})
+```
+
+**L2 — execute 入口归一化**：把 `''` / `0` / `null` 全部按"未设置"处理。这一层是不依赖 SDK 行为的物理兜底，**绝不能省略**。
+
+```typescript
+// 错（GPT 默认值 0 会绕过 undefined 判断，触发 .eq('edition_number', 0) 过滤器）
+if (edition_number !== undefined) {
+  query = query.eq('edition_number', edition_number);
+}
+
+// 对
+if (edition_number != null && edition_number !== 0) {
+  query = query.eq('edition_number', edition_number);
+}
+
+// 字符串字段同理
+if (location != null && location !== '') {
+  query = query.ilike('locations.name', `%${location}%`);
+}
+```
+
+**L3 — prompt 引导**：`getSystemPromptForOpenAI` 已包含显式指令 "Pass null for any tool parameter you do not want to filter on" 并给出反向例子，降低 GPT 试错成本。仅 OpenAI prompt 需要这条 —— Anthropic 版字节级保留 v1.2.3，不要碰。
+
+### 为什么三层都不能省
+
+- L1 治本，但依赖 `@ai-sdk/openai` 把 nullable 正确翻译成 JSON schema —— 一旦 SDK 升级有回归，L1 失效。
+- L2 是物理拦截，**绝对兜底**。即便 LLM 把每个字段都填默认值，execute 也不会污染查询。
+- L3 是引导。LLM 看到 prompt 显式说明会更倾向于直接传 null，减少对 L2 的依赖、加快 happy path。
+
+### 守护测试
+
+- `api/__tests__/chat-integration.test.ts` —— 断言 OpenAI prompt 含 null-instruction，且 Anthropic 路径**不含**该指令（保护两份 prompt 不漂移）。
+- `api/tools/__tests__/search-editions.test.ts` 等 —— 断言 default-payload（`edition_number=0`、`edition_type='unique'` 等）不污染 Supabase 查询链。

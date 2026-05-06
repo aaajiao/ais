@@ -210,6 +210,181 @@ describe('search_editions — three-state location hint (v1.2.4)', () => {
   });
 });
 
+describe('search_editions — OpenAI strict structured outputs default-value payload', () => {
+  /**
+   * Regression for v1.2.5: GPT-5.4 + OpenAI Responses API strict structured
+   * outputs forces every property to appear in the response. zod-to-JSON-schema
+   * emits `.optional()` without `null` in the type, so the model fills each
+   * field with its type default (`""` / `0` / first enum value). Without
+   * normalization those defaults become real Supabase filters and zero out
+   * results.
+   */
+
+  function getEditionsCallFilters(calls: CapturedCall[]) {
+    const editionsCall = calls.find(c => c.table === 'editions');
+    if (!editionsCall) throw new Error('expected editions call');
+    return editionsCall.filters;
+  }
+
+  it('OpenAI default-value payload (empty strings + zero numbers) with only meaningful location still matches editions', async () => {
+    /**
+     * L2 defense: empty strings + zero numbers must be stripped even if L1
+     * (nullable schema) somehow fails to make GPT emit `null`. Enum fields
+     * carrying a valid enum value (e.g. `'unique'`) cannot be physically
+     * distinguished from real user intent — those rely on L1 (the schema
+     * `.nullable()` makes GPT send `null` instead of the first enum value).
+     */
+    const { supabase, calls } = createMockSupabase({
+      locationsResult: {
+        data: [{ id: 'loc-1', name: 'Tabula Rasa London', city: 'London' }],
+        error: null,
+      },
+      editionsResult: {
+        data: [
+          {
+            id: 'ed-1',
+            edition_number: 1,
+            status: 'at_gallery',
+            artworks: { id: 'aw-1', title_en: 'Work A', user_id: 'me' },
+            locations: { id: 'loc-1', name: 'Tabula Rasa London', city: 'London' },
+          },
+        ],
+        error: null,
+      },
+    });
+    const tool = createSearchEditionsTool({ supabase, userId: 'me', locale: 'zh' });
+
+    const result = (await getExec(tool)({
+      artwork_title: '',
+      edition_number: 0,
+      status: '',
+      location: 'london',
+      edition_type: null,
+      condition: null,
+      inventory_number: '',
+      buyer_name: '',
+      price_min: 0,
+      price_max: 0,
+      sold_after: '',
+      sold_before: '',
+    })) as { editions: unknown[]; hint?: string };
+
+    expect(result.editions).toHaveLength(1);
+    expect(result.hint).toBe('has_editions');
+
+    const filters = getEditionsCallFilters(calls);
+    const filterCols = filters.map(f => f.col);
+    expect(filterCols).not.toContain('edition_number');
+    expect(filterCols).not.toContain('status');
+    expect(filterCols).not.toContain('edition_type');
+    expect(filterCols).not.toContain('condition');
+    expect(filterCols).not.toContain('inventory_number');
+    expect(filterCols).not.toContain('buyer_name');
+    expect(filterCols).not.toContain('sale_price');
+    expect(filterCols).not.toContain('sale_date');
+
+    const orExprs = filters.filter(f => f.kind === 'or').map(f => f.expr || '');
+    const titleOrPresent = orExprs.some(e => e.includes('title_en') || e.includes('title_cn'));
+    expect(titleOrPresent).toBe(false);
+
+    const inFilters = filters.filter(f => f.kind === 'in');
+    const locationInPresent = inFilters.some(f => f.col === 'location_id');
+    expect(locationInPresent).toBe(true);
+  });
+
+  it('null values from OpenAI strict mode are treated as unset', async () => {
+    const { supabase, calls } = createMockSupabase({
+      editionsResult: {
+        data: [
+          {
+            id: 'ed-2',
+            status: 'sold',
+            artworks: { id: 'aw-1', title_en: 'X', user_id: 'me' },
+            locations: null,
+          },
+        ],
+        error: null,
+      },
+    });
+    const tool = createSearchEditionsTool({ supabase, userId: 'me', locale: 'zh' });
+
+    const result = (await getExec(tool)({
+      artwork_title: null,
+      edition_number: null,
+      status: 'sold',
+      location: null,
+      edition_type: null,
+      condition: null,
+      inventory_number: null,
+      buyer_name: null,
+      price_min: null,
+      price_max: null,
+      sold_after: null,
+      sold_before: null,
+    })) as { editions: unknown[] };
+
+    expect(result.editions).toHaveLength(1);
+
+    const filters = getEditionsCallFilters(calls);
+    const eqs = filters.filter(f => f.kind === 'eq');
+    const eqCols = eqs.map(f => f.col);
+    expect(eqCols).toContain('status');
+    expect(eqCols).not.toContain('edition_number');
+    expect(eqCols).not.toContain('edition_type');
+    expect(eqCols).not.toContain('condition');
+  });
+
+  it('whitespace-only strings are treated as unset', async () => {
+    const { supabase, calls } = createMockSupabase({
+      editionsResult: { data: [], error: null },
+    });
+    const tool = createSearchEditionsTool({ supabase, userId: 'me', locale: 'zh' });
+
+    await getExec(tool)({
+      artwork_title: '   ',
+      status: '\t',
+      inventory_number: '',
+      buyer_name: '   ',
+    });
+
+    const filters = getEditionsCallFilters(calls);
+    const filterCols = filters.map(f => f.col);
+    expect(filterCols).not.toContain('status');
+    expect(filterCols).not.toContain('inventory_number');
+    expect(filterCols).not.toContain('buyer_name');
+    const orExprs = filters.filter(f => f.kind === 'or').map(f => f.expr || '');
+    const titleOrPresent = orExprs.some(e => e.includes('title_en') || e.includes('title_cn'));
+    expect(titleOrPresent).toBe(false);
+  });
+
+  it('inputSchema accepts null for every optional field (zod-level guarantee)', () => {
+    const tool = createSearchEditionsTool({
+      supabase: {} as SupabaseClient,
+      userId: 'me',
+      locale: 'zh',
+    });
+    const schema = (tool as unknown as {
+      inputSchema: { safeParse: (v: unknown) => { success: boolean } };
+    }).inputSchema;
+
+    const allNull = {
+      artwork_title: null,
+      edition_number: null,
+      status: null,
+      location: null,
+      edition_type: null,
+      condition: null,
+      inventory_number: null,
+      buyer_name: null,
+      price_min: null,
+      price_max: null,
+      sold_after: null,
+      sold_before: null,
+    };
+    expect(schema.safeParse(allNull).success).toBe(true);
+  });
+});
+
 describe('search_editions toModelOutput — text differs by hint', () => {
   it('hint=no_location_match → text mentions location not found', () => {
     const tool = createSearchEditionsTool({

@@ -150,6 +150,14 @@ CRITICAL: When the user mentions a place, USE search_editions DIRECTLY. DO NOT c
 If a search returns an empty array, retry once with a different parameter (e.g. swap
 location ↔ artwork_title) before telling the user "not found".
 
+# Parameter passing rules — CRITICAL for search tools
+
+Pass \`null\` for any tool parameter you do not want to filter on.
+DO NOT use empty string \`""\`, \`0\`, or default enum values as "unset" indicators — they are valid filter values and will exclude matching results.
+Example: search_editions({ location: 'London' }) — NOT search_editions({ location: 'London', edition_type: 'unique', condition: 'excellent', edition_number: 0, price_max: 0 }).
+
+Only include a parameter when the user actually mentioned a constraint for it. If the user only said a place, pass only \`location\`. Every extra default-valued parameter narrows the search and risks zeroing out the result set.
+
 # Tool call examples (follow this style)
 
 Example 1 — place query (THE most common GPT-5 failure mode):

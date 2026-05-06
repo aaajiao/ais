@@ -3,6 +3,9 @@ import { z } from 'zod';
 import type { ToolContext } from './types.js';
 import { sanitizeSearchTerm } from '../lib/search-utils.js';
 import { createT } from '../lib/i18n.js';
+import { normalizeString, normalizeEnum } from '../lib/normalize-filters.js';
+
+const LOCATION_TYPES = ['studio', 'gallery', 'museum', 'other'] as const;
 
 /**
  * 创建搜索位置工具
@@ -14,11 +17,16 @@ export function createSearchLocationsTool(ctx: ToolContext) {
 USE THIS WHEN the user asks ABOUT a location itself — e.g. "列出所有画廊", "我有哪些美术馆合作", "找北京的所有位置", "show me all galleries in Germany". The result is a list of locations, not editions.
 DO NOT use this when the user wants to filter EDITIONS by where they are (e.g. "什么作品在 London", "Pace Gallery 有哪些版本", "在德国的版本") — for those queries use \`search_editions\` with the \`location\` parameter, which returns editions filtered by their current location.`,
     inputSchema: z.object({
-      query: z.string().optional().describe('搜索关键词（匹配名称、城市、国家）'),
-      type: z.enum(['studio', 'gallery', 'museum', 'other']).optional().describe('位置类型'),
-      country: z.string().optional().describe('国家'),
+      query: z.string().nullable().optional().describe('搜索关键词（匹配名称、城市、国家）'),
+      type: z.enum(LOCATION_TYPES).nullable().optional().describe('位置类型'),
+      country: z.string().nullable().optional().describe('国家'),
     }),
-    execute: async ({ query, type, country }) => {
+    execute: async (raw) => {
+      const r = raw as Record<string, unknown>;
+      const query = normalizeString(r.query);
+      const type = normalizeEnum(r.type, LOCATION_TYPES);
+      const country = normalizeString(r.country);
+
       const { supabase } = ctx;
 
       let queryBuilder = supabase.from('locations').select('*').eq('user_id', ctx.userId);

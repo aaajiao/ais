@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { ToolContext } from './types.js';
 import { sanitizeSearchTerm, expandSearchQuery } from '../lib/search-utils.js';
 import { createT } from '../lib/i18n.js';
+import { normalizeString, normalizeBoolean } from '../lib/normalize-filters.js';
 
 /**
  * 创建搜索作品工具
@@ -14,13 +15,20 @@ export function createSearchArtworksTool(ctx: ToolContext) {
 USE THIS WHEN the user asks about an artwork's title, year of creation, medium/type, or material composition (e.g. "用磁铁的作品", "2020 年的作品", "video 类作品", "找标题里有 GFW 的作品").
 DO NOT use this for location/city/gallery filtering — if the user asks WHERE an artwork is, or which works are at a gallery/city/country, use \`search_editions\` with its \`location\` parameter instead. This tool searches the artwork catalog, not physical edition placement.`,
     inputSchema: z.object({
-      query: z.string().optional().describe('Title keyword — searches artwork title (English and Chinese). NOT for location names; use search_editions for that.'),
-      year: z.string().optional().describe('年份'),
-      type: z.string().optional().describe('作品类型'),
-      materials: z.string().optional().describe('材料关键词（支持中英文）'),
-      is_unique: z.boolean().optional().describe('是否独版作品'),
+      query: z.string().nullable().optional().describe('Title keyword — searches artwork title (English and Chinese). NOT for location names; use search_editions for that.'),
+      year: z.string().nullable().optional().describe('年份'),
+      type: z.string().nullable().optional().describe('作品类型'),
+      materials: z.string().nullable().optional().describe('材料关键词（支持中英文）'),
+      is_unique: z.boolean().nullable().optional().describe('是否独版作品'),
     }),
-    execute: async ({ query, year, type, materials, is_unique }) => {
+    execute: async (raw) => {
+      const r = raw as Record<string, unknown>;
+      const query = normalizeString(r.query);
+      const year = normalizeString(r.year);
+      const type = normalizeString(r.type);
+      const materials = normalizeString(r.materials);
+      const is_unique = normalizeBoolean(r.is_unique);
+
       const { supabase, searchExpansionModel } = ctx;
 
       // 排除已删除的作品，限定当前用户
