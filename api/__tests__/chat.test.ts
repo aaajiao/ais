@@ -17,66 +17,104 @@ describe('buildProviderOptions', () => {
     }
   });
 
-  describe('thinkingEnabled = false (default / regression guard)', () => {
-    it('returns empty object → 两家都走默认行为，零行为变化', () => {
-      const opts = buildProviderOptions(false);
-      // 关键回归断言：thinking off 时不传任何 providerOptions。
-      // - Anthropic 不传 thinking → 模型行为不变
-      // - OpenAI 不传 reasoningEffort → 避免 GPT-5.4 等模型对 'minimal' 报错
-      //   （'minimal' 在 gpt-5.1+ 已移除，仅 base gpt-5 支持；不同 GPT 模型 enum 不统一）
-      // cacheControl / contextManagement 等 Anthropic-only 字段在别处注入：
-      //   - cacheControl 在 system message 的 providerOptions 里（buildSystemMessage）
-      //   - contextManagement 在 chat handler 里按 provider 分支注入
+  // ────────────────────────────────────────────────────────────────────────
+  // Anthropic 路径
+  // ────────────────────────────────────────────────────────────────────────
+  describe('Anthropic 路径', () => {
+    it('thinking off → 返回空对象（Claude 模型行为零变化的关键回归断言）', () => {
+      const opts = buildProviderOptions(false, 'claude-sonnet-4-6', 'anthropic');
       expect(opts).toEqual({});
       expect(opts).not.toHaveProperty('anthropic');
-      expect(opts).not.toHaveProperty('openai');
     });
-  });
 
-  describe('thinkingEnabled = true', () => {
-    it('enables anthropic thinking with default 4000 budget tokens', () => {
-      const opts = buildProviderOptions(true);
+    it('thinking on → 默认 budgetTokens 4000', () => {
+      const opts = buildProviderOptions(true, 'claude-sonnet-4-6', 'anthropic');
       expect(opts.anthropic).toEqual({
         thinking: { type: 'enabled', budgetTokens: 4000 },
       });
     });
 
-    it('does NOT inject openai field → thinking 开关只对 Anthropic 生效（避免 GPT 跨模型 enum 不一致 + 高 reasoning 引发的搜索循环）', () => {
-      const opts = buildProviderOptions(true);
+    it('thinking on → 不注入 openai 字段', () => {
+      const opts = buildProviderOptions(true, 'claude-sonnet-4-6', 'anthropic');
       expect(opts).not.toHaveProperty('openai');
     });
 
-    it('respects THINKING_BUDGET env override', () => {
+    it('thinking on + THINKING_BUDGET=8000 → budgetTokens 覆盖', () => {
       process.env.THINKING_BUDGET = '8000';
-      const opts = buildProviderOptions(true);
+      const opts = buildProviderOptions(true, 'claude-sonnet-4-6', 'anthropic');
       expect(opts.anthropic).toMatchObject({
         thinking: { type: 'enabled', budgetTokens: 8000 },
       });
     });
 
-    it('falls back to 4000 when THINKING_BUDGET is not a valid number', () => {
+    it('thinking on + 无效 THINKING_BUDGET → fallback 4000', () => {
       process.env.THINKING_BUDGET = 'not-a-number';
-      const opts = buildProviderOptions(true);
+      const opts = buildProviderOptions(true, 'claude-sonnet-4-6', 'anthropic');
       expect(opts.anthropic).toMatchObject({
         thinking: { type: 'enabled', budgetTokens: 4000 },
       });
     });
 
-    // P1-2: adaptive thinking（Anthropic v3.0.74 GA）
-    it('uses adaptive thinking when THINKING_BUDGET=adaptive', () => {
+    it('thinking on + THINKING_BUDGET=adaptive → 走 adaptive 模式（v3.0.74 GA）', () => {
       process.env.THINKING_BUDGET = 'adaptive';
-      const opts = buildProviderOptions(true);
+      const opts = buildProviderOptions(true, 'claude-sonnet-4-6', 'anthropic');
       expect(opts.anthropic).toEqual({
         thinking: { type: 'adaptive', display: 'summarized' },
       });
     });
 
-    it('adaptive mode does NOT include budgetTokens (model decides)', () => {
+    it('adaptive 模式不带 budgetTokens（由模型自决）', () => {
       process.env.THINKING_BUDGET = 'adaptive';
-      const opts = buildProviderOptions(true);
+      const opts = buildProviderOptions(true, 'claude-sonnet-4-6', 'anthropic');
       const thinking = (opts.anthropic as { thinking: Record<string, unknown> }).thinking;
       expect(thinking).not.toHaveProperty('budgetTokens');
     });
+  });
+
+  // ────────────────────────────────────────────────────────────────────────
+  // OpenAI 路径（v1.2.3 修复 GPT 不调工具问题）
+  // ────────────────────────────────────────────────────────────────────────
+  describe('OpenAI 路径 — gpt-5.4 / gpt-5.5（项目实际使用的模型）', () => {
+    // 项目只用 gpt-5.4 / gpt-5.5（含 -mini 变体）。这两个默认 reasoning_effort='none'，
+    // 必须显式给 effort 才能让模型正常调工具。
+    const cases = [
+      { model: 'gpt-5.4', off: 'low', on: 'high' },
+      { model: 'gpt-5.4-mini', off: 'low', on: 'high' },
+      { model: 'gpt-5.5', off: 'low', on: 'high' },
+      { model: 'gpt-5.5-mini', off: 'low', on: 'high' },
+    ] as const;
+
+    for (const { model, off, on } of cases) {
+      it(`${model} thinking off → reasoningEffort: '${off}'`, () => {
+        const opts = buildProviderOptions(false, model, 'openai');
+        expect(opts.openai).toEqual({ reasoningEffort: off });
+        expect(opts).not.toHaveProperty('anthropic');
+      });
+
+      it(`${model} thinking on → reasoningEffort: '${on}'`, () => {
+        const opts = buildProviderOptions(true, model, 'openai');
+        expect(opts.openai).toEqual({ reasoningEffort: on });
+        expect(opts).not.toHaveProperty('anthropic');
+      });
+    }
+  });
+
+  describe('OpenAI 路径 — 未列出的模型（保守降级）', () => {
+    // 项目暂不使用，但保留兜底：未匹配的模型不传 reasoningEffort 字段。
+    // 这避免在 gpt-4 系列（不支持该字段）或未知模型上引入兼容性问题。
+    const unsupportedModels = ['gpt-4o', 'gpt-4-turbo', 'gpt-5', 'gpt-5-pro', 'o3-mini'];
+
+    for (const model of unsupportedModels) {
+      it(`${model} thinking off → 不传任何 providerOptions（{}）`, () => {
+        const opts = buildProviderOptions(false, model, 'openai');
+        expect(opts).toEqual({});
+      });
+
+      it(`${model} thinking on → 不传任何 providerOptions（{}）`, () => {
+        const opts = buildProviderOptions(true, model, 'openai');
+        expect(opts).toEqual({});
+      });
+    }
   });
 });
 
@@ -123,19 +161,12 @@ describe('buildStopConditions', () => {
 
   it('first condition is stepCountIs(8) (硬上限兜底)', () => {
     const conditions = buildStopConditions();
-    // stepCountIs / hasToolCall 都是 ai 包导出的函数，
-    // 它们返回的 StopCondition 实例不暴露内部参数 —— 我们只能用引用相等校验：
-    // 拿一个新建的 stepCountIs(8) 比对函数体语义不可行，
-    // 但我们可以确保 buildStopConditions 输出的两个 condition 不是同一个函数。
     expect(conditions[0]).not.toBe(conditions[1]);
-    // 间接校验：stepCountIs 与 hasToolCall 至少都是函数（StopCondition 是函数类型）
     expect(typeof conditions[0]).toBe('function');
     expect(typeof conditions[1]).toBe('function');
   });
 
   it('uses sdk-exported stepCountIs and hasToolCall (regression: imports must come from "ai" package)', () => {
-    // 这个断言保证：如果未来 ai 包 rename 这两个函数，buildStopConditions 会编译失败，
-    // 而本测试也会因为 import 不到而 fail —— 双重保险。
     expect(typeof stepCountIs).toBe('function');
     expect(typeof hasToolCall).toBe('function');
   });

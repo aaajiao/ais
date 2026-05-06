@@ -126,8 +126,12 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 ## Common Pitfalls
 
 - **OpenAI 工具路由依赖 description 明确性**: GPT 对工具 description 的解读比 Claude 更字面。新增 AI 工具时，description 必须包含 USE THIS WHEN 场景描述 + 反向指令（"DO NOT call this when..."），否则 GPT 可能凭记忆作答而不调用工具。同时 `api/lib/system-prompt.ts` 的「工具调用强制路由」段也要同步维护（已被 `api/lib/system-prompt.test.ts` 守护）。
-- **Thinking 模式开关 off 时必须返回空对象**: `api/chat.ts:buildProviderOptions(false)` 必须返回 `{}` —— 不传 `anthropic.thinking` 也不传 `openai.reasoningEffort`。任何 `{ type: 'disabled' }` 之类的写法都会改变 Claude 行为。回归断言见 `api/__tests__/chat.test.ts`。注意：cacheControl 走 message-level providerOptions（`buildSystemMessage`），不在这条断言范围内。
-- **Thinking 开关只对 Anthropic 生效，绝不要绑到 OpenAI `reasoningEffort`**: 各 GPT 模型的 reasoningEffort enum 不统一（`gpt-5` 支持 `minimal`、`gpt-5.1+` 不再支持、`gpt-5-pro` 仅支持 `high`、`gpt-4` 不支持该字段），任何 hardcode 值都会在某个模型上 break（v1.2.0 实证：`'minimal'` 在 gpt-5.4 报错 `Unsupported value`；`'high'` + 搜索类查询导致无限循环）。详见 `docs/ai-chat-tools.md#深度推理-thinking-模式` 的"为什么不绑 OpenAI"段。
+- **Thinking 模式开关：Anthropic off 必须 `{}`，OpenAI 必须按模型族分支**: `api/chat.ts:buildProviderOptions(thinkingEnabled, modelId, provider)` 按 provider 分支：
+  - **Anthropic**: off → `{}`（Claude 行为零变化）；on → `{ anthropic: { thinking } }`。任何 `{ type: 'disabled' }` 之类的写法都会改变 Claude 行为
+  - **OpenAI**: 通过 `getOpenAIReasoningEffort(modelId, thinkingOn)` 决定。项目用的 gpt-5.4/5.5（含 -mini）默认 `reasoning_effort='none'`（Responses API 行为），**off 时必须传 `'low'`** 否则模型不调工具（v1.2.2 实证：完全不传字段时 GPT 不响应"什么作品在 london"）。on → `'high'`。其他模型（gpt-4 / gpt-5-pro 等）函数返回 `undefined`，不传字段
+  - 各 GPT 模型 reasoningEffort enum 不统一（`gpt-5` 默认 medium 支持 minimal、`gpt-5.4`/`5.5` 默认 none 不支持 minimal、`gpt-5-pro` 仅 high、`gpt-4` 不支持该字段），任何 hardcode 单一值都会在某个模型上 break。详见 `docs/ai-chat-tools.md#深度推理-thinking-模式`
+  - 回归断言：`api/__tests__/chat.test.ts` 覆盖 Anthropic off/on × OpenAI 4 个模型 × on/off × 5 个未列出模型的兜底分支
+  - cacheControl 走 message-level providerOptions（`buildSystemMessage`），不在 buildProviderOptions 范围
 - **Anthropic-only providerOptions 必须按 provider 分支**: `cacheControl`（prompt caching）、`contextManagement.compact_20260112`（服务端 compaction）只对 Anthropic 路径有效。OpenAI 路径必须保留 `prepareMessagesForModel` 的客户端 token 截断兜底（OpenAI 没有等效官方机制）。新加 Anthropic-only 字段时，按 `getProviderName(model)` 分支注入；千万不要给 OpenAI 路径也带上，会导致请求体异常。
 - **api/ 测试文件必须放在 `__tests__/` 子目录**: Vercel 编译 `api/**/*.ts` 当 serverless functions，但跳过 `__tests__/` 子目录。直接放在 `api/` 或 `api/lib/` 顶层的 `*.test.ts` 会被当成函数编译，遇到 `moduleResolution: nodenext` 严格 ESM 规则可能阻断部署（v1.2.0/v1.2.1 实证）。本地 tsconfig 用 `bundler` resolution 不会捕获，约定纪律比类型检查重要。
 

@@ -1,7 +1,7 @@
 import { streamText, stepCountIs, hasToolCall, type UIMessage } from 'ai';
 import type { ProviderOptions, SystemModelMessage } from '@ai-sdk/provider-utils';
 import { verifyAuth, unauthorizedResponse } from './lib/auth.js';
-import { getModel, getSupabase, getProviderName } from './lib/model-provider.js';
+import { getModel, getSupabase, getProviderName, getOpenAIReasoningEffort } from './lib/model-provider.js';
 import { getSystemPrompt } from './lib/system-prompt.js';
 import { createTools } from './tools/index.js';
 import { prepareMessagesForModel } from './lib/message-utils.js';
@@ -17,37 +17,47 @@ export const config = {
 type StreamTextProviderOptions = ProviderOptions;
 
 /**
- * 构造 streamText 的 providerOptions（顶层）。
+ * 构造 streamText 的 providerOptions（顶层），按 provider 分支注入。
  *
- * 设计取向：thinking 开关只对 Anthropic 生效。
- *   - Anthropic thinking 和 OpenAI reasoningEffort 虽然都是「让模型多想」，
- *     但底层机制差异大，强行绑同一个开关会引入：
- *       1. GPT-5.4 不接受 'minimal'，旧模型不支持 reasoningEffort 字段
- *       2. high reasoning + 搜索类查询有循环风险（生产观察到无限搜索）
- *   - 改为：thinking off → 两家都走默认；thinking on → 仅 Anthropic 走 thinking
- *   - OpenAI 路径不被 thinking 开关影响，由模型自身默认行为决定
+ * Anthropic 路径：
+ *   - thinking off → 不传 anthropic.thinking → Claude 模型行为零变化
+ *   - thinking on → anthropic.thinking = { type: 'enabled', budgetTokens } 或 adaptive
+ *     - THINKING_BUDGET=adaptive → { type: 'adaptive', display: 'summarized' }（v3.0.74 GA）
+ *     - 其他值（数字 / 缺省）→ { type: 'enabled', budgetTokens: number || 4000 }
  *
- * thinking on：
- *   - THINKING_BUDGET=adaptive → { type: 'adaptive', display: 'summarized' }（Anthropic v3.0.74 GA）
- *   - 其他值（数字 / 缺省）→ { type: 'enabled', budgetTokens: number || 4000 }
+ * OpenAI 路径（v1.2.3 修复 GPT 不调工具的问题）：
+ *   - 项目用的 gpt-5.4 / gpt-5.5（含 -mini）默认 reasoning_effort='none' —— 模型几乎
+ *     不做内部规划，工具调用决策失效。必须显式传 effort 才能正常调工具。
+ *   - thinking off → 'low'（保留 reasoning 但开销小）
+ *   - thinking on → 'high'（深度推理）
+ *   - 其他模型（gpt-4 等）→ getOpenAIReasoningEffort 返回 undefined，不传字段
  *
  * 注：cacheControl 不在这里，而是放在 system message 的 providerOptions 里
  *     （见 buildSystemMessage），这样不影响 OpenAI 路径请求体。
  */
-export function buildProviderOptions(thinkingEnabled: boolean): StreamTextProviderOptions {
-  if (!thinkingEnabled) {
-    return {};
+export function buildProviderOptions(
+  thinkingEnabled: boolean,
+  modelId: string,
+  provider: 'anthropic' | 'openai'
+): StreamTextProviderOptions {
+  if (provider === 'anthropic') {
+    if (!thinkingEnabled) {
+      return {};
+    }
+    const rawBudget = process.env.THINKING_BUDGET;
+    const thinking =
+      rawBudget === 'adaptive'
+        ? { type: 'adaptive' as const, display: 'summarized' as const }
+        : { type: 'enabled' as const, budgetTokens: Number(rawBudget) || 4000 };
+    return { anthropic: { thinking } };
   }
 
-  const rawBudget = process.env.THINKING_BUDGET;
-  const thinking =
-    rawBudget === 'adaptive'
-      ? { type: 'adaptive' as const, display: 'summarized' as const }
-      : { type: 'enabled' as const, budgetTokens: Number(rawBudget) || 4000 };
-
-  return {
-    anthropic: { thinking },
-  };
+  // provider === 'openai'
+  const effort = getOpenAIReasoningEffort(modelId, thinkingEnabled);
+  if (effort === undefined) {
+    return {};
+  }
+  return { openai: { reasoningEffort: effort } };
 }
 
 /**
@@ -151,7 +161,7 @@ export default async function handler(req: Request) {
     });
 
     // 5. providerOptions：thinking + （仅 Anthropic）contextManagement
-    const providerOptions = buildProviderOptions(thinkingEnabled);
+    const providerOptions = buildProviderOptions(thinkingEnabled, model, provider);
     if (provider === 'anthropic') {
       providerOptions.anthropic = {
         ...(providerOptions.anthropic ?? {}),

@@ -56,6 +56,35 @@ export function getProviderName(modelId: string): 'anthropic' | 'openai' {
 }
 
 /**
+ * 根据模型 ID 与 thinking 开关推断 OpenAI reasoningEffort 值。
+ *
+ * 背景：@ai-sdk/openai v3 默认走 Responses API。`gpt-5.1+` / `gpt-5.4` / `gpt-5.5`
+ * 的默认 reasoning_effort 是 `'none'` —— 模型几乎不做内部规划，多步工具调用决策
+ * 失效（v1.2.2 实证：用户问"什么作品在 london"GPT 完全不调 search 工具）。
+ * 必须显式传一个非零的 effort 才能让模型正常调用工具。
+ *
+ * 项目实际只用 gpt-5.4 / gpt-5.5（含 -mini 变体）：两者都需显式 effort。
+ *   - thinking off → 'low'（不再退化到 none，仍调工具但 reasoning 开销小）
+ *   - thinking on → 'high'（深度推理；曾在 v1.2.0 配 stepCountIs(5) 时引发循环，
+ *     当前 stepCountIs(8) + hasToolCall 应已缓解；如再现循环可降到 'medium'）
+ *
+ * 其他模型（gpt-4 / claude-* / 未知前缀）→ 返回 undefined，调用方不传字段。
+ *
+ * 不同模型族 reasoningEffort enum 不统一（见 docs/ai-chat-tools.md 矩阵），
+ * 任何 hardcode 单一值都会在某些模型上 break。
+ */
+export function getOpenAIReasoningEffort(
+  modelId: string,
+  thinkingEnabled: boolean
+): 'low' | 'high' | undefined {
+  // 匹配 gpt-5.4 / gpt-5.5 / gpt-5.4-mini / gpt-5.5-mini 等所有变体
+  if (/^gpt-5\.(4|5)/.test(modelId)) {
+    return thinkingEnabled ? 'high' : 'low';
+  }
+  return undefined;
+}
+
+/**
  * 根据模型 ID 动态选择 provider
  */
 export function getModel(modelId: string) {
