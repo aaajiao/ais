@@ -523,3 +523,15 @@ await supabase.from('editions').update(updateData).eq('id', edition_id);
 - `api/tools/__tests__/execute-update.test.ts` —— "default-padded payload only updates fields user actually mentioned"、"all-null payload returns no fields to update"、"never writes empty string to UUID FK"、"does not write sale_price=0"、"does not write empty-string date fields"。
 - `api/tools/__tests__/update-confirmation.test.ts` —— "confirmation card excludes default-padded fields"。
 - `api/tools/__tests__/export-artworks.test.ts` —— "default-padded include_* defaults to true"、"artwork_ids array filters out empty strings"。
+
+### 外部 API 路径：L2 自动继承（v1.3.4 起）
+
+`/api/external/v1/query` 直接调 `tool.execute(params)`（绕过 zod schema 校验），但因为 L2 normalize-filters 写在每个工具 execute() 入口里的，外部客户端（含外部 OpenAI structured outputs LLM）发来的 default-padded payload **自动**被同样物理拦截 —— 即便 `''/0/null` 全塞进来，read-only 路径也安全。
+
+**关键约束**：未来重构 search 工具时**绝不能**把归一化逻辑从 execute() 入口提到外面（例如挪到 `api/chat.ts` 的 onCall 钩子），否则外部 API 路径会立刻失去保护。L2 必须留在 execute() 内部。
+
+**对外契约也要同步**：`api/external/v1/schema.ts` 的 SCHEMA 常量必须给每个非 required 参数标 `nullable: true`，并维护顶层 `parameter_handling` 章节告诉外部客户端"传 null 别传 ''/0"。这与内部 OpenAI prompt 的 null-instruction 是同一份契约的两份外化（一份给我们的 LLM 是 prompt，一份给外部 LLM 是 schema endpoint）。详见 [docs/external-api.md `参数处理铁律`](external-api.md#参数处理铁律v134-起)。
+
+守护测试：
+
+- `api/external/__tests__/schema.test.ts` —— "marks every non-required param as nullable: true"、"exposes parameter_handling section explaining 'pass null, not empty/0'"。

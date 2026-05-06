@@ -71,6 +71,40 @@ users (用户)
 
 ---
 
+## 添加 / 修改数据库字段（强制 checklist）
+
+任何 DB schema 改动都必须走完这条链，否则 schema ↔ AI 工具 ↔ prompt ↔ 外部 API 之间会出现漂移（v1.2.0–v1.3.x 一连串 GPT 失败的根因）：
+
+1. **DB**：写 SQL migration（位置 `supabase/migrations/`），手动到 Supabase Dashboard SQL Editor 应用，归档到 `migrations/archived/`，**同步更新 `supabase/schema.sql`（source of truth）**
+2. **TypeScript 类型**：`bunx supabase gen types typescript --project-id <id> > src/lib/database.types.ts` 重新生成
+3. **AI 工具映射审计**：`grep -rn '<field-name>' api/tools/` 列出所有引用该字段的工具，对照 DB 真实列类型逐个核对：
+   - **enum 列**（如 status / condition / sale_currency / edition_type）→ 工具必须用 `z.enum(LOCAL_CONST).nullable().optional()`，**不能** `z.string().optional()`。LOCAL_CONST 字节级匹配 DB enum 值
+   - **UUID FK 列**（location_id / artwork_id / edition_id）→ `z.string().nullable().optional()` + execute 入口必须用 `normalizeString` 兜底 `''` → undefined（否则破外键）
+   - **数字列**（sale_price / edition_number / price_min/max）→ 判断 0 是否有业务含义；多数情况用 `normalizeNumber`（0 视为 unset）
+   - **日期列**（YYYY-MM-DD 文本）→ 用 `normalizeString`，`''` 进 date 列会 cast 失败
+   - **NOT NULL 列**（即使有 DB 默认值）→ 工具不能传 null 进 update payload；归一化为 undefined 时必须从 payload 过滤掉，让 DB 默认值生效
+4. **写工具 payload 过滤铁律**（execute-update / update-confirmation）：归一化后只把"用户真正提到的字段"写进 supabase update payload。参考 `api/tools/execute-update.ts` 范式：
+   ```ts
+   const norm = { status: normalizeEnum(...), location_id: normalizeString(...), ... };
+   const hasAnyField = Object.values(norm).some((v) => v !== undefined);
+   if (!hasAnyField) return { error: t('update.noFields') };
+   const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+   for (const [k, v] of Object.entries(norm)) {
+     if (v !== undefined) payload[k] = v;
+   }
+   ```
+   漏一个字段过滤 → null 覆盖既有数据 → 数据丢失
+5. **回归测试**（位置必须在 `__tests__/` 子目录，Vercel 部署纪律）：每个引用该字段的工具加：
+   - `default-padded payload only updates fields user actually mentioned`（断言 update payload 不含该字段当 LLM 默认值时）
+   - `inputSchema accepts null for every optional field`（zod-level 守护，防止后续退化为 `.optional()` 不带 nullable）
+6. **Prompt（如果新字段进了 search/update 工具的常见交互流）**：`api/lib/system-prompt.ts` 的 `getSystemPromptForOpenAI` few-shot example 给该字段的正确传参示例。**绝不要碰** `getSystemPromptForAnthropic`（v1.2.3 字节级保留，单测守护）
+7. **外部 API**：`api/external/v1/schema.ts` 的 SCHEMA 常量同步更新该字段：标 `nullable: true`、enum 字段同步 `enum: [...]`。`docs/external-api.md` 的字段表也要同步
+8. **本地验证**：`bun run lint && bun run typecheck && bun run test:run`
+
+跳过任何一步意味着 DB ↔ schema ↔ tool ↔ prompt ↔ 外部 API 间出现漂移。这是 AI 工具层最重要的纪律 —— 任何 PR 改 DB 字段都必须在这 8 步上逐条说明已执行或刻意跳过的理由。详见 [docs/ai-chat-tools.md `OpenAI strict mode schema 兼容性`](ai-chat-tools.md#openai-strict-mode-schema-兼容性) 和 CLAUDE.md Common Pitfalls 对应条目。
+
+---
+
 ## 字段与 UI 对应关系
 
 ### 数据库表概览
