@@ -80,12 +80,26 @@ export async function verifyAuth(req: CompatibleRequest): Promise<AuthResult> {
     }
 
     // 验证邮箱白名单
+    //
+    // 设计：production fail-closed，dev/test fail-open + warn。
+    // 历史教训（v1.3.5 之前）：如果 ALLOWED_EMAILS 不设，旧逻辑直接放行所有
+    // Supabase 认证用户 → 任何 Google 账号都能调用 /api/chat 烧掉 Anthropic
+    // / OpenAI 账单。VITE_ALLOWED_EMAILS 只控前端 UX，绕开 UI 直接 curl
+    // 就过。production 必须 fail-closed 才能拦住这条路径。
     const allowedEmails = (process.env.ALLOWED_EMAILS || '')
       .split(',')
       .map(e => e.trim().toLowerCase())
       .filter(Boolean);
 
-    if (allowedEmails.length > 0 && !allowedEmails.includes(user.email?.toLowerCase() || '')) {
+    if (allowedEmails.length === 0) {
+      if (process.env.VERCEL_ENV === 'production') {
+        // production deploy 缺 ALLOWED_EMAILS 是配置错误，必须 fail-closed
+        // 避免静默放行任何 Google 用户。本地 dev / test 走 else 分支放行 + warn。
+        console.error('[auth] CRITICAL: ALLOWED_EMAILS not configured in production. Refusing all auth.');
+        return { success: false, error: 'Server auth misconfigured' };
+      }
+      console.warn('[auth] ALLOWED_EMAILS not set; allowing all authenticated users (dev/test mode).');
+    } else if (!allowedEmails.includes(user.email?.toLowerCase() || '')) {
       return { success: false, error: 'User not authorized' };
     }
 

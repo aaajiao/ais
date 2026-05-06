@@ -83,7 +83,13 @@ vercel env pull
 | `SUPABASE_SERVICE_KEY` | Supabase 服务密钥（后端用） | 同上 |
 | `ANTHROPIC_API_KEY` | Claude API 密钥 | [console.anthropic.com](https://console.anthropic.com/) |
 | `OPENAI_API_KEY` | OpenAI API 密钥 | [platform.openai.com](https://platform.openai.com/) |
-| `ALLOWED_EMAILS` | 允许登录的邮箱列表（逗号分隔） | 自定义 |
+| `ALLOWED_EMAILS` | **服务端**白名单（实际安全边界）| 自定义 |
+| `VITE_ALLOWED_EMAILS` | **客户端**白名单（仅 UX，必须与 `ALLOWED_EMAILS` 同值）| 自定义 |
+
+> ⚠️ **必须同时配置 `ALLOWED_EMAILS` 和 `VITE_ALLOWED_EMAILS`，值保持一致**。
+> 客户端那个只控登录页 UI 反馈（VITE\_ 前缀会打包进 client bundle）；服务端那个才是实际拦截 API 调用的安全边界。
+> 缺 `ALLOWED_EMAILS` 时：production 部署 v1.3.5 起会 **fail-closed**（API 全拒绝并打 CRITICAL log）；preview / 本地 dev 会 warn + 放行。
+> 历史教训：v1.3.5 之前没设 `ALLOWED_EMAILS` 会静默放行任何 Google 用户（仅客户端检查可被绕过），导致 LLM 账单可被任意烧。
 
 ### 可选变量
 
@@ -109,6 +115,7 @@ SUPABASE_SERVICE_KEY=eyJhbGciOi...
 ANTHROPIC_API_KEY=sk-ant-xxx
 OPENAI_API_KEY=sk-xxx
 ALLOWED_EMAILS=your@email.com
+VITE_ALLOWED_EMAILS=your@email.com
 ```
 
 ## Vite 7 + Vercel Dev 兼容性
@@ -210,12 +217,15 @@ kill -9 <PID>
 
 ### API 返回 401 Unauthorized
 
-检查 `ALLOWED_EMAILS` 是否包含你的登录邮箱：
+检查 `ALLOWED_EMAILS`（服务端）和 `VITE_ALLOWED_EMAILS`（客户端）**两个都**包含你的登录邮箱：
 
 ```bash
 # .env.local
 ALLOWED_EMAILS=your@email.com,another@email.com
+VITE_ALLOWED_EMAILS=your@email.com,another@email.com
 ```
+
+如果错误是 "Server auth misconfigured" + 后端 log 有 `CRITICAL: ALLOWED_EMAILS not configured` —— production 环境的 `ALLOWED_EMAILS` 没设，v1.3.5 起这是 fail-closed 行为（拒绝所有 auth 而不是静默放行）。修复：在 Vercel 加上同名变量，值与 `VITE_ALLOWED_EMAILS` 一致。
 
 ### Google OAuth 回调失败
 

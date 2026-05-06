@@ -41,11 +41,14 @@ bun run dev:api    # API (port 3000)
 ```bash
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_KEY=
-ANTHROPIC_API_KEY=
-OPENAI_API_KEY=
-ALLOWED_EMAILS=
+SUPABASE_SERVICE_KEY=          # Sensitive
+ANTHROPIC_API_KEY=             # Sensitive
+OPENAI_API_KEY=                # Sensitive
+ALLOWED_EMAILS=                # 服务端白名单（实际安全边界）
+VITE_ALLOWED_EMAILS=           # 客户端 UX，必须与 ALLOWED_EMAILS 同值
 ```
+
+> `ALLOWED_EMAILS` 与 `VITE_ALLOWED_EMAILS` 必须同时配置且值一致。服务端变量是实际安全边界，`VITE_` 那个只控登录页 UX（会打包进 client JS）。v1.3.5 起 production 缺 `ALLOWED_EMAILS` 会 fail-closed。
 
 ## 文档
 

@@ -43,11 +43,14 @@ bun run dev:api    # API (port 3000)
 ```bash
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_KEY=
-ANTHROPIC_API_KEY=
-OPENAI_API_KEY=
-ALLOWED_EMAILS=
+SUPABASE_SERVICE_KEY=          # Sensitive
+ANTHROPIC_API_KEY=             # Sensitive
+OPENAI_API_KEY=                # Sensitive
+ALLOWED_EMAILS=                # server-side allowlist (real security boundary)
+VITE_ALLOWED_EMAILS=           # client-side UX, must match ALLOWED_EMAILS
 ```
+
+> Both `ALLOWED_EMAILS` and `VITE_ALLOWED_EMAILS` must be set to the same value. The server-side variable is the actual security boundary; the `VITE_` one only controls login-page UX (it gets bundled into the client JS). Since v1.3.5, production deployments fail-closed when `ALLOWED_EMAILS` is missing.
 
 ## Documentation
 

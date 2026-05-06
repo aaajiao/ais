@@ -87,12 +87,15 @@ docs/                   # 详细文档
 ```
 VITE_SUPABASE_URL=https://xxx.supabase.co
 VITE_SUPABASE_ANON_KEY=xxx
-SUPABASE_SERVICE_KEY=xxx
-ANTHROPIC_API_KEY=sk-ant-xxx
-OPENAI_API_KEY=sk-xxx
-ALLOWED_EMAILS=email1@example.com,email2@example.com
-CONTEXT7_API_KEY=xxx                # Context7 API（获取最新库文档）
+SUPABASE_SERVICE_KEY=xxx                          # Sensitive
+ANTHROPIC_API_KEY=sk-ant-xxx                      # Sensitive
+OPENAI_API_KEY=sk-xxx                             # Sensitive
+ALLOWED_EMAILS=email1@example.com,email2@example.com       # 服务端白名单（实际安全边界）
+VITE_ALLOWED_EMAILS=email1@example.com,email2@example.com  # 客户端 UX，必须与 ALLOWED_EMAILS 同值
+CONTEXT7_API_KEY=xxx                              # Context7 API（获取最新库文档）
 ```
+
+> **必须同时配 `ALLOWED_EMAILS` 与 `VITE_ALLOWED_EMAILS`，值一致**。前者是服务端检查（实际拦截 API 调用），后者只控登录页 UX（VITE\_ 前缀打包进 client bundle）。v1.3.5 起 production 缺 `ALLOWED_EMAILS` 会 fail-closed（API 全拒绝 + CRITICAL log），守护测试 `api/__tests__/auth.test.ts`。
 
 ## Database
 

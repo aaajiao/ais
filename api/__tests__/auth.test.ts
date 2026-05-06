@@ -164,4 +164,83 @@ describe('verifyAuth', () => {
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/Authentication failed/i);
   });
+
+  // v1.3.5 fail-closed 守护 ——
+  // 历史 bug：ALLOWED_EMAILS 不设时旧逻辑直接放行所有 Supabase 认证用户，
+  // 导致任何 Google 账号都能调 /api/chat 烧掉 Anthropic 账单。
+  describe('production fail-closed when ALLOWED_EMAILS missing (v1.3.5)', () => {
+    it('refuses auth in production when ALLOWED_EMAILS is empty', async () => {
+      process.env.VERCEL_ENV = 'production';
+      process.env.ALLOWED_EMAILS = '';
+      authState = {
+        getUser: async () => ({
+          data: { user: { id: 'u-any', email: 'any@example.com' } },
+          error: null,
+        }),
+      };
+      const result = await verifyAuth(makeRequest({ authorization: 'Bearer t' }));
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/misconfigured/i);
+      delete process.env.VERCEL_ENV;
+    });
+
+    it('refuses auth in production when ALLOWED_EMAILS is whitespace-only', async () => {
+      process.env.VERCEL_ENV = 'production';
+      process.env.ALLOWED_EMAILS = '   ,  ,';
+      authState = {
+        getUser: async () => ({
+          data: { user: { id: 'u-any', email: 'any@example.com' } },
+          error: null,
+        }),
+      };
+      const result = await verifyAuth(makeRequest({ authorization: 'Bearer t' }));
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/misconfigured/i);
+      delete process.env.VERCEL_ENV;
+    });
+
+    it('production with ALLOWED_EMAILS configured still works normally', async () => {
+      process.env.VERCEL_ENV = 'production';
+      process.env.ALLOWED_EMAILS = 'owner@example.com';
+      authState = {
+        getUser: async () => ({
+          data: { user: { id: 'u-owner', email: 'owner@example.com' } },
+          error: null,
+        }),
+      };
+      const result = await verifyAuth(makeRequest({ authorization: 'Bearer t' }));
+      expect(result.success).toBe(true);
+      expect(result.userId).toBe('u-owner');
+      delete process.env.VERCEL_ENV;
+    });
+
+    it('preview / dev environments fall through to fail-open + warn (no production gate)', async () => {
+      process.env.VERCEL_ENV = 'preview';
+      process.env.ALLOWED_EMAILS = '';
+      authState = {
+        getUser: async () => ({
+          data: { user: { id: 'u-preview', email: 'tester@example.com' } },
+          error: null,
+        }),
+      };
+      const result = await verifyAuth(makeRequest({ authorization: 'Bearer t' }));
+      expect(result.success).toBe(true);
+      expect(result.userId).toBe('u-preview');
+      delete process.env.VERCEL_ENV;
+    });
+
+    it('non-Vercel environment (no VERCEL_ENV at all) still fail-opens — local dev', async () => {
+      delete process.env.VERCEL_ENV;
+      process.env.ALLOWED_EMAILS = '';
+      authState = {
+        getUser: async () => ({
+          data: { user: { id: 'u-local', email: 'dev@example.com' } },
+          error: null,
+        }),
+      };
+      const result = await verifyAuth(makeRequest({ authorization: 'Bearer t' }));
+      expect(result.success).toBe(true);
+      expect(result.userId).toBe('u-local');
+    });
+  });
 });
