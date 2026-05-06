@@ -56,17 +56,33 @@
 
 ## 深度推理（Thinking 模式）
 
-设置页提供「深度推理」开关（设置 → AI 模型），控制 Claude / OpenAI 的扩展推理能力。**默认关闭**。
+设置页提供「深度推理」开关（设置 → AI 模型），控制 Claude 的 extended thinking。**默认关闭**。
+
+> **重要：开关只对 Anthropic / Claude 生效**。OpenAI / GPT 路径不响应这个开关，由模型自身默认行为决定 reasoning 强度。
+
+### 为什么不绑 OpenAI
+
+OpenAI 的 `reasoningEffort` 在不同 GPT 模型上 enum 不统一：
+
+| 模型 | 支持的 reasoningEffort 值 |
+|---|---|
+| `gpt-5`（base） | `none` / `minimal` / `low` / `medium` / `high` / `xhigh` |
+| `gpt-5.1+` / `gpt-5.4` | `none` / `low` / `medium` / `high`（**不再支持 `minimal`**） |
+| `gpt-5-pro` | 仅 `high`（默认且唯一） |
+| `gpt-5.1-codex-max` 之后 | 增加 `xhigh` |
+| `gpt-4` 系列 | 不支持 reasoningEffort 字段 |
+
+任何 hardcode 一个值都会在某个模型上 break（v1.2.0/v1.2.1 实证：hardcode `'minimal'` 在 gpt-5.4 抛 `Unsupported value` 错；hardcode `'high'` 在搜索类查询上引发无限循环）。Anthropic `thinking` 是统一接口，跨模型一致。
 
 ### 行为
 
 | 开关 | Claude 路径 | OpenAI 路径 |
 |------|-------------|-------------|
-| **关闭**（默认） | 不传 `thinking` 参数 → 行为零变化 | `reasoningEffort: 'minimal'`（比默认 medium 更快） |
-| **开启** | `providerOptions.anthropic.thinking = { type: 'enabled', budgetTokens: 4000 }` | `reasoningEffort: 'high'` |
-| **开启** + `THINKING_BUDGET=adaptive` | `providerOptions.anthropic.thinking = { type: 'adaptive', display: 'summarized' }` —— Claude 自决 thinking 长度（@ai-sdk/anthropic v3.0.74 GA） | 同上（`reasoningEffort: 'high'`，OpenAI 不支持 adaptive） |
+| **关闭**（默认） | 不传 `thinking` 参数 → 行为零变化 | 不传 `reasoningEffort` → 走模型默认 |
+| **开启** | `providerOptions.anthropic.thinking = { type: 'enabled', budgetTokens: 4000 }` | 同关闭——不响应此开关 |
+| **开启** + `THINKING_BUDGET=adaptive` | `providerOptions.anthropic.thinking = { type: 'adaptive', display: 'summarized' }` —— Claude 自决 thinking 长度（@ai-sdk/anthropic v3.0.74 GA） | 同上 |
 
-### 何时开启
+### 何时开启（仅当用 Claude）
 
 - 趋势分析（"过去三年最贵的几件作品有什么共同点？"）
 - 定价建议（"基于历史成交，这个版本应该定价多少？"）
@@ -76,6 +92,7 @@
 
 - 单步查询（"列出 AP 版本"、"统计在库数量"）—— 关闭更快更省 token
 - 简单更新确认
+- 用 GPT 时—— 开关对 GPT 无影响，但保持习惯关闭即可
 
 ### 后端环境变量
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { stepCountIs, hasToolCall } from 'ai';
-import { buildProviderOptions, buildSystemMessage, buildStopConditions } from './chat.js';
+import { buildProviderOptions, buildSystemMessage, buildStopConditions } from '../chat';
 
 describe('buildProviderOptions', () => {
   const originalBudget = process.env.THINKING_BUDGET;
@@ -18,19 +18,18 @@ describe('buildProviderOptions', () => {
   });
 
   describe('thinkingEnabled = false (default / regression guard)', () => {
-    it('does NOT include anthropic.* on the streamText top-level providerOptions → Claude 路径行为零变化', () => {
+    it('returns empty object → 两家都走默认行为，零行为变化', () => {
       const opts = buildProviderOptions(false);
-      // 关键回归断言：streamText 顶层 providerOptions 中 anthropic 键必须缺席。
+      // 关键回归断言：thinking off 时不传任何 providerOptions。
+      // - Anthropic 不传 thinking → 模型行为不变
+      // - OpenAI 不传 reasoningEffort → 避免 GPT-5.4 等模型对 'minimal' 报错
+      //   （'minimal' 在 gpt-5.1+ 已移除，仅 base gpt-5 支持；不同 GPT 模型 enum 不统一）
       // cacheControl / contextManagement 等 Anthropic-only 字段在别处注入：
       //   - cacheControl 在 system message 的 providerOptions 里（buildSystemMessage）
       //   - contextManagement 在 chat handler 里按 provider 分支注入
-      // 所以 buildProviderOptions(false) 的输出本身仍应只含 openai 路径。
+      expect(opts).toEqual({});
       expect(opts).not.toHaveProperty('anthropic');
-    });
-
-    it('uses minimal reasoningEffort for OpenAI (faster than default medium)', () => {
-      const opts = buildProviderOptions(false);
-      expect(opts.openai).toEqual({ reasoningEffort: 'minimal' });
+      expect(opts).not.toHaveProperty('openai');
     });
   });
 
@@ -42,9 +41,9 @@ describe('buildProviderOptions', () => {
       });
     });
 
-    it('uses high reasoningEffort for OpenAI', () => {
+    it('does NOT inject openai field → thinking 开关只对 Anthropic 生效（避免 GPT 跨模型 enum 不一致 + 高 reasoning 引发的搜索循环）', () => {
       const opts = buildProviderOptions(true);
-      expect(opts.openai).toEqual({ reasoningEffort: 'high' });
+      expect(opts).not.toHaveProperty('openai');
     });
 
     it('respects THINKING_BUDGET env override', () => {

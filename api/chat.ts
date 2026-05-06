@@ -19,22 +19,24 @@ type StreamTextProviderOptions = ProviderOptions;
 /**
  * 构造 streamText 的 providerOptions（顶层）。
  *
- * thinking off：
- *   - anthropic 键必须缺席 → Claude 路径模型行为零变化（回归测试见 api/chat.test.ts）
- *   - openai 走 minimal reasoningEffort
+ * 设计取向：thinking 开关只对 Anthropic 生效。
+ *   - Anthropic thinking 和 OpenAI reasoningEffort 虽然都是「让模型多想」，
+ *     但底层机制差异大，强行绑同一个开关会引入：
+ *       1. GPT-5.4 不接受 'minimal'，旧模型不支持 reasoningEffort 字段
+ *       2. high reasoning + 搜索类查询有循环风险（生产观察到无限搜索）
+ *   - 改为：thinking off → 两家都走默认；thinking on → 仅 Anthropic 走 thinking
+ *   - OpenAI 路径不被 thinking 开关影响，由模型自身默认行为决定
+ *
  * thinking on：
  *   - THINKING_BUDGET=adaptive → { type: 'adaptive', display: 'summarized' }（Anthropic v3.0.74 GA）
  *   - 其他值（数字 / 缺省）→ { type: 'enabled', budgetTokens: number || 4000 }
- *   - openai 走 high reasoningEffort
  *
  * 注：cacheControl 不在这里，而是放在 system message 的 providerOptions 里
  *     （见 buildSystemMessage），这样不影响 OpenAI 路径请求体。
  */
 export function buildProviderOptions(thinkingEnabled: boolean): StreamTextProviderOptions {
   if (!thinkingEnabled) {
-    return {
-      openai: { reasoningEffort: 'minimal' },
-    };
+    return {};
   }
 
   const rawBudget = process.env.THINKING_BUDGET;
@@ -45,7 +47,6 @@ export function buildProviderOptions(thinkingEnabled: boolean): StreamTextProvid
 
   return {
     anthropic: { thinking },
-    openai: { reasoningEffort: 'high' },
   };
 }
 

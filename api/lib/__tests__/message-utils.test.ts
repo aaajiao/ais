@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { UIMessage } from 'ai';
-import { prepareMessagesForModel, estimateTokens } from './message-utils';
+import { prepareMessagesForModel, estimateTokens } from '../message-utils';
 
 /**
  * 守护测试（P1-1）：

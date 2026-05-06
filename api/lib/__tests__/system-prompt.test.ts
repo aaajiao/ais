@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getSystemPrompt } from './system-prompt';
+import { getSystemPrompt } from '../system-prompt';
 
 /**
  * 守护测试：保护 commit 2c5a016（GPT 工具调用修复）引入的「工具调用强制路由」段。
