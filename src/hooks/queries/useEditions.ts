@@ -9,6 +9,17 @@ import {
 } from '@/lib/paginationUtils';
 import type { Database, EditionStatus } from '@/lib/database.types';
 
+// Escape ILIKE wildcards (\, %, _) and PostgREST .or() value separators.
+// Quotes/commas/parens get stripped because the .or() filter syntax can't
+// disambiguate them from the grammar even when wrapped in double quotes.
+function sanitizeIlikeForOr(s: string): string {
+  return s
+    .replace(/\\/g, '\\\\')
+    .replace(/%/g, '\\%')
+    .replace(/_/g, '\\_')
+    .replace(/[",()]/g, ' ');
+}
+
 type Artwork = Database['public']['Tables']['artworks']['Row'];
 type Edition = Database['public']['Tables']['editions']['Row'];
 type Location = Database['public']['Tables']['locations']['Row'];
@@ -57,6 +68,49 @@ export async function fetchEditionsPaginated(params: {
     query = query.eq('status', filters.status);
   }
 
+  // Apply search filter (server-side, OR across edition columns + matched artwork/location ids).
+  // Pre-fetch artwork and location ids in parallel so the main query can filter by `.in(...)`.
+  const search = filters.search?.trim();
+  if (search) {
+    const sanitized = sanitizeIlikeForOr(search);
+    const pattern = `%${sanitized}%`;
+
+    const [artworkMatchesRes, locationMatchesRes] = await Promise.all([
+      supabase
+        .from('artworks')
+        .select('id')
+        .is('deleted_at', null)
+        .or(`title_en.ilike.${pattern},title_cn.ilike.${pattern}`),
+      supabase
+        .from('locations')
+        .select('id')
+        .ilike('name', pattern),
+    ]);
+
+    const artworkIds = ((artworkMatchesRes.data ?? []) as Array<{ id: string }>).map(
+      (a) => a.id
+    );
+    const locationIds = ((locationMatchesRes.data ?? []) as Array<{ id: string }>).map(
+      (l) => l.id
+    );
+
+    const orParts = [
+      `buyer_name.ilike.${pattern}`,
+      `notes.ilike.${pattern}`,
+      `condition_notes.ilike.${pattern}`,
+      `storage_detail.ilike.${pattern}`,
+      `certificate_number.ilike.${pattern}`,
+      `inventory_number.ilike.${pattern}`,
+    ];
+    if (artworkIds.length > 0) {
+      orParts.push(`artwork_id.in.(${artworkIds.join(',')})`);
+    }
+    if (locationIds.length > 0) {
+      orParts.push(`location_id.in.(${locationIds.join(',')})`);
+    }
+    query = query.or(orParts.join(','));
+  }
+
   // Apply cursor pagination
   if (cursor) {
     query = query.or(
@@ -81,22 +135,11 @@ export async function fetchEditionsPaginated(params: {
   // Process only pageSize items
   const dataToProcess = rawData.slice(0, pageSize);
 
-  // Filter out editions with soft-deleted artworks and apply search filter client-side
-  let filteredData = dataToProcess.filter(
+  // Filter out editions with soft-deleted artworks. The search filter is now
+  // applied server-side via .or() above (see fetchEditionsPaginated body).
+  const filteredData = dataToProcess.filter(
     (edition) => !edition.artwork || edition.artwork.deleted_at === null
   );
-
-  // Apply search filter (client-side for better UX)
-  if (filters.search?.trim()) {
-    const searchLower = filters.search.toLowerCase();
-    filteredData = filteredData.filter(
-      (edition) =>
-        edition.artwork?.title_en?.toLowerCase().includes(searchLower) ||
-        edition.artwork?.title_cn?.toLowerCase().includes(searchLower) ||
-        edition.inventory_number?.toLowerCase().includes(searchLower) ||
-        edition.location?.name?.toLowerCase().includes(searchLower)
-    );
-  }
 
   // Clean up artwork data (remove deleted_at from response)
   const cleanedItems: EditionWithDetails[] = filteredData.map((item) => ({

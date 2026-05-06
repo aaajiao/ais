@@ -132,7 +132,7 @@ export const EditionInfoCard = memo(function EditionInfoCard({
                         </p>
                       )}
                       {edition.location.notes && (
-                        <p>
+                        <p className="whitespace-pre-wrap">
                           <span className="text-muted-foreground">
                             {t('info.locationNotes')}
                           </span>
@@ -235,7 +235,7 @@ export const EditionInfoCard = memo(function EditionInfoCard({
 
             {/* Storage detail */}
             {edition.storage_detail && (
-              <p>
+              <p className="whitespace-pre-wrap">
                 <span className="text-muted-foreground">
                   {t('info.storageDetail')}
                 </span>
@@ -255,7 +255,7 @@ export const EditionInfoCard = memo(function EditionInfoCard({
 
             {/* Condition notes */}
             {edition.condition_notes && (
-              <p>
+              <p className="whitespace-pre-wrap">
                 <span className="text-muted-foreground">
                   {t('info.conditionNotes')}
                 </span>
@@ -268,7 +268,7 @@ export const EditionInfoCard = memo(function EditionInfoCard({
           {edition.notes && (
             <div className="mt-4 p-3 bg-muted rounded-lg text-sm">
               <p className="text-muted-foreground mb-1">{t('info.notes')}</p>
-              <p>{edition.notes}</p>
+              <p className="whitespace-pre-wrap">{edition.notes}</p>
             </div>
           )}
         </div>

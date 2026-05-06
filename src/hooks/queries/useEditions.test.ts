@@ -16,6 +16,11 @@ let nextResponse: { data: unknown; error: unknown; count?: number | null } = {
   error: null,
   count: null,
 };
+const responseQueue: Array<{
+  data: unknown;
+  error: unknown;
+  count?: number | null;
+}> = [];
 
 function setNextResponse(response: {
   data?: unknown;
@@ -29,6 +34,23 @@ function setNextResponse(response: {
   };
 }
 
+function setResponseQueue(
+  responses: Array<{ data?: unknown; error?: unknown; count?: number | null }>
+) {
+  responseQueue.length = 0;
+  for (const r of responses) {
+    responseQueue.push({
+      data: r.data ?? null,
+      error: r.error ?? null,
+      count: r.count ?? null,
+    });
+  }
+}
+
+function takeResponse() {
+  return responseQueue.length > 0 ? responseQueue.shift()! : nextResponse;
+}
+
 const TERMINAL_METHODS = new Set(['single', 'maybeSingle', 'csv']);
 
 function createBuilder(state: BuilderState): unknown {
@@ -39,10 +61,11 @@ function createBuilder(state: BuilderState): unknown {
           onFulfilled: (value: unknown) => unknown,
           onRejected?: (reason: unknown) => unknown
         ) => {
+          const resp = takeResponse();
           const result = {
-            data: nextResponse.data,
-            error: nextResponse.error,
-            count: nextResponse.count,
+            data: resp.data,
+            error: resp.error,
+            count: resp.count,
           };
           try {
             return Promise.resolve(onFulfilled(result));
@@ -56,12 +79,13 @@ function createBuilder(state: BuilderState): unknown {
       return (...args: unknown[]) => {
         state.calls.push({ method: prop, args });
         if (TERMINAL_METHODS.has(prop)) {
-          const data = Array.isArray(nextResponse.data)
-            ? nextResponse.data[0] ?? null
-            : nextResponse.data;
+          const resp = takeResponse();
+          const data = Array.isArray(resp.data)
+            ? resp.data[0] ?? null
+            : resp.data;
           return Promise.resolve({
             data,
-            error: nextResponse.error,
+            error: resp.error,
           });
         }
         return proxy;
@@ -145,6 +169,7 @@ function lastBuilder(): BuilderState {
 
 beforeEach(() => {
   builderRegistry.length = 0;
+  responseQueue.length = 0;
   fromMock.mockClear();
   setNextResponse({ data: [], error: null, count: null });
 });
@@ -235,30 +260,91 @@ describe('fetchEditionsPaginated', () => {
     expect(eqStatus).toBeUndefined();
   });
 
-  it('search 过滤匹配 inventory_number/title/location.name (客户端)', async () => {
-    setNextResponse({
-      data: [
-        baseEditionRow,
-        {
-          ...baseEditionRow,
-          id: 'e2',
-          inventory_number: 'XYZ-2024-001',
-          artwork: {
-            ...baseEditionRow.artwork,
-            title_en: 'Different',
-            title_cn: '不同',
-          },
-        },
-      ],
-    });
+  it('无 search 时不预查 artworks/locations', async () => {
+    setNextResponse({ data: [baseEditionRow] });
+    await fetchEditionsPaginated({ pageParam: null });
+    expect(builderRegistry.map((b) => b.table)).toEqual(['editions']);
+  });
+
+  it('search 时构造跨字段 OR 查询 + 跨表 ids（artwork/location 预查）', async () => {
+    // 三次查询顺序：editions builder 先建（registry[0]），prefetch artworks（registry[1]）/locations（registry[2]）
+    // 而 .then 解析顺序是 prefetch 先消费、editions 后消费 — 所以 queue 顺序：artworks → locations → editions
+    setResponseQueue([
+      { data: [{ id: 'a1' }, { id: 'a2' }] },
+      { data: [{ id: 'l1' }] },
+      { data: [baseEditionRow] },
+    ]);
 
     const result = await fetchEditionsPaginated({
       pageParam: null,
       filters: { search: 'xyz' },
     });
 
+    expect(builderRegistry.map((b) => b.table)).toEqual([
+      'editions',
+      'artworks',
+      'locations',
+    ]);
+
+    const editionsBuilder = builderRegistry[0];
+    const orCall = editionsBuilder.calls.find(
+      (c) => c.method === 'or' && String(c.args[0]).includes('buyer_name')
+    );
+    expect(orCall).toBeDefined();
+    const orStr = String(orCall?.args[0]);
+    expect(orStr).toContain('buyer_name.ilike.%xyz%');
+    expect(orStr).toContain('notes.ilike.%xyz%');
+    expect(orStr).toContain('condition_notes.ilike.%xyz%');
+    expect(orStr).toContain('storage_detail.ilike.%xyz%');
+    expect(orStr).toContain('certificate_number.ilike.%xyz%');
+    expect(orStr).toContain('inventory_number.ilike.%xyz%');
+    expect(orStr).toContain('artwork_id.in.(a1,a2)');
+    expect(orStr).toContain('location_id.in.(l1)');
+
     expect(result.data).toHaveLength(1);
-    expect(result.data[0].id).toBe('e2');
+  });
+
+  it('search 命中 artwork/location 为空时仍走纯 editions 列 OR 查询', async () => {
+    setResponseQueue([
+      { data: [] }, // artworks: 无命中
+      { data: [] }, // locations: 无命中
+      { data: [baseEditionRow] },
+    ]);
+
+    await fetchEditionsPaginated({
+      pageParam: null,
+      filters: { search: 'collector-name' },
+    });
+
+    const editionsBuilder = builderRegistry[0];
+    const orCall = editionsBuilder.calls.find(
+      (c) => c.method === 'or' && String(c.args[0]).includes('buyer_name')
+    );
+    const orStr = String(orCall?.args[0]);
+    expect(orStr).toContain('buyer_name.ilike.%collector-name%');
+    expect(orStr).not.toContain('artwork_id.in.');
+    expect(orStr).not.toContain('location_id.in.');
+  });
+
+  it('search 中的 LIKE 通配符 (%/_) 与 .or 分隔符 (",()) 被转义', async () => {
+    setResponseQueue([{ data: [] }, { data: [] }, { data: [] }]);
+
+    await fetchEditionsPaginated({
+      pageParam: null,
+      filters: { search: '50%_off,"x"(y)' },
+    });
+
+    const editionsBuilder = builderRegistry[0];
+    const orCall = editionsBuilder.calls.find(
+      (c) => c.method === 'or' && String(c.args[0]).includes('buyer_name')
+    );
+    const orStr = String(orCall?.args[0]);
+    // LIKE 通配符转义
+    expect(orStr).toContain('\\%');
+    expect(orStr).toContain('\\_');
+    // PostgREST .or 分隔符替换为空格
+    expect(orStr).not.toContain('"');
+    expect(orStr).not.toMatch(/[(][a-z]/); // (y) 已替换 — 仅 in.( 保留
   });
 
   it('hasMore=true 当返回多于 pageSize', async () => {
