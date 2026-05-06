@@ -45,6 +45,15 @@ const messages: Record<string, Record<Locale, string>> = {
     zh: '找到 {count} 个符合条件的版本：',
     en: 'Found {count} matching editions:',
   },
+  // 三段式 hint（v1.2.4 新增，详见 search-editions.ts 注释）
+  'editions.noLocationMatch': {
+    zh: '未找到匹配「{location}」的位置（数据库中没有该名称的画廊/美术馆/城市/国家）',
+    en: 'No location matched "{location}" (no gallery, museum, city, or country with that name)',
+  },
+  'editions.locationNoEditions': {
+    zh: '找到 {count} 个匹配「{location}」的位置（{names}），但当前没有版本关联到这些位置',
+    en: 'Found {count} location(s) matching "{location}" ({names}), but no editions are currently associated with them',
+  },
 
   // === search-locations ===
   'locations.noMatch': {
@@ -192,7 +201,7 @@ export function createT(locale: Locale = 'zh') {
 
     if (params) {
       for (const [k, v] of Object.entries(params)) {
-        text = text.replaceAll(`{${k}}`, String(v));
+        text = text.split(`{${k}}`).join(String(v));
       }
     }
 

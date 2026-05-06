@@ -14,7 +14,7 @@ export function createSearchLocationsTool(ctx: ToolContext) {
 USE THIS WHEN the user asks ABOUT a location itself — e.g. "列出所有画廊", "我有哪些美术馆合作", "找北京的所有位置", "show me all galleries in Germany". The result is a list of locations, not editions.
 DO NOT use this when the user wants to filter EDITIONS by where they are (e.g. "什么作品在 London", "Pace Gallery 有哪些版本", "在德国的版本") — for those queries use \`search_editions\` with the \`location\` parameter, which returns editions filtered by their current location.`,
     inputSchema: z.object({
-      query: z.string().optional().describe('搜索关键词（名称或城市）'),
+      query: z.string().optional().describe('搜索关键词（匹配名称、城市、国家）'),
       type: z.enum(['studio', 'gallery', 'museum', 'other']).optional().describe('位置类型'),
       country: z.string().optional().describe('国家'),
     }),
@@ -25,7 +25,10 @@ DO NOT use this when the user wants to filter EDITIONS by where they are (e.g. "
 
       if (query) {
         const sanitized = sanitizeSearchTerm(query);
-        queryBuilder = queryBuilder.or(`name.ilike.%${sanitized}%,city.ilike.%${sanitized}%`);
+        // v1.2.4: description 一直声称支持 country，但实现只查 name+city —— 现在统一。
+        queryBuilder = queryBuilder.or(
+          `name.ilike.%${sanitized}%,city.ilike.%${sanitized}%,country.ilike.%${sanitized}%`
+        );
       }
       if (type) {
         queryBuilder = queryBuilder.eq('type', type);

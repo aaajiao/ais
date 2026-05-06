@@ -61,19 +61,28 @@ Examples: "什么作品在 london" → location:"London"; "Pace Gallery 有哪�
       }
 
       // 预查询位置 ID（按名称、城市、国家匹配）
+      // 三段式 hint（v1.2.4 改动）：让模型能区分"地点完全没匹配"和"地点匹配但没 edition 关联"
+      // 这两种语义对用户的回答完全不同 ——
+      //   no_location_match    → "不存在该地点"
+      //   location_no_editions → "存在地点 X，但当前没有 edition 在那里"
+      //   has_editions         → 正常返回 editions
       let locationIds: string[] = [];
+      let matchedLocations: Array<{ id: string; name: string | null; city: string | null }> = [];
       if (location) {
         const sanitized = sanitizeSearchTerm(location);
         const { data: locations } = await supabase
           .from('locations')
-          .select('id')
+          .select('id, name, city')
           .eq('user_id', ctx.userId)
           .or(`name.ilike.%${sanitized}%,city.ilike.%${sanitized}%,country.ilike.%${sanitized}%`);
-        locationIds = locations?.map(l => l.id) || [];
+        matchedLocations = (locations as typeof matchedLocations) || [];
+        locationIds = matchedLocations.map(l => l.id);
         if (locationIds.length === 0) {
           return {
             editions: [],
-            message: t('editions.noResultsWithTerms', { terms: location })
+            hint: 'no_location_match' as const,
+            location,
+            message: t('editions.noResultsWithTerms', { terms: location }),
           };
         }
       }
@@ -139,6 +148,19 @@ Examples: "什么作品在 london" → location:"London"; "Pace Gallery 有哪�
 
       if (editions.length === 0) {
         const searchTerms = [artwork_title, status, location].filter(Boolean).join('、');
+        // 当只是按 location 过滤而没有 edition，返回 location_no_editions hint
+        // ——告诉模型"地点找到了，但没 edition 关联到那里"
+        if (location && matchedLocations.length > 0) {
+          return {
+            editions: [],
+            hint: 'location_no_editions' as const,
+            location,
+            matched_locations: matchedLocations,
+            message: searchTerms
+              ? t('editions.noResultsWithTerms', { terms: searchTerms })
+              : t('editions.noResultsEmpty'),
+          };
+        }
         return {
           editions: [],
           message: searchTerms
@@ -147,11 +169,18 @@ Examples: "什么作品在 london" → location:"London"; "Pace Gallery 有哪�
         };
       }
 
-      return { editions };
+      return location ? { editions, hint: 'has_editions' as const } : { editions };
     },
     // 控制返回给模型的内容：包含 ID 和关键标识字段，以便后续工具调用
     toModelOutput({ output }) {
-      const result = output as { editions?: Array<Record<string, unknown>>; message?: string; error?: string };
+      const result = output as {
+        editions?: Array<Record<string, unknown>>;
+        message?: string;
+        error?: string;
+        hint?: 'no_location_match' | 'location_no_editions' | 'has_editions';
+        location?: string;
+        matched_locations?: Array<{ id: string; name: string | null; city: string | null }>;
+      };
 
       if (result.error) {
         return {
@@ -161,9 +190,29 @@ Examples: "什么作品在 london" → location:"London"; "Pace Gallery 有哪�
       }
 
       if (!result.editions || result.editions.length === 0) {
+        // 三段式 hint 对应不同的模型可见文本
+        // 'no_location_match' → 明确告诉模型该地点不存在
+        // 'location_no_editions' → 告诉模型地点存在但没 edition 关联（带匹配到的位置名）
+        // 其他空结果 → 沿用 result.message
+        let text: string;
+        if (result.hint === 'no_location_match' && result.location) {
+          text = t('editions.noLocationMatch', { location: result.location });
+        } else if (result.hint === 'location_no_editions' && result.location) {
+          const names = (result.matched_locations || [])
+            .map(l => l.name || l.city)
+            .filter(Boolean)
+            .join('、');
+          text = t('editions.locationNoEditions', {
+            location: result.location,
+            count: result.matched_locations?.length ?? 0,
+            names: names || '-',
+          });
+        } else {
+          text = result.message || t('editions.noMatch');
+        }
         return {
           type: 'content' as const,
-          value: [{ type: 'text' as const, text: result.message || t('editions.noMatch') }],
+          value: [{ type: 'text' as const, text }],
         };
       }
 

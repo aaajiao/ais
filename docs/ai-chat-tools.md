@@ -1,6 +1,6 @@
 # AI 聊天工具
 
-聊天界面 (`/chat`) 提供自然语言访问系统功能，系统提示词使用中文。
+聊天界面 (`/chat`) 提供自然语言访问系统功能。**自 v1.2.4 起按 provider 维护两份 system prompt**：Claude 路径用中文 imperative 风格，GPT 路径用英文 + tool preambles few-shot 示例（详见 [Per-Provider System Prompt](#per-provider-system-prompt)）。
 
 ---
 
@@ -148,6 +148,113 @@ streamText 的 `stopWhen` 同时启用两种条件（满足任一即停步）：
 **为什么要 hasToolCall？** 仅靠 `stepCountIs(8)` 时，模型可能在生成确认卡片后还想继续多调一次工具，浪费一步并增加延迟。`hasToolCall` 让模型生成更新确认卡片即停步。
 
 `api/chat.ts:buildStopConditions()` 返回 `[stepCountIs(8), hasToolCall('generate_update_confirmation')]`。
+
+---
+
+## Per-Provider System Prompt
+
+**自 v1.2.4 起**，system prompt 按 provider 拆分维护（v1.2.0–v1.2.3 4 次 hotfix 都未能解决"GPT 不直接调 search_editions(location='London')"问题，根因是 GPT-5 对中文 imperative 列表的服从性远低于 Claude）。
+
+| Provider | 函数 | 风格 |
+|---|---|---|
+| `anthropic` | `getSystemPromptForAnthropic(artistName?)` | 中文 imperative + 工具调用强制路由（v1.2.3 字节级保留） |
+| `openai`    | `getSystemPromptForOpenAI(artistName?)`    | 英文 + condition→action 表 + tool preambles few-shot 示例 |
+
+入口：`getSystemPromptByProvider(provider, artistName)` —— `provider` 由 `getProviderName(modelId)` 推断。旧 `getSystemPrompt(...)` 保留作为向后兼容（默认走 anthropic）。
+
+### 为什么 GPT 路径用 tool preambles
+
+OpenAI cookbook 推荐 GPT-5 用 **few-shot 工具调用示例**引导多步决策。OpenAI 路径 prompt 内含 5 个 thought + tool call 示例，最关键的一条是：
+
+```
+Example 1 — place query (THE most common GPT-5 failure mode):
+  User: 在 london 画廊有哪些作品
+  Thought: User mentioned "london". Per the routing table, call search_editions
+  with location="London" directly. Do NOT call search_locations first.
+  Action: search_editions({ location: "London" })
+```
+
+外加显式负例指令：
+
+```
+CRITICAL: When the user mentions a place, USE search_editions DIRECTLY.
+DO NOT call search_locations first to find the location's exact name —
+search_editions internally matches by name, city, AND country.
+```
+
+### 维护规则
+
+- **新增工具或新业务规则时，两份 prompt 必须同步更新** —— 否则两个路径行为漂移。
+- 关键业务规则（status 列表 + emoji、确认卡片要求、不支持的操作）应保持语义一致。
+- `api/lib/__tests__/system-prompt.test.ts` 守护两份 prompt 的关键关键词，新增规则时也要扩展该测试。
+- `api/__tests__/chat-integration.test.ts` 守护两份 prompt 的契约（共享业务规则、独有差异点），是更高层的回归网。
+
+### 关键文件
+
+- `api/lib/system-prompt.ts` —— 三个导出：`getSystemPrompt` / `getSystemPromptForAnthropic` / `getSystemPromptForOpenAI` / `getSystemPromptByProvider`
+- `api/chat.ts:182` —— `system: buildSystemMessage(getSystemPromptByProvider(provider, artistName), provider)`
+
+---
+
+## Step Logging（onStepFinish 可观测性）
+
+**自 v1.2.4 起**，`streamText` 接 `onStepFinish` 回调，每个 step（一次 LLM 调用，可能含若干工具调用）完成时输出一条结构化 log，让"GPT 实际调了什么工具传了什么参数"肉眼可见。
+
+### Log 内容
+
+每条 `[chat] step` log 包含：
+
+| 字段 | 说明 |
+|---|---|
+| `userId` | 当前用户 |
+| `modelId` | 配置的模型（如 `gpt-5.4`） |
+| `stepNumber` | 0-based step 序号 |
+| `stepProvider` / `stepModelId` | 实际处理 step 的 provider / 模型 ID |
+| `toolCalls` | `[{ name, input }]`，input 截断到 200 字符 |
+| `toolResults` | `[{ name, output }]`，output 截断到 200 字符 |
+| `finishReason` | `'tool-calls'` / `'stop'` / `'length'` 等 |
+| `usage` | 该 step 的 token 用量 |
+
+截断到 200 字符是经验值：足以看清关键参数（`location='London'`、`status='sold'`），同时一个 step 即便有 4-5 个工具调用也不会爆掉单条 log。
+
+### 关键设计：fire-and-forget
+
+`onStepFinish` 必须**绝不抛错**且**不能 await**：
+
+- 内部 `try/catch` 吞掉序列化异常
+- 外层 `try/catch` 再防御一层
+- 全部 sync —— 不要在回调里做 await（会拖慢流式响应）
+
+如果未来切换到 OTel exporter，只改 `logStepForObservability` 一处即可。
+
+### `onError` 增强
+
+同时把 `onError` 升级为结构化日志，输出 `name / kind / toolName / message / stack(头 400 字)`，便于区分 tool error vs stream error。
+
+### 关键文件
+
+- `api/chat.ts` —— `buildStepLogPayload` / `truncateForLog` / `logStepForObservability`
+- `api/__tests__/chat-integration.test.ts` —— payload 结构 / 截断行为单测
+
+---
+
+## search_editions 三段式 location hint
+
+**自 v1.2.4 起**，`search_editions` 当传 `location` 参数时返回带 `hint` 字段的结构，区分三种语义（让模型能给出语义正确的回答而不是泛化的"找不到"）：
+
+| hint | 含义 | 模型可见文本 |
+|---|---|---|
+| `no_location_match` | 数据库里完全没有匹配该字符串的位置 | "未找到匹配 'X' 的位置" |
+| `location_no_editions` | 位置匹配到了，但没 edition 关联到这些位置 | "找到 N 个匹配 'X' 的位置（位置名列表），但当前没有版本关联到这些位置" |
+| `has_editions` | 正常返回 editions（与 v1.2.3 一致） | 原 summary 格式 |
+
+注意：`has_editions` 的 `toModelOutput` 文本与 v1.2.3 字节级一致 —— Sonnet 现有 happy path 行为零变化。
+
+### 关键文件
+
+- `api/tools/search-editions.ts` —— hint 三段式逻辑 + toModelOutput 分支
+- `api/lib/i18n.ts` —— `editions.noLocationMatch` / `editions.locationNoEditions`
+- `api/tools/__tests__/search-editions.test.ts` —— 三段式守护测试
 
 ---
 

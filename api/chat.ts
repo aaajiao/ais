@@ -2,7 +2,7 @@ import { streamText, stepCountIs, hasToolCall, type UIMessage } from 'ai';
 import type { ProviderOptions, SystemModelMessage } from '@ai-sdk/provider-utils';
 import { verifyAuth, unauthorizedResponse } from './lib/auth.js';
 import { getModel, getSupabase, getProviderName, getOpenAIReasoningEffort } from './lib/model-provider.js';
-import { getSystemPrompt } from './lib/system-prompt.js';
+import { getSystemPromptByProvider } from './lib/system-prompt.js';
 import { createTools } from './tools/index.js';
 import { prepareMessagesForModel } from './lib/message-utils.js';
 
@@ -105,6 +105,81 @@ export function buildStopConditions() {
   return [stepCountIs(8), hasToolCall('generate_update_confirmation')];
 }
 
+/**
+ * 截断字符串（用于 step log 的 input/output payload，避免 Vercel logs 爆炸）。
+ * 200 字符是经验值：足以看清工具调用的关键参数（location='London'、status='sold'），
+ * 同时一个 step 即便有 4-5 个工具调用也不会超过单条 log 的合理上限。
+ */
+export function truncateForLog(value: unknown, max = 200): string {
+  let s: string;
+  try {
+    s = typeof value === 'string' ? value : JSON.stringify(value);
+  } catch {
+    s = '[unserializable]';
+  }
+  if (s == null) return '';
+  return s.length > max ? `${s.slice(0, max)}…(+${s.length - max})` : s;
+}
+
+/**
+ * 把单个 step 的工具调用决策序列化成一条 log 行。导出供测试断言。
+ * 关键字段：stepNumber / model / toolCalls(name+input) / toolResults(name+output)
+ *           / finishReason / usage。
+ *
+ * 设计动机：v1.2.0–v1.2.3 4 次 hotfix 都打偏，根因之一是 onStepFinish / telemetry
+ * 完全没接，无法看到 GPT 实际调了哪些工具传了什么参数。这条 log 让"GPT 没调
+ * search_editions(location='London') 反而调 search_locations"这类问题肉眼可见。
+ */
+export function buildStepLogPayload(
+  step: {
+    stepNumber?: number;
+    model?: { provider?: string; modelId?: string };
+    toolCalls?: ReadonlyArray<{ toolName: string; input?: unknown }>;
+    toolResults?: ReadonlyArray<{ toolName: string; output?: unknown }>;
+    finishReason?: string;
+    usage?: unknown;
+  },
+  userId: string,
+  modelId: string
+): Record<string, unknown> {
+  return {
+    userId,
+    modelId,
+    stepNumber: step.stepNumber,
+    stepProvider: step.model?.provider,
+    stepModelId: step.model?.modelId,
+    toolCalls: (step.toolCalls || []).map((c) => ({
+      name: c.toolName,
+      input: truncateForLog(c.input),
+    })),
+    toolResults: (step.toolResults || []).map((r) => ({
+      name: r.toolName,
+      output: truncateForLog(r.output),
+    })),
+    finishReason: step.finishReason,
+    usage: step.usage,
+  };
+}
+
+/**
+ * Fire-and-forget step logger。绝不抛错（外层 try/catch + 内部 try/catch 双保险）。
+ *
+ * 不导出 console 副作用以外的东西：未来若需切换到 OTel exporter，只改这一处。
+ */
+function logStepForObservability(
+  step: Parameters<typeof buildStepLogPayload>[0],
+  userId: string,
+  modelId: string
+): void {
+  try {
+    const payload = buildStepLogPayload(step, userId, modelId);
+    console.log('[chat] step', payload);
+  } catch (err) {
+    // 即便序列化失败也不能 throw —— 上游回调声明为 sync void
+    console.error('[chat] buildStepLogPayload threw:', err);
+  }
+}
+
 export default async function handler(req: Request) {
   if (req.method !== 'POST') {
     return new Response('Method not allowed', { status: 405 });
@@ -179,14 +254,38 @@ export default async function handler(req: Request) {
     // 6. 流式对话
     const result = streamText({
       model: selectedModel,
-      system: buildSystemMessage(getSystemPrompt(artistName), provider),
+      system: buildSystemMessage(getSystemPromptByProvider(provider, artistName), provider),
       messages: modelMessages,
       tools,
       stopWhen: buildStopConditions(),
       providerOptions,
+      // 每个 step（一次 LLM 调用）完成时记录工具调用决策。
+      // 用途：观察 GPT/Claude 在 search_editions(location='London') 这类路由上的实际行为。
+      // 关键约束：必须 fire-and-forget + try/catch 吞错。绝不能让 logger 异常中断流。
+      onStepFinish(step) {
+        try {
+          logStepForObservability(step, auth.userId!, model);
+        } catch (err) {
+          // 日志兜底失败也不能影响流。这里再 catch 一层防御。
+          console.error('[chat] onStepFinish logger threw:', err);
+        }
+      },
       onError({ error }) {
-        // 记录流式错误（不中断流）
-        console.error('[chat] Stream error:', error);
+        // 记录流式错误（不中断流）—— 增强：分离 toolName / kind，便于 v1.2.x GPT 排查
+        const e = error as {
+          toolName?: string;
+          message?: string;
+          name?: string;
+          kind?: string;
+          stack?: string;
+        };
+        console.error('[chat] Stream error:', {
+          name: e?.name,
+          kind: e?.kind,
+          toolName: e?.toolName,
+          message: e?.message,
+          stack: typeof e?.stack === 'string' ? e.stack.slice(0, 400) : undefined,
+        });
       },
     });
 
