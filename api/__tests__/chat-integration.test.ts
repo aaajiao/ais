@@ -89,9 +89,25 @@ describe('chat integration — per-provider system prompt contract (v1.2.4)', ()
       // Prompt-level fix: tell GPT explicitly that null = unset.
       expect(prompt).toMatch(/Pass\s+`?null`?/);
       expect(prompt).toMatch(/DO NOT use empty string|DO NOT use\s+`?""`?|DO NOT use\s+`?0`?/);
-      // The reverse example must show what NOT to do (default-padded call)
+      // The search reverse example must show what NOT to do (default-padded call)
       expect(prompt).toMatch(/edition_type:\s*['"]unique['"]/);
       expect(prompt).toMatch(/edition_number:\s*0/);
+    });
+
+    it('parameter passing rule covers update + export tools, not just search (v1.3.3)', () => {
+      // After v1.3.2 made update / execute / export tools strict-mode safe at the
+      // schema layer, the prompt must explicitly tell GPT that the same "no defaults"
+      // rule applies — otherwise GPT can still pad updates with `condition: 'excellent'`,
+      // `location_id: ''`, etc. which OVERWRITE database values (worse than search).
+      // Section title must NOT be limited to "for search tools" anymore.
+      expect(prompt).toMatch(/Parameter passing rules.*ALL tools/i);
+      expect(prompt).not.toMatch(/Parameter passing rules\s*—\s*CRITICAL for search tools/i);
+      // Update tools section: must call out the data-overwrite risk
+      expect(prompt).toMatch(/Update tools/);
+      expect(prompt).toMatch(/OVERWRITE/);
+      expect(prompt).toMatch(/location_id:\s*['"]{2}/);
+      // Export tools mentioned (so all 3 tool families covered)
+      expect(prompt).toMatch(/Export tools/);
     });
   });
 

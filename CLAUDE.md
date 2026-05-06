@@ -165,6 +165,27 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 bunx supabase gen types typescript --project-id <id> > src/lib/database.types.ts
 ```
 
+### 添加 / 修改数据库字段（强制 checklist）
+
+**任何 DB schema 改动都必须走完这条链**，否则会出现 schema ↔ AI 工具 ↔ prompt 三处漂移（v1.2.0–v1.3.x 一连串 GPT 失败的根因）：
+
+1. **DB**：写 SQL migration（位置 `supabase/migrations/`），手动到 Supabase Dashboard SQL Editor 应用，归档到 `migrations/archived/`，同步更新 `supabase/schema.sql`（source of truth）
+2. **TypeScript 类型**：`bunx supabase gen types typescript --project-id <id> > src/lib/database.types.ts` 重新生成
+3. **AI 工具映射审计**：grep 该字段名在 `api/tools/*.ts` 的引用，确认每个工具的 `inputSchema` 与 DB 真实列类型对齐：
+   - **enum 列**（如 status / condition / sale_currency）→ 工具必须用 `z.enum(LOCAL_CONST).nullable().optional()`，**不能** `z.string().optional()`（OpenAI strict mode 会塞 `''` 进 enum 列，cast 失败）。LOCAL_CONST 必须与 DB enum 值字节一致
+   - **UUID FK 列**（如 location_id / artwork_id / edition_id）→ 工具用 `z.string().nullable().optional()`，**execute 入口必须 `normalizeString` 兜底**，否则 `''` 会进 supabase 破外键
+   - **数字列**（sale_price / edition_number / price_min/max）→ 判断 0 是否有业务含义；若无（绝大多数情况），用 `normalizeNumber` 把 0 当未设置
+   - **日期列**（YYYY-MM-DD 文本）→ 用 `normalizeString`，`''` 进 date 列会报错
+   - **可空列 vs NOT NULL 列**：DB 是 NOT NULL（即使有默认值）→ 工具 schema 不能传 null 进 update payload，**归一化为 undefined 时必须从 payload 过滤掉**，让 DB 默认值生效
+4. **写工具 payload 过滤铁律**（execute-update / update-confirmation）：归一化后**只把"用户真正提到的字段"**写进 supabase update payload。参考 `api/tools/execute-update.ts` 的 `for (const [k, v] of Object.entries(norm)) if (v !== undefined) payload[k] = v;` 范式。漏一个字段 → null 覆盖既有数据
+5. **测试**：在 `api/tools/__tests__/<tool>.test.ts` 加回归断言：
+   - `default-padded payload only updates fields user actually mentioned`（断言 update payload 不含该字段当 GPT 传默认值时）
+   - 如果是 enum 字段：`accepts null for every optional field`（zod-level 守护）
+6. **Prompt（如果新字段进了 search/update 工具的常见交互流）**：`api/lib/system-prompt.ts` 的 `getSystemPromptForOpenAI` few-shot example 里给一个该字段的正确传参示例（不要碰 `getSystemPromptForAnthropic`，字节级保留 v1.2.3）
+7. **类型 + 测试本地验证**：`bun run typecheck && bun run test:run`
+
+跳过任何一步都意味着 DB ↔ schema ↔ tool ↔ prompt 间出现漂移。这是 AI 工具层最重要的纪律 —— 任何 PR 改 DB 字段都要在这 7 步 checklist 上逐条说明已执行或刻意跳过的理由。详见 Common Pitfalls 里的 "OpenAI strict structured outputs..." 与 "更新类工具：归一化后必须过滤 undefined 字段..." 两条。
+
 ## Documentation
 
 | 文档 | 内容 |

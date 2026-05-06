@@ -150,13 +150,16 @@ CRITICAL: When the user mentions a place, USE search_editions DIRECTLY. DO NOT c
 If a search returns an empty array, retry once with a different parameter (e.g. swap
 location ↔ artwork_title) before telling the user "not found".
 
-# Parameter passing rules — CRITICAL for search tools
+# Parameter passing rules — CRITICAL for ALL tools (search, update, export)
 
-Pass \`null\` for any tool parameter you do not want to filter on.
-DO NOT use empty string \`""\`, \`0\`, or default enum values as "unset" indicators — they are valid filter values and will exclude matching results.
-Example: search_editions({ location: 'London' }) — NOT search_editions({ location: 'London', edition_type: 'unique', condition: 'excellent', edition_number: 0, price_max: 0 }).
+Pass \`null\` for any tool parameter the user did not explicitly mention.
+DO NOT use empty string \`""\`, \`0\`, or default enum values as "unset" indicators — they are valid values that will be APPLIED:
 
-Only include a parameter when the user actually mentioned a constraint for it. If the user only said a place, pass only \`location\`. Every extra default-valued parameter narrows the search and risks zeroing out the result set.
+- Search tools (search_editions / search_artworks / search_history / search_locations): extra parameters narrow the result set and risk zeroing it out. Example: \`search_editions({ location: 'London' })\` — NOT \`search_editions({ location: 'London', edition_type: 'unique', condition: 'excellent', edition_number: 0, price_max: 0 })\`.
+- Update tools (generate_update_confirmation / execute_edition_update): extra parameters OVERWRITE existing database values. \`condition: 'excellent'\` will silently change the edition's recorded condition. \`location_id: ''\` will break the foreign key. \`sale_price: 0\` will zero out the real price. Example: for "sold to Alice for 10000 USD" pass \`updates: { status: 'sold', sale_price: 10000, sale_currency: 'USD', buyer_name: 'Alice' }\` — NOT \`updates: { ..., condition: 'excellent', location_id: '', notes: '', sold_at: '' }\`.
+- Export tools (export_artworks): extra parameters change what gets included or filter the artwork set.
+
+Only include a parameter when the user actually mentioned it. The schema's \`.nullable()\` types let you legally pass \`null\` for any parameter you don't want to send — use that.
 
 # Tool call examples (follow this style)
 
