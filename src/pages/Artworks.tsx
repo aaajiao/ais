@@ -4,7 +4,6 @@
  */
 
 import { useState, useMemo, useCallback } from 'react';
-import { useDebounce } from 'use-debounce';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
@@ -77,7 +76,7 @@ export default function Artworks() {
   const { user } = useAuth();
   const [filter, setFilter] = useState<FilterStatus>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearchQuery] = useDebounce(searchQuery, 300);
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
 
   // 添加作品对话框
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -379,6 +378,7 @@ export default function Artworks() {
           placeholder={t('searchPlaceholder')}
           value={searchQuery}
           onChange={setSearchQuery}
+          onDebouncedChange={setDebouncedSearchQuery}
           className="w-full px-4 py-3 bg-card border border-border rounded-xl focus:ring-2 focus:ring-ring focus:border-transparent outline-none"
         />
       </div>

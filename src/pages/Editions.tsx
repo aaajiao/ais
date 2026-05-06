@@ -1,5 +1,4 @@
 import { useState, useMemo, useCallback } from 'react';
-import { useDebounce } from 'use-debounce';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { EditionStatus } from '@/lib/database.types';
@@ -47,7 +46,7 @@ export default function Editions() {
 
   const [filter, setFilter] = useState<FilterStatus>(initialFilter);
   const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearchQuery] = useDebounce(searchQuery, 300);
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
 
   // Status counts for filter tabs
   const { data: statusCounts } = useEditionStatusCounts();
@@ -171,6 +170,7 @@ export default function Editions() {
           placeholder={t('searchPlaceholder')}
           value={searchQuery}
           onChange={setSearchQuery}
+          onDebouncedChange={setDebouncedSearchQuery}
           className="w-full px-4 py-3 bg-card border border-border rounded-xl focus:ring-2 focus:ring-ring focus:border-transparent outline-none"
         />
       </div>

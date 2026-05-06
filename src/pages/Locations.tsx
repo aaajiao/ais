@@ -3,13 +3,13 @@
  * 独立管理所有位置的增删改查
  */
 
-import { useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
-import { useDebounce } from 'use-debounce';
+import { useState, useCallback, useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocations, type Location } from '@/hooks/useLocations';
 import type { LocationType } from '@/lib/database.types';
 import LocationDialog from '@/components/editions/LocationDialog';
 import LocationItem from '@/components/locations/LocationItem';
+import { SearchInput } from '@/components/ui/SearchInput';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -39,8 +39,7 @@ export default function Locations() {
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
   const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearchQuery] = useDebounce(searchQuery, 300);
-  const isComposing = useRef(false);
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [locationUsage, setLocationUsage] = useState<Record<string, number>>({});
 
   // 加载每个位置的使用次数
@@ -182,12 +181,10 @@ export default function Locations() {
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
-          <input
-            type="text"
+          <SearchInput
             value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            onCompositionStart={() => { isComposing.current = true; }}
-            onCompositionEnd={() => { isComposing.current = false; }}
+            onChange={setSearchQuery}
+            onDebouncedChange={setDebouncedSearchQuery}
             placeholder={t('searchPlaceholder')}
             className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
