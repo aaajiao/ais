@@ -9,6 +9,8 @@
     "selectClaude": "选择 Claude 模型",
     "selectGPT": "选择 GPT 模型",
     "modelHint": "选择用于对话的 AI 模型。模型列表从 API 动态加载。",
+    "deepReasoning": "深度推理",
+    "deepReasoningHint": "开启后，模型会在回答前进行更长的思考链（适合趋势分析、定价建议等场景）。默认关闭，常规查询更快更省。",
     "advancedOptions": "高级选项",
     "advancedDescription": "不同类型的后台任务可以使用不同的模型，以平衡成本和效果。",
     "backgroundModel": "导入提取模型",

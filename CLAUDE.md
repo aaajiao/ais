@@ -123,6 +123,11 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 - **Styling**: TailwindCSS + shadcn/ui 组件
 - **Icons**: Lucide React，不用 emoji
 
+## Common Pitfalls
+
+- **OpenAI 工具路由依赖 description 明确性**: GPT 对工具 description 的解读比 Claude 更字面。新增 AI 工具时，description 必须包含 USE THIS WHEN 场景描述 + 反向指令（"DO NOT call this when..."），否则 GPT 可能凭记忆作答而不调用工具。同时 `api/lib/system-prompt.ts` 的「工具调用强制路由」段也要同步维护（已被 `api/lib/system-prompt.test.ts` 守护）。
+- **Thinking 模式开关 off 时 Claude 路径必须零变化**: `api/chat.ts:buildProviderOptions(false)` 不能包含 `anthropic` 键 —— 任何 `anthropic.thinking: { type: 'disabled' }` 之类的写法都会改变 Claude 行为。回归断言见 `api/chat.test.ts`。
+
 ## Verification
 
 修改代码后必须通过验证才算完成：

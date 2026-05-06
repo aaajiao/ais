@@ -10,6 +10,26 @@ export const config = {
   runtime: 'edge',
 };
 
+type StreamTextProviderOptions = NonNullable<Parameters<typeof streamText>[0]['providerOptions']>;
+
+// off：anthropic 键必须缺席 → Claude 路径零行为变化（回归测试见 api/chat.test.ts）
+// on：Claude 走 thinking + budgetTokens（默认 4000，由后端 env THINKING_BUDGET 覆盖）；OpenAI 走 reasoningEffort: 'high'
+export function buildProviderOptions(thinkingEnabled: boolean): StreamTextProviderOptions {
+  if (!thinkingEnabled) {
+    return {
+      openai: { reasoningEffort: 'minimal' },
+    };
+  }
+
+  const budgetTokens = Number(process.env.THINKING_BUDGET) || 4000;
+  return {
+    anthropic: {
+      thinking: { type: 'enabled', budgetTokens },
+    },
+    openai: { reasoningEffort: 'high' },
+  };
+}
+
 export default async function handler(req: Request) {
   if (req.method !== 'POST') {
     return new Response('Method not allowed', { status: 405 });
@@ -23,7 +43,15 @@ export default async function handler(req: Request) {
     }
 
     const body = await req.json();
-    const { messages: uiMessages, model = 'claude-sonnet-4-6', extractionModel, searchExpansionModel, artistName, locale = 'zh' } = body;
+    const {
+      messages: uiMessages,
+      model = 'claude-sonnet-4-6',
+      extractionModel,
+      searchExpansionModel,
+      thinkingEnabled = false,
+      artistName,
+      locale = 'zh',
+    } = body;
 
     // 2. 安全日志（不记录敏感消息内容）
     const requestSize = JSON.stringify(uiMessages || []).length;
@@ -32,6 +60,7 @@ export default async function handler(req: Request) {
       model,
       extractionModel: extractionModel || 'default',
       searchExpansionModel: searchExpansionModel || 'default',
+      thinkingEnabled,
       messageCount: uiMessages?.length,
       requestSizeKB: Math.round(requestSize / 1024),
     });
@@ -58,6 +87,7 @@ export default async function handler(req: Request) {
       messages: modelMessages,
       tools,
       stopWhen: stepCountIs(8),
+      providerOptions: buildProviderOptions(thinkingEnabled),
       onError({ error }) {
         // 记录流式错误（不中断流）
         console.error('[chat] Stream error:', error);

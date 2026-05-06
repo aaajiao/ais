@@ -54,6 +54,46 @@
 
 ---
 
+## 深度推理（Thinking 模式）
+
+设置页提供「深度推理」开关（设置 → AI 模型），控制 Claude / OpenAI 的扩展推理能力。**默认关闭**。
+
+### 行为
+
+| 开关 | Claude 路径 | OpenAI 路径 |
+|------|-------------|-------------|
+| **关闭**（默认） | 不传 `thinking` 参数 → 行为零变化 | `reasoningEffort: 'minimal'`（比默认 medium 更快） |
+| **开启** | `providerOptions.anthropic.thinking = { type: 'enabled', budgetTokens: 4000 }` | `reasoningEffort: 'high'` |
+
+### 何时开启
+
+- 趋势分析（"过去三年最贵的几件作品有什么共同点？"）
+- 定价建议（"基于历史成交，这个版本应该定价多少？"）
+- 复杂条件汇总（多步推断）
+
+### 何时不开启
+
+- 单步查询（"列出 AP 版本"、"统计在库数量"）—— 关闭更快更省 token
+- 简单更新确认
+
+### 后端环境变量
+
+| 变量 | 默认 | 说明 |
+|------|------|------|
+| `THINKING_BUDGET` | `4000` | 仅当开关开启时生效，控制 Claude `budgetTokens`。后端变量（不带 `VITE_` 前缀） |
+
+### 持久化
+
+开关状态存于浏览器 `localStorage.thinking-enabled`（`'true'` / `'false'`），随设备保留。每次发送消息时通过 chat 请求 body 的 `thinkingEnabled` 字段传给 `/api/chat`。
+
+### 关键文件
+
+- `src/components/settings/useModelSettings.ts` - `thinkingEnabled` state + setter
+- `src/components/settings/ModelSettings.tsx` - 开关 UI
+- `api/chat.ts` - `buildProviderOptions(thinkingEnabled)` 构造 streamText 的 providerOptions
+
+---
+
 ## 用户数据隔离
 
 所有 AI 工具的搜索和修改操作自动隔离为当前用户的数据：

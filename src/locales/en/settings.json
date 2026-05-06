@@ -9,6 +9,8 @@
     "selectClaude": "Select Claude model",
     "selectGPT": "Select GPT model",
     "modelHint": "Select AI model for conversations. Model list is dynamically loaded from API.",
+    "deepReasoning": "Deep Reasoning",
+    "deepReasoningHint": "When enabled, the model thinks longer before answering (best for trend analysis, pricing suggestions, etc.). Off by default for faster, cheaper everyday queries.",
     "advancedOptions": "Advanced Options",
     "advancedDescription": "Different types of background tasks can use different models to balance cost and quality.",
     "backgroundModel": "Import Extraction Model",

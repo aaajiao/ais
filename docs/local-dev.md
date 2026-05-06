@@ -85,6 +85,12 @@ vercel env pull
 | `OPENAI_API_KEY` | OpenAI API 密钥 | [platform.openai.com](https://platform.openai.com/) |
 | `ALLOWED_EMAILS` | 允许登录的邮箱列表（逗号分隔） | 自定义 |
 
+### 可选变量
+
+| 变量 | 默认 | 说明 |
+|------|------|------|
+| `THINKING_BUDGET` | `4000` | 设置页「深度推理」开关开启时，Claude `thinking.budgetTokens` 的预算值。仅后端读取。 |
+
 ### 变量前缀规则
 
 | 前缀 | 可访问范围 |

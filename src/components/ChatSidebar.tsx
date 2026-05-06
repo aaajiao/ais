@@ -38,6 +38,11 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
     return localStorage.getItem('search-expansion-model') || '';
   });
 
+  // 深度推理开关（默认 false）
+  const [thinkingEnabled] = useState(() => {
+    return localStorage.getItem('thinking-enabled') === 'true';
+  });
+
   // 创建带认证的 fetch 函数
   const authenticatedFetch = useCallback(async (url: RequestInfo | URL, options?: RequestInit) => {
     return fetch(url, {
@@ -61,9 +66,11 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
           extractionModel: extractionModel || selectedModel,
           // 传递搜索扩展模型：空字符串表示使用默认快速模型
           searchExpansionModel: searchExpansionModel || '',
+          // 深度推理开关
+          thinkingEnabled,
         },
       }),
-    [selectedModel, extractionModel, searchExpansionModel, authenticatedFetch]
+    [selectedModel, extractionModel, searchExpansionModel, thinkingEnabled, authenticatedFetch]
   );
 
   const {

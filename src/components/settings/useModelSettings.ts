@@ -36,6 +36,11 @@ export function useModelSettings() {
   const [searchExpansionModel, setSearchExpansionModel] = useState<string>(() => {
     return localStorage.getItem('search-expansion-model') || '';
   });
+  // 深度推理开关：独立于模型选择，控制 thinking / reasoningEffort
+  // 默认 false → Claude 路径行为不变（不传 thinking），OpenAI 路径走 minimal
+  const [thinkingEnabled, setThinkingEnabledState] = useState<boolean>(() => {
+    return localStorage.getItem('thinking-enabled') === 'true';
+  });
   const [models, setModels] = useState<ModelsResponse | null>(null);
   const [loadingModels, setLoadingModels] = useState(true);
   const [modelsError, setModelsError] = useState<string | null>(null);
@@ -97,6 +102,11 @@ export function useModelSettings() {
     }
   };
 
+  const setThinkingEnabled = (enabled: boolean) => {
+    setThinkingEnabledState(enabled);
+    localStorage.setItem('thinking-enabled', enabled ? 'true' : 'false');
+  };
+
   // 获取选中模型的信息
   const selectedModelInfo = useMemo(() => {
     if (!models || !selectedModel) return null;
@@ -135,5 +145,8 @@ export function useModelSettings() {
     searchExpansionModel,
     searchExpansionModelInfo,
     handleSearchExpansionModelChange,
+    // 深度推理开关
+    thinkingEnabled,
+    setThinkingEnabled,
   };
 }

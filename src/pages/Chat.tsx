@@ -51,6 +51,11 @@ export default function Chat() {
     return localStorage.getItem('search-expansion-model') || '';
   });
 
+  // 深度推理开关（默认 false）
+  const [thinkingEnabled] = useState(() => {
+    return localStorage.getItem('thinking-enabled') === 'true';
+  });
+
   // 获取模型显示名称（包含版本号）
   const getModelDisplayName = (modelId: string) => {
     // Claude 模型：提取版本号
@@ -128,13 +133,14 @@ export default function Chat() {
               model: selectedModel,
               extractionModel: extractionModel || selectedModel,
               searchExpansionModel: searchExpansionModel || '',
+              thinkingEnabled,
               artistName,
               locale: i18n.language,
             },
           };
         },
       }),
-    [selectedModel, extractionModel, searchExpansionModel, artistName, authenticatedFetch, i18n.language]
+    [selectedModel, extractionModel, searchExpansionModel, thinkingEnabled, artistName, authenticatedFetch, i18n.language]
   );
 
   const {

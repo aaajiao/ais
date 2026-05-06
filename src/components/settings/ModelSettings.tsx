@@ -29,6 +29,8 @@ export default function ModelSettings() {
     searchExpansionModel,
     searchExpansionModelInfo,
     handleSearchExpansionModelChange,
+    thinkingEnabled,
+    setThinkingEnabled,
   } = useModelSettings();
 
   // 渲染加载/错误状态
@@ -142,6 +144,35 @@ export default function ModelSettings() {
         <Lightbulb className="w-4 h-4 flex-shrink-0 mt-0.5" />
         <span>{t('ai.modelHint')}</span>
       </p>
+
+      {/* 深度推理开关 */}
+      <div className="mt-4 flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+        <div className="flex-1 mr-4">
+          <label htmlFor="thinking-enabled-switch" className="text-sm font-medium cursor-pointer">
+            {t('ai.deepReasoning')}
+          </label>
+          <p className="text-xs text-muted-foreground mt-1">
+            {t('ai.deepReasoningHint')}
+          </p>
+        </div>
+        <button
+          id="thinking-enabled-switch"
+          type="button"
+          role="switch"
+          aria-checked={thinkingEnabled}
+          aria-label={t('ai.deepReasoning')}
+          onClick={() => setThinkingEnabled(!thinkingEnabled)}
+          className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+            thinkingEnabled ? 'bg-primary' : 'bg-muted-foreground/30'
+          }`}
+        >
+          <span
+            className={`inline-block h-5 w-5 transform rounded-full bg-background shadow-sm transition-transform ${
+              thinkingEnabled ? 'translate-x-5' : 'translate-x-0.5'
+            }`}
+          />
+        </button>
+      </div>
 
       {/* 高级选项 */}
       <div className="mt-6 pt-6 border-t border-border">
