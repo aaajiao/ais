@@ -466,3 +466,60 @@ if (location != null && location !== '') {
 
 - `api/__tests__/chat-integration.test.ts` —— 断言 OpenAI prompt 含 null-instruction，且 Anthropic 路径**不含**该指令（保护两份 prompt 不漂移）。
 - `api/tools/__tests__/search-editions.test.ts` 等 —— 断言 default-payload（`edition_number=0`、`edition_type='unique'` 等）不污染 Supabase 查询链。
+
+### 更新类工具：payload 过滤铁律（v1.3.2 起）
+
+search 工具最坏情况是结果归零；update / execute 类工具（`execute-update`、`update-confirmation`、`export-artworks`）的代价是**直接破坏数据库**：
+
+| GPT default-padded 字段 | DB 列类型 | 不过滤会发生什么 |
+|--|--|--|
+| `location_id: ''` | UUID FK | cast 失败或破外键 |
+| `condition: 'excellent'` | `condition_type` enum | 用户没说品相，被强写成 excellent |
+| `sale_price: 0` | DECIMAL(12,2) | 真实价格被清零 |
+| `sold_at: ''` | DATE | 空串写到 date 列 |
+| `notes: ''` | TEXT | 空串覆盖既有备注 |
+| `sale_currency: ''` | `currency_type` enum | enum 写空串 |
+
+**铁律**：execute 入口先用 `normalize-filters.ts` 归一化每个字段，再过滤 undefined，**只把用户真正提到的字段写进 supabase update payload**。
+
+```typescript
+// 错（v1.3.1 之前的 execute-update）
+const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
+if (updates.location_id) updateData.location_id = updates.location_id;
+// ...其他字段
+await supabase.from('editions').update(updateData).eq('id', edition_id);
+// 问题：truthy check 漏掉 0 和 ''；schema z.string().optional() 让 GPT 塞 ''
+// 进 location_id 还是会被 truthy 跳过没错——但 sale_price=0 会被跳过却**不应该**
+// 跳过 0 这件事；同时 condition: 'excellent'（enum 第一个值）truthy = true，
+// 会被强写进 DB 覆盖原值。
+
+// 对（v1.3.2 起的范式）
+const norm = {
+  status: normalizeEnum(u.status, STATUSES),
+  location_id: normalizeString(u.location_id),
+  sale_price: normalizeNumber(u.sale_price),
+  condition: normalizeEnum(u.condition, CONDITIONS),
+  // ...
+};
+const hasAnyField = Object.values(norm).some((v) => v !== undefined);
+if (!hasAnyField) return { error: t('update.noFields') };
+
+const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
+for (const [k, v] of Object.entries(norm)) {
+  if (v !== undefined) updateData[k] = v;
+  // sold_at → sale_date 之类的字段映射在这里特殊处理
+}
+await supabase.from('editions').update(updateData).eq('id', edition_id);
+```
+
+**额外要求**：
+
+- `status` / `condition` / `sale_currency` 必须用 `z.enum(...).nullable().optional()`，**不能用** `z.string().optional()`。enum 比字符串更精确，OpenAI strict mode 也会被强约束到合法值范围。
+- `update-confirmation` 也要做同样过滤——避免给用户看一堆"condition: excellent（虚假默认值）"的假改动卡片。
+- `export-artworks` 的 bool 字段（include_price/status/location）"未设置"语义是"用默认值"，用 `normalizeBoolean(...) ?? true`，不要 `?? false`，否则 GPT 默认值会让导出丢字段。
+
+守护测试：
+
+- `api/tools/__tests__/execute-update.test.ts` —— "default-padded payload only updates fields user actually mentioned"、"all-null payload returns no fields to update"、"never writes empty string to UUID FK"、"does not write sale_price=0"、"does not write empty-string date fields"。
+- `api/tools/__tests__/update-confirmation.test.ts` —— "confirmation card excludes default-padded fields"。
+- `api/tools/__tests__/export-artworks.test.ts` —— "default-padded include_* defaults to true"、"artwork_ids array filters out empty strings"。

@@ -105,6 +105,45 @@ describe('execute_edition_update schema', () => {
       confirmed: true,
     }).success).toBe(false);
   });
+
+  it('accepts null for every optional field (OpenAI strict mode)', () => {
+    expect(schema.safeParse({
+      edition_id: 'ed-1',
+      updates: {
+        status: null,
+        location_id: null,
+        sale_price: null,
+        sale_currency: null,
+        buyer_name: null,
+        sold_at: null,
+        notes: null,
+        condition: null,
+        condition_notes: null,
+        storage_detail: null,
+        consignment_start: null,
+        consignment_end: null,
+        loan_start: null,
+        loan_end: null,
+      },
+      confirmed: true,
+    }).success).toBe(true);
+  });
+
+  it('rejects unknown status enum values', () => {
+    expect(schema.safeParse({
+      edition_id: 'ed-1',
+      updates: { status: 'totally-fake' },
+      confirmed: true,
+    }).success).toBe(false);
+  });
+
+  it('rejects unknown sale_currency enum values', () => {
+    expect(schema.safeParse({
+      edition_id: 'ed-1',
+      updates: { sale_currency: 'BTC' },
+      confirmed: true,
+    }).success).toBe(false);
+  });
 });
 
 describe('export_artworks schema', () => {
@@ -137,6 +176,17 @@ describe('export_artworks schema', () => {
       include_price: true,
       include_status: true,
       include_location: false,
+    }).success).toBe(true);
+  });
+
+  it('accepts null for every optional field (OpenAI strict mode)', () => {
+    expect(schema.safeParse({
+      format: 'pdf',
+      artwork_title: null,
+      artwork_ids: null,
+      include_price: null,
+      include_status: null,
+      include_location: null,
     }).success).toBe(true);
   });
 });
@@ -243,6 +293,37 @@ describe('generate_update_confirmation schema', () => {
       updates: { status: 'sold', sale_price: 100 },
       reason: '已售出',
     }).success).toBe(true);
+  });
+
+  it('accepts null for every optional field (OpenAI strict mode)', () => {
+    expect(schema.safeParse({
+      edition_id: 'ed-1',
+      updates: {
+        status: null,
+        location_id: null,
+        sale_price: null,
+        sale_currency: null,
+        buyer_name: null,
+        sold_at: null,
+        notes: null,
+        condition: null,
+        condition_notes: null,
+        storage_detail: null,
+        consignment_start: null,
+        consignment_end: null,
+        loan_start: null,
+        loan_end: null,
+      },
+      reason: 'test',
+    }).success).toBe(true);
+  });
+
+  it('rejects unknown status enum', () => {
+    expect(schema.safeParse({
+      edition_id: 'ed-1',
+      updates: { status: 'invalid_status' },
+      reason: 'r',
+    }).success).toBe(false);
   });
 });
 

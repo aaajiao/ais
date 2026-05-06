@@ -318,4 +318,191 @@ describe('execute_edition_update', () => {
     })) as { error?: string };
     expect(result.error).toBe('permission denied');
   });
+
+  // --- v1.3.2 regression: OpenAI strict default-payload defense ---
+
+  it('all-null payload returns "no fields to update" error and skips DB writes', async () => {
+    const { supabase, calls } = createMockSupabase();
+    const tool = createExecuteUpdateTool({ supabase, userId: 'me', locale: 'zh' });
+    const result = (await getExec(tool)({
+      edition_id: 'ed-1',
+      updates: {
+        status: null,
+        location_id: null,
+        sale_price: null,
+        sale_currency: null,
+        buyer_name: null,
+        sold_at: null,
+        notes: null,
+        condition: null,
+        condition_notes: null,
+        storage_detail: null,
+        consignment_start: null,
+        consignment_end: null,
+        loan_start: null,
+        loan_end: null,
+      },
+      confirmed: true,
+    })) as { error?: string };
+    expect(result.error).toBeTruthy();
+    expect(calls.length).toBe(0);
+  });
+
+  it('default-padded payload (empty strings, 0, null) only updates fields user actually mentioned', async () => {
+    const { supabase, calls } = createMockSupabase({
+      selectResult: {
+        data: {
+          id: 'ed-1',
+          status: 'in_studio',
+          location_id: 'loc-old',
+          condition: 'good',
+          notes: 'existing note',
+          artworks: { user_id: 'me' },
+        },
+        error: null,
+      },
+      updateResult: { data: { id: 'ed-1', status: 'sold' }, error: null },
+    });
+    const tool = createExecuteUpdateTool({ supabase, userId: 'me', locale: 'zh' });
+    // Simulate GPT strict-mode default-padded payload: user only said "mark as sold"
+    // but the model also sent default values for every other optional field
+    await getExec(tool)({
+      edition_id: 'ed-1',
+      updates: {
+        status: 'sold',
+        location_id: '',
+        sale_price: 0,
+        sale_currency: '',
+        buyer_name: '',
+        sold_at: '',
+        notes: '',
+        condition: '',
+        condition_notes: '',
+        storage_detail: '',
+        consignment_start: '',
+        consignment_end: '',
+        loan_start: '',
+        loan_end: '',
+      },
+      confirmed: true,
+    });
+    const update = calls.find((c) => c.op === 'update' && c.table === 'editions');
+    expect(update).toBeDefined();
+    const payload = update!.payload as Record<string, unknown>;
+    // status was actually mentioned, so it should be in the payload
+    expect(payload.status).toBe('sold');
+    // updated_at is always set
+    expect(payload.updated_at).toBeDefined();
+    // EVERY other field MUST be absent — never write '' to UUID FK / 0 to price / '' to date
+    expect(payload).not.toHaveProperty('location_id');
+    expect(payload).not.toHaveProperty('sale_price');
+    expect(payload).not.toHaveProperty('sale_currency');
+    expect(payload).not.toHaveProperty('buyer_name');
+    expect(payload).not.toHaveProperty('sale_date');
+    expect(payload).not.toHaveProperty('sold_at');
+    expect(payload).not.toHaveProperty('notes');
+    expect(payload).not.toHaveProperty('condition');
+    expect(payload).not.toHaveProperty('condition_notes');
+    expect(payload).not.toHaveProperty('storage_detail');
+    expect(payload).not.toHaveProperty('consignment_start');
+    expect(payload).not.toHaveProperty('consignment_end');
+    expect(payload).not.toHaveProperty('loan_start');
+    expect(payload).not.toHaveProperty('loan_end');
+  });
+
+  it('never writes empty string to UUID FK column location_id', async () => {
+    const { supabase, calls } = createMockSupabase({
+      selectResult: {
+        data: { id: 'ed-1', status: 'in_studio', artworks: { user_id: 'me' } },
+        error: null,
+      },
+      updateResult: { data: { id: 'ed-1' }, error: null },
+    });
+    const tool = createExecuteUpdateTool({ supabase, userId: 'me', locale: 'zh' });
+    await getExec(tool)({
+      edition_id: 'ed-1',
+      updates: { notes: 'updated note', location_id: '' },
+      confirmed: true,
+    });
+    const update = calls.find((c) => c.op === 'update' && c.table === 'editions');
+    const payload = update!.payload as Record<string, unknown>;
+    expect(payload.location_id).toBeUndefined();
+    expect(payload).not.toHaveProperty('location_id');
+    // notes (real value) should be set
+    expect(payload.notes).toBe('updated note');
+  });
+
+  it('does not write sale_price=0 (treats 0 as "unset")', async () => {
+    const { supabase, calls } = createMockSupabase({
+      selectResult: {
+        data: { id: 'ed-1', status: 'in_studio', artworks: { user_id: 'me' } },
+        error: null,
+      },
+      updateResult: { data: { id: 'ed-1' }, error: null },
+    });
+    const tool = createExecuteUpdateTool({ supabase, userId: 'me', locale: 'zh' });
+    await getExec(tool)({
+      edition_id: 'ed-1',
+      updates: { notes: 'x', sale_price: 0 },
+      confirmed: true,
+    });
+    const update = calls.find((c) => c.op === 'update' && c.table === 'editions');
+    const payload = update!.payload as Record<string, unknown>;
+    expect(payload).not.toHaveProperty('sale_price');
+  });
+
+  it('does not write empty-string date fields to date columns', async () => {
+    const { supabase, calls } = createMockSupabase({
+      selectResult: {
+        data: { id: 'ed-1', status: 'in_studio', artworks: { user_id: 'me' } },
+        error: null,
+      },
+      updateResult: { data: { id: 'ed-1' }, error: null },
+    });
+    const tool = createExecuteUpdateTool({ supabase, userId: 'me', locale: 'zh' });
+    await getExec(tool)({
+      edition_id: 'ed-1',
+      updates: {
+        notes: 'x',
+        sold_at: '',
+        consignment_start: '',
+        consignment_end: '',
+        loan_start: '',
+        loan_end: '',
+      },
+      confirmed: true,
+    });
+    const update = calls.find((c) => c.op === 'update' && c.table === 'editions');
+    const payload = update!.payload as Record<string, unknown>;
+    expect(payload).not.toHaveProperty('sale_date');
+    expect(payload).not.toHaveProperty('sold_at');
+    expect(payload).not.toHaveProperty('consignment_start');
+    expect(payload).not.toHaveProperty('consignment_end');
+    expect(payload).not.toHaveProperty('loan_start');
+    expect(payload).not.toHaveProperty('loan_end');
+  });
+
+  it('does not insert status_change history when default-padded status equals current status', async () => {
+    const { supabase, calls } = createMockSupabase({
+      selectResult: {
+        data: {
+          id: 'ed-1',
+          status: 'in_studio',
+          location_id: 'loc-1',
+          condition: 'good',
+          artworks: { user_id: 'me' },
+        },
+        error: null,
+      },
+      updateResult: { data: { id: 'ed-1' }, error: null },
+    });
+    const tool = createExecuteUpdateTool({ supabase, userId: 'me', locale: 'zh' });
+    // GPT default-pads status to 'in_studio' (first/default enum value), but it equals current
+    await getExec(tool)({
+      edition_id: 'ed-1',
+      updates: { notes: 'just adding a note', status: 'in_studio' },
+      confirmed: true,
+    });
+    expect(calls.find((c) => c.op === 'insert')).toBeUndefined();
+  });
 });

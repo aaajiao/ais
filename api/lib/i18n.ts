@@ -104,6 +104,10 @@ const messages: Record<string, Record<Locale, string>> = {
     zh: '更新成功',
     en: 'Update successful',
   },
+  'update.noFields': {
+    zh: '没有要更新的字段（请明确指定要修改的内容）',
+    en: 'No fields to update (please specify what to change)',
+  },
 
   // === export-artworks ===
   'export.artworkNotFound': {
