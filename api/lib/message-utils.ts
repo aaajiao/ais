@@ -26,19 +26,40 @@ export function estimateTokens(messages: UIMessage[]): number {
   }, 0);
 }
 
+export interface PrepareMessagesOptions {
+  /**
+   * 当前 provider 名称。决定是否走客户端 token 截断兜底。
+   * - 'anthropic'：跳过客户端截断，依赖 streamText 的
+   *   providerOptions.anthropic.contextManagement.compact_20260112（服务端官方 compaction）
+   * - 'openai'：保留客户端 token 截断兜底（OpenAI 路径无对应官方机制）
+   * - 缺省：保守起见走 'openai' 路径（保留兜底，行为与历史版本一致）
+   */
+  provider?: 'anthropic' | 'openai';
+}
+
 /**
  * 准备发送给模型的消息
  * 使用 AI SDK 的 pruneMessages 修剪工具调用历史
- * 然后根据 token 限制截断旧消息
+ * 然后根据 token 限制截断旧消息（仅 OpenAI 路径）
  *
  * @param messages 完整的 UIMessage 数组
- * @param maxTokens 最大 token 数（默认 150000，为响应预留空间）
+ * @param maxTokens 最大 token 数（默认 150000，为响应预留空间，仅 OpenAI 路径生效）
+ * @param options provider 信息（决定是否走客户端截断兜底）
  * @returns 转换后的 ModelMessage 数组
+ *
+ * 设计说明（P1-1）：
+ * - Anthropic 走官方 contextManagement.compact_20260112（服务端按 token 数自动压缩历史），
+ *   客户端 `JSON.stringify().length / 3` 估算不准确，移除以避免误截断长上下文。
+ * - OpenAI 没有等效官方机制，必须保留客户端兜底逻辑（即使估算粗糙也比硬超 token 上限好）。
+ * - pruneMessages 对两个 provider 都有意义（去除冗余的工具调用结果），保留。
  */
 export async function prepareMessagesForModel(
   messages: UIMessage[],
-  maxTokens: number = 150000
+  maxTokens: number = 150000,
+  options: PrepareMessagesOptions = {}
 ) {
+  const provider = options.provider ?? 'openai';
+
   // 1. 先转换为 ModelMessage 格式
   const modelMessages = await convertToModelMessages(messages);
 
@@ -51,7 +72,18 @@ export async function prepareMessagesForModel(
     emptyMessages: 'remove',
   });
 
-  // 3. 如果仍然超限，截断旧消息（保留第一条和最近的消息）
+  // 3. Anthropic 路径：依赖服务端 compaction，跳过客户端截断
+  if (provider === 'anthropic') {
+    if (prunedMessages.length < messages.length) {
+      console.log('[message-utils] Pruned messages (anthropic, server-side compaction)', {
+        originalCount: messages.length,
+        prunedCount: prunedMessages.length,
+      });
+    }
+    return prunedMessages;
+  }
+
+  // 4. OpenAI 路径：保留旧的 token 截断兜底逻辑
   const estimated = estimateTokensFromModel(prunedMessages);
 
   if (estimated > maxTokens && prunedMessages.length > 2) {

@@ -89,7 +89,7 @@ vercel env pull
 
 | 变量 | 默认 | 说明 |
 |------|------|------|
-| `THINKING_BUDGET` | `4000` | 设置页「深度推理」开关开启时，Claude `thinking.budgetTokens` 的预算值。仅后端读取。 |
+| `THINKING_BUDGET` | `4000` | 设置页「深度推理」开关开启时，可选值：`数字`（如 `8000`）→ `thinking.budgetTokens`；字符串 `adaptive` → `{ type: 'adaptive', display: 'summarized' }`，让 Claude 自决 thinking 长度（@ai-sdk/anthropic v3.0.74 GA）。仅后端读取。 |
 
 ### 变量前缀规则
 

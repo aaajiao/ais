@@ -64,6 +64,7 @@
 |------|-------------|-------------|
 | **关闭**（默认） | 不传 `thinking` 参数 → 行为零变化 | `reasoningEffort: 'minimal'`（比默认 medium 更快） |
 | **开启** | `providerOptions.anthropic.thinking = { type: 'enabled', budgetTokens: 4000 }` | `reasoningEffort: 'high'` |
+| **开启** + `THINKING_BUDGET=adaptive` | `providerOptions.anthropic.thinking = { type: 'adaptive', display: 'summarized' }` —— Claude 自决 thinking 长度（@ai-sdk/anthropic v3.0.74 GA） | 同上（`reasoningEffort: 'high'`，OpenAI 不支持 adaptive） |
 
 ### 何时开启
 
@@ -80,7 +81,7 @@
 
 | 变量 | 默认 | 说明 |
 |------|------|------|
-| `THINKING_BUDGET` | `4000` | 仅当开关开启时生效，控制 Claude `budgetTokens`。后端变量（不带 `VITE_` 前缀） |
+| `THINKING_BUDGET` | `4000` | 仅当开关开启时生效，可选值：`数字`（如 `8000`）→ `{ type: 'enabled', budgetTokens: <num> }`；字符串 `adaptive` → `{ type: 'adaptive', display: 'summarized' }`，让 Claude 自决 thinking 长度。后端变量（不带 `VITE_` 前缀） |
 
 ### 持久化
 
@@ -91,6 +92,59 @@
 - `src/components/settings/useModelSettings.ts` - `thinkingEnabled` state + setter
 - `src/components/settings/ModelSettings.tsx` - 开关 UI
 - `api/chat.ts` - `buildProviderOptions(thinkingEnabled)` 构造 streamText 的 providerOptions
+
+---
+
+## Prompt Caching（仅 Anthropic 路径）
+
+Claude 路径默认对 system prompt 启用 ephemeral prompt cache，节省 ~30% 输入 token（连续对话场景，5 分钟 TTL）。
+
+### 行为
+
+`api/chat.ts:buildSystemMessage(prompt, provider)`：
+- **Anthropic**：返回 `SystemModelMessage`，message 层级 `providerOptions.anthropic.cacheControl = { type: 'ephemeral' }`
+- **OpenAI**：返回原始 `string`，请求体不含任何 cacheControl 字段（OpenAI 不识别）
+
+AI SDK 按 provider 名称过滤 message-level providerOptions —— 即便给两个 provider 都附带 anthropic key，OpenAI 请求体也不会变。这里仍按 provider 区分返回类型，是为了让类型签名更直观。
+
+### 关键文件
+
+- `api/chat.ts:buildSystemMessage()` —— message-level cacheControl 注入
+- `node_modules/@ai-sdk/anthropic/dist/index.d.ts:152` —— `cacheControl: { type: 'ephemeral', ttl?: '5m' | '1h' }`
+
+---
+
+## Stop Conditions（停止条件）
+
+streamText 的 `stopWhen` 同时启用两种条件（满足任一即停步）：
+
+| 条件 | 用途 |
+|------|------|
+| `hasToolCall('generate_update_confirmation')` | 自然停止信号：模型生成确认卡片 → 立即结束当前轮 |
+| `stepCountIs(8)` | 兜底硬上限：防止工具链失控（曾导致工具链断裂 bug） |
+
+**为什么要 hasToolCall？** 仅靠 `stepCountIs(8)` 时，模型可能在生成确认卡片后还想继续多调一次工具，浪费一步并增加延迟。`hasToolCall` 让模型生成更新确认卡片即停步。
+
+`api/chat.ts:buildStopConditions()` 返回 `[stepCountIs(8), hasToolCall('generate_update_confirmation')]`。
+
+---
+
+## Context Management（仅 Anthropic 路径）
+
+Claude 路径启用 Anthropic 官方 `contextManagement.compact_20260112`，由服务端按 token 自动压缩长上下文，替代客户端粗糙的 `JSON.stringify().length / 3` 估算截断。
+
+| Provider | 长上下文处理 |
+|----------|-------------|
+| **Anthropic** | 服务端 `contextManagement.edits = [{ type: 'compact_20260112' }]` 自动压缩 |
+| **OpenAI** | 保留客户端 token 截断兜底（`api/lib/message-utils.ts:prepareMessagesForModel`），OpenAI 没有等效官方机制 |
+
+`pruneMessages`（去除重复工具调用）对两个 provider 都生效，与压缩/截断正交。
+
+### 关键文件
+
+- `api/chat.ts` —— 按 `getProviderName()` 分支注入 `contextManagement`
+- `api/lib/message-utils.ts:prepareMessagesForModel(messages, max, { provider })` —— Anthropic 跳过截断兜底
+- `node_modules/@ai-sdk/anthropic/dist/index.d.ts:199-234` —— `contextManagement` 类型签名
 
 ---
 

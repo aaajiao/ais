@@ -40,6 +40,22 @@ export function getSupabase() {
 }
 
 /**
+ * 根据模型 ID 推断 provider 名称（不实例化 provider，纯函数）。
+ * 与 getModel 的 prefix 判断逻辑保持一致 —— 修改一处必须同步修改另一处。
+ *
+ * 用途：chat.ts 需要知道当前路径是 Anthropic 还是 OpenAI，以决定是否注入
+ *      Anthropic-only 的 providerOptions（cacheControl / contextManagement）。
+ */
+export function getProviderName(modelId: string): 'anthropic' | 'openai' {
+  const id = modelId || DEFAULT_MODEL;
+  if (id.startsWith('gpt-') || id.startsWith('o1') || id.startsWith('o3') || id.startsWith('o4')) {
+    return 'openai';
+  }
+  // claude-* 以及未知前缀均回退到 Anthropic（与 getModel 一致）
+  return 'anthropic';
+}
+
+/**
  * 根据模型 ID 动态选择 provider
  */
 export function getModel(modelId: string) {

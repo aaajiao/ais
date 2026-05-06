@@ -211,3 +211,19 @@ import { invalidateArtworks } from '@/lib/cacheInvalidation';
 // 在变更后
 await invalidateArtworks(queryClient);
 ```
+
+---
+
+## AI Prompt Caching（仅 Anthropic）
+
+`api/chat.ts:buildSystemMessage()` 给 Claude 路径的 system prompt 注入 `providerOptions.anthropic.cacheControl = { type: 'ephemeral' }`，让 1400+ 字符的 system prompt 走 5 分钟 ephemeral cache：
+
+- **节省**：连续对话场景下输入 token ~30%（cache hit 走折扣价）
+- **范围**：仅 Anthropic 路径。OpenAI 路径返回原始 string，请求体不含 cacheControl
+- **TTL**：5 分钟（默认），可在 d.ts 类型签名里改 `'1h'`
+
+### Anthropic 服务端 compaction
+
+`api/chat.ts` 给 Anthropic 路径注入 `providerOptions.anthropic.contextManagement.edits = [{ type: 'compact_20260112' }]`：服务端在接近 context window 时自动压缩历史，比客户端粗糙的 `JSON.stringify().length / 3` 估算精准。OpenAI 路径仍走 `api/lib/message-utils.ts:prepareMessagesForModel` 客户端兜底（OpenAI 无等效官方机制）。
+
+详见 [docs/ai-chat-tools.md](./ai-chat-tools.md#prompt-caching仅-anthropic-路径)。
