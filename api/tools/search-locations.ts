@@ -10,7 +10,9 @@ import { createT } from '../lib/i18n.js';
 export function createSearchLocationsTool(ctx: ToolContext) {
   const t = createT(ctx.locale);
   return tool({
-    description: '搜索位置/画廊，可以按名称、城市、类型、国家搜索',
+    description: `Search the locations directory (galleries, museums, studios, storage sites) by name, city, type, or country. Returns location records themselves (id, name, city, type, country).
+USE THIS WHEN the user asks ABOUT a location itself — e.g. "列出所有画廊", "我有哪些美术馆合作", "找北京的所有位置", "show me all galleries in Germany". The result is a list of locations, not editions.
+DO NOT use this when the user wants to filter EDITIONS by where they are (e.g. "什么作品在 London", "Pace Gallery 有哪些版本", "在德国的版本") — for those queries use \`search_editions\` with the \`location\` parameter, which returns editions filtered by their current location.`,
     inputSchema: z.object({
       query: z.string().optional().describe('搜索关键词（名称或城市）'),
       type: z.enum(['studio', 'gallery', 'museum', 'other']).optional().describe('位置类型'),

@@ -10,9 +10,11 @@ import { createT } from '../lib/i18n.js';
 export function createSearchArtworksTool(ctx: ToolContext) {
   const t = createT(ctx.locale);
   return tool({
-    description: '搜索艺术作品，可以按标题、年份、类型、材料搜索。支持中英文搜索，系统会自动翻译和扩展搜索词',
+    description: `Search artworks by TITLE, year, type (medium/category), or materials. Supports Chinese/English bilingual search with automatic translation and synonym expansion.
+USE THIS WHEN the user asks about an artwork's title, year of creation, medium/type, or material composition (e.g. "用磁铁的作品", "2020 年的作品", "video 类作品", "找标题里有 GFW 的作品").
+DO NOT use this for location/city/gallery filtering — if the user asks WHERE an artwork is, or which works are at a gallery/city/country, use \`search_editions\` with its \`location\` parameter instead. This tool searches the artwork catalog, not physical edition placement.`,
     inputSchema: z.object({
-      query: z.string().optional().describe('搜索关键词（标题）'),
+      query: z.string().optional().describe('Title keyword — searches artwork title (English and Chinese). NOT for location names; use search_editions for that.'),
       year: z.string().optional().describe('年份'),
       type: z.string().optional().describe('作品类型'),
       materials: z.string().optional().describe('材料关键词（支持中英文）'),

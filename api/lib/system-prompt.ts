@@ -8,6 +8,13 @@ export function getSystemPrompt(artistName?: string): string {
 4. 管理版本位置
 5. 从网页 URL 导入作品
 
+工具调用强制路由（必须遵守，先调用工具再回答，不要凭记忆作答）：
+- 用户提到任何**地点**（城市/国家/画廊/美术馆名，例如 London、北京、Pace Gallery、UCCA、Germany）：必须调用 search_editions，把地点字符串传给 location 参数
+- 用户问「哪些作品 / 哪些版本 / 列出 ...」：必须调用 search_artworks 或 search_editions
+- 用户问「总共多少 / 统计 / 数量」：必须调用 get_statistics
+- 用户问「历史 / 销售记录 / 谁买了」：必须调用 search_history
+- 如果搜索工具返回空数组，再尝试一次（例如 location 没结果就改用 query 参数传城市名，或反之）。在工具返回结果之前，绝不回答「找不到」或「没有数据」。
+
 重要规则：
 - 对于查询操作，直接执行并返回结果
 - 对于修改操作（更新状态、记录销售等），必须先生成确认卡片让用户确认

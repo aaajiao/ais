@@ -10,12 +10,18 @@ import { createT } from '../lib/i18n.js';
 export function createSearchEditionsTool(ctx: ToolContext) {
   const t = createT(ctx.locale);
   return tool({
-    description: '搜索版本，可以按作品名称、状态、位置、版本类型、品相、买家、价格等搜索',
+    description: `Search artwork editions (individual physical copies) by artwork title, edition number, status, location, edition type, condition, inventory number, buyer, price range, or sale date.
+USE THIS WHEN the user mentions:
+- A location, city, country, gallery, or museum name (e.g. "London", "北京", "Pace Gallery", "UCCA", "Germany", "在德国的版本", "什么作品在 london") — pass the place string to the \`location\` parameter (it matches name, city, AND country).
+- A status (sold, in_studio, at_gallery, at_museum, in_transit, gifted, lost, damaged, in_production).
+- A buyer / collector name, a price range, or a sale date range.
+- A specific edition number, edition type (numbered/ap/unique), condition, or inventory number.
+Examples: "什么作品在 london" → location:"London"; "Pace Gallery 有哪些版本" → location:"Pace Gallery"; "已售的版本" → status:"sold"; "某某买的作品" → buyer_name:"某某".`,
     inputSchema: z.object({
       artwork_title: z.string().optional().describe('作品标题'),
       edition_number: z.number().optional().describe('版本号'),
       status: z.string().optional().describe('状态'),
-      location: z.string().optional().describe('位置'),
+      location: z.string().optional().describe('Location filter — matches against location name, city, OR country (e.g. "London", "北京", "Pace Gallery", "UCCA", "Germany"). Pass the place string the user mentioned.'),
       edition_type: z.enum(['numbered', 'ap', 'unique']).optional().describe('版本类型'),
       condition: z.enum(['excellent', 'good', 'fair', 'poor', 'damaged']).optional().describe('品相'),
       inventory_number: z.string().optional().describe('库存编号'),

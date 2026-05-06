@@ -57,7 +57,7 @@ export default async function handler(req: Request) {
       system: getSystemPrompt(artistName),
       messages: modelMessages,
       tools,
-      stopWhen: stepCountIs(5),
+      stopWhen: stepCountIs(8),
       onError({ error }) {
         // 记录流式错误（不中断流）
         console.error('[chat] Stream error:', error);
