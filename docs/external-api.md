@@ -196,8 +196,50 @@ console.log(data.editions);
 - `QUERY_ERROR` — 查询执行错误 (500)
 - `METHOD_NOT_ALLOWED` — 仅支持 POST (405)
 
+## 参数处理铁律（v1.3.4 起）
+
+**对走 OpenAI structured outputs strict mode（或任何强 schema LLM）的客户端尤其重要**：
+
+所有非必填参数都是 nullable + optional：
+- 你**应当** pass `null` 或干脆**省略**任何不想用的字段
+- 服务端把**空字符串 `""`、`0`、`null` 一律按"未设置"处理**（不会变成过滤器）
+- 但 **enum 合法值会被当成 filter 应用**——如果传 `edition_type: "unique"`，服务端会过滤到独版作品
+
+### 安全的最小化调用
+
+```json
+{ "action": "search_editions", "params": { "location": "London" } }
+```
+
+### 危险的 default-padded 调用（OpenAI strict 经典反模式）
+
+```json
+{
+  "action": "search_editions",
+  "params": {
+    "location": "London",
+    "edition_type": "unique",      // ← 会过滤到独版，可能归零
+    "condition": "excellent",       // ← 会按品相过滤
+    "edition_number": 0,            // ← 服务端归一为 unset（安全），但仍属反模式
+    "price_max": 0,                  // ← 同上
+    "buyer_name": "",                // ← 服务端归一为 unset（安全）
+    "artwork_title": ""              // ← 同上
+  }
+}
+```
+
+**结果**：服务端 L2 归一化会把 `0` / `""` 当 unset 拦掉（这是不可关闭的内置兜底），但 enum 合法值（`edition_type: "unique"`、`condition: "excellent"`）会被当作真实 filter 应用，可能导致结果归零。
+
+### 给客户端 LLM 的建议 prompt 片段
+
+如果你用 LLM 生成请求，加这条：
+
+> Pass `null` for any parameter you do not want to filter on. Empty string `""`, `0`, and default enum values are NOT valid "unset" indicators — enum values will be applied as filters. Only include a parameter when you actually want to constrain on it.
+
+服务端会自动把 `""` / `0` / `null` 归一为未设置，所以即便 LLM 失误塞了空串/零，也不会破坏查询。但合法的 enum 值就只能靠 prompt 约束了。
+
 ## 限制
 
-- API Key 仅提供**只读**访问
+- API Key 仅提供**只读**访问（无写入端点 → 无 payload 污染数据库的风险）
 - 每用户最多 5 个活跃 Key
 - 搜索结果默认限制 10-50 条

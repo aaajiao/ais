@@ -48,4 +48,38 @@ describe('external/v1/schema (GET)', () => {
       expect(n.startsWith('generate_')).toBe(false);
     }
   });
+
+  it('marks every non-required param as nullable: true (v1.3.4 — OpenAI strict-mode compatibility)', async () => {
+    // Why: external clients running OpenAI structured outputs strict mode need
+    // the schema to advertise null as a legal value, otherwise their LLM will
+    // pad every optional field with a type default ('', 0, first enum value)
+    // and silently break the search. Marking nullable: true tells those clients
+    // "you can pass null" — same fix as v1.3.1 did internally for our chat.
+    const res = await handler(new Request('http://localhost/api/external/v1/schema', { method: 'GET' }));
+    const body = (await res.json()) as {
+      actions: Record<string, { params?: Record<string, { nullable?: boolean; required?: boolean }> }>;
+    };
+    for (const [actionName, action] of Object.entries(body.actions)) {
+      const params = action.params || {};
+      for (const [paramName, param] of Object.entries(params)) {
+        if (param.required === true) continue; // required params (get_statistics.type) skip nullable check
+        expect(
+          param.nullable,
+          `${actionName}.${paramName} must be marked nullable: true so OpenAI strict-mode clients know null is legal`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('exposes parameter_handling section explaining "pass null, not empty/0" (v1.3.4)', async () => {
+    const res = await handler(new Request('http://localhost/api/external/v1/schema', { method: 'GET' }));
+    const body = (await res.json()) as {
+      parameter_handling?: { description?: string; examples?: { good?: unknown; bad?: unknown } };
+    };
+    expect(body.parameter_handling).toBeDefined();
+    expect(body.parameter_handling?.description).toMatch(/null/i);
+    expect(body.parameter_handling?.description).toMatch(/empty string|""/);
+    expect(body.parameter_handling?.examples?.good).toBeDefined();
+    expect(body.parameter_handling?.examples?.bad).toBeDefined();
+  });
 });
