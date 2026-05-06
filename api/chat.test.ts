@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { stepCountIs, hasToolCall } from 'ai';
-import { buildProviderOptions, buildSystemMessage, buildStopConditions } from './chat';
+import { buildProviderOptions, buildSystemMessage, buildStopConditions } from './chat.js';
 
 describe('buildProviderOptions', () => {
   const originalBudget = process.env.THINKING_BUDGET;

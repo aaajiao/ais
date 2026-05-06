@@ -1,4 +1,4 @@
-import { streamText, stepCountIs, hasToolCall, type UIMessage, type StopCondition, type ToolSet } from 'ai';
+import { streamText, stepCountIs, hasToolCall, type UIMessage } from 'ai';
 import type { ProviderOptions, SystemModelMessage } from '@ai-sdk/provider-utils';
 import { verifyAuth, unauthorizedResponse } from './lib/auth.js';
 import { getModel, getSupabase, getProviderName } from './lib/model-provider.js';
@@ -85,8 +85,12 @@ export function buildSystemMessage(
  * - stepCountIs(8)：兜底硬上限，防止工具链失控（曾导致工具链断裂 bug）
  *
  * 数组语义：满足任一条件即停止（v6.0.132+ 支持，d.ts:2736）。
+ *
+ * 不带泛型注解：让 TS 按 stepCountIs / hasToolCall 自身签名（StopCondition<any>）推断，
+ * 与 streamText 的 stopWhen?: StopCondition<NoInfer<typeof tools>> 兼容（any 兼容一切）。
+ * 显式 <TOOLS extends ToolSet> 会被 NoInfer 屏蔽反向推断，导致 nodenext typecheck 失败。
  */
-export function buildStopConditions<TOOLS extends ToolSet>(): Array<StopCondition<TOOLS>> {
+export function buildStopConditions() {
   return [stepCountIs(8), hasToolCall('generate_update_confirmation')];
 }
 
