@@ -52,7 +52,11 @@ const [artworksRes, editionsRes, locationsRes, historyRes] = await Promise.all([
 
 ### Strata
 
-- **横向 swimlane，每 type 一条带**：当前实现（重设计自 v1.5）。type 身份完全由行位置承担——所有方块统一 `fill-foreground` 0.65，hover 升 1.0。**不要**改回"颜色/透明度区分 type"——type 数量可能超过 10 种，单色 + opacity 区分不开。
+- **横向 swimlane，每 type 一条带**：当前实现（重设计自 v1.5）。type 身份完全由行位置承担——所有方块统一 `fill-foreground`，默认 `opacity-[0.65]`，hover 升至 `opacity-100`。**不要**改回"颜色/透明度区分 type"——type 数量可能超过 10 种，单色 + opacity 区分不开。
+- **方块用 `<g role="button" tabIndex={0}>` 包裹 `<rect>` 而非裸 `<rect onClick>`**：跟 Diaspora 同模式——screen reader 读得到，键盘 Enter / Space 触发 navigate，aria-label 拼装 `{type} · {year} · {title}`。`<rect>` 只负责视觉，事件挂 `<g>` 上。`a.id` 缺失就标 `aria-disabled` + `tabIndex=-1` 不 navigate（理论上 DB NOT NULL，但 schema 类型可空时防御）。
+- **dark 模式对比度走 Tailwind dark: variant**：默认 `opacity-[0.65] dark:opacity-[0.8]`；其它 lane 暗化 `opacity-[0.3] dark:opacity-[0.4]`；focused lane + hovered block 一律 `opacity-100`。**不要**用 SVG `fillOpacity` attribute——它独立于 Tailwind dark mode，dark 下方块会比 light 模式更暗、不容易看清。
+- **响应式宽度：`className="w-full"` + `viewBox`**：跟 Diaspora 同模式。`CANVAS_W` 仍按 `LABEL_W + yearCount * 20 + RIGHT_PAD` 算，决定 viewBox 逻辑尺寸；SVG 渲染时不设 `width` 属性，靠 `w-full` 撑满容器。外层 `overflow-x-auto` 留作极端窄屏兜底（实际很少触发）。
+- **touch hover 不卡 stuck**：方块用 Tailwind 的 `hover:opacity-100`（默认 gated 在 `@media (hover: hover) and (pointer: fine)`），touch 设备 tap 不触发 hover、直接 navigate。JS 侧 `hoveredArtwork` / `hoveredLane` 状态仅驱动底部 tooltip 信息条，触摸 tap 也不会让该状态卡住（mouseenter 在 touch 上通常不持久 fire）。
 - **带高 = log1p(count) 归一化**：`SWIMLANE_MIN_H=16` / `MAX_H=64`。Installation(115) 占 64px，单件 type 仍有 16px 可辨识，两个数量级落差不会让小 type 消失。
 - **列出所有 distinct type，含 `null`**：`null` 归入字面 key `__untyped__`，显示为 `(untyped)` swimlane（跟 Terminal 的"null 不藏"美学一致）。**不要**把 type 归到 "other" 桶——分类多样性是真实数据。
 - **缺失年份保留空列**：x 轴是真正的时间轴（不是密度图）。2014 没作品也画一个空 column，肉眼能看到节奏。
@@ -94,6 +98,7 @@ const [artworksRes, editionsRes, locationsRes, historyRes] = await Promise.all([
 | `terminalUtils.test.ts` | 29 — inventory 自然排序 / edition label 4 种 / location 拼接 / group 分桶 / markets line |
 | `diasporaUtils.test.ts` | 30 — 节点关联 / 中心选择 tie-breaker / 同心环布局 / 边聚合 / tracked stat |
 | `DiasporaView.test.tsx` | 14 — 初始状态 / hover 预览 / hover 离开 / click pin / edition 行跳转 / view all 跳转 / 二次 click 取消 pin / 切换 pin / pin 时 hover 不干扰 / 无编号 edition / 空数据 / aria-pressed / 键盘 Enter / title_cn fallback |
+| `StrataView.test.tsx` | 11 — role=button 包裹 rect / aria-label 拼装 / click navigate / Enter / Space / 其它键不触发 / tabindex=0 / id 缺失 aria-disabled / viewBox 响应式 / hover tooltip / 空数据 |
 | `Visualize.test.tsx` | 8 — loading / error / 4 个 view 默认渲染 / 非法 ?view 回落 / refetch 按钮 |
 | `visualize-parity.test.ts` | 2 — zh ⟷ en key 完全一致 / 核心段都存在 |
 

@@ -16,6 +16,10 @@
     "description": "Stratified by type — each band represents one artwork category. Band thickness reflects the number of works. X axis is year of creation.",
     "axisYear": "Year",
     "axisHistory": "Record entered",
+    "aria": {
+      "blockLabel": "{{type}} · {{year}} · {{title}}",
+      "untitled": "untitled"
+    },
     "tooltip": {
       "yearLabel": "{{year}}",
       "count": "{{count}} artworks",

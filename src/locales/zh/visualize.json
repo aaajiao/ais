@@ -16,6 +16,10 @@
     "description": "按类型分层，每条带对应一种作品类型。带的厚薄反映该类型的作品数量。横轴是创作年份。",
     "axisYear": "创作年份",
     "axisHistory": "档案录入",
+    "aria": {
+      "blockLabel": "{{type}} · {{year}} · {{title}}",
+      "untitled": "未命名"
+    },
     "tooltip": {
       "yearLabel": "{{year}} 年",
       "count": "{{count}} 件作品",

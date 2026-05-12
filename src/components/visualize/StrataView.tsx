@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { cn } from '@/lib/utils';
 import type {
   VizArtwork,
   VizHistory,
@@ -31,8 +32,13 @@ const YEAR_LABEL_H = 20;  // 底部 year label 行高
 const TOP_PAD = 12;
 const BOTTOM_PAD = 8;
 
-// 默认全局 opacity 和 hover 时的 opacity
-const BLOCK_OPACITY_DEFAULT = 0.65;
+// ─── 方块状态 → Tailwind className ────────────────────────────────────────────
+// 用 Tailwind opacity 而非 SVG `fillOpacity` attribute，这样 dark 模式可以单独提暗。
+// `hover:opacity-100` 由 Tailwind 默认 gated 在 `@media (hover: hover) and (pointer: fine)` 下，
+// touch 设备 tap 不会触发该效果，tap 直接 navigate。
+const BLOCK_DEFAULT_CLS = 'opacity-[0.65] dark:opacity-[0.8] hover:opacity-100';
+const BLOCK_FOCUSED_LANE_CLS = 'opacity-100';
+const BLOCK_OTHER_LANE_CLS = 'opacity-[0.3] dark:opacity-[0.4]';
 
 export default function StrataView({ artworks, history }: Props) {
   const { t } = useTranslation('visualize');
@@ -79,7 +85,9 @@ export default function StrataView({ artworks, history }: Props) {
     laneHeights.reduce((s, h) => s + h + LANE_GAP, 0) - LANE_GAP;
 
   // ─── x 轴：year column 宽度自适应 ─────────────────────────────────────────
-  // SVG 总宽度固定 800（溢出则横向滚动）；列宽由可用宽度 / yearCount 决定
+  // viewBox 内部坐标：保留 800 为最小逻辑宽度，由 yearCount 决定向上扩展
+  // SVG 外层用 className="w-full" 响应式缩放（参考 Diaspora）；
+  // overflow-x-auto 兜底极端窄屏（虽然 w-full 缩放后通常不触发）
   const CANVAS_W = Math.max(800, LABEL_W + yearCount * 20 + RIGHT_PAD);
   const colW = yearCount > 0
     ? Math.max(14, Math.floor((CANVAS_W - LABEL_W - RIGHT_PAD) / yearCount))
@@ -129,6 +137,13 @@ export default function StrataView({ artworks, history }: Props) {
       ? artworks.filter((a) => parseYearFromArtwork(a) === hoveredYear).length
       : 0;
 
+  // ─── 跳转处理 ──────────────────────────────────────────────────────────────
+  // 防御：id 缺失就不 navigate（理论上 DB 保证 NOT NULL，但 schema 类型仍是可空）
+  function handleBlockActivate(a: VizArtwork) {
+    if (!a.id) return;
+    navigate(`/artworks/${a.id}`);
+  }
+
   return (
     <div className="space-y-4">
       {/* ─── Header ─────────────────────────────────────────────────────── */}
@@ -144,10 +159,9 @@ export default function StrataView({ artworks, history }: Props) {
       {/* ─── SVG ────────────────────────────────────────────────────────── */}
       <div className="relative overflow-x-auto border border-border">
         <svg
-          width={CANVAS_W}
-          height={totalH}
           viewBox={`0 0 ${CANVAS_W} ${totalH}`}
-          className="block"
+          className="block w-full"
+          preserveAspectRatio="xMinYMin meet"
           role="img"
           aria-label={t('strata.heading')}
         >
@@ -177,8 +191,7 @@ export default function StrataView({ artworks, history }: Props) {
                       y={barY}
                       width={barW}
                       height={h}
-                      className="fill-foreground"
-                      opacity={0.5}
+                      className="fill-foreground opacity-50 dark:opacity-70"
                     />
                     <title>{`${month}: ${count}`}</title>
                   </g>
@@ -266,22 +279,35 @@ export default function StrataView({ artworks, history }: Props) {
                     const blockY =
                       laneY + laneH - (pos.row + 1) * (BLOCK + BLOCK_GAP) + BLOCK_GAP;
 
-                    const isHoveredBlock = hoveredArtwork?.id === a.id;
-                    let opacity = BLOCK_OPACITY_DEFAULT;
-                    if (isFocusedLane) opacity = 1.0;
-                    else if (isOtherLane) opacity = 0.3;
-                    if (isHoveredBlock) opacity = 1.0;
+                    // 状态优先级：hovered (rect:hover) > focused lane > other lane > default
+                    // hovered 通过 Tailwind `hover:opacity-100` 由 CSS 直接驱动（gated 在 hover-capable device），
+                    // 这里只用 JS 状态处理 lane 维度
+                    const stateCls = isFocusedLane
+                      ? BLOCK_FOCUSED_LANE_CLS
+                      : isOtherLane
+                      ? BLOCK_OTHER_LANE_CLS
+                      : BLOCK_DEFAULT_CLS;
+
+                    const disabled = !a.id;
+                    const title =
+                      a.title_en || a.title_cn || t('strata.aria.untitled');
+                    const ariaLabel = t('strata.aria.blockLabel', {
+                      type: sl.displayLabel,
+                      year,
+                      title,
+                    });
 
                     return (
-                      <rect
-                        key={a.id}
-                        x={blockX}
-                        y={blockY}
-                        width={BLOCK}
-                        height={BLOCK}
-                        className="fill-foreground cursor-pointer"
-                        opacity={opacity}
-                        style={{ transition: 'opacity 0.1s' }}
+                      <g
+                        key={a.id ?? `${sl.type}-${year}-${i}`}
+                        role="button"
+                        tabIndex={disabled ? -1 : 0}
+                        aria-label={ariaLabel}
+                        aria-disabled={disabled || undefined}
+                        className={cn(
+                          'focus:outline-none focus-visible:outline-2 focus-visible:outline-foreground',
+                          !disabled && 'cursor-pointer'
+                        )}
                         onMouseEnter={() => {
                           setHoveredArtwork(a);
                           setHoveredYear(year);
@@ -290,8 +316,26 @@ export default function StrataView({ artworks, history }: Props) {
                           setHoveredArtwork(null);
                           setHoveredYear(null);
                         }}
-                        onClick={() => navigate(`/artworks/${a.id}`)}
-                      />
+                        onClick={() => handleBlockActivate(a)}
+                        onKeyDown={(e) => {
+                          if (disabled) return;
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleBlockActivate(a);
+                          }
+                        }}
+                      >
+                        <rect
+                          x={blockX}
+                          y={blockY}
+                          width={BLOCK}
+                          height={BLOCK}
+                          className={cn(
+                            'fill-foreground transition-opacity duration-100',
+                            stateCls
+                          )}
+                        />
+                      </g>
                     );
                   });
                 })}
