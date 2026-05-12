@@ -4,6 +4,7 @@
  */
 
 import { useState, useCallback, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { Location } from '@/hooks/useLocations';
 import type { LocationType } from '@/lib/database.types';
@@ -132,9 +133,14 @@ export default function LocationItem({
             )}
           </div>
           {usageCount !== undefined && usageCount > 0 && (
-            <span className="text-xs bg-muted px-2 py-0.5 rounded-full flex-shrink-0">
+            <Link
+              to={`/editions?locationId=${location.id}`}
+              onClick={(e) => e.stopPropagation()}
+              title={tLocations('viewEditionsTooltip')}
+              className="text-xs bg-muted hover:bg-foreground hover:text-background px-2 py-0.5 rounded-full flex-shrink-0 transition-colors"
+            >
               {t('location.editionsCount', { count: usageCount })}
-            </span>
+            </Link>
           )}
           {/* 展开/收起图标 */}
           {hasDetails && (

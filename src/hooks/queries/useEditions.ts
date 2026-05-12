@@ -68,6 +68,11 @@ export async function fetchEditionsPaginated(params: {
     query = query.eq('status', filters.status);
   }
 
+  // Apply location filter (server-side) —— 从位置页跳转过来时按位置过滤
+  if (filters.locationId) {
+    query = query.eq('location_id', filters.locationId);
+  }
+
   // Apply search filter (server-side, OR across edition columns + matched artwork/location ids).
   // Pre-fetch artwork and location ids in parallel so the main query can filter by `.in(...)`.
   const search = filters.search?.trim();

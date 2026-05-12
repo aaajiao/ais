@@ -25,5 +25,6 @@
     "aliases": "Aliases",
     "notes": "Notes"
   },
-  "editionsAtLocation": "{{count}} editions at this location"
+  "editionsAtLocation": "{{count}} editions at this location",
+  "viewEditionsTooltip": "View all editions at this location"
 }

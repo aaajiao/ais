@@ -9,6 +9,7 @@ export interface ArtworkFilters {
 export interface EditionFilters {
   status?: EditionStatus | 'all';
   search?: string;
+  locationId?: string;
 }
 
 // Query key factory

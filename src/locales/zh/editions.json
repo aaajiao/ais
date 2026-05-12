@@ -10,7 +10,9 @@
     "atGallery": "外借中",
     "atMuseum": "展览中",
     "inTransit": "运输中",
-    "sold": "已售"
+    "sold": "已售",
+    "locationLabel": "位置",
+    "clearLocation": "清除位置筛选"
   },
   "editionNumber": "版本号",
   "status": "状态",

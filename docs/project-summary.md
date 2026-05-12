@@ -27,10 +27,10 @@
 | ArtworkDetail | 418 | 作品信息、版本管理 |
 | Artworks | 408 | 虚拟滚动列表、筛选 |
 | EditionDetail | 321 | 版本生命周期、附件、历史 |
-| Editions | 313 | 版本列表 |
+| Editions | 313 | 版本列表（支持 `?status=` / `?locationId=` URL 筛选） |
 | Chat | 294 | AI 对话 |
 | Trash | 292 | 回收站 |
-| Locations | 269 | 位置管理 |
+| Locations | 269 | 位置管理（版本数 badge 可跳转 `/editions?locationId=` 查看该位置下所有版本） |
 | Dashboard | 261 | 统计概览 |
 | Import | 94 | MD 导入 |
 | Login | 87 | Google OAuth |

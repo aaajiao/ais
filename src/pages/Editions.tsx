@@ -1,13 +1,15 @@
 import { useState, useMemo, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
 import type { EditionStatus } from '@/lib/database.types';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
 import ListEndIndicator from '@/components/ui/ListEndIndicator';
 import { ToggleChip } from '@/components/ui/toggle-chip';
 import { SearchInput } from '@/components/ui/SearchInput';
-import { Image } from 'lucide-react';
+import { Image, X, MapPin } from 'lucide-react';
 import { queryKeys } from '@/lib/queryKeys';
+import { supabase } from '@/lib/supabase';
 import {
   useEditionsQueryFn,
   useEditionStatusCounts,
@@ -43,6 +45,7 @@ export default function Editions() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialFilter =
     (searchParams.get('status') as FilterStatus) || 'all';
+  const locationIdParam = searchParams.get('locationId');
 
   const [filter, setFilter] = useState<FilterStatus>(initialFilter);
   const [searchQuery, setSearchQuery] = useState('');
@@ -51,13 +54,30 @@ export default function Editions() {
   // Status counts for filter tabs
   const { data: statusCounts } = useEditionStatusCounts();
 
+  // 从 URL 进来的位置过滤：拉一下名字用于 active chip 展示
+  const { data: filterLocation } = useQuery<{ id: string; name: string } | null>({
+    queryKey: queryKeys.locations.detail(locationIdParam || ''),
+    queryFn: async () => {
+      if (!locationIdParam) return null;
+      const { data, error } = await supabase
+        .from('locations')
+        .select('id, name')
+        .eq('id', locationIdParam)
+        .maybeSingle();
+      if (error) throw error;
+      return data as { id: string; name: string } | null;
+    },
+    enabled: !!locationIdParam,
+  });
+
   // Create query function with current filters - use debounced search to reduce API calls
   const filters = useMemo(
     () => ({
       status: filter,
       search: debouncedSearchQuery,
+      locationId: locationIdParam ?? undefined,
     }),
-    [filter, debouncedSearchQuery]
+    [filter, debouncedSearchQuery, locationIdParam]
   );
 
   const queryFn = useEditionsQueryFn(filters);
@@ -80,20 +100,30 @@ export default function Editions() {
     estimateSize: () => 96,
   });
 
-  // Handle filter change
+  // Handle filter change —— 保留 locationId 等其他参数，仅更新 status
   const handleFilterChange = useCallback(
     (newFilter: FilterStatus) => {
       setFilter(newFilter);
+      const next = new URLSearchParams(searchParams);
       if (newFilter !== 'all') {
-        setSearchParams({ status: newFilter });
+        next.set('status', newFilter);
       } else {
-        setSearchParams({});
+        next.delete('status');
       }
+      setSearchParams(next);
       // Reset scroll position
       parentRef.current?.scrollTo(0, 0);
     },
-    [setSearchParams, parentRef]
+    [setFilter, searchParams, setSearchParams, parentRef]
   );
+
+  // 清除位置筛选 —— 保留 status / search 其他参数
+  const handleClearLocation = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('locationId');
+    setSearchParams(next);
+    parentRef.current?.scrollTo(0, 0);
+  }, [searchParams, setSearchParams, parentRef]);
 
   // 格式化版本号
   const formatEditionNumber = (edition: EditionWithDetails): string => {
@@ -148,6 +178,24 @@ export default function Editions() {
   return (
     <div className="p-6 flex flex-col h-[calc(100dvh-var(--spacing-chrome-mobile))] lg:h-[calc(100dvh-var(--spacing-chrome-desktop))]">
       <h1 className="text-page-title mb-6 xl:mb-8">{t('title')}</h1>
+
+      {/* 位置过滤 active chip —— 从位置页跳转过来时显示，点 × 清除 */}
+      {locationIdParam && (
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={handleClearLocation}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors text-sm"
+            aria-label={t('filters.clearLocation')}
+          >
+            <MapPin className="w-3.5 h-3.5" />
+            <span>
+              {t('filters.locationLabel')}: {filterLocation?.name || locationIdParam}
+            </span>
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* 筛选标签 */}
       <div className="flex gap-2 mb-6 overflow-x-auto pb-2" role="listbox" aria-label={t('filters.label')}>

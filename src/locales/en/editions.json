@@ -10,7 +10,9 @@
     "atGallery": "On Loan",
     "atMuseum": "Exhibition",
     "inTransit": "In Transit",
-    "sold": "Sold"
+    "sold": "Sold",
+    "locationLabel": "Location",
+    "clearLocation": "Clear location filter"
   },
   "editionNumber": "Edition #",
   "status": "Status",

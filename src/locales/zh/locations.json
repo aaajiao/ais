@@ -25,5 +25,6 @@
     "aliases": "别名",
     "notes": "备注"
   },
-  "editionsAtLocation": "{{count}} 个版本在此位置"
+  "editionsAtLocation": "{{count}} 个版本在此位置",
+  "viewEditionsTooltip": "查看该位置下的所有版本"
 }

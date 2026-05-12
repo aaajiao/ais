@@ -260,6 +260,34 @@ describe('fetchEditionsPaginated', () => {
     expect(eqStatus).toBeUndefined();
   });
 
+  it('locationId 过滤器传入时调用 eq("location_id", ...)（位置→版本跳转）', async () => {
+    setNextResponse({ data: [baseEditionRow] });
+
+    await fetchEditionsPaginated({
+      pageParam: null,
+      filters: { locationId: 'loc-abc' },
+    });
+
+    const builder = lastBuilder();
+    const eqCall = builder.calls.find(
+      (c) => c.method === 'eq' && c.args[0] === 'location_id'
+    );
+    expect(eqCall).toBeDefined();
+    expect(eqCall?.args[1]).toBe('loc-abc');
+  });
+
+  it('无 locationId 时不调用 eq("location_id",...)', async () => {
+    setNextResponse({ data: [baseEditionRow] });
+
+    await fetchEditionsPaginated({ pageParam: null });
+
+    const builder = lastBuilder();
+    const eqLocation = builder.calls.find(
+      (c) => c.method === 'eq' && c.args[0] === 'location_id'
+    );
+    expect(eqLocation).toBeUndefined();
+  });
+
   it('无 search 时不预查 artworks/locations', async () => {
     setNextResponse({ data: [baseEditionRow] });
     await fetchEditionsPaginated({ pageParam: null });
