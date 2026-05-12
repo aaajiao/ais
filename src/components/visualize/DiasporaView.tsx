@@ -30,11 +30,12 @@ export interface DiasporaViewProps {
 const W = 800;
 const H = 560;
 
-// 同心环辅助圆半径（纯视觉参考）
+// 同心环辅助圆半径（纯视觉参考）—— 必须与 diasporaUtils.ts 的 RING_RADII 同步
+// 外环 0.42 留出节点半径 + label 高度的安全边距，避免上下边缘节点被裁
 const RING_GUIDE_RADII = [
   Math.min(W, H) * 0.22,
-  Math.min(W, H) * 0.38,
-  Math.min(W, H) * 0.50,
+  Math.min(W, H) * 0.34,
+  Math.min(W, H) * 0.42,
 ];
 
 /** 二次贝塞尔控制点：把 from→to 曲线偏向中心以外，避免所有线交叉在原点 */

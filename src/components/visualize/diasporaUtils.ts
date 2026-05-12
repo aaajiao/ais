@@ -125,11 +125,12 @@ export function radialLayout(
     return { center, ring: [] };
   }
 
-  // 半径桶：内圈 / 中圈 / 外圈
+  // 半径桶：内圈 / 中圈 / 外圈 —— 与 DiasporaView.tsx 的 RING_GUIDE_RADII 同步
+  // 外环 0.42 留出 ~45px 给节点 + label，避免上下边缘节点被 viewBox 裁切
   const RING_RADII = [
     Math.min(viewport.width, viewport.height) * 0.22,
-    Math.min(viewport.width, viewport.height) * 0.38,
-    Math.min(viewport.width, viewport.height) * 0.50,
+    Math.min(viewport.width, viewport.height) * 0.34,
+    Math.min(viewport.width, viewport.height) * 0.42,
   ];
 
   // 按 editionCount 降序的外环节点，分三桶
