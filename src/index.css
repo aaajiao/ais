@@ -234,6 +234,14 @@ h1, h2, h3, .font-display {
   animation: pulse-ring 2s ease-out infinite;
 }
 
+/* 隐藏滚动条但保留滚动能力（用于 tab bar 等横向溢出可滚的容器） */
+.scrollbar-none {
+  scrollbar-width: none; /* Firefox */
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none; /* Safari / Chrome */
+}
+
 /* Diaspora pin 节点：选中态闪烁脉冲（在 SVG circle 上用 opacity 动画，box-shadow 不支持） */
 @keyframes diaspora-pin-blink {
   0%, 100% { opacity: 0.3; }

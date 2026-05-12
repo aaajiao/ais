@@ -49,8 +49,8 @@ export default function Visualize() {
       </header>
 
       {/* Tab bar */}
-      <nav className="flex items-center justify-between border-b border-border">
-        <div className="flex">
+      <nav className="flex items-center justify-between border-b border-border gap-2">
+        <div className="flex overflow-x-auto -mx-1 px-1 scrollbar-none">
           {tabs.map((tab) => {
             const selected = activeView === tab.key;
             return (
@@ -58,7 +58,7 @@ export default function Visualize() {
                 key={tab.key}
                 type="button"
                 onClick={() => setView(tab.key)}
-                className={`px-4 py-2.5 text-sm uppercase tracking-wider transition-colors border-b-2 -mb-px ${
+                className={`px-2 lg:px-4 py-2.5 text-[11px] lg:text-sm uppercase tracking-normal lg:tracking-wider whitespace-nowrap transition-colors border-b-2 -mb-px ${
                   selected
                     ? 'border-foreground text-foreground font-medium'
                     : 'border-transparent text-muted-foreground hover:text-foreground'
