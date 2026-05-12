@@ -11,6 +11,8 @@ An artwork inventory management system for artist aaajiao. Manage the full lifec
 - **AI Chat** - Natural language queries and operations ("Guard 1/3 sold, $50k")
 - **URL Import** - Type "import https://..." in chat to auto-extract artwork from webpages
 - **Public Links** - Create shareable links for locations with price visibility control
+- **Visualize** - Read the entire archive as terrain: 4 views (Strata / Markets / Terminal / Diaspora), realtime, single-color SVG aesthetic
+- **External API** - API key auth + read-only structured query endpoint for external AI agents
 - **Data Export** - PDF / Markdown / CSV / JSON
 - **Offline Support** - PWA + IndexedDB cache for offline browsing
 - **i18n** - Chinese / English
@@ -58,6 +60,8 @@ VITE_ALLOWED_EMAILS=           # client-side UX, must match ALLOWED_EMAILS
 - `docs/database.md` - Database schema, deployment, and field reference
 - `docs/local-dev.md` - Local development setup
 - `docs/api-reference.md` - AI tools and API endpoints
+- `docs/external-api.md` - External API (API Key structured query)
+- `docs/visualize.md` - Visualize page (4 views)
 - `docs/style-guide.md` - UI/UX design specification
 
 ## License

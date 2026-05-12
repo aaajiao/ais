@@ -9,6 +9,8 @@
 - **AI 对话** - 自然语言查询和操作（"Guard 1/3 卖了，5万美金"）
 - **URL 导入** - 对话中输入「导入 https://...」自动抓取网页创建作品
 - **公开链接** - 为位置创建分享链接，可控制价格可见性
+- **可视化** - 把整个 archive 当作可读的地形：4 个视图（Strata / Markets / Terminal / Diaspora），实时数据，单色 SVG 美学
+- **外部 API** - API Key 鉴权 + 只读结构化查询端点，供外部 AI 代理访问
 - **数据导出** - PDF / Markdown / JSON（设置页备份：JSON + MD；列表/详情页：MD；公开画廊：PDF）
 - **离线支持** - PWA + IndexedDB 缓存，断网可查看
 - **国际化** - 中文 / English
@@ -56,6 +58,8 @@ VITE_ALLOWED_EMAILS=           # 客户端 UX，必须与 ALLOWED_EMAILS 同值
 - `docs/database.md` - 数据库部署、字段说明、RLS
 - `docs/local-dev.md` - 本地开发说明
 - `docs/api-reference.md` - AI 工具和 API 端点
+- `docs/external-api.md` - 外部 API（API Key 结构化查询）
+- `docs/visualize.md` - 可视化页面（4 视图）
 - `docs/style-guide.md` - UI/UX 设计规范
 
 ## License

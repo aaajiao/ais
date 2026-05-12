@@ -1,40 +1,31 @@
 # 项目总结
 
-## 代码统计
+## 规模
 
-| 分类 | 文件数 | 代码行 |
-|------|--------|--------|
-| 页面 | 13 | 3,644 |
-| 组件 (TSX) | 58 | 8,970 |
-| 组件工具 (TS) | 12 | 1,068 |
-| Hooks | 11 | 2,117 |
-| API | 27 | 3,942 |
-| Lib | 15 | 2,423 |
-| **TypeScript 总计** | **~174** | **~22,200** |
+> 数字会漂——以 `bun run test:run` / `find src/pages -name "*.tsx"` 为准。下表是粗略快照。
 
-### 测试覆盖
+- **测试**：63 个文件，1226 个用例（API 工具、工具函数、React Hooks、组件级 / smoke）
+- **页面**：14 个（见下）
+- **TypeScript 源码**：~25K 行（src + api）
 
-- **22 个测试文件**
-- **572 个测试用例**
-- 覆盖：API 工具、工具函数、React Hooks、组件工具函数
+### 页面清单
 
-### 页面代码量
-
-| 页面 | 行数 | 功能 |
-|------|------|------|
-| Links | 445 | 公开链接管理 |
-| PublicView | 419 | 画廊门户（无需认证） |
-| ArtworkDetail | 418 | 作品信息、版本管理 |
-| Artworks | 408 | 虚拟滚动列表、筛选 |
-| EditionDetail | 321 | 版本生命周期、附件、历史 |
-| Editions | 313 | 版本列表（支持 `?status=` / `?locationId=` URL 筛选） |
-| Chat | 294 | AI 对话 |
-| Trash | 292 | 回收站 |
-| Locations | 269 | 位置管理（版本数 badge 可跳转 `/editions?locationId=` 查看该位置下所有版本） |
-| Dashboard | 261 | 统计概览 |
-| Import | 94 | MD 导入 |
-| Login | 87 | Google OAuth |
-| Settings | 23 | 设置入口（已拆分为子组件） |
+| 页面 | 功能 |
+|------|------|
+| Visualize | 把整个 archive 当作可读地形 — 4 视图（Strata / Markets / Terminal / Diaspora），实时数据 |
+| Links | 公开链接管理 |
+| PublicView | 画廊门户（无需认证） |
+| ArtworkDetail | 作品信息、版本管理 |
+| Artworks | 虚拟滚动列表、筛选 |
+| EditionDetail | 版本生命周期、附件、历史 |
+| Editions | 版本列表（支持 `?status=` / `?locationId=` URL 筛选） |
+| Chat | AI 对话 |
+| Trash | 回收站 |
+| Locations | 位置管理（版本数 badge 可跳转 `/editions?locationId=` 查看该位置下所有版本） |
+| Dashboard | 统计概览 |
+| Import | MD 导入 |
+| Login | Google OAuth |
+| Settings | 设置入口（已拆分为 ModelSettings / ExportSettings / ApiKeySettings / AccountSettings） |
 
 ## 已完成功能
 
@@ -66,6 +57,11 @@
 - 结构化查询端点（5 个只读工具）
 - Schema 端点（参数定义自动生成）
 - 支持外部 AI 代理访问库存数据
+
+### 可视化（v1.5）
+- 4 个视图共享一次数据拉取（`useVisualizationData`）+ mutation 同步失效
+- Brutalist 美学：单色 + 透明度 + 纯 SVG，无 d3 / three.js
+- 移动端底部 nav 设 Eye 入口；管理类页面不进入移动 nav
 
 ### 用户体验
 - PWA（可安装、Service Worker）
@@ -123,4 +119,4 @@ Supabase
 
 ---
 
-*最后更新: 2026-01-27*
+*最后更新: 2026-05-12（v1.5.0）*
