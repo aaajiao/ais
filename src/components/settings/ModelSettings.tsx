@@ -29,6 +29,7 @@ export default function ModelSettings() {
     searchExpansionModel,
     searchExpansionModelInfo,
     handleSearchExpansionModelChange,
+    defaultExpansionModelName,
     thinkingEnabled,
     setThinkingEnabled,
   } = useModelSettings();
@@ -214,7 +215,7 @@ export default function ModelSettings() {
                 selectedModel={searchExpansionModel}
                 selectedModelInfo={searchExpansionModelInfo}
                 mainModelName=""
-                defaultLabel={t('ai.usingDefaultFastModel')}
+                defaultLabel={t('ai.usingDefaultFastModel', { modelName: defaultExpansionModelName })}
                 models={models}
                 descLang={descLang}
                 onModelChange={handleSearchExpansionModelChange}

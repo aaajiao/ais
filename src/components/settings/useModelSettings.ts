@@ -10,7 +10,10 @@ export interface ModelInfo {
 export interface ModelsResponse {
   anthropic: ModelInfo[];
   openai: ModelInfo[];
+  /** 主聊天默认模型 ID（后端 DEFAULT_MODEL，当前 Sonnet 4.6） */
   defaultModel: string | null;
+  /** 翻译 / 搜索扩展默认模型 ID（后端 DEFAULT_EXPANSION_MODEL，当前 Haiku 4.5） */
+  defaultExpansionModel: string | null;
 }
 
 /**
@@ -126,6 +129,13 @@ export function useModelSettings() {
     return allModels.find(m => m.id === searchExpansionModel);
   }, [models, searchExpansionModel]);
 
+  // 默认翻译模型的显示名（用于"默认：xxx（独立于主聊天）"文案，避免硬编码）
+  const defaultExpansionModelName = useMemo(() => {
+    if (!models?.defaultExpansionModel) return 'Claude Haiku 4.5';
+    const allModels = [...models.anthropic, ...models.openai];
+    return allModels.find(m => m.id === models.defaultExpansionModel)?.name || 'Claude Haiku 4.5';
+  }, [models]);
+
   return {
     // 状态
     models,
@@ -145,6 +155,7 @@ export function useModelSettings() {
     searchExpansionModel,
     searchExpansionModelInfo,
     handleSearchExpansionModelChange,
+    defaultExpansionModelName,
     // 深度推理开关
     thinkingEnabled,
     setThinkingEnabled,

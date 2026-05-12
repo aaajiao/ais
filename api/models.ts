@@ -3,6 +3,11 @@
  * GET /api/models
  */
 
+// 跟 api/lib/model-provider.ts 同步（edge runtime 不能 import 非 edge 模块；
+// 改这两个常量必须同时改 model-provider.ts，单元测试守护两边一致）
+const DEFAULT_MAIN_MODEL_ID = 'claude-sonnet-4-6';
+const DEFAULT_EXPANSION_MODEL_ID = 'claude-haiku-4-5';
+
 export const config = {
   runtime: 'edge',
 };
@@ -259,14 +264,23 @@ export default async function handler(req: Request) {
       fetchOpenAIModels(),
     ]);
 
+    // 找回默认主模型 / 默认翻译模型；若 list 不含则 fallback 第一个 anthropic
+    const defaultMainModel =
+      anthropicModels.find((m) => m.id === DEFAULT_MAIN_MODEL_ID)?.id
+      || anthropicModels.find((m) => m.id.includes('sonnet'))?.id
+      || anthropicModels[0]?.id
+      || openaiModels[0]?.id
+      || null;
+    const defaultExpansionModel =
+      anthropicModels.find((m) => m.id === DEFAULT_EXPANSION_MODEL_ID)?.id
+      || anthropicModels.find((m) => m.id.includes('haiku'))?.id
+      || null;
+
     const response = {
       anthropic: anthropicModels,
       openai: openaiModels,
-      // Provide a default model if available
-      defaultModel: anthropicModels.find(m => m.id.includes('sonnet'))?.id
-        || anthropicModels[0]?.id
-        || openaiModels[0]?.id
-        || null,
+      defaultModel: defaultMainModel,
+      defaultExpansionModel,
     };
 
     return new Response(JSON.stringify(response), {
