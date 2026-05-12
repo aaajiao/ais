@@ -22,15 +22,12 @@ const mockHookResult = {
   isSuccess: true,
 };
 
-vi.mock('@/hooks/queries/useVisualizationData', async () => {
-  const actual = await vi.importActual<
-    typeof import('@/hooks/queries/useVisualizationData')
-  >('@/hooks/queries/useVisualizationData');
-  return {
-    ...actual,
-    useVisualizationData: () => mockHookResult,
-  };
-});
+// 不用 vi.importActual —— 它会触发真模块加载 → supabase.ts → createClient() →
+// 在 CI 无 VITE_SUPABASE_URL 时抛 "supabaseUrl is required"。
+// 类型导入都是 `import type`（编译期擦除），mock 只需暴露 useVisualizationData。
+vi.mock('@/hooks/queries/useVisualizationData', () => ({
+  useVisualizationData: () => mockHookResult,
+}));
 
 import Visualize from '../Visualize';
 
