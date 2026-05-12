@@ -84,7 +84,8 @@
     "tooltip": {
       "editions": "{{count}} editions here",
       "untracked": "no location recorded",
-      "clickToPin": "Click to pin this node"
+      "clickToPin": "Click to pin this node",
+      "idleHint": "Hover or click a node to see details"
     },
     "pin": {
       "editionsAt": "{{count}} editions here",

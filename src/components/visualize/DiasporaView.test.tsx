@@ -189,7 +189,7 @@ describe('DiasporaView', () => {
     expect(screen.queryByText(/查看此位置全部版本|View all editions/i)).not.toBeInTheDocument();
 
     // Default hint shown
-    expect(screen.getByText(/点击查看该年作品|Click to view/i)).toBeInTheDocument();
+    expect(screen.getByText(/悬停或点击节点|Hover or click/i)).toBeInTheDocument();
   });
 
   it('hover 节点 → 下方信息条预览 location 信息', () => {
@@ -220,7 +220,7 @@ describe('DiasporaView', () => {
     // Preview gone
     expect(screen.queryByText(/Test Gallery Berlin/)).not.toBeInTheDocument();
     // Default hint restored
-    expect(screen.getByText(/点击查看该年作品|Click to view/i)).toBeInTheDocument();
+    expect(screen.getByText(/悬停或点击节点|Hover or click/i)).toBeInTheDocument();
   });
 
   it('click 节点 → pin 卡片出现 + 显示 editions 列表', () => {
@@ -290,7 +290,7 @@ describe('DiasporaView', () => {
     fireEvent.click(galleryGroup);
     // Unpinned
     expect(screen.queryByText(/查看此位置全部版本|View all editions/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/点击查看该年作品|Click to view/i)).toBeInTheDocument();
+    expect(screen.getByText(/悬停或点击节点|Hover or click/i)).toBeInTheDocument();
   });
 
   it('click 另一节点 → 切换 pin 到新节点', () => {

@@ -84,7 +84,8 @@
     "tooltip": {
       "editions": "{{count}} 个版本在此",
       "untracked": "未记录所在地",
-      "clickToPin": "点击固定此节点"
+      "clickToPin": "点击固定此节点",
+      "idleHint": "悬停或点击节点查看详情"
     },
     "pin": {
       "editionsAt": "此处 {{count}} 个版本",

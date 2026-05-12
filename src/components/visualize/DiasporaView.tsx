@@ -557,7 +557,7 @@ export default function DiasporaView({
         ) : (
           /* ── 默认提示 ───────────────────────────────────────────── */
           <div className="text-muted-foreground">
-            {t('strata.tooltip.click')}
+            {t('diaspora.tooltip.idleHint')}
           </div>
         )}
       </div>

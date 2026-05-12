@@ -4,7 +4,7 @@
 
 | View | 视觉对象 | 数据切面 |
 |---|---|---|
-| **Strata** 地层 | 按 year × type 堆叠的色块 + 顶部录入时间轴 | `artworks.year` / `artworks.type` / `edition_history.created_at` |
+| **Strata** 地层 | 横向 swimlane（每 type 一条带），方块按 year 列对齐 + 顶部录入时间轴 | `artworks.year` / `artworks.type` / `edition_history.created_at` |
 | **Markets** 市场 | 多列散点（一货币一列），半径 = log(price) | `editions.sale_price` / `editions.sale_currency` |
 | **Terminal** 终端 | monospace 字符表格，137 行 | 全表合并视图 |
 | **Diaspora** 流散 | 同心环关系图，中心 = 工作室 | `editions.location_id` / `edition_history.action='location_change'` |
@@ -15,9 +15,9 @@
 
 1. **进入即最新**：`useVisualizationData` 设了 `staleTime: 0` + `refetchOnMount: 'always'`。任何编辑动作后回到这里都看到当前快照。`refetchOnWindowFocus` 关闭——避免 SVG 在切窗口时跳动。
 2. **不引入新依赖**：纯 SVG / CSS / 算术。165 件作品 + 137 个版本对纯前端而言体量极小，无需 d3 / three.js / 任何图表库。
-3. **数据驱动而非 schema 驱动**：Markets 不硬编码 3 个货币。`CurrencyType` schema 列了 7 种（USD/EUR/CNY/GBP/CHF/HKD/JPY），实际出现哪些就画哪些列，按交易数降序。Strata 的 type 分层也只把头部 3 种（Installation/Video/Digital printing）保留辨识度，其余归入 `other`。
-4. **缺失数据不藏**：Terminal 把 null 显式渲染为 `─`。Diaspora 顶部直接显示 `X / Y editions have known location history`，把档案的"薄"做成 statement，而不是装饰。
-5. **跟随主题**：所有 SVG 颜色用 `fill-foreground` / `fill-muted-foreground` / `fill-border`，明暗模式自动适配。Strata 用透明度做 type 区分，避免引入彩色。
+3. **数据驱动而非 schema 驱动**：Markets 不硬编码 3 个货币。`CurrencyType` schema 列了 7 种（USD/EUR/CNY/GBP/CHF/HKD/JPY），实际出现哪些就画哪些列，按交易数降序。Strata 同理 —— 不硬编码 type 名单，把所有 distinct `artworks.type` 各占一条 swimlane，按 count desc 排列；`null` 归入 `(untyped)` swimlane。
+4. **缺失数据不藏**：Terminal 把 null 显式渲染为 `─`。Diaspora 顶部直接显示 `X / Y editions have known location history`，把档案的"薄"做成 statement，而不是装饰。Strata 的 `(untyped)` swimlane 同理。
+5. **跟随主题**：所有 SVG 颜色用 `fill-foreground` / `fill-muted-foreground` / `fill-border`，明暗模式自动适配。所有 view 都用单色 + 透明度做区分（绝不用彩色）。**Strata 不再用透明度区分 type**——type 身份由 swimlane 行位置承担，方块全部用统一 `fill-foreground` 0.65。
 
 ---
 
@@ -52,10 +52,14 @@ const [artworksRes, editionsRes, locationsRes, historyRes] = await Promise.all([
 
 ### Strata
 
-- **type 用透明度而非彩色**：保留 Brutalist 单色调性，明暗主题自动适配。Installation 1.0 → other 0.22。
+- **横向 swimlane，每 type 一条带**：当前实现（重设计自 v1.5）。type 身份完全由行位置承担——所有方块统一 `fill-foreground` 0.65，hover 升 1.0。**不要**改回"颜色/透明度区分 type"——type 数量可能超过 10 种，单色 + opacity 区分不开。
+- **带高 = log1p(count) 归一化**：`SWIMLANE_MIN_H=16` / `MAX_H=64`。Installation(115) 占 64px，单件 type 仍有 16px 可辨识，两个数量级落差不会让小 type 消失。
+- **列出所有 distinct type，含 `null`**：`null` 归入字面 key `__untyped__`，显示为 `(untyped)` swimlane（跟 Terminal 的"null 不藏"美学一致）。**不要**把 type 归到 "other" 桶——分类多样性是真实数据。
 - **缺失年份保留空列**：x 轴是真正的时间轴（不是密度图）。2014 没作品也画一个空 column，肉眼能看到节奏。
 - **year range 锚定到 start year**：`'2014-2015'` → 堆到 2014 列。range 内不重复堆，保持每个作品在档案里只有一个位置。
+- **stack 满了水平蔓延**：同一 (type, year) 多个作品先竖直堆，行满了 col 右移一格 row 重置——确保多作品 cell 不溢出 swimlane 边界。
 - **顶部断层条**：history 月度密度作为单独的 SVG 层。85/87 条历史挤在 2026 年三个月——这是数据自己的故事，做成视觉断层就让"档案在 2026 年突然出现"立得住。
+- **跟 Markets 视觉对称**：Markets 是垂直列 × 散点；Strata 是水平带 × 方块。两者镜像。
 
 ### Markets
 
@@ -85,7 +89,7 @@ const [artworksRes, editionsRes, locationsRes, historyRes] = await Promise.all([
 | 文件 | 测试 |
 |---|---|
 | `useVisualizationData.test.ts` | 4 — 并行查 4 表 / RLS deleted_at / 聚合 / error 传播 |
-| `strataUtils.test.ts` | 15 — year 解析 / tier 分组 / bucket 连续填充 / 排序 |
+| `strataUtils.test.ts` | 26 — year 解析 / swimlane 分组 + 排序 / `(untyped)` 处理 / 高度 log scale / stack 满了水平蔓延 |
 | `marketsUtils.test.ts` | 17 — 过滤 sold/有价 / 中位数 / 半径归一化 / 边界 |
 | `terminalUtils.test.ts` | 29 — inventory 自然排序 / edition label 4 种 / location 拼接 / group 分桶 / markets line |
 | `diasporaUtils.test.ts` | 30 — 节点关联 / 中心选择 tie-breaker / 同心环布局 / 边聚合 / tracked stat |
