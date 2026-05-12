@@ -27,6 +27,13 @@
 - URL 可分享、可前后退
 - 数据 hook 在容器层加载，4 个 view 共享一次 fetch
 
+### 容器规范
+
+- `Layout.tsx` 给 `/visualize` 路由配 `max-w-7xl + mx-auto`（4 个 view 都需要宽幅），**不带 padding**
+- `Visualize.tsx` 自己加 `px-4 lg:px-8 py-6` —— 因为 Layout 不带 padding，所以这里不冗余
+- **断点约定**：`lg:` (1024px) 而非 `md:` (768px)。与 [style-guide 响应式断点](style-guide.md#响应式断点) 一致 —— 项目里 `lg:` 是移动端/桌面端分界的核心断点，`md:` 在导航/布局相关的场景禁用。Visualize 守护测试 `Visualize.test.tsx` 断言容器 className 含 `lg:` 不含 `md:`。
+- 重构时**不要**把 padding 移进 Layout（其他页面 padding 各异，Dashboard 用 `p-4 sm:p-6 lg:p-8`，Artworks 用 `p-6`，统一到 Layout 会破其他页面）
+
 ---
 
 ## 数据 hook
@@ -94,6 +101,8 @@ const [artworksRes, editionsRes, locationsRes, historyRes] = await Promise.all([
 - **"档案薄"显式声明**：顶部 stat bar 直接写 `27 / 137 editions have known location`，配 stateHint "数据会随系统使用而生长"。**不要把空白藏起来**——薄数据是当前 archive 的真实状态，本身是 statement。
 - **`from_location` / `to_location` 是 name（text）不是 UUID**：构建边时需要 name → id 反向映射。改 schema 时注意（见 `supabase/schema.sql` 的 trigger）。
 - **双态交互：hover = 预览，click = pin**：`hoveredNodeId` 只在无 pin 时驱动预览信息条；`pinnedNodeId` 驱动完整 pin 卡片（位置信息 + edition 列表 + "view all"链接）。两次点同一节点或点 SVG 空白取消 pin。**pin 卡片中每一行 edition（inventory_number · 标题 · status）都是可点击的 `<button>`，navigate 到 `/editions/{id}`；底部 "view all" 按钮 navigate 到 `/editions?locationId={id}`**。这条不要退回到只显示 `<span>` inventory_number 的旧实现。
+- **长名 label 用 SVG `<title>` 做原生 tooltip**：节点可见 label 超过 18 字符会截断为 16+`…`（避免覆盖相邻节点）。每个 `<g data-node>` 内的第一个子元素是 `<title>{node.name}</title>`，浏览器 hover 节点时显示完整名（中心节点同样处理）。这是无依赖、跨浏览器、零样式开销的方案，不要换成自定义 HTML tooltip。
+- **pin 卡片按钮防御性 `stopPropagation`**：edition 行按钮和 "view all" 按钮的 `onClick` 都调 `e.stopPropagation()`。当前 pin 卡片在 SVG 外不会冒泡到 `handleSvgClick`，但未来重构若把卡片移入 `<foreignObject>`（为了和 SVG 同坐标系联动），点击就会冒泡触发 unpin。预防为主，省得调试。
 
 ---
 
@@ -107,9 +116,9 @@ const [artworksRes, editionsRes, locationsRes, historyRes] = await Promise.all([
 | `terminalUtils.test.ts` | 29 — inventory 自然排序 / edition label 4 种 / location 拼接 / group 分桶 / markets line |
 | `TerminalView.test.tsx` | 9 — 行 role=button + tabIndex / 点击 navigate / 键盘 Enter+Space / 其他键不触发 / 分组 heading + aria-hidden 装饰 / 紧凑字号 class / row.id 防御 / separator 对 SR 隐藏 |
 | `diasporaUtils.test.ts` | 30 — 节点关联 / 中心选择 tie-breaker / 同心环布局 / 边聚合 / tracked stat |
-| `DiasporaView.test.tsx` | 14 — 初始状态 / hover 预览 / hover 离开 / click pin / edition 行跳转 / view all 跳转 / 二次 click 取消 pin / 切换 pin / pin 时 hover 不干扰 / 无编号 edition / 空数据 / aria-pressed / 键盘 Enter / title_cn fallback |
+| `DiasporaView.test.tsx` | 18 — 初始状态 / hover 预览 / hover 离开 / click pin / edition 行跳转 / view all 跳转 / 二次 click 取消 pin / 切换 pin / pin 时 hover 不干扰 / 无编号 edition / 空数据 / aria-pressed / 键盘 Enter / title_cn fallback / 长名 SVG `<title>` / center node `<title>` / pin 卡片 stopPropagation / spy stopPropagation |
 | `StrataView.test.tsx` | 11 — role=button 包裹 rect / aria-label 拼装 / click navigate / Enter / Space / 其它键不触发 / tabindex=0 / id 缺失 aria-disabled / viewBox 响应式 / hover tooltip / 空数据 |
-| `Visualize.test.tsx` | 8 — loading / error / 4 个 view 默认渲染 / 非法 ?view 回落 / refetch 按钮 |
+| `Visualize.test.tsx` | 9 — loading / error / 4 个 view 默认渲染 / 非法 ?view 回落 / refetch 按钮 / 容器断点 lg: |
 | `visualize-parity.test.ts` | 2 — zh ⟷ en key 完全一致 / 核心段都存在 |
 
 不写每个 View 组件的视觉细节测试——SVG 几何细节用代码 review，回归靠 utils 测试 + smoke test 兜底。DiasporaView 是例外：交互状态机复杂，组件级测试守护 pin/hover 流。

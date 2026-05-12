@@ -42,7 +42,7 @@ export default function Visualize() {
   );
 
   return (
-    <div className="px-4 md:px-6 lg:px-8 py-6 space-y-6">
+    <div className="px-4 lg:px-8 py-6 space-y-6">
       <header className="space-y-2">
         <h1 className="text-2xl font-bold tracking-tight">{t('title')}</h1>
         <p className="text-sm text-muted-foreground">{t('subtitle')}</p>

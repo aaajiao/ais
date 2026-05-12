@@ -181,4 +181,20 @@ describe('Visualize page', () => {
     fireEvent.click(refreshBtn!);
     expect(mockHookResult.refetch).toHaveBeenCalledTimes(1);
   });
+
+  // ─── 容器规范化（style-guide：移动端/桌面端分界用 lg，不用 md）──────────
+  it('容器使用 lg: 断点而非 md:（与 Layout.tsx 移动端/桌面端分界一致）', () => {
+    resetMock();
+    const { container } = renderAt('/visualize');
+
+    // The outermost div is the page container — first child of the test render root
+    const rootDiv = container.querySelector('div.px-4');
+    expect(rootDiv).not.toBeNull();
+
+    const cls = rootDiv!.className;
+    // 必须包含 lg: 断点（桌面端 padding）
+    expect(cls).toMatch(/\blg:px-/);
+    // 必须不包含 md: 断点（与 style-guide 一致：lg 是核心断点）
+    expect(cls).not.toMatch(/\bmd:px-/);
+  });
 });

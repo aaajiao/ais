@@ -337,6 +337,8 @@ export default function DiasporaView({
                     }
                   }}
                 >
+                  {/* SVG 原生 tooltip：hover 显示完整 name（label 被截断时尤其重要） */}
+                  <title>{node.name}</title>
                   {/* pin 外圈（仅 pin 状态显示，比 hover ring 更粗更明显） */}
                   {isPinned && (
                     <circle
@@ -421,6 +423,8 @@ export default function DiasporaView({
                   }
                 }}
               >
+                {/* SVG 原生 tooltip：center node label 截断时也能看完整名 */}
+                <title>{centerNodeObj.name}</title>
                 {/* pin outer ring for center */}
                 {isCenterPinned && (
                   <circle
@@ -507,7 +511,12 @@ export default function DiasporaView({
                     key={edition.id}
                     type="button"
                     className="block w-full text-left px-2 py-1 hover:bg-muted/50 border border-transparent hover:border-border transition-colors cursor-pointer"
-                    onClick={() => navigate(`/editions/${edition.id}`)}
+                    onClick={(e) => {
+                      // 防御性 stopPropagation：pin 卡片在 SVG 外，理论上不会冒泡到 SVG unpin，
+                      // 但未来重构若把卡片移入 <foreignObject> 就会触发。预防为主。
+                      e.stopPropagation();
+                      navigate(`/editions/${edition.id}`);
+                    }}
                   >
                     <span className="font-mono">
                       {displayId}
@@ -529,7 +538,10 @@ export default function DiasporaView({
             <button
               type="button"
               className="text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2 cursor-pointer"
-              onClick={() => navigate(`/editions?locationId=${pinnedNodeId}`)}
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/editions?locationId=${pinnedNodeId}`);
+              }}
             >
               {t('diaspora.pin.viewAll')}
             </button>

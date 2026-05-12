@@ -68,6 +68,30 @@ const galleryLocation: VizLocation = {
   country: 'Germany',
 };
 
+// Location with a name longer than 18 chars to assert SVG <title> tooltip + truncation
+const longNameLocation: VizLocation = {
+  id: 'loc-longname',
+  name: 'A Very Long Gallery Name That Exceeds Eighteen Chars',
+  type: 'gallery',
+  city: 'Tokyo',
+  country: 'Japan',
+};
+
+const longNameEdition: VizEdition = {
+  id: 'e5',
+  artwork_id: 'artwork-1',
+  inventory_number: 'AAJ-LONG-001',
+  edition_type: 'numbered',
+  edition_number: 3,
+  status: 'at_gallery',
+  location_id: 'loc-longname',
+  sale_price: null,
+  sale_currency: null,
+  sale_date: null,
+  buyer_name: null,
+  created_at: '2024-02-01T00:00:00Z',
+};
+
 // Editions at studio
 const studioEditions: VizEdition[] = [
   {
@@ -201,8 +225,10 @@ describe('DiasporaView', () => {
     });
     fireEvent.mouseEnter(galleryGroup);
 
-    // Preview appears
-    expect(screen.getByText('Test Gallery Berlin')).toBeInTheDocument();
+    // Preview appears (scope to div/span — SVG <title> also contains the name now)
+    expect(
+      screen.getByText('Test Gallery Berlin', { selector: 'div,span' })
+    ).toBeInTheDocument();
     // Should show clickToPin hint
     expect(screen.getByText(/点击固定|Click to pin/i)).toBeInTheDocument();
   });
@@ -214,11 +240,16 @@ describe('DiasporaView', () => {
       name: /Test Gallery Berlin/i,
     });
     fireEvent.mouseEnter(galleryGroup);
-    expect(screen.getByText('Test Gallery Berlin')).toBeInTheDocument();
+    expect(
+      screen.getByText('Test Gallery Berlin', { selector: 'div,span' })
+    ).toBeInTheDocument();
 
     fireEvent.mouseLeave(galleryGroup);
-    // Preview gone
-    expect(screen.queryByText(/Test Gallery Berlin/)).not.toBeInTheDocument();
+    // Preview gone — assert the visible (non-SVG-title) instance disappears.
+    // SVG <title> remains on the node permanently; that's fine.
+    expect(
+      screen.queryByText('Test Gallery Berlin', { selector: 'div,span' })
+    ).not.toBeInTheDocument();
     // Default hint restored
     expect(screen.getByText(/悬停或点击节点|Hover or click/i)).toBeInTheDocument();
   });
@@ -231,8 +262,10 @@ describe('DiasporaView', () => {
     });
     fireEvent.click(galleryGroup);
 
-    // Pin card should show gallery name
-    expect(screen.getByText('Test Gallery Berlin')).toBeInTheDocument();
+    // Pin card should show gallery name (scope away from SVG <title>)
+    expect(
+      screen.getByText('Test Gallery Berlin', { selector: 'div,span' })
+    ).toBeInTheDocument();
     // View all link
     expect(screen.getByText(/查看此位置全部版本|View all editions/i)).toBeInTheDocument();
     // Edition inventory number
@@ -301,7 +334,9 @@ describe('DiasporaView', () => {
       name: /Test Gallery Berlin/i,
     });
     fireEvent.click(galleryGroup);
-    expect(screen.getByText('Test Gallery Berlin')).toBeInTheDocument();
+    expect(
+      screen.getByText('Test Gallery Berlin', { selector: 'div,span' })
+    ).toBeInTheDocument();
 
     // Click center node (studio) to switch pin
     const studioGroup = screen.getByRole('button', {
@@ -310,7 +345,9 @@ describe('DiasporaView', () => {
     fireEvent.click(studioGroup);
 
     // Now studio is pinned, gallery pin is gone
-    expect(screen.getByText('aaajiao Shanghai Studio')).toBeInTheDocument();
+    expect(
+      screen.getByText('aaajiao Shanghai Studio', { selector: 'div,span' })
+    ).toBeInTheDocument();
     // Gallery node name should not be in pin card position
     // Check "view all" still present (still pinned, just to different location)
     expect(screen.getByText(/查看此位置全部版本|View all editions/i)).toBeInTheDocument();
@@ -394,5 +431,88 @@ describe('DiasporaView', () => {
 
     // Should show cn title as fallback
     expect(screen.getByText(/末日媒体/)).toBeInTheDocument();
+  });
+
+  it('长名 location 节点渲染 SVG <title> 元素显示完整 name（label 被截断）', () => {
+    const { container } = renderDiaspora({
+      locations: [studioLocation, longNameLocation],
+      editions: [...studioEditions, longNameEdition],
+    });
+
+    // The node <g> has data-node attribute matching the location id
+    const node = container.querySelector('g[data-node="loc-longname"]');
+    expect(node).not.toBeNull();
+
+    // SVG native <title> child carries the full name (used as native tooltip on hover)
+    const titleEl = node!.querySelector('title');
+    expect(titleEl).not.toBeNull();
+    expect(titleEl!.textContent).toBe(longNameLocation.name);
+
+    // The visible label is truncated (16 chars + '…')
+    const visibleText = node!.querySelector('text');
+    expect(visibleText).not.toBeNull();
+    expect(visibleText!.textContent).toBe(
+      longNameLocation.name.slice(0, 16) + '…'
+    );
+  });
+
+  it('center node 也带 SVG <title> 显示完整 name', () => {
+    const { container } = renderDiaspora();
+
+    // Studio is the center (3 editions vs gallery's 1)
+    const centerNode = container.querySelector('g[data-node="loc-studio"]');
+    expect(centerNode).not.toBeNull();
+
+    const titleEl = centerNode!.querySelector('title');
+    expect(titleEl).not.toBeNull();
+    expect(titleEl!.textContent).toBe(studioLocation.name);
+  });
+
+  it('pin 卡片 edition 行点击不会冒泡触发 SVG unpin（stopPropagation 防御）', () => {
+    renderDiaspora();
+
+    // Pin the gallery
+    const galleryGroup = screen.getByRole('button', {
+      name: /Test Gallery Berlin/i,
+    });
+    fireEvent.click(galleryGroup);
+    expect(screen.getByText(/查看此位置全部版本|View all editions/i)).toBeInTheDocument();
+
+    // Click the edition row — should navigate but NOT unpin
+    const editionBtn = screen.getByRole('button', { name: /AAJ-2023-001/i });
+    fireEvent.click(editionBtn);
+
+    expect(mockNavigate).toHaveBeenCalledWith('/editions/e4');
+    // Verify stopPropagation by checking we'd remain pinned if the navigate were not present.
+    // Direct verification: the click event handler should call stopPropagation —
+    // we cover this with a dedicated spy test below.
+  });
+
+  it('pin 卡片按钮 onClick 调用 stopPropagation（spy 验证）', () => {
+    renderDiaspora();
+
+    // Pin gallery
+    const galleryGroup = screen.getByRole('button', {
+      name: /Test Gallery Berlin/i,
+    });
+    fireEvent.click(galleryGroup);
+
+    // Spy stopPropagation by creating a custom event
+    const editionBtn = screen.getByRole('button', { name: /AAJ-2023-001/i });
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    const stopProp = vi.spyOn(event, 'stopPropagation');
+    editionBtn.dispatchEvent(event);
+
+    expect(stopProp).toHaveBeenCalled();
+
+    // Same for "view all" button
+    const viewAllBtn = screen.getByRole('button', {
+      name: /查看此位置全部版本|View all editions/i,
+    });
+    const event2 = new MouseEvent('click', { bubbles: true, cancelable: true });
+    const stopProp2 = vi.spyOn(event2, 'stopPropagation');
+    viewAllBtn.dispatchEvent(event2);
+
+    expect(stopProp2).toHaveBeenCalled();
   });
 });
