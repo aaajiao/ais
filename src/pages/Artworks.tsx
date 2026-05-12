@@ -353,9 +353,14 @@ export default function Artworks() {
         <h1 className="text-page-title">{t('title')}</h1>
         <div className="flex items-center gap-2">
           {!selectMode && (
-            <Button size="small" onClick={openAddDialog}>
+            <Button
+              size="small"
+              onClick={openAddDialog}
+              aria-label={t('addArtwork')}
+              title={t('addArtwork')}
+            >
               <Plus />
-              <span>{t('addArtwork')}</span>
+              <span className="hidden sm:inline">{t('addArtwork')}</span>
             </Button>
           )}
           <SelectionToolbar
