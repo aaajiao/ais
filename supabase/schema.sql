@@ -226,13 +226,14 @@ CREATE INDEX idx_gallery_links_token ON gallery_links(token);
 -- =====================================================
 
 -- Auto-update updated_at
+-- search_path 固定为 public, pg_temp（防 schema 注入，migration 005 加固）
 CREATE OR REPLACE FUNCTION update_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SET search_path = public, pg_temp;
 
 CREATE TRIGGER artworks_updated_at
   BEFORE UPDATE ON artworks
@@ -246,6 +247,7 @@ CREATE TRIGGER editions_updated_at
 
 -- Auto-record status/location changes
 -- SECURITY DEFINER: trigger 需要读取 locations 表，且在 RLS 环境下需要权限
+-- search_path 固定为 public, pg_temp（防 schema 注入，migration 005 加固）
 --
 -- auth.uid() 行为：
 -- - 前端 session（anon key）→ 返回用户 ID，trigger 写入历史
@@ -277,7 +279,11 @@ BEGIN
 
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
+
+-- 仅 trigger 调用，无 RPC 路径；REVOKE 所有外部角色防止越权（migration 005 加固）
+REVOKE EXECUTE ON FUNCTION record_edition_status_change() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION record_edition_status_change() FROM anon, authenticated;
 
 CREATE TRIGGER editions_status_change
   AFTER UPDATE ON editions
@@ -432,10 +438,9 @@ ON CONFLICT (id) DO UPDATE SET
   allowed_mime_types = EXCLUDED.allowed_mime_types;
 
 -- Storage policies
-CREATE POLICY "Public read access for thumbnails"
-ON storage.objects FOR SELECT TO public
-USING (bucket_id = 'thumbnails');
-
+-- 注意：thumbnails bucket public=true 自带 GET-by-URL（CDN 直链），不依赖 storage.objects 的 SELECT 策略。
+-- 故意不为 thumbnails 创建 public SELECT 策略（migration 005 加固），避免匿名 LIST bucket 全部 key。
+-- 公开缩略图通过 supabase.storage.from('thumbnails').getPublicUrl(path) 拼出直链访问。
 CREATE POLICY "Authenticated users can upload thumbnails"
 ON storage.objects FOR INSERT TO authenticated
 WITH CHECK (bucket_id = 'thumbnails');

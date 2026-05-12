@@ -493,7 +493,19 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 - 后端 API 使用 service key 绕过 RLS，代码中手动添加 `user_id` 过滤
 - 软删除不在 RLS 中强制，Trash 页面需要读取已删除数据
 - `(SELECT auth.uid())` 子查询模式用于性能优化（每条语句只计算一次）
-- 迁移文件归档：`supabase/migrations/archived/001_add_user_id_and_rls.sql`、`002_add_api_keys.sql`、`003_fix_edition_history_double_write.sql`
+- 迁移文件归档：`supabase/migrations/archived/001_add_user_id_and_rls.sql`、`002_add_api_keys.sql`、`003_fix_edition_history_double_write.sql`、`004_normalize_artwork_types.sql`、`005_supabase_security_hardening.sql`
+
+### v1.4 安全加固（migration 005）
+
+`005_supabase_security_hardening.sql` 处理了 Supabase Linter 报告的 6 类告警：
+
+| Linter 规则 | 修复 | 说明 |
+|---|---|---|
+| `rls_policy_always_true` × 4 | DROP `"Enable read access for all users"` (artworks) / `"Allow all operations on editions"` / `"Allow all operations on edition_history"` / `"Allow all operations on locations"` | 建表早期 `USING (true)` 全开策略残留；PG 多条 PERMISSIVE 策略按 OR 合并 → 全开旁路 001 的严格 user_id 策略。**关键铁律**：建表 / 加 RLS 时不要让"全开"策略和严格策略并存。 |
+| `function_search_path_mutable` × 2 | `ALTER FUNCTION ... SET search_path = public, pg_temp` 给 `update_updated_at()` 和 `record_edition_status_change()` | 未固定 search_path 时攻击者可投放同名 schema 对象改变函数内部解析。 |
+| `function_security_definer` 越权 | `REVOKE EXECUTE ON record_edition_status_change FROM anon, authenticated, PUBLIC` | 函数仅由 `editions_status_change` AFTER UPDATE trigger 触发；全仓库无 `supabase.rpc()` 调用，REVOKE 不影响 trigger 路径。 |
+| `public_bucket_allows_listing` | DROP `"Public read access for thumbnails"` on `storage.objects` | bucket `public=true` 仍提供 CDN 直链 GET（`getPublicUrl()` 工作），但匿名 LIST 被拒绝，防止枚举 bucket 全部 key。 |
+| `auth_leaked_password_protection` | **暂未处理（known issue）** | HaveIBeenPwned 集成是 Supabase Auth 高级功能，受订阅计划级别限制；当前计划下开关不可用。等计划升级或 Supabase 调整可用性后再启用。Linter 此条告警保留为预期行为。 |
 
 ---
 
@@ -508,3 +520,4 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 | 2025-02-01 | 合并 database-deployment.md 和 database-fields.md 为统一文档；迁移文件归档到 archived/ |
 | 2025-02-06 | 添加 api_keys 表（外部 API Key 管理），支持外部 AI 代理只读查询库存数据 |
 | 2026-05-04 | 修复 `edition_history` 双写：触发器 `record_edition_status_change` 在 `auth.uid() IS NULL`（service key）时跳过，由后端代码自行写带富字段的历史。前端 anon key 路径不变。Migration 003 |
+| 2026-05-12 | Supabase Linter 安全加固：DROP 4 张表残留的 `USING (true)` 旧策略 / 给 2 个函数 `SET search_path` / REVOKE `record_edition_status_change` EXECUTE / DROP thumbnails bucket 公开 SELECT 策略（保留 GET-by-URL）。8 条告警清掉 7 条；`auth_leaked_password_protection` 因订阅级别限制保留为 known issue。Migration 005 |

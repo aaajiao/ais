@@ -138,6 +138,7 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 - **Anthropic-only providerOptions 必须按 provider 分支**: `cacheControl`（prompt caching）、`contextManagement.compact_20260112`（服务端 compaction）只对 Anthropic 路径有效。OpenAI 路径必须保留 `prepareMessagesForModel` 的客户端 token 截断兜底（OpenAI 没有等效官方机制）。新加 Anthropic-only 字段时，按 `getProviderName(model)` 分支注入；千万不要给 OpenAI 路径也带上，会导致请求体异常。
 - **api/ 测试文件必须放在 `__tests__/` 子目录**: Vercel 编译 `api/**/*.ts` 当 serverless functions，但跳过 `__tests__/` 子目录。直接放在 `api/` 或 `api/lib/` 顶层的 `*.test.ts` 会被当成函数编译，遇到 `moduleResolution: nodenext` 严格 ESM 规则可能阻断部署（v1.2.0/v1.2.1 实证）。本地 tsconfig 用 `bundler` resolution 不会捕获，约定纪律比类型检查重要。
 - **artworks.type 任何写入路径必须调归一化（v1.4 起）**: 历史上裸 `<input type="text">` 让同一类型分裂成 `Installation` / `installation` / `installation `（尾空格）三份。新增写入入口（前端 mutation / API handler / 工具 execute）必须在保存前调用 `normalizeArtworkType(raw, existingTypes)`（`src/lib/normalizeArtworkType.ts`），否则脏数据会重新堆积。**不要**对 `materials` / `year` 做同样处理 —— 它们的多样性是真实数据。详见 [docs/database.md `artworks.type 归一化策略`](docs/database.md#artworkstype-归一化策略)。
+- **RLS 策略：严禁"全开 `USING (true)`"和严格策略并存（migration 005 加固）**: PostgreSQL 多条 PERMISSIVE 策略按 **OR** 合并 → 任何一条 `USING (true)` 全开策略都会**旁路**所有严格 `user_id` 策略，等于 RLS 形同虚设。建表 / 改 RLS 时永远只保留严格策略（"Users can ... own ..." 类）；如果引入新表，确认无遗留全开策略再 enable RLS。详见 [docs/database.md `v1.4 安全加固（migration 005）`](docs/database.md#v14-安全加固migration-005)。
 
 ## Verification
 
