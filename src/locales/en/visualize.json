@@ -83,7 +83,14 @@
     },
     "tooltip": {
       "editions": "{{count}} editions here",
-      "untracked": "no location recorded"
+      "untracked": "no location recorded",
+      "clickToPin": "Click to pin this node"
+    },
+    "pin": {
+      "editionsAt": "{{count}} editions here",
+      "viewAll": "View all editions at this location →",
+      "noInventory": "(no inv)",
+      "unpinHint": "Click node again or click empty area to unpin"
     }
   }
 }

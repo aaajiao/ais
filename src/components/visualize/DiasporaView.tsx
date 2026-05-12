@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type {
   VizEdition,
   VizLocation,
   VizHistory,
+  VizArtwork,
 } from '@/hooks/queries/useVisualizationData';
 import {
   buildNodes,
@@ -18,6 +20,7 @@ import {
 } from './diasporaUtils';
 
 export interface DiasporaViewProps {
+  artworks?: VizArtwork[];
   editions: VizEdition[];
   locations: VizLocation[];
   history: VizHistory[];
@@ -56,18 +59,37 @@ function curvedPath(
   return `M ${x1.toFixed(1)} ${y1.toFixed(1)} Q ${qx.toFixed(1)} ${qy.toFixed(1)} ${x2.toFixed(1)} ${y2.toFixed(1)}`;
 }
 
+/** 从 VizArtwork 数组取得 artwork_id → artwork 的 Map */
+function buildArtworkMap(artworks: VizArtwork[]): Map<string, VizArtwork> {
+  const m = new Map<string, VizArtwork>();
+  for (const a of artworks) m.set(a.id, a);
+  return m;
+}
+
+/** 取 artwork 标题：title_en（非空） → title_cn → 'untitled' */
+function artworkTitle(artwork: VizArtwork | undefined): string {
+  if (!artwork) return 'untitled';
+  return artwork.title_en || artwork.title_cn || 'untitled';
+}
+
 export default function DiasporaView({
+  artworks = [],
   editions,
   locations,
   history,
 }: DiasporaViewProps) {
   const { t } = useTranslation('visualize');
+  const navigate = useNavigate();
 
-  // hover / click 状态
-  const [hoveredNode, setHoveredNode] = useState<LocationNode | null>(null);
-  const [expandedNodeId, setExpandedNodeId] = useState<string | null>(null);
+  // ─── 交互状态 ──────────────────────────────────────────────────────────────
+  // pinnedNodeId: 点击固定的节点 id（null = 无 pin）
+  // hoveredNodeId: hover 的节点 id（仅 pin 为 null 时有效）
+  // 当前展示节点 = pinnedNodeId ?? hoveredNodeId
+  const [pinnedNodeId, setPinnedNodeId] = useState<string | null>(null);
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
 
   // ─── 数据变换 ──────────────────────────────────────────────────────────────
+  const artworkMap = useMemo(() => buildArtworkMap(artworks), [artworks]);
   const nodes = useMemo(() => buildNodes(editions, locations), [editions, locations]);
   const centerNode = useMemo(() => pickCenterNode(nodes), [nodes]);
   const outerNodes = useMemo(
@@ -95,16 +117,55 @@ export default function DiasporaView({
     return m;
   }, [layout]);
 
-  // 展开节点的 inventory_numbers
-  const expandedInventoryNumbers = useMemo(() => {
-    if (!expandedNodeId) return [];
-    const node = nodes.find((n) => n.id === expandedNodeId);
-    if (!node) return [];
+  // 当前激活节点 id（pin 优先，否则 hover 预览）
+  const activeNodeId = pinnedNodeId ?? hoveredNodeId;
+
+  // pin 卡片用的 edition 列表（按 location 过滤，附带 artwork 信息）
+  const pinnedEditions = useMemo(() => {
+    if (!pinnedNodeId) return [];
     return editions
-      .filter((e) => e.location_id === expandedNodeId)
-      .map((e) => e.inventory_number ?? e.id)
-      .filter(Boolean);
-  }, [expandedNodeId, nodes, editions]);
+      .filter((e) => e.location_id === pinnedNodeId)
+      .map((e) => ({
+        edition: e,
+        artwork: artworkMap.get(e.artwork_id),
+        displayId: e.inventory_number ?? `${e.id.slice(0, 8)}${t('diaspora.pin.noInventory')}`,
+      }));
+  }, [pinnedNodeId, editions, artworkMap, t]);
+
+  // hover 预览用的 node（仅无 pin 时显示）
+  const previewNode: LocationNode | null = useMemo(() => {
+    if (pinnedNodeId) return null; // pin 时不显示预览
+    if (!hoveredNodeId) return null;
+    return nodes.find((n) => n.id === hoveredNodeId) ?? null;
+  }, [pinnedNodeId, hoveredNodeId, nodes]);
+
+  // pin 节点对应的 LocationNode
+  const pinnedNode: LocationNode | null = useMemo(() => {
+    if (!pinnedNodeId) return null;
+    return nodes.find((n) => n.id === pinnedNodeId) ?? null;
+  }, [pinnedNodeId, nodes]);
+
+  // ─── 事件处理 ──────────────────────────────────────────────────────────────
+  function handleNodeClick(nodeId: string) {
+    setPinnedNodeId((prev) => (prev === nodeId ? null : nodeId));
+  }
+
+  function handleNodeMouseEnter(nodeId: string) {
+    setHoveredNodeId(nodeId);
+  }
+
+  function handleNodeMouseLeave() {
+    setHoveredNodeId(null);
+  }
+
+  function handleSvgClick(e: React.MouseEvent<SVGSVGElement>) {
+    // 只有点击 SVG 背景（target 是 svg 或 circle/path 等非交互元素）才取消 pin
+    // 节点 <g> 已阻止冒泡，所以这里只有"真正点 SVG 空白"才会触发
+    const target = e.target as Element;
+    // 如果 target 是节点 g 或其子元素，不取消 pin（节点自己处理）
+    if (target.closest('g[data-node]')) return;
+    setPinnedNodeId(null);
+  }
 
   // ─── 空状态 ────────────────────────────────────────────────────────────────
   if (nodes.length === 0) {
@@ -196,6 +257,7 @@ export default function DiasporaView({
           style={{ maxHeight: '70vh' }}
           role="img"
           aria-label={t('diaspora.heading')}
+          onClick={handleSvgClick}
         >
           {/* 同心环辅助圆（弱色参考线） */}
           {RING_GUIDE_RADII.map((r, i) => (
@@ -236,8 +298,9 @@ export default function DiasporaView({
             layout.ring.map(({ x, y, node }) => {
               const r = nodeRadius(node.editionCount);
               const opacity = TYPE_OPACITY[node.type];
-              const isHovered = hoveredNode?.id === node.id;
-              const isExpanded = expandedNodeId === node.id;
+              const isHovered = hoveredNodeId === node.id && !pinnedNodeId;
+              const isPinned = pinnedNodeId === node.id;
+              const isActive = activeNodeId === node.id;
               const iso2 = countryToISO2(node.country);
 
               // 节点 label 偏移：让文字不覆盖节点本体
@@ -258,17 +321,36 @@ export default function DiasporaView({
               return (
                 <g
                   key={node.id}
+                  data-node={node.id}
                   className="cursor-pointer"
-                  onMouseEnter={() => setHoveredNode(node)}
-                  onMouseLeave={() => setHoveredNode(null)}
-                  onClick={() =>
-                    setExpandedNodeId(
-                      expandedNodeId === node.id ? null : node.id
-                    )
-                  }
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${node.name} — ${t('diaspora.tooltip.editions', { count: node.editionCount })}`}
+                  aria-pressed={isPinned}
+                  onMouseEnter={() => handleNodeMouseEnter(node.id)}
+                  onMouseLeave={handleNodeMouseLeave}
+                  onClick={(e) => { e.stopPropagation(); handleNodeClick(node.id); }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleNodeClick(node.id);
+                    }
+                  }}
                 >
-                  {/* hover ring */}
-                  {(isHovered || isExpanded) && (
+                  {/* pin 外圈（仅 pin 状态显示，比 hover ring 更粗更明显） */}
+                  {isPinned && (
+                    <circle
+                      cx={x}
+                      cy={y}
+                      r={r + 6}
+                      fill="none"
+                      className="stroke-foreground"
+                      strokeWidth={2}
+                      opacity={0.9}
+                    />
+                  )}
+                  {/* hover ring（仅 hover 预览时，细线） */}
+                  {isHovered && !isPinned && (
                     <circle
                       cx={x}
                       cy={y}
@@ -294,7 +376,7 @@ export default function DiasporaView({
                     className="fill-foreground"
                     fontSize="9"
                     fontFamily="ui-monospace, monospace"
-                    opacity={isHovered || isExpanded ? 1 : 0.75}
+                    opacity={isActive ? 1 : 0.75}
                   >
                     {node.name.length > 18
                       ? node.name.slice(0, 16) + '…'
@@ -316,105 +398,169 @@ export default function DiasporaView({
             })}
 
           {/* ─── center node ────────────────────────────────────── */}
-          {layout && (
-            <g
-              className="cursor-pointer"
-              onMouseEnter={() => setHoveredNode(layout.center.node)}
-              onMouseLeave={() => setHoveredNode(null)}
-              onClick={() =>
-                setExpandedNodeId(
-                  expandedNodeId === layout.center.node.id
-                    ? null
-                    : layout.center.node.id
-                )
-              }
-            >
-              {/* pulse ring */}
-              <circle
-                cx={layout.center.x}
-                cy={layout.center.y}
-                r={26}
-                fill="none"
-                className="stroke-foreground"
-                strokeWidth={0.5}
-                opacity={0.2}
-              />
-              <circle
-                cx={layout.center.x}
-                cy={layout.center.y}
-                r={18}
-                className="fill-foreground"
-                opacity={1}
-              />
-              {/* center label */}
-              <text
-                x={layout.center.x}
-                y={layout.center.y + 32}
-                textAnchor="middle"
-                className="fill-foreground"
-                fontSize="9"
-                fontFamily="ui-monospace, monospace"
+          {layout && (() => {
+            const centerNodeObj = layout.center.node;
+            const isCenterHovered = hoveredNodeId === centerNodeObj.id && !pinnedNodeId;
+            const isCenterPinned = pinnedNodeId === centerNodeObj.id;
+
+            return (
+              <g
+                data-node={centerNodeObj.id}
+                className="cursor-pointer"
+                role="button"
+                tabIndex={0}
+                aria-label={`${centerNodeObj.name} — ${t('diaspora.tooltip.editions', { count: centerNodeObj.editionCount })}`}
+                aria-pressed={isCenterPinned}
+                onMouseEnter={() => handleNodeMouseEnter(centerNodeObj.id)}
+                onMouseLeave={handleNodeMouseLeave}
+                onClick={(e) => { e.stopPropagation(); handleNodeClick(centerNodeObj.id); }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleNodeClick(centerNodeObj.id);
+                  }
+                }}
               >
-                {layout.center.node.name.length > 20
-                  ? layout.center.node.name.slice(0, 18) + '…'
-                  : layout.center.node.name}
-              </text>
-              <text
-                x={layout.center.x}
-                y={layout.center.y + 42}
-                textAnchor="middle"
-                className="fill-muted-foreground"
-                fontSize="8"
-                fontFamily="ui-monospace, monospace"
-              >
-                {countryToISO2(layout.center.node.country)}
-              </text>
-            </g>
-          )}
+                {/* pin outer ring for center */}
+                {isCenterPinned && (
+                  <circle
+                    cx={layout.center.x}
+                    cy={layout.center.y}
+                    r={30}
+                    fill="none"
+                    className="stroke-foreground"
+                    strokeWidth={2}
+                    opacity={0.9}
+                  />
+                )}
+                {/* pulse ring */}
+                <circle
+                  cx={layout.center.x}
+                  cy={layout.center.y}
+                  r={26}
+                  fill="none"
+                  className="stroke-foreground"
+                  strokeWidth={isCenterHovered ? 1 : 0.5}
+                  opacity={isCenterHovered ? 0.4 : 0.2}
+                />
+                <circle
+                  cx={layout.center.x}
+                  cy={layout.center.y}
+                  r={18}
+                  className="fill-foreground"
+                  opacity={1}
+                />
+                {/* center label */}
+                <text
+                  x={layout.center.x}
+                  y={layout.center.y + 32}
+                  textAnchor="middle"
+                  className="fill-foreground"
+                  fontSize="9"
+                  fontFamily="ui-monospace, monospace"
+                >
+                  {centerNodeObj.name.length > 20
+                    ? centerNodeObj.name.slice(0, 18) + '…'
+                    : centerNodeObj.name}
+                </text>
+                <text
+                  x={layout.center.x}
+                  y={layout.center.y + 42}
+                  textAnchor="middle"
+                  className="fill-muted-foreground"
+                  fontSize="8"
+                  fontFamily="ui-monospace, monospace"
+                >
+                  {countryToISO2(centerNodeObj.country)}
+                </text>
+              </g>
+            );
+          })()}
         </svg>
       </div>
 
-      {/* ─── Tooltip / Info bar ──────────────────────────────────────── */}
+      {/* ─── Tooltip / Info bar（hover 预览或 pin 卡片）──────────────── */}
       <div className="min-h-[3.5rem] border-t border-border pt-3 text-xs font-mono space-y-0.5">
-        {hoveredNode ? (
+        {pinnedNode ? (
+          /* ── Pin 卡片 ───────────────────────────────────────────── */
+          <div className="space-y-2">
+            {/* 标题行 */}
+            <div className="flex items-baseline justify-between gap-2">
+              <div>
+                <span className="font-bold">{pinnedNode.name}</span>
+                <span className="text-muted-foreground ml-2">
+                  {pinnedNode.type}
+                  {pinnedNode.city ? ` · ${pinnedNode.city}` : ''}
+                  {pinnedNode.country ? ` · ${pinnedNode.country}` : ''}
+                </span>
+              </div>
+            </div>
+
+            {/* Edition 列表 */}
+            {pinnedEditions.length > 0 && (
+              <div className="space-y-0.5">
+                <div className="text-muted-foreground mb-1">
+                  {t('diaspora.pin.editionsAt', { count: pinnedEditions.length })}:
+                </div>
+                {pinnedEditions.map(({ edition, artwork, displayId }) => (
+                  <button
+                    key={edition.id}
+                    type="button"
+                    className="block w-full text-left px-2 py-1 hover:bg-muted/50 border border-transparent hover:border-border transition-colors cursor-pointer"
+                    onClick={() => navigate(`/editions/${edition.id}`)}
+                  >
+                    <span className="font-mono">
+                      {displayId}
+                    </span>
+                    {artwork && (
+                      <span className="text-muted-foreground ml-1.5">
+                        · {artworkTitle(artwork)}
+                      </span>
+                    )}
+                    <span className="text-muted-foreground ml-1.5">
+                      · {edition.status}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* View all 链接 */}
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2 cursor-pointer"
+              onClick={() => navigate(`/editions?locationId=${pinnedNodeId}`)}
+            >
+              {t('diaspora.pin.viewAll')}
+            </button>
+
+            {/* Unpin 提示 */}
+            <div className="text-muted-foreground italic opacity-60">
+              {t('diaspora.pin.unpinHint')}
+            </div>
+          </div>
+        ) : previewNode ? (
+          /* ── Hover 预览 ─────────────────────────────────────────── */
           <>
-            <div className="font-bold">{hoveredNode.name}</div>
+            <div className="font-bold">{previewNode.name}</div>
             <div className="text-muted-foreground">
               {t('diaspora.tooltip.editions', {
-                count: hoveredNode.editionCount,
+                count: previewNode.editionCount,
               })}
-              {hoveredNode.city ? ` · ${hoveredNode.city}` : ''}
-              {hoveredNode.country ? ` · ${hoveredNode.country}` : ''}
+              {previewNode.city ? ` · ${previewNode.city}` : ''}
+              {previewNode.country ? ` · ${previewNode.country}` : ''}
             </div>
             <div className="text-muted-foreground">
-              {hoveredNode.type} · click to expand
+              {previewNode.type} · {t('diaspora.tooltip.clickToPin')}
             </div>
           </>
         ) : (
+          /* ── 默认提示 ───────────────────────────────────────────── */
           <div className="text-muted-foreground">
             {t('strata.tooltip.click')}
           </div>
         )}
       </div>
-
-      {/* ─── Expanded node: inventory numbers ───────────────────────── */}
-      {expandedNodeId && expandedInventoryNumbers.length > 0 && (
-        <div className="border border-border p-3 space-y-2">
-          <div className="text-xs font-bold uppercase tracking-wider">
-            {nodes.find((n) => n.id === expandedNodeId)?.name}
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {expandedInventoryNumbers.map((inv) => (
-              <span
-                key={inv}
-                className="font-mono text-xs border border-border px-1.5 py-0.5 text-foreground"
-              >
-                {inv}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

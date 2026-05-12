@@ -83,7 +83,14 @@
     },
     "tooltip": {
       "editions": "{{count}} 个版本在此",
-      "untracked": "未记录所在地"
+      "untracked": "未记录所在地",
+      "clickToPin": "点击固定此节点"
+    },
+    "pin": {
+      "editionsAt": "此处 {{count}} 个版本",
+      "viewAll": "查看此位置全部版本 →",
+      "noInventory": "（无编号）",
+      "unpinHint": "再次点击节点或点击空白处取消固定"
     }
   }
 }
