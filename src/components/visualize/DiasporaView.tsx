@@ -253,7 +253,7 @@ export default function DiasporaView({
           aria-label={t('diaspora.heading')}
           onClick={handleSvgClick}
         >
-          {/* 同心环辅助圆（弱色参考线） */}
+          {/* 同心环辅助圆（弱色参考线，提升对比让节点压住时仍能看清环路） */}
           {RING_GUIDE_RADII.map((r, i) => (
             <circle
               key={i}
@@ -261,9 +261,10 @@ export default function DiasporaView({
               cy={H / 2}
               r={r}
               fill="none"
-              className="stroke-border"
-              strokeWidth={0.5}
-              strokeDasharray="3 4"
+              className="stroke-foreground"
+              strokeWidth={1}
+              strokeDasharray="2 5"
+              opacity={0.25}
             />
           ))}
 
