@@ -25,18 +25,14 @@
   "export": {
     "title": "Data Export",
     "jsonBackup": "JSON Full Backup",
-    "jsonDescription": "Export all data (artworks, editions, locations, history)",
-    "artworksCsv": "Artworks CSV",
-    "artworksCsvDescription": "Export artwork info, can be opened in Excel",
-    "editionsCsv": "Editions CSV",
-    "editionsCsvDescription": "Export all editions with status info",
+    "jsonDescription": "Structured backup: artworks, editions, locations, files, history (files/history nested under editions)",
+    "mdBackup": "Markdown Full Backup",
+    "mdDescription": "Human-readable: artwork + editions + file links + history, mirroring the JSON structure",
     "exportJson": "Export JSON",
-    "exportCsv": "Export CSV",
+    "exportMd": "Export MD",
     "exporting": "Exporting...",
-    "noArtworks": "No artworks to export",
-    "noEditions": "No editions to export",
     "exportError": "Export failed",
-    "exportHint": "Regular JSON backups are recommended to prevent data loss"
+    "exportHint": "Regular JSON or MD backups are recommended to prevent data loss"
   },
   "profile": {
     "title": "Project",

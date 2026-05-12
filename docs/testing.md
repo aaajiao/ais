@@ -51,7 +51,7 @@ src/lib/
 ├── editionStatus.test.ts     # 版本状态流转验证
 ├── cacheInvalidation.test.ts # 缓存失效逻辑
 └── exporters/
-    └── exporters.test.ts     # MD 导出格式化（版本行、作品 Markdown、完整文档）
+    └── exporters.test.ts     # MD 统一布局：## Artwork + ## Editions + Files / History 子块
 
 src/hooks/queries/
 ├── useEditions.test.ts       # Edition hooks（实际调用 + Supabase 链断言）
@@ -63,7 +63,7 @@ src/hooks/__tests__/
 
 src/components/settings/
 ├── useModelSettings.test.ts  # 模型 ID 格式化
-└── useExport.test.ts         # CSV 格式化、下载工具
+└── useExport.test.ts         # 下载工具、日期工具
 
 src/components/import/
 └── types.test.ts             # 作品 UID 生成
@@ -128,7 +128,7 @@ src/test/
 | `useArtworksSelection` | 21 | 选择模式、批量选择、状态管理 |
 | `useArtworks` | 21 | 实际调用 hook、deleted_at 过滤、统计计算 |
 | `useInventoryNumber` | 16 | 防抖、Supabase 错误、editionId 排除、卸载清理 |
-| `useExport` | 15 | CSV 格式化、文件下载、日期工具 |
+| `useExport` | - | 文件下载、日期工具（CSV 已废弃移除） |
 | `useNetworkStatus` | 14 | 在线/离线探测、可见性轮询、超时 |
 | `useModelSettings` | 9 | 模型 ID 格式化显示 |
 
@@ -149,7 +149,7 @@ src/test/
 | `catalog-template` | 44 | PDF HTML 模板生成、转义、分页 |
 | `tool-schemas` | 39 | AI 工具 Zod schema（import 真实 schema） |
 | `pdf-helpers` | 37 | 版本标签格式化、CatalogItem 构建、文件名 |
-| `exporters` | 36 | MD 导出格式化（版本行、详情字段、作品 Markdown） |
+| `exporters` | - | MD 统一布局：## Artwork bullet 字段 + ## Editions 列表 + Files / History 子块 |
 | `api-key-auth` | 19 | 生成 / 哈希 + `verifyApiKey`（撤销、未知 key、header 解析） |
 | `auth` | 16 | 用户会话 verifyAuth + ALLOWED_EMAILS 白名单 |
 | `execute-update` | 12 | AI 写：userId 强制、deleted_at 过滤、history 写入 |

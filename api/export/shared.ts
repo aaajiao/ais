@@ -1,7 +1,7 @@
 // 共享导出工具模块
 
 import { createClient } from '@supabase/supabase-js';
-import type { Artwork, Edition, Location } from '../../src/lib/types.js';
+import type { Artwork, Edition, Location, EditionFile, EditionHistory } from '../../src/lib/types.js';
 import type { ArtworkExportData } from '../../src/lib/exporters/index.js';
 import { calculateEditionStats, getArtworkPriceInfo } from '../../src/lib/exporters/index.js';
 
@@ -20,12 +20,19 @@ export function getSupabaseClient() {
 // Supabase 客户端类型
 export type SupabaseClient = ReturnType<typeof getSupabaseClient>;
 
+// fetchArtworkExportData 选项
+export interface FetchExportOptions {
+  // 是否查询 edition_history（仅全量备份场景应该开启 —— 数据量大）
+  includeHistory?: boolean;
+}
+
 // 获取作品导出数据
 export async function fetchArtworkExportData(
   supabase: SupabaseClient,
   artworkIds?: string[],
   editionIds?: string[],  // 可选：指定导出的版本 ID
   userId?: string,  // 限定用户
+  options: FetchExportOptions = {},
 ): Promise<ArtworkExportData[]> {
   // 获取作品（排除已删除的，限定当前用户）
   let artworksQuery = supabase.from('artworks').select('*').is('deleted_at', null);
@@ -67,6 +74,7 @@ export async function fetchArtworkExportData(
   }
 
   const editions = (editionsData || []) as Edition[];
+  const editionIdList = editions.map((e: Edition) => e.id);
 
   // 获取位置
   const locationIdSet = new Set<string>();
@@ -89,6 +97,44 @@ export async function fetchArtworkExportData(
     }
   }
 
+  // 获取版本文件（始终查询 —— 图片链接是作品本体信息，任何导出都应该带）
+  const filesByEdition = new Map<string, EditionFile[]>();
+  if (editionIdList.length > 0) {
+    const { data: filesData } = await supabase
+      .from('edition_files')
+      .select('*')
+      .in('edition_id', editionIdList);
+
+    if (filesData) {
+      for (const f of filesData as EditionFile[]) {
+        const arr = filesByEdition.get(f.edition_id) || [];
+        arr.push(f);
+        filesByEdition.set(f.edition_id, arr);
+      }
+    }
+  }
+
+  // 获取版本历史（仅 includeHistory=true 时 —— 全量备份场景）
+  let historyByEdition: Map<string, EditionHistory[]> | undefined;
+  if (options.includeHistory && editionIdList.length > 0) {
+    historyByEdition = new Map();
+    const { data: historyData } = await supabase
+      .from('edition_history')
+      .select('*')
+      .in('edition_id', editionIdList);
+
+    if (historyData) {
+      for (const h of historyData as EditionHistory[]) {
+        const arr = historyByEdition.get(h.edition_id) || [];
+        arr.push(h);
+        historyByEdition.set(h.edition_id, arr);
+      }
+    }
+  } else if (options.includeHistory) {
+    // 即使没有 editions 也保留 Map，标记"已请求历史"
+    historyByEdition = new Map();
+  }
+
   // 组装数据
   const result: ArtworkExportData[] = [];
 
@@ -99,6 +145,8 @@ export async function fetchArtworkExportData(
       artwork: artwork,
       editions: artworkEditions,
       locations: locationsMap,
+      filesByEdition,
+      historyByEdition,
       stats: calculateEditionStats(artworkEditions),
       priceInfo: getArtworkPriceInfo(artworkEditions),
     });

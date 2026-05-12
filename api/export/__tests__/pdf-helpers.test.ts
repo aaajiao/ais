@@ -242,6 +242,7 @@ describe('buildCatalogItemFromArtworkData', () => {
       } as unknown as Artwork,
       editions: [],
       locations: new Map(),
+      filesByEdition: new Map(),
       stats: { total: 0, inStock: 0, onLoan: 0, sold: 0, other: 0 },
       ...overrides,
     };
@@ -252,6 +253,7 @@ describe('buildCatalogItemFromArtworkData', () => {
     includeStatus: false,
     includeLocation: false,
     includeDetails: false,
+    includeFiles: false,
   };
 
   it('should build item from artwork data', () => {

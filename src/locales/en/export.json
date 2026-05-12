@@ -8,6 +8,7 @@
   "statusDetails": "Edition status details (In Studio/Consigned/Sold)",
   "locationInfo": "Location Information",
   "detailInfo": "Details (condition, buyer, consignment, loan, notes, etc.)",
+  "filesInfo": "File links (images, PDFs, certificates, etc.)",
   "formatLabel": "Markdown (.md)",
   "backupHint": "For full data backup, go to Settings page",
   "exporting": "Exporting...",

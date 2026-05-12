@@ -25,18 +25,14 @@
   "export": {
     "title": "数据导出",
     "jsonBackup": "JSON 完整备份",
-    "jsonDescription": "导出所有数据（作品、版本、位置、历史记录）",
-    "artworksCsv": "作品列表 CSV",
-    "artworksCsvDescription": "导出作品基本信息，可用 Excel 打开",
-    "editionsCsv": "版本列表 CSV",
-    "editionsCsvDescription": "导出所有版本及状态信息",
+    "jsonDescription": "结构化备份：作品、版本、位置、文件、流转历史（文件和历史嵌套在 editions 下）",
+    "mdBackup": "Markdown 完整备份",
+    "mdDescription": "人类可读：作品 + 版本 + 文件链接 + 流转历史，结构与 JSON 一致",
     "exportJson": "导出 JSON",
-    "exportCsv": "导出 CSV",
+    "exportMd": "导出 MD",
     "exporting": "导出中...",
-    "noArtworks": "没有作品数据可导出",
-    "noEditions": "没有版本数据可导出",
     "exportError": "导出失败",
-    "exportHint": "建议定期导出 JSON 备份，以防数据丢失"
+    "exportHint": "建议定期导出 JSON 或 MD 备份，以防数据丢失"
   },
   "profile": {
     "title": "项目信息",

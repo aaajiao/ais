@@ -493,13 +493,49 @@ POST /api/export/md
     includeStatus: boolean;
     includeLocation: boolean;
     includeDetails: boolean;  // 详细信息（品相、买家、寄售、借展、备注等）
+    includeFiles: boolean;    // 版本文件链接（图片、PDF、证书等）
   };
   artistName?: string;  // 项目名称，用于文件名和内容（默认 "aaajiao"）
 }
 ```
 
-`includeDetails` 控制以下字段输出：condition、buyer_name、sale_date、consignment、loan、storage_detail、edition notes。
-inventory_number 和 certificate_number 始终输出（不受选项控制）。
+**字段输出规则**：
+- `inventory_number` 和 `certificate_number` 始终输出（身份标识，不受选项控制）
+- `includeDetails` 控制：`condition`、`buyer_name`、`sale_date`、`consignment_*`、`loan_*`、`storage_detail`（需配合 `includeLocation`）、`edition notes`
+- `includeFiles=true` + 版本有文件时，每个版本下追加 **Files** 子区块
+- **scope=`all` 时自动启用 edition_history**（每个版本下追加 **History** 子区块）；其他 scope 不输出历史
+
+**输出结构（统一布局）**：
+```markdown
+# Title (EN)
+Title (CN)
+<img src="thumbnail_url" alt="..." />
+
+## Artwork
+- **Year**: ...
+- **Type**: ...
+- ...
+- **Edition**: Edition of N + M AP
+- **Source**: <url>
+
+## Editions
+
+### 1/N · INV-001
+- **Status**: ...
+- **Location**: ...
+- ...
+
+**Files**:
+- [filename](url) — type, description
+
+**History**:    # 仅 scope=all
+- 2025-03-01 — Sold (in_studio → sold) · Buyer X · $1,000 USD
+```
+
+**文件名**：
+- `scope=all` → `{artist}-inventory-backup-{date}.md`（与 JSON 备份对齐）
+- 单作品 → `{artist}-{slugified-title}-{date}.md`
+- 多选 → `{artist}-artworks-{date}.md`
 
 返回 `text/markdown` 文件流。
 

@@ -1,6 +1,6 @@
 // 导出功能类型定义和数据获取
 
-import type { Artwork, Edition, Location, EditionStatus } from '../types.js';
+import type { Artwork, Edition, Location, EditionFile, EditionHistory, EditionStatus } from '../types.js';
 
 // 导出请求参数
 export interface ExportRequest {
@@ -18,13 +18,18 @@ export interface ExportOptions {
   includeStatus: boolean;
   includeLocation: boolean;
   includeDetails: boolean;
+  includeFiles: boolean;
 }
 
-// 导出用的作品数据（包含版本统计）
+// 导出用的作品数据（包含版本统计 + 版本文件 + 版本历史）
 export interface ArtworkExportData {
   artwork: Artwork;
   editions: Edition[];
   locations: Map<string, Location>;
+  // 版本文件，按 edition_id 分组（无文件的 edition 不出现在 Map 中）
+  filesByEdition: Map<string, EditionFile[]>;
+  // 版本历史，按 edition_id 分组；undefined 表示未请求历史（仅全量备份请求）
+  historyByEdition?: Map<string, EditionHistory[]>;
   // 版本统计
   stats: {
     total: number;
@@ -165,123 +170,228 @@ const STATUS_LABELS: Record<EditionStatus, { zh: string; en: string }> = {
   damaged: { zh: '损坏', en: 'Damaged' },
 };
 
-// 格式化单个版本的显示文本（主行 + 详情子行）
-export function formatEditionLine(
+// 历史动作标签映射
+const HISTORY_ACTION_LABELS: Record<string, { zh: string; en: string }> = {
+  created: { zh: '创建', en: 'Created' },
+  status_change: { zh: '状态变更', en: 'Status changed' },
+  location_change: { zh: '位置变更', en: 'Location changed' },
+  sold: { zh: '售出', en: 'Sold' },
+  consigned: { zh: '寄售', en: 'Consigned' },
+  returned: { zh: '归还', en: 'Returned' },
+  condition_update: { zh: '品相更新', en: 'Condition updated' },
+  file_added: { zh: '文件添加', en: 'File added' },
+  file_deleted: { zh: '文件删除', en: 'File deleted' },
+  number_assigned: { zh: '编号分配', en: 'Number assigned' },
+};
+
+// 版本编号标签（"1/5" / "AP 1" / "Unique"）
+export function formatEditionLabel(
   edition: Edition,
   artwork: Artwork,
+  lang: 'zh' | 'en' = 'en'
+): string {
+  if (edition.edition_type === 'unique') {
+    return lang === 'zh' ? '独版' : 'Unique';
+  }
+  if (edition.edition_type === 'ap') {
+    return `AP ${edition.edition_number || ''}`.trim();
+  }
+  // numbered
+  return `${edition.edition_number || '?'}/${artwork.edition_total || '?'}`;
+}
+
+// 版本标题（"### 1/5 · INV-001" 中的 "1/5 · INV-001" 部分）
+export function formatEditionHeading(
+  edition: Edition,
+  artwork: Artwork,
+  lang: 'zh' | 'en' = 'en'
+): string {
+  const label = formatEditionLabel(edition, artwork, lang);
+  if (edition.inventory_number) {
+    return `${label} · ${edition.inventory_number}`;
+  }
+  return label;
+}
+
+// 版本字段列表（每个 toggle 控制对应字段；空值不输出整行）
+export function formatEditionFields(
+  edition: Edition,
   locations: Map<string, Location>,
   options: ExportOptions,
-  lang: 'zh' | 'en' = 'zh'
-): { main: string; details: string[] } {
-  const parts: string[] = [];
-  const details: string[] = [];
+  lang: 'zh' | 'en' = 'en'
+): string[] {
+  const lines: string[] = [];
 
-  // 1. 版本编号
-  let editionLabel: string;
-  if (edition.edition_type === 'unique') {
-    editionLabel = lang === 'zh' ? '独版' : 'Unique';
-  } else if (edition.edition_type === 'ap') {
-    editionLabel = `AP ${edition.edition_number || ''}`.trim();
-  } else {
-    // numbered
-    editionLabel = `${edition.edition_number || '?'}/${artwork.edition_total || '?'}`;
-  }
-  parts.push(editionLabel);
-
-  // 库存编号（始终输出）
-  if (edition.inventory_number) {
-    parts.push(edition.inventory_number);
+  // Status（仅在 includeStatus 开启时）
+  if (options.includeStatus) {
+    const statusLabel = STATUS_LABELS[edition.status]?.[lang] || edition.status;
+    lines.push(`- **Status**: ${statusLabel}`);
   }
 
-  // 2. 位置（如果选项启用且有位置）
+  // Location（仅在 includeLocation 开启且有位置时）
   if (options.includeLocation && edition.location_id) {
     const location = locations.get(edition.location_id);
     if (location) {
-      parts.push(location.name);
+      lines.push(`- **Location**: ${location.name}`);
     }
   }
 
-  // 3. 状态（如果选项启用）
-  if (options.includeStatus) {
-    const statusLabel = STATUS_LABELS[edition.status]?.[lang] || edition.status;
-    // 对于在库状态，如果已显示位置则不重复显示"在库"
-    if (edition.status === 'in_studio' && options.includeLocation && edition.location_id) {
-      // 不显示状态，位置已足够表达
-    } else {
-      parts.push(`(${statusLabel})`);
-    }
+  // Storage（保留原有"双门控"语义：需要 includeLocation + includeDetails）
+  if (options.includeLocation && options.includeDetails && edition.storage_detail) {
+    lines.push(`- **Storage**: ${edition.storage_detail}`);
   }
 
-  // 4. 价格（如果选项启用且有价格）
+  // Price（仅在 includePrice 开启且有价格时）
   if (options.includePrice && edition.sale_price && edition.sale_currency) {
-    parts.push(formatPrice(edition.sale_price, edition.sale_currency));
+    lines.push(`- **Price**: ${formatPrice(edition.sale_price, edition.sale_currency)} ${edition.sale_currency}`);
   }
 
-  // 证书编号（始终输出）
+  // Certificate（始终输出 —— 等同身份标识）
   if (edition.certificate_number) {
-    details.push(`Certificate: ${edition.certificate_number}`);
+    lines.push(`- **Certificate**: ${edition.certificate_number}`);
   }
 
-  // 5. 详细信息（如果选项启用）
+  // 详细信息（受 includeDetails 控制）
   if (options.includeDetails) {
     if (edition.condition) {
       const conditionText = edition.condition_notes
         ? `${edition.condition} — ${edition.condition_notes}`
         : edition.condition;
-      details.push(`Condition: ${conditionText}`);
+      lines.push(`- **Condition**: ${conditionText}`);
     }
     if (edition.buyer_name) {
-      details.push(`Buyer: ${edition.buyer_name}`);
+      lines.push(`- **Buyer**: ${edition.buyer_name}`);
     }
     if (edition.sale_date) {
-      details.push(`Sale Date: ${edition.sale_date}`);
+      lines.push(`- **Sale Date**: ${edition.sale_date}`);
     }
     if (edition.consignment_start || edition.consignment_end) {
       const range = [edition.consignment_start, edition.consignment_end].filter(Boolean).join(' ~ ');
-      details.push(`Consignment: ${range}`);
+      lines.push(`- **Consignment**: ${range}`);
     }
     if (edition.loan_start || edition.loan_end || edition.loan_institution) {
       const loanParts: string[] = [];
       if (edition.loan_institution) loanParts.push(edition.loan_institution);
       const range = [edition.loan_start, edition.loan_end].filter(Boolean).join(' ~ ');
       if (range) loanParts.push(range);
-      if (loanParts.length > 0) details.push(`Loan: ${loanParts.join(', ')}`);
-    }
-    if (options.includeLocation && edition.storage_detail) {
-      details.push(`Storage: ${edition.storage_detail}`);
+      if (loanParts.length > 0) lines.push(`- **Loan**: ${loanParts.join(', ')}`);
     }
     if (edition.notes) {
-      details.push(`Notes: ${edition.notes}`);
+      lines.push(`- **Notes**: ${edition.notes}`);
     }
   }
 
-  return { main: parts.join(', '), details };
+  return lines;
 }
 
-// 格式化所有版本为行数组（每个元素包含主行和详情子行）
-export function formatEditionLines(
-  editions: Edition[],
+// 版本文件块（仅在 includeFiles=true 且有文件时输出）
+export function formatEditionFiles(
+  files: EditionFile[] | undefined,
+  options: ExportOptions,
+  lang: 'zh' | 'en' = 'en'
+): string[] {
+  if (!options.includeFiles || !files || files.length === 0) {
+    return [];
+  }
+  const lines: string[] = [];
+  lines.push(`**${lang === 'zh' ? '文件' : 'Files'}**:`);
+  const sorted = [...files].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  for (const f of sorted) {
+    const name = f.file_name || f.file_url;
+    const tagParts: string[] = [f.file_type];
+    if (f.description) tagParts.push(f.description);
+    lines.push(`- [${name}](${f.file_url}) — ${tagParts.join(', ')}`);
+  }
+  return lines;
+}
+
+// 版本历史块（仅在传入 history 时输出 —— 调用方负责仅在 scope=all 时传入）
+export function formatEditionHistory(
+  history: EditionHistory[] | undefined,
+  lang: 'zh' | 'en' = 'en'
+): string[] {
+  if (!history || history.length === 0) {
+    return [];
+  }
+  const lines: string[] = [];
+  lines.push(`**${lang === 'zh' ? '历史' : 'History'}**:`);
+  // 时间倒序：最新在前
+  const sorted = [...history].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  for (const h of sorted) {
+    const date = h.created_at.slice(0, 10);
+    const actionLabel = HISTORY_ACTION_LABELS[h.action]?.[lang] || h.action;
+    const segments: string[] = [date, '—', actionLabel];
+
+    // 状态/位置流转
+    if (h.from_status || h.to_status) {
+      const arrow = `${h.from_status || '-'} → ${h.to_status || '-'}`;
+      segments.push(`(${arrow})`);
+    } else if (h.from_location || h.to_location) {
+      const arrow = `${h.from_location || '-'} → ${h.to_location || '-'}`;
+      segments.push(`(${arrow})`);
+    }
+
+    // 相关方
+    if (h.related_party) {
+      segments.push(`· ${h.related_party}`);
+    }
+
+    // 价格
+    if (h.price && h.currency) {
+      segments.push(`· ${formatPrice(h.price, h.currency)} ${h.currency}`);
+    }
+
+    // 备注
+    if (h.notes) {
+      segments.push(`· ${h.notes}`);
+    }
+
+    lines.push(`- ${segments.join(' ')}`);
+  }
+  return lines;
+}
+
+// 编排单个版本完整块（heading + fields + files + history）
+export function formatEditionBlock(
+  edition: Edition,
   artwork: Artwork,
   locations: Map<string, Location>,
+  files: EditionFile[] | undefined,
+  history: EditionHistory[] | undefined,
   options: ExportOptions,
-  lang: 'zh' | 'en' = 'zh'
-): { main: string; details: string[] }[] {
-  if (editions.length === 0) {
-    return [{ main: lang === 'zh' ? '无版本信息' : 'No editions', details: [] }];
+  lang: 'zh' | 'en' = 'en'
+): string[] {
+  const lines: string[] = [];
+  lines.push(`### ${formatEditionHeading(edition, artwork, lang)}`);
+  lines.push('');
+
+  const fields = formatEditionFields(edition, locations, options, lang);
+  if (fields.length > 0) {
+    lines.push(...fields);
+    lines.push('');
   }
 
-  // 按版本类型和编号排序
-  const sortedEditions = [...editions].sort((a, b) => {
-    // 类型优先级: numbered > ap > unique
-    const typeOrder: Record<string, number> = { numbered: 0, ap: 1, unique: 2 };
+  const fileLines = formatEditionFiles(files, options, lang);
+  if (fileLines.length > 0) {
+    lines.push(...fileLines);
+    lines.push('');
+  }
+
+  const historyLines = formatEditionHistory(history, lang);
+  if (historyLines.length > 0) {
+    lines.push(...historyLines);
+    lines.push('');
+  }
+
+  return lines;
+}
+
+// 对一组版本按类型 + 编号排序
+export function sortEditions(editions: Edition[]): Edition[] {
+  const typeOrder: Record<string, number> = { numbered: 0, ap: 1, unique: 2 };
+  return [...editions].sort((a, b) => {
     const typeCompare = (typeOrder[a.edition_type] || 0) - (typeOrder[b.edition_type] || 0);
     if (typeCompare !== 0) return typeCompare;
-
-    // 同类型按编号排序
     return (a.edition_number || 0) - (b.edition_number || 0);
   });
-
-  return sortedEditions.map(edition =>
-    formatEditionLine(edition, artwork, locations, options, lang)
-  );
 }

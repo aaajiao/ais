@@ -1,18 +1,19 @@
-// 导出格式化工具
+// 导出格式化工具 —— 统一 Markdown 布局
 
 import type { ArtworkExportData, ExportOptions } from './index.js';
 import {
   formatEditionInfo,
-  formatPrice,
-  formatEditionLines,
+  formatEditionBlock,
+  sortEditions,
 } from './index.js';
 
 // 生成单个作品的 Markdown
+// 统一布局：H1 标题 + thumbnail + ## Artwork bullet 字段 + ## Editions 列表
 export function generateArtworkMarkdown(
   data: ArtworkExportData,
   options: ExportOptions
 ): string {
-  const { artwork, priceInfo, editions, locations } = data;
+  const { artwork, editions, locations, filesByEdition, historyByEdition } = data;
   const lines: string[] = [];
 
   // 标题
@@ -28,68 +29,44 @@ export function generateArtworkMarkdown(
     lines.push('');
   }
 
-  // 基础信息 - 使用英文标签
+  // Artwork 字段块
+  lines.push('## Artwork');
+  lines.push('');
   if (artwork.year) {
-    lines.push(`**Year**: ${artwork.year}`);
+    lines.push(`- **Year**: ${artwork.year}`);
   }
   if (artwork.type) {
-    lines.push(`**Type**: ${artwork.type}`);
+    lines.push(`- **Type**: ${artwork.type}`);
   }
   if (artwork.materials) {
-    lines.push(`**Materials**: ${artwork.materials}`);
+    lines.push(`- **Materials**: ${artwork.materials}`);
   }
   if (artwork.dimensions) {
-    lines.push(`**Dimensions**: ${artwork.dimensions}`);
+    lines.push(`- **Dimensions**: ${artwork.dimensions}`);
   }
   if (artwork.duration) {
-    lines.push(`**Duration**: ${artwork.duration}`);
+    lines.push(`- **Duration**: ${artwork.duration}`);
   }
-
-  // 版本信息
-  const editionInfo = formatEditionInfo(artwork);
-  lines.push(`**Edition**: ${editionInfo}`);
-
-  // 作品备注
+  lines.push(`- **Edition**: ${formatEditionInfo(artwork)}`);
   if (options.includeDetails && artwork.notes) {
-    lines.push(`**Notes**: ${artwork.notes}`);
+    lines.push(`- **Notes**: ${artwork.notes}`);
   }
-
-  // 版本明细（如果有任何可选信息启用）
-  if (options.includeStatus || options.includeLocation || options.includePrice || options.includeDetails) {
-    if (editions.length > 0) {
-      lines.push('');
-      lines.push('**Edition Details**:');
-      const editionLines = formatEditionLines(editions, artwork, locations, options, 'en');
-      editionLines.forEach(({ main, details }) => {
-        lines.push(`- ${main}`);
-        details.forEach(detail => {
-          lines.push(`  ${detail}`);
-        });
-      });
-    } else {
-      // 无版本时的简化显示
-      if (options.includePrice) {
-        if (priceInfo) {
-          lines.push(`**Price**: ${formatPrice(priceInfo.price, priceInfo.currency)}`);
-        } else {
-          lines.push(`**Price**: Price on request`);
-        }
-      }
-      if (options.includeStatus) {
-        lines.push(`**Status**: No editions`);
-      }
-      if (options.includeLocation) {
-        lines.push(`**Location**: -`);
-      }
-    }
+  if (artwork.source_url) {
+    lines.push(`- **Source**: <${artwork.source_url}>`);
   }
-
   lines.push('');
 
-  // 来源链接
-  if (artwork.source_url) {
-    lines.push(`[View Details](${artwork.source_url})`);
+  // Editions 列表
+  if (editions.length > 0) {
+    lines.push('## Editions');
     lines.push('');
+    const sorted = sortEditions(editions);
+    for (const edition of sorted) {
+      const files = filesByEdition.get(edition.id);
+      const history = historyByEdition?.get(edition.id);
+      const block = formatEditionBlock(edition, artwork, locations, files, history, options, 'en');
+      lines.push(...block);
+    }
   }
 
   // 分隔线
@@ -111,6 +88,10 @@ export function generateFullMarkdown(
 
   // YAML Frontmatter
   const exportDate = new Date();
+  // 是否包含历史信息：所有 ArtworkExportData 必须一致；以第一个为准
+  const includeHistory = artworksData.length > 0
+    ? artworksData[0].historyByEdition !== undefined
+    : false;
   lines.push('---');
   lines.push(`title: "${name} Artworks"`);
   lines.push(`exported_at: "${exportDate.toISOString()}"`);
@@ -119,6 +100,8 @@ export function generateFullMarkdown(
   lines.push(`include_status: ${options.includeStatus}`);
   lines.push(`include_location: ${options.includeLocation}`);
   lines.push(`include_details: ${options.includeDetails}`);
+  lines.push(`include_files: ${options.includeFiles}`);
+  lines.push(`include_history: ${includeHistory}`);
   lines.push('---');
   lines.push('');
 
@@ -143,4 +126,3 @@ export function generateFullMarkdown(
 
   return lines.join('\n');
 }
-

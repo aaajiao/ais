@@ -28,10 +28,11 @@ export default function ExportDialog({
   const { session } = useAuthContext();
   const { artistName } = useProfile();
   const [options, setOptions] = useState<ExportOptions>({
-    includePrice: false,
-    includeStatus: false,
-    includeLocation: false,
-    includeDetails: false,
+    includePrice: true,
+    includeStatus: true,
+    includeLocation: true,
+    includeDetails: true,
+    includeFiles: true,
   });
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -219,6 +220,18 @@ export default function ExportDialog({
                   className="w-4 h-4 accent-primary"
                 />
                 <span>{t('detailInfo')}</span>
+              </label>
+
+              <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={options.includeFiles}
+                  onChange={(e) =>
+                    setOptions({ ...options, includeFiles: e.target.checked })
+                  }
+                  className="w-4 h-4 accent-primary"
+                />
+                <span>{t('filesInfo')}</span>
               </label>
             </div>
           </div>

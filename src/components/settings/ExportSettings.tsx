@@ -7,7 +7,7 @@ import { useProfile } from '@/hooks/queries/useProfile';
 export default function ExportSettings() {
   const { t } = useTranslation('settings');
   const { artistName } = useProfile();
-  const { exporting, exportJSON, exportArtworksCSV, exportEditionsCSV } = useExport(artistName);
+  const { exporting, exportJSON, exportMD } = useExport(artistName);
 
   const handleExportJSON = async () => {
     const result = await exportJSON();
@@ -16,25 +16,10 @@ export default function ExportSettings() {
     }
   };
 
-  const handleExportArtworksCSV = async () => {
-    const result = await exportArtworksCSV();
-    if (!result.success) {
-      if (result.isEmpty) {
-        alert(t('export.noArtworks'));
-      } else if (result.error) {
-        alert(t('export.exportError') + ': ' + result.error);
-      }
-    }
-  };
-
-  const handleExportEditionsCSV = async () => {
-    const result = await exportEditionsCSV();
-    if (!result.success) {
-      if (result.isEmpty) {
-        alert(t('export.noEditions'));
-      } else if (result.error) {
-        alert(t('export.exportError') + ': ' + result.error);
-      }
+  const handleExportMD = async () => {
+    const result = await exportMD();
+    if (!result.success && result.error) {
+      alert(t('export.exportError') + ': ' + result.error);
     }
   };
 
@@ -54,25 +39,14 @@ export default function ExportSettings() {
           </Button>
         </div>
 
-        {/* 作品 CSV */}
+        {/* MD 完整备份（人类可读） */}
         <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
           <div>
-            <p className="font-medium">{t('export.artworksCsv')}</p>
-            <p className="text-sm text-muted-foreground">{t('export.artworksCsvDescription')}</p>
+            <p className="font-medium">{t('export.mdBackup')}</p>
+            <p className="text-sm text-muted-foreground">{t('export.mdDescription')}</p>
           </div>
-          <Button onClick={handleExportArtworksCSV} disabled={exporting !== null}>
-            {exporting === 'artworks-csv' ? t('export.exporting') : t('export.exportCsv')}
-          </Button>
-        </div>
-
-        {/* 版本 CSV */}
-        <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-          <div>
-            <p className="font-medium">{t('export.editionsCsv')}</p>
-            <p className="text-sm text-muted-foreground">{t('export.editionsCsvDescription')}</p>
-          </div>
-          <Button onClick={handleExportEditionsCSV} disabled={exporting !== null}>
-            {exporting === 'editions-csv' ? t('export.exporting') : t('export.exportCsv')}
+          <Button onClick={handleExportMD} disabled={exporting !== null}>
+            {exporting === 'md' ? t('export.exporting') : t('export.exportMd')}
           </Button>
         </div>
       </div>

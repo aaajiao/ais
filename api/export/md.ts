@@ -1,7 +1,7 @@
 // Markdown 导出 API
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import type { ExportRequest } from '../../src/lib/exporters/index.js';
+import type { ExportRequest, ExportOptions } from '../../src/lib/exporters/index.js';
 import { generateFullMarkdown } from '../../src/lib/exporters/formatters.js';
 import { getSupabaseClient, fetchArtworkExportData } from './shared.js';
 import { verifyAuth } from '../lib/auth.js';
@@ -52,20 +52,35 @@ export async function handleMarkdownExport(request: ExportRequest, userId?: stri
   }
   // scope === 'all' 时不传 artworkIds，获取全部
 
+  // scope=all 全量备份才查询 edition_history（其他 scope 跳过历史以减少 payload）
+  const isFullBackup = request.scope === 'all';
+
   // 获取数据（支持版本过滤，限定用户）
-  const artworksData = await fetchArtworkExportData(supabase, artworkIds, request.editionIds, userId);
+  const artworksData = await fetchArtworkExportData(
+    supabase,
+    artworkIds,
+    request.editionIds,
+    userId,
+    { includeHistory: isFullBackup },
+  );
 
   if (artworksData.length === 0) {
     throw new Error('No artworks found');
   }
 
-  // 生成 Markdown（提供默认 options）
-  const options = request.options ?? {
-    includePrice: false,
-    includeStatus: false,
-    includeLocation: false,
-    includeDetails: false,
+  // 生成 Markdown
+  // 缺失 options 时默认全开 —— 与 ExportDialog / 设置页全量备份的默认行为一致
+  const options: ExportOptions = request.options ?? {
+    includePrice: true,
+    includeStatus: true,
+    includeLocation: true,
+    includeDetails: true,
+    includeFiles: true,
   };
+  // 兼容旧 client：缺 includeFiles 时默认 true
+  if (options.includeFiles === undefined) {
+    options.includeFiles = true;
+  }
   const artistName = request.artistName || 'aaajiao';
   const content = generateFullMarkdown(artworksData, options, artistName);
 
@@ -73,7 +88,10 @@ export async function handleMarkdownExport(request: ExportRequest, userId?: stri
   const dateStr = new Date().toISOString().split('T')[0];
   let filename: string;
 
-  if (artworksData.length === 1) {
+  if (isFullBackup) {
+    // 全量备份：与 JSON 备份命名对齐
+    filename = `${artistName}-inventory-backup-${dateStr}.md`;
+  } else if (artworksData.length === 1) {
     // 单个作品：使用作品名
     const title = artworksData[0].artwork.title_en
       .toLowerCase()
@@ -81,7 +99,7 @@ export async function handleMarkdownExport(request: ExportRequest, userId?: stri
       .replace(/^-|-$/g, '');
     filename = `${artistName}-${title}-${dateStr}.md`;
   } else {
-    // 多个作品
+    // 多个作品（多选导出）
     filename = `${artistName}-artworks-${dateStr}.md`;
   }
 
