@@ -180,9 +180,9 @@ users (用户)
 | `id` | UUID | - | 主键 |
 | `title_en` | TEXT | 作品编辑 | 英文标题（必填） |
 | `title_cn` | TEXT | 作品编辑 | 中文标题 |
-| `year` | INT | 作品编辑 | 创作年份 |
-| `type` | TEXT | 作品编辑 | 作品类型 |
-| `materials` | TEXT | 作品编辑 | 材料 |
+| `year` | INT | 作品编辑 | 创作年份。允许 `"2017-2019"` 跨年区间格式，**不要**收紧 |
+| `type` | TEXT | 作品编辑 | 作品类型。**三层归一化**：见下方 [artworks.type 归一化策略](#artworkstype-归一化策略) |
+| `materials` | TEXT | 作品编辑 | 材料。多样性是真实数据，**不归一**（同一作品的实际材料组合天然唯一） |
 | `dimensions` | TEXT | 作品编辑 | 尺寸 |
 | `duration` | TEXT | 作品编辑 | 时长（视频作品） |
 | `thumbnail_url` | TEXT | 作品编辑 | 缩略图 URL |
@@ -195,6 +195,22 @@ users (用户)
 | `deleted_at` | TIMESTAMP | - | 软删除标记 |
 | `created_at` | TIMESTAMP | - | 创建时间 |
 | `updated_at` | TIMESTAMP | - | 更新时间 |
+
+#### artworks.type 归一化策略
+
+`type` 字段在 v1.3.6 之前是裸 `<input type="text">`，造成历史脏数据：`Installation` / `installation` / `Video` / `video` / `digital printing `（尾空格）等同义变体并存。v1.4 起改为 **三层防御**：
+
+1. **数据清洗（一次性 SQL）**：`supabase/migrations/004_normalize_artwork_types.sql` 全表 `TRIM` + 已知 case-dupe 归一为最常见形式。应用后挪到 `archived/`。
+2. **写入端归一（self-bootstrapping）**：所有写入入口必须调 `normalizeArtworkType(raw, existingTypes)`（`src/lib/normalizeArtworkType.ts`）：先 trim，再跟当前用户 distinct type 做 case-insensitive 匹配 —— 命中则用 DB 里的规范形式覆盖，未命中则原样写入（让新类型成为未来的规范形式）。
+3. **UI 提示（datalist）**：`ArtworkEditForm` 的 type 输入挂 `<datalist>`，列出当前用户已有 type（按频次 desc），减少新输入时的写法分歧。
+
+当前已接入的写入入口：
+- `src/pages/ArtworkDetail.tsx` `saveEditing`（用户编辑）
+- `src/pages/Artworks.tsx` `handleCreateArtwork`（用户新建）
+- `api/tools/import-from-url.ts`（AI 从 URL 抓取）
+- `api/import/md.ts`（Markdown 批量导入，insert + update 双路径）
+
+**新增写入路径时必须接入归一化**，否则脏数据会重新堆积。守护测试：`src/lib/normalizeArtworkType.test.ts`（helper 单元）、`src/components/artwork/ArtworkEditForm.test.tsx`（datalist 渲染）、`api/tools/__tests__/import-from-url.test.ts`（"normalizes the LLM-extracted type" 用例）。
 
 ---
 

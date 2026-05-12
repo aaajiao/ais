@@ -4,6 +4,10 @@ import type { ToolContext } from './types.js';
 import { extractArtworkFromUrl } from '../lib/artwork-extractor.js';
 import { selectBestImage } from '../lib/image-downloader.js';
 import { createT } from '../lib/i18n.js';
+import {
+  fetchExistingArtworkTypes,
+  normalizeArtworkType,
+} from '../../src/lib/normalizeArtworkType.js';
 
 /**
  * 创建从 URL 导入作品工具
@@ -68,11 +72,14 @@ export function createImportFromUrlTool(ctx: ToolContext) {
       }
 
       // 4. 准备作品数据
+      // LLM 抓取 URL 时类型字段最脏（"installation" / "Installation " / "Video"），
+      // 用当前用户已有的 distinct type 做 case-insensitive 归一，避免堆积分散写法。
+      const existingTypes = await fetchExistingArtworkTypes(supabase, { userId: ctx.userId });
       const artworkData: Record<string, unknown> = {
         title_en: artwork.title_en,
         title_cn: artwork.title_cn,
         year: artwork.year,
-        type: artwork.type,
+        type: normalizeArtworkType(artwork.type, existingTypes),
         dimensions: artwork.dimensions,
         materials: artwork.materials,
         duration: artwork.duration,

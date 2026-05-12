@@ -4,7 +4,9 @@ import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { invalidateOnArtworkEdit, invalidateOnEditionCreate, invalidateOnArtworkDelete } from '@/lib/cacheInvalidation';
+import { normalizeArtworkType } from '@/lib/normalizeArtworkType';
 import { useArtworkDetail } from '@/hooks/queries/useArtworks';
+import { useArtworkTypes } from '@/hooks/queries/useArtworkTypes';
 import { useEditionsByArtwork } from '@/hooks/queries/useEditions';
 import ExportDialog from '@/components/export/ExportDialog';
 import { Button } from '@/components/ui/button';
@@ -37,6 +39,9 @@ export default function ArtworkDetail() {
     data: editions = [],
     isLoading: editionsLoading,
   } = useEditionsByArtwork(id);
+
+  // 当前用户已有的 distinct type 列表，用于保存前 case-insensitive 归一
+  const { data: existingTypes = [] } = useArtworkTypes();
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -84,7 +89,7 @@ export default function ArtworkDetail() {
         title_en: formData.title_en,
         title_cn: formData.title_cn || null,
         year: formData.year || null,
-        type: formData.type || null,
+        type: normalizeArtworkType(formData.type, existingTypes),
         materials: formData.materials || null,
         dimensions: formData.dimensions || null,
         duration: formData.duration || null,

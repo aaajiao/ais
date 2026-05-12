@@ -15,11 +15,13 @@ import { SearchInput } from '@/components/ui/SearchInput';
 import { queryKeys } from '@/lib/queryKeys';
 import { useAuth } from '@/hooks/useAuth';
 import { invalidateOnArtworkCreate } from '@/lib/cacheInvalidation';
+import { normalizeArtworkType } from '@/lib/normalizeArtworkType';
 import {
   useArtworksQueryFn,
   useArtworksTotalCount,
   type ArtworkWithStats,
 } from '@/hooks/queries/useArtworks';
+import { useArtworkTypes } from '@/hooks/queries/useArtworkTypes';
 import {
   useInfiniteVirtualList,
   isGroupHeader,
@@ -106,6 +108,9 @@ export default function Artworks() {
   // Total count for "全部" tab
   const { data: totalCount } = useArtworksTotalCount();
 
+  // 当前用户已有的 distinct type 列表，用于创建前 case-insensitive 归一
+  const { data: existingTypes = [] } = useArtworkTypes();
+
   // Create query function with current filters
   const filters = useMemo(
     () => ({
@@ -189,7 +194,7 @@ export default function Artworks() {
         title_en: addFormData.title_en.trim(),
         title_cn: addFormData.title_cn.trim() || null,
         year: addFormData.year.trim() || null,
-        type: addFormData.type.trim() || null,
+        type: normalizeArtworkType(addFormData.type, existingTypes),
         materials: addFormData.materials.trim() || null,
         dimensions: addFormData.dimensions.trim() || null,
         duration: addFormData.duration.trim() || null,
@@ -223,7 +228,7 @@ export default function Artworks() {
     } finally {
       setCreating(false);
     }
-  }, [user, addFormData, queryClient, navigate]);
+  }, [user, addFormData, existingTypes, queryClient, navigate]);
 
   // 批量删除（软删除）
   const handleBatchDelete = useCallback(async () => {

@@ -2,6 +2,10 @@ import { createClient } from '@supabase/supabase-js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { verifyAuth } from '../lib/auth.js';
 import { processExternalImage, isSupabaseUrl } from './process-image.js';
+import {
+  fetchExistingArtworkTypes,
+  normalizeArtworkType,
+} from '../../src/lib/normalizeArtworkType.js';
 
 // Vercel 配置：使用 Node.js runtime（因为 process-image 使用 sharp）
 export const config = {
@@ -218,6 +222,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     };
 
+    // 一次性拉当前用户已有的 distinct type，循环内做 case-insensitive 归一。
+    // MD 导入是常见脏数据来源（"Installation" vs "installation" 在过去的 165 条里就是这么来的）。
+    const existingArtworkTypes = await fetchExistingArtworkTypes(supabase, {
+      userId: authResult.userId!,
+    });
+
     for (const artwork of body.artworks) {
       try {
         // 通过 source_url 或标题匹配已有作品（只匹配未删除的，限定当前用户）
@@ -261,7 +271,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               title_en: artwork.title_en,
               title_cn: artwork.title_cn,
               year: artwork.year,
-              type: artwork.type,
+              type: normalizeArtworkType(artwork.type, existingArtworkTypes),
               dimensions: artwork.dimensions,
               materials: artwork.materials,
               duration: artwork.duration,
@@ -309,7 +319,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           for (const field of WEBSITE_FIELDS) {
             const val = artwork[field as keyof ImportArtwork];
             if (val !== null && val !== undefined) {
-              updateData[field] = val;
+              // type 字段做归一：trim + 跟现有 type case-insensitive 匹配
+              if (field === 'type') {
+                const normalized = normalizeArtworkType(val as string, existingArtworkTypes);
+                if (normalized !== null) {
+                  updateData[field] = normalized;
+                }
+              } else {
+                updateData[field] = val;
+              }
             }
           }
 

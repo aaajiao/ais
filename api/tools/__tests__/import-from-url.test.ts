@@ -71,21 +71,40 @@ function buildHandler(opts: {
       select(cols?: string) {
         const call: CapturedCall = { table, op: 'select', filters: [] };
         calls.push(call);
-        const builder = {
-          eq(col: string, val: unknown) {
+        // Thenable builder：每次链式 filter 都返回 self，await builder 时 resolve 数据。
+        // fetchExistingArtworkTypes 走 .not().is().eq() 顺序，import-from-url 自身走
+        // .eq().eq().is() 顺序 —— 两条路径都需要可链 + 可 await。
+        interface SelectBuilder {
+          eq(col: string, val: unknown): SelectBuilder;
+          not(col: string, op: string, val: unknown): SelectBuilder;
+          is(col: string, val: unknown): SelectBuilder;
+          single(): Promise<{ data: ExistingArtwork | null; error: null }>;
+          then<TResult>(
+            onfulfilled: (v: { data: ExistingArtwork[]; error: null }) => TResult,
+          ): Promise<TResult>;
+        }
+        const builder: SelectBuilder = {
+          eq(col, val) {
             call.filters.push({ col, val, method: 'eq' });
             return builder;
           },
-          is(col: string, val: unknown) {
+          not(col, op, val) {
+            call.filters.push({ col, val, method: `not.${op}` });
+            return builder;
+          },
+          is(col, val) {
             call.filters.push({ col, val, method: 'is' });
-            return Promise.resolve({
-              data: resolveSelect(call, opts) ?? [],
-              error: null,
-            });
+            return builder;
           },
           single() {
             const data = resolveSelect(call, opts);
             return Promise.resolve({ data: Array.isArray(data) ? data[0] : data, error: null });
+          },
+          then(onfulfilled) {
+            return Promise.resolve({
+              data: resolveSelect(call, opts) ?? [],
+              error: null,
+            }).then(onfulfilled);
           },
         };
         void cols;
@@ -125,6 +144,14 @@ function resolveSelect(
 ): ExistingArtwork[] | null {
   if (call.table !== 'artworks') return [];
   const filterCols = call.filters.map((f) => f.col);
+  // fetchExistingArtworkTypes 用 `.not('type', 'is', null)`，没 source_url/title_en 过滤
+  if (
+    call.filters.some((f) => f.col === 'type' && f.method === 'not.is') &&
+    !filterCols.includes('source_url') &&
+    !filterCols.includes('title_en')
+  ) {
+    return [];
+  }
   if (filterCols.includes('source_url')) {
     return opts.existingByUrl ?? [];
   }
@@ -232,6 +259,87 @@ describe('import_artwork_from_url', () => {
     );
     expect(titleLookup).toBeDefined();
     expect(titleLookup!.filters.find((f) => f.col === 'user_id')?.val).toBe('me');
+  });
+
+  it('normalizes the LLM-extracted type against existing user types (case-insensitive + trim)', async () => {
+    // LLM 从网页抽出 "installation " (尾空格 + 小写)，用户库里已有 "Installation"。
+    // 期望：写入 DB 时归一化为 "Installation"。
+    extractStub = {
+      success: true,
+      artwork: { title_en: 'Dirty Type Test', type: 'installation ' },
+      images: [],
+    };
+    // 自定义 handler：让 fetchExistingArtworkTypes 那次 select 返回 [{type:'Installation'}]
+    const typeAwareHandler: FromHandler = (table, calls) => ({
+      select() {
+        const call: CapturedCall = { table, op: 'select', filters: [] };
+        calls.push(call);
+        interface SelectBuilder {
+          eq(col: string, val: unknown): SelectBuilder;
+          not(col: string, op: string, val: unknown): SelectBuilder;
+          is(col: string, val: unknown): SelectBuilder;
+          single(): Promise<{ data: unknown; error: null }>;
+          then<TResult>(onfulfilled: (v: { data: unknown[]; error: null }) => TResult): Promise<TResult>;
+        }
+        const builder: SelectBuilder = {
+          eq(col, val) {
+            call.filters.push({ col, val, method: 'eq' });
+            return builder;
+          },
+          not(col, op, val) {
+            call.filters.push({ col, val, method: `not.${op}` });
+            return builder;
+          },
+          is(col, val) {
+            call.filters.push({ col, val, method: 'is' });
+            return builder;
+          },
+          single() {
+            return Promise.resolve({ data: null, error: null });
+          },
+          then(onfulfilled) {
+            // fetchExistingArtworkTypes 是唯一带 `not.is` 过滤的 select
+            const isTypesFetch = call.filters.some(
+              (f) => f.col === 'type' && f.method === 'not.is',
+            );
+            return Promise.resolve({
+              data: isTypesFetch ? [{ type: 'Installation' }, { type: 'Installation' }] : [],
+              error: null,
+            }).then(onfulfilled);
+          },
+        };
+        return builder;
+      },
+      insert(payload: unknown) {
+        const call: CapturedCall = { table, op: 'insert', payload, filters: [] };
+        calls.push(call);
+        return {
+          select: () => ({
+            single: () => Promise.resolve({ data: { id: 'new-art-id' }, error: null }),
+          }),
+        };
+      },
+      update(payload: unknown) {
+        const call: CapturedCall = { table, op: 'update', payload, filters: [] };
+        calls.push(call);
+        return {
+          eq(col: string, val: unknown) {
+            call.filters.push({ col, val, method: 'eq' });
+            return Promise.resolve({ error: null });
+          },
+        };
+      },
+    });
+    const { supabase, calls } = createMockSupabase(typeAwareHandler);
+    const tool = createImportFromUrlTool({ supabase, userId: 'me', locale: 'zh' });
+    await (tool as unknown as { execute: (a: unknown) => Promise<unknown> }).execute({
+      url: 'https://example.com/dirty-type',
+    });
+
+    const insert = calls.find((c) => c.op === 'insert' && c.table === 'artworks');
+    expect(insert).toBeDefined();
+    const payload = insert!.payload as Record<string, unknown>;
+    expect(payload.type).toBe('Installation');
   });
 
   it('updates the thumbnail_url when a best image is selected', async () => {

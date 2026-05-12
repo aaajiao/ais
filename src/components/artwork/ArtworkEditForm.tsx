@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
+import { useArtworkTypes } from '@/hooks/queries/useArtworkTypes';
 import type { ArtworkFormData } from './types';
 
 interface ArtworkEditFormProps {
@@ -19,6 +20,9 @@ export default function ArtworkEditForm({
 }: ArtworkEditFormProps) {
   const { t } = useTranslation('artworkDetail');
   const { t: tCommon } = useTranslation('common');
+  // 拉当前用户已有的 distinct type 列表用于 datalist 提示。
+  // 归一化（trim + case-insensitive 匹配）在 mutation 调用点完成，本表单只负责数据收集。
+  const { data: existingTypes = [] } = useArtworkTypes();
 
   return (
     <div className="space-y-4">
@@ -57,9 +61,15 @@ export default function ArtworkEditForm({
             type="text"
             value={formData.type}
             onChange={e => onFormChange({ ...formData, type: e.target.value })}
+            list="artwork-types"
             className="w-full px-3 py-2 border border-border rounded-lg bg-background focus:ring-2 focus:ring-ring outline-none"
             placeholder={t('form.typePlaceholder')}
           />
+          <datalist id="artwork-types">
+            {existingTypes.map((typeOption) => (
+              <option key={typeOption} value={typeOption} />
+            ))}
+          </datalist>
         </div>
         <div className="md:col-span-2">
           <label className="block text-sm font-medium mb-1">{t('form.materials')}</label>
