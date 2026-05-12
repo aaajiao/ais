@@ -56,10 +56,18 @@ describe('cacheInvalidation', () => {
       });
     });
 
-    it('should make 4 invalidation calls', async () => {
+    it('should invalidate visualize snapshot', async () => {
       await invalidateOnArtworkEdit(queryClient, 'artwork-1');
 
-      expect(invalidateQueriesSpy).toHaveBeenCalledTimes(4);
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+        queryKey: queryKeys.visualize.snapshot,
+      });
+    });
+
+    it('should make 5 invalidation calls', async () => {
+      await invalidateOnArtworkEdit(queryClient, 'artwork-1');
+
+      expect(invalidateQueriesSpy).toHaveBeenCalledTimes(5);
     });
   });
 
@@ -131,7 +139,15 @@ describe('cacheInvalidation', () => {
     it('should make 9 invalidation calls', async () => {
       await invalidateOnEditionEdit(queryClient, 'edition-1', 'artwork-1');
 
-      expect(invalidateQueriesSpy).toHaveBeenCalledTimes(9);
+      expect(invalidateQueriesSpy).toHaveBeenCalledTimes(10);
+    });
+
+    it('should invalidate visualize snapshot', async () => {
+      await invalidateOnEditionEdit(queryClient, 'edition-1', 'artwork-1');
+
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+        queryKey: queryKeys.visualize.snapshot,
+      });
     });
   });
 
@@ -179,7 +195,15 @@ describe('cacheInvalidation', () => {
     it('should make 6 invalidation calls', async () => {
       await invalidateOnEditionCreate(queryClient, 'artwork-1');
 
-      expect(invalidateQueriesSpy).toHaveBeenCalledTimes(6);
+      expect(invalidateQueriesSpy).toHaveBeenCalledTimes(7);
+    });
+
+    it('should invalidate visualize snapshot', async () => {
+      await invalidateOnEditionCreate(queryClient, 'artwork-1');
+
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+        queryKey: queryKeys.visualize.snapshot,
+      });
     });
   });
 
@@ -227,7 +251,15 @@ describe('cacheInvalidation', () => {
     it('should make 5 invalidation calls', async () => {
       await invalidateOnEditionDelete(queryClient, 'artwork-1');
 
-      expect(invalidateQueriesSpy).toHaveBeenCalledTimes(5);
+      expect(invalidateQueriesSpy).toHaveBeenCalledTimes(6);
+    });
+
+    it('should invalidate visualize snapshot', async () => {
+      await invalidateOnEditionDelete(queryClient, 'artwork-1');
+
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+        queryKey: queryKeys.visualize.snapshot,
+      });
     });
   });
 
@@ -275,7 +307,15 @@ describe('cacheInvalidation', () => {
     it('should make 5 invalidation calls', async () => {
       await invalidateOnArtworkDelete(queryClient);
 
-      expect(invalidateQueriesSpy).toHaveBeenCalledTimes(5);
+      expect(invalidateQueriesSpy).toHaveBeenCalledTimes(6);
+    });
+
+    it('should invalidate visualize snapshot', async () => {
+      await invalidateOnArtworkDelete(queryClient);
+
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+        queryKey: queryKeys.visualize.snapshot,
+      });
     });
   });
 
@@ -315,7 +355,15 @@ describe('cacheInvalidation', () => {
     it('should make 4 invalidation calls', async () => {
       await invalidateOnArtworkPermanentDelete(queryClient);
 
-      expect(invalidateQueriesSpy).toHaveBeenCalledTimes(4);
+      expect(invalidateQueriesSpy).toHaveBeenCalledTimes(5);
+    });
+
+    it('should invalidate visualize snapshot', async () => {
+      await invalidateOnArtworkPermanentDelete(queryClient);
+
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+        queryKey: queryKeys.visualize.snapshot,
+      });
     });
   });
 

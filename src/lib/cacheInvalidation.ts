@@ -1,9 +1,13 @@
 import { QueryClient } from '@tanstack/react-query';
 import { queryKeys } from './queryKeys';
 
+// 任何 artworks / editions / locations 的写入都会影响 /visualize 的快照。
+// 这个 key 放在所有 invalidate 函数里，保持 viz 页打开时也自动跟上 mutation。
+const VISUALIZE_KEY = queryKeys.visualize.snapshot;
+
 /**
  * 编辑作品后的缓存失效
- * 影响：作品详情、作品列表、版本列表（显示作品标题）、最近更新
+ * 影响：作品详情、作品列表、版本列表（显示作品标题）、最近更新、可视化快照
  */
 export const invalidateOnArtworkEdit = async (
   queryClient: QueryClient,
@@ -14,12 +18,13 @@ export const invalidateOnArtworkEdit = async (
     queryClient.invalidateQueries({ queryKey: ['artworks', 'infinite'] }),
     queryClient.invalidateQueries({ queryKey: ['editions', 'infinite'] }),
     queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.recentUpdates }),
+    queryClient.invalidateQueries({ queryKey: VISUALIZE_KEY }),
   ]);
 };
 
 /**
  * 编辑版本后的缓存失效
- * 影响：版本详情、版本列表、版本统计、作品详情（显示版本统计）、作品列表、仪表板
+ * 影响：版本详情、版本列表、版本统计、作品详情（显示版本统计）、作品列表、仪表板、可视化快照
  */
 export const invalidateOnEditionEdit = async (
   queryClient: QueryClient,
@@ -36,12 +41,13 @@ export const invalidateOnEditionEdit = async (
     queryClient.invalidateQueries({ queryKey: ['artworks', 'infinite'] }),
     queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.stats }),
     queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.recentUpdates }),
+    queryClient.invalidateQueries({ queryKey: VISUALIZE_KEY }),
   ]);
 };
 
 /**
  * 创建版本后的缓存失效
- * 影响：该作品的版本列表、版本列表、版本统计、作品详情、作品列表、仪表板统计
+ * 影响：该作品的版本列表、版本列表、版本统计、作品详情、作品列表、仪表板统计、可视化快照
  */
 export const invalidateOnEditionCreate = async (
   queryClient: QueryClient,
@@ -54,12 +60,13 @@ export const invalidateOnEditionCreate = async (
     queryClient.invalidateQueries({ queryKey: queryKeys.artworks.detail(artworkId) }),
     queryClient.invalidateQueries({ queryKey: ['artworks', 'infinite'] }),
     queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.stats }),
+    queryClient.invalidateQueries({ queryKey: VISUALIZE_KEY }),
   ]);
 };
 
 /**
  * 删除版本后的缓存失效
- * 影响：所有版本缓存、作品详情、作品列表、仪表板
+ * 影响：所有版本缓存、作品详情、作品列表、仪表板、可视化快照
  */
 export const invalidateOnEditionDelete = async (
   queryClient: QueryClient,
@@ -71,24 +78,26 @@ export const invalidateOnEditionDelete = async (
     queryClient.invalidateQueries({ queryKey: ['artworks', 'infinite'] }),
     queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.stats }),
     queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.recentUpdates }),
+    queryClient.invalidateQueries({ queryKey: VISUALIZE_KEY }),
   ]);
 };
 
 /**
  * 创建作品后的缓存失效
- * 影响：作品列表、仪表板
+ * 影响：作品列表、仪表板、可视化快照
  */
 export const invalidateOnArtworkCreate = async (queryClient: QueryClient) => {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: queryKeys.artworks.all }),
     queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.stats }),
     queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.recentUpdates }),
+    queryClient.invalidateQueries({ queryKey: VISUALIZE_KEY }),
   ]);
 };
 
 /**
  * 删除作品（软删除）或恢复作品后的缓存失效
- * 影响：所有作品缓存、版本列表、版本统计、仪表板
+ * 影响：所有作品缓存、版本列表、版本统计、仪表板、可视化快照
  */
 export const invalidateOnArtworkDelete = async (queryClient: QueryClient) => {
   await Promise.all([
@@ -97,12 +106,13 @@ export const invalidateOnArtworkDelete = async (queryClient: QueryClient) => {
     queryClient.invalidateQueries({ queryKey: ['editions', 'counts'] }),
     queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.stats }),
     queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.recentUpdates }),
+    queryClient.invalidateQueries({ queryKey: VISUALIZE_KEY }),
   ]);
 };
 
 /**
  * 永久删除作品后的缓存失效
- * 影响：所有作品和版本缓存、仪表板
+ * 影响：所有作品和版本缓存、仪表板、可视化快照
  */
 export const invalidateOnArtworkPermanentDelete = async (
   queryClient: QueryClient
@@ -112,5 +122,6 @@ export const invalidateOnArtworkPermanentDelete = async (
     queryClient.invalidateQueries({ queryKey: queryKeys.editions.all }),
     queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.stats }),
     queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.recentUpdates }),
+    queryClient.invalidateQueries({ queryKey: VISUALIZE_KEY }),
   ]);
 };
