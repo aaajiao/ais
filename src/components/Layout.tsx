@@ -6,7 +6,7 @@ import { useThemeContext } from '@/contexts/useThemeContext';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { NetworkIndicator } from '@/components/ui/NetworkIndicator';
-import { MessageSquare, Sun, Moon, Home, Package, MessageCircle, Settings } from 'lucide-react';
+import { MessageSquare, Sun, Moon, Home, Package, MessageCircle, Settings, Eye } from 'lucide-react';
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher';
 import ChatSidebar from './ChatSidebar';
 import { useProfile } from '@/hooks/queries/useProfile';
@@ -262,6 +262,15 @@ export default function Layout() {
         >
           <Package className="w-5 h-5" fill={location.pathname.startsWith('/artworks') ? 'currentColor' : 'none'} />
           <span className="text-xs mt-1 uppercase tracking-wider">{t('artworks')}</span>
+        </NavLink>
+        <NavLink
+          to="/visualize"
+          className={({ isActive }) =>
+            `flex flex-col items-center py-2 px-4 min-w-[60px] ${isActive ? 'text-foreground' : 'text-muted-foreground'}`
+          }
+        >
+          <Eye className="w-5 h-5" fill={location.pathname.startsWith('/visualize') ? 'currentColor' : 'none'} />
+          <span className="text-xs mt-1 uppercase tracking-wider">{t('visualize')}</span>
         </NavLink>
         <NavLink
           to="/settings"
