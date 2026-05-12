@@ -268,10 +268,8 @@ describe('DiasporaView', () => {
     ).toBeInTheDocument();
     // View all link
     expect(screen.getByText(/查看此位置全部版本|View all editions/i)).toBeInTheDocument();
-    // Edition inventory number
-    expect(screen.getByText('AAJ-2023-001')).toBeInTheDocument();
-    // Edition status
-    expect(screen.getByText(/at_gallery/)).toBeInTheDocument();
+    // Edition inventory chip
+    expect(screen.getByRole('button', { name: 'AAJ-2023-001' })).toBeInTheDocument();
   });
 
   it('pin 卡片中的 edition 行点击 → navigate 到 /editions/{id}', () => {
@@ -420,20 +418,18 @@ describe('DiasporaView', () => {
     expect(screen.getByText(/查看此位置全部版本|View all editions/i)).toBeInTheDocument();
   });
 
-  it('pin 卡片中每个 edition chip 显示 inventory + status', () => {
+  it('pin 卡片中每个 edition chip 只显示 inventory 号（status 仅作 title）', () => {
     renderDiaspora();
 
-    // Pin gallery — galleryEdition 的 inventory_number 是 AAJ-2023-001，status 是 at_gallery
     const galleryGroup = screen.getByRole('button', {
       name: /Test Gallery Berlin/i,
     });
     fireEvent.click(galleryGroup);
 
-    // chip 内容应同时包含 inv 与 status
-    const chip = screen.getByRole('button', {
-      name: /AAJ-2023-001.*at_gallery/i,
-    });
+    // chip 仅显示 inv；status 作为 title attr 不进 accessible name
+    const chip = screen.getByRole('button', { name: 'AAJ-2023-001' });
     expect(chip).toBeInTheDocument();
+    expect(chip).toHaveAttribute('title', 'at_gallery');
   });
 
   it('长名 location 节点渲染 SVG <title> 元素显示完整 name（label 被截断）', () => {

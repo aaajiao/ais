@@ -512,10 +512,7 @@ export default function DiasporaView({
                         navigate(`/editions/${edition.id}`);
                       }}
                     >
-                      <span>{displayId}</span>
-                      <span className="text-muted-foreground ml-1.5">
-                        · {edition.status}
-                      </span>
+                      {displayId}
                     </button>
                   ))}
                 </div>
