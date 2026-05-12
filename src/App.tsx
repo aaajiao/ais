@@ -24,6 +24,7 @@ const Trash = lazy(() => import('./pages/Trash'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Links = lazy(() => import('./pages/Links'));
 const PublicView = lazy(() => import('./pages/PublicView'));
+const Visualize = lazy(() => import('./pages/Visualize'));
 
 function App() {
   return (
@@ -131,6 +132,14 @@ function App() {
                 element={
                   <Suspense fallback={<PageLoader />}>
                     <Links />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="visualize"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <Visualize />
                   </Suspense>
                 }
               />

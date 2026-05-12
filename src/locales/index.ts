@@ -20,6 +20,7 @@ import zhEditionDetail from './zh/editionDetail.json';
 import zhArtworkDetail from './zh/artworkDetail.json';
 import zhLinks from './zh/links.json';
 import zhPublicView from './zh/publicView.json';
+import zhVisualize from './zh/visualize.json';
 
 // English translations
 import enCommon from './en/common.json';
@@ -39,6 +40,7 @@ import enEditionDetail from './en/editionDetail.json';
 import enArtworkDetail from './en/artworkDetail.json';
 import enLinks from './en/links.json';
 import enPublicView from './en/publicView.json';
+import enVisualize from './en/visualize.json';
 
 const resources = {
   zh: {
@@ -59,6 +61,7 @@ const resources = {
     artworkDetail: zhArtworkDetail,
     links: zhLinks,
     publicView: zhPublicView,
+    visualize: zhVisualize,
   },
   en: {
     common: enCommon,
@@ -78,6 +81,7 @@ const resources = {
     artworkDetail: enArtworkDetail,
     links: enLinks,
     publicView: enPublicView,
+    visualize: enVisualize,
   },
 };
 

@@ -45,4 +45,7 @@ export const queryKeys = {
     all: ['profile'] as const,
     public: ['profile', 'public'] as const,
   },
+  visualize: {
+    snapshot: ['visualize', 'snapshot'] as const,
+  },
 };

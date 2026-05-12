@@ -1,0 +1,93 @@
+{
+  "title": "Visualize",
+  "subtitle": "Read the archive as terrain",
+  "loading": "Reading archive…",
+  "error": "Failed to load archive",
+  "errorRetry": "Retry",
+  "empty": "No data to visualize",
+  "view": {
+    "strata": "Strata",
+    "markets": "Markets",
+    "terminal": "Terminal",
+    "diaspora": "Diaspora"
+  },
+  "strata": {
+    "heading": "Strata — Archive Strata",
+    "description": "X axis is year of creation; blocks stack within each year. Top band shows when records were entered — the archive was written down only in 2026.",
+    "axisYear": "Year",
+    "axisHistory": "Record entered",
+    "legend": {
+      "title": "Type",
+      "more": "Other"
+    },
+    "tooltip": {
+      "yearLabel": "{{year}}",
+      "count": "{{count}} artworks",
+      "editions": "{{count}} editions",
+      "click": "Click to view artworks from this year"
+    },
+    "gapNote": "Record time ≠ creation time. 85 of 87 history rows were written in a few weeks of 2026."
+  },
+  "markets": {
+    "heading": "Markets — Currency Distribution",
+    "description": "Each dot is one sold edition; radius scales with log price. One column per currency present in the data, sorted by transaction count.",
+    "stat": {
+      "sum": "Sum",
+      "median": "Median",
+      "max": "Max",
+      "min": "Min",
+      "count": "Count"
+    },
+    "tooltip": {
+      "noBuyer": "no buyer recorded",
+      "noDate": "no date recorded"
+    },
+    "empty": "No sold editions yet",
+    "currenciesAvailable": "{{count}} currencies"
+  },
+  "terminal": {
+    "heading": "Terminal — Archive Output",
+    "description": "System output as art object. Missing fields are shown as ─, not hidden.",
+    "groupBy": {
+      "label": "Group by",
+      "none": "None",
+      "status": "Status",
+      "year": "Year",
+      "location": "Location"
+    },
+    "stat": {
+      "artworks": "Artworks {{withEditions}} / {{total}} have editions",
+      "editions": "Editions {{count}}",
+      "markets": "Markets CNY {{cny}} / USD {{usd}} / EUR {{eur}}",
+      "fetched": "Fetched at {{time}}"
+    },
+    "header": {
+      "year": "year",
+      "type": "type",
+      "inv": "inv",
+      "edition": "ed",
+      "status": "status",
+      "location": "location",
+      "price": "price"
+    },
+    "manifesto": "$ archive list --all --no-cache"
+  },
+  "diaspora": {
+    "heading": "Diaspora",
+    "description": "The studio sits at the centre; works radiate outward to 21 locations. Node size scales with edition count.",
+    "stat": {
+      "trackedRatio": "{{tracked}} / {{total}} editions have known location ({{percent}}%)"
+    },
+    "stateHint": "The archive is thin. Location-flow data will grow as the system gets used.",
+    "legend": {
+      "studio": "Studio",
+      "gallery": "Gallery",
+      "museum": "Museum",
+      "other": "Other"
+    },
+    "tooltip": {
+      "editions": "{{count}} editions here",
+      "untracked": "no location recorded"
+    }
+  }
+}

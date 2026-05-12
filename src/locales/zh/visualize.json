@@ -1,0 +1,93 @@
+{
+  "title": "可视化",
+  "subtitle": "把档案当作可读的地形",
+  "loading": "正在读取档案…",
+  "error": "档案读取失败",
+  "errorRetry": "重试",
+  "empty": "暂无数据可视化",
+  "view": {
+    "strata": "地层",
+    "markets": "市场",
+    "terminal": "终端",
+    "diaspora": "流散"
+  },
+  "strata": {
+    "heading": "Strata — 档案地层",
+    "description": "横轴是创作年份，纵向堆叠该年作品。最上方为录入时间轴 — 显示档案在 2026 年才被人类记录的事实。",
+    "axisYear": "创作年份",
+    "axisHistory": "档案录入",
+    "legend": {
+      "title": "类型",
+      "more": "其他"
+    },
+    "tooltip": {
+      "yearLabel": "{{year}} 年",
+      "count": "{{count}} 件作品",
+      "editions": "{{count}} 个版本",
+      "click": "点击查看该年作品"
+    },
+    "gapNote": "记录时间 ≠ 创作时间。85 / 87 条历史在 2026 年的几周内集中产生。"
+  },
+  "markets": {
+    "heading": "Markets — 货币分布",
+    "description": "每个圆点是一个已售版本，半径按价格对数缩放。每种货币独占一列，按交易数降序排列 —— 实际出现哪些就显示哪些。",
+    "stat": {
+      "sum": "总额",
+      "median": "中位",
+      "max": "最高",
+      "min": "最低",
+      "count": "件数"
+    },
+    "tooltip": {
+      "noBuyer": "未记录买家",
+      "noDate": "未记录日期"
+    },
+    "empty": "暂无已售版本",
+    "currenciesAvailable": "{{count}} 种货币"
+  },
+  "terminal": {
+    "heading": "Terminal — 档案输出",
+    "description": "系统输出当作艺术对象。缺失字段用 ─ 显示，不掩饰。",
+    "groupBy": {
+      "label": "分组",
+      "none": "不分组",
+      "status": "按状态",
+      "year": "按年份",
+      "location": "按位置"
+    },
+    "stat": {
+      "artworks": "作品 {{withEditions}} / {{total}} 有版本",
+      "editions": "版本 {{count}}",
+      "markets": "市场 CNY {{cny}} / USD {{usd}} / EUR {{eur}}",
+      "fetched": "拉取于 {{time}}"
+    },
+    "header": {
+      "year": "年份",
+      "type": "类型",
+      "inv": "编号",
+      "edition": "版本",
+      "status": "状态",
+      "location": "位置",
+      "price": "价格"
+    },
+    "manifesto": "$ archive list --all --no-cache"
+  },
+  "diaspora": {
+    "heading": "Diaspora — 流散",
+    "description": "中心是工作室，作品向外辐射至 21 处。节点大小按版本数量。",
+    "stat": {
+      "trackedRatio": "{{tracked}} / {{total}} 版本有位置历史（{{percent}}%）"
+    },
+    "stateHint": "档案还薄。位置流转数据会随系统使用而生长。",
+    "legend": {
+      "studio": "工作室",
+      "gallery": "画廊",
+      "museum": "美术馆",
+      "other": "其他"
+    },
+    "tooltip": {
+      "editions": "{{count}} 个版本在此",
+      "untracked": "未记录所在地"
+    }
+  }
+}

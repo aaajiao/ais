@@ -187,6 +187,7 @@ bunx supabase gen types typescript --project-id <id> > src/lib/database.types.ts
 | [docs/database.md](docs/database.md) | 数据库部署、字段说明、RLS |
 | [docs/api-reference.md](docs/api-reference.md) | API 参考 |
 | [docs/external-api.md](docs/external-api.md) | 外部 API（API Key 结构化查询） |
+| [docs/visualize.md](docs/visualize.md) | 可视化 4 视图（Strata / Markets / Terminal / Diaspora） |
 | [docs/project-summary.md](docs/project-summary.md) | 项目总结 |
 | [docs/claude-code-skills.md](docs/claude-code-skills.md) | Claude Code Skills 配置指南 |
 

@@ -36,6 +36,8 @@ const PAGE_WIDTH_CONFIG: Record<string, PageWidthConfig> = {
   '/trash': { maxWidth: 'max-w-4xl', centered: true },
   // 对话页面：特殊处理，需要全高度
   '/chat': { maxWidth: 'max-w-4xl', centered: true },
+  // 可视化：地层 / 终端等视图需要宽幅
+  '/visualize': { maxWidth: 'max-w-7xl', centered: true },
 };
 
 // 获取页面宽度配置
@@ -133,6 +135,14 @@ export default function Layout() {
               }
             >
               {t('locations')}
+            </NavLink>
+            <NavLink
+              to="/visualize"
+              className={({ isActive }) =>
+                `nav-link ${isActive ? 'text-foreground active' : 'text-muted-foreground'}`
+              }
+            >
+              {t('visualize')}
             </NavLink>
             <NavLink
               to="/links"
