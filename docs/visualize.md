@@ -77,10 +77,15 @@ const [artworksRes, editionsRes, locationsRes, historyRes] = await Promise.all([
 
 ### Terminal
 
-- **`<pre>` 而非 `<table>`**：terminal 美学要求等宽字符在 JS 层 `padEnd/padStart` 对齐，table 会引入 DOM 列网格的"结构感"破坏字符流。
+- **`<pre>` 而非 `<table>`**：terminal 美学要求等宽字符在 JS 层 `padEnd/padStart` 对齐，table 会引入 DOM 列网格的"结构感"破坏字符流。**这是核心设计原则，未来改 a11y / 响应式都不能动**。
 - **null 显示为 `─`（box-drawing U+2500，非减号）**：缺失本身是信息密度的一部分，不藏。这是档案"诚实"的核心 statement。
 - **group by 存 local state（不进 URL）**：URL 已被 `?view=` 占用；groupBy 是视图内临时偏好，刷新即丢弃符合直觉。
 - **状态用 text-foreground / text-muted-foreground 二元区分**（sold/gifted 加重，其他弱化）：替代彩色 status badge，保持单色调性。
+- **数据行键盘可达：`<span role="button" tabIndex={0}>` 而非 `<button>`**：`<button>` 会带 user-agent padding/border/font-family/background，破坏 `<pre>` 内等宽字符流。`span + role=button + tabIndex=0 + onKeyDown(Enter/Space)` 同样满足 WAI-ARIA 可达性 + screen reader 识别。每行附带 `aria-label`（"年份 2024, 类型 Installation, 编号 AAJ-…"）让 SR 用户不必听整行字符流。`focus-visible` 用 outline 取代 hover 背景，键盘焦点视觉可见。
+- **box-drawing 装饰对 SR 隐藏**：分组标题 `╭─ status: sold (5) ╮` 中 `╭─` / `─╮` 属于纯装饰，直接 read out 会变成 "line drawings light arc down and right"。包成 `<span aria-hidden="true">` 后用 `<span role="heading" aria-level={3} aria-label="status: sold (5 items)">` 提供人类可读总结。`separator` 横线同理 aria-hidden。
+- **移动端紧凑字号：`text-[10px] sm:text-xs`**：375px 屏下默认 `text-xs (12px)` 一行 137 字符会爆。小屏先压到 10px 保全部列可见，≥640px 回到 12px。**不**隐藏列（如 location）—— 信息完整性优先，横向滚动作为兜底。
+- **hover 用 Tailwind `hover:` 修饰符（不再用 React state）**：原实现把 `hoveredId` 存 React state，每次 mouseEnter/Leave 触发 137 行整表重渲染（O(n) per hover）。改用 `hover:bg-foreground/10` CSS-only 后 0 次重渲染，触摸设备也不会卡在"最后 hover"的 stuck 状态。
+- **row.id 防御**：edition.id 在 DB 层是 NOT NULL，但若数据异常（空字符串 / 测试 fixture 错误），不渲染 role=button，避免出现 navigate 到 `/editions/` 死链。
 
 ### Diaspora
 
@@ -100,6 +105,7 @@ const [artworksRes, editionsRes, locationsRes, historyRes] = await Promise.all([
 | `strataUtils.test.ts` | 26 — year 解析 / swimlane 分组 + 排序 / `(untyped)` 处理 / 高度 log scale / stack 满了水平蔓延 |
 | `marketsUtils.test.ts` | 17 — 过滤 sold/有价 / 中位数 / 半径归一化 / 边界 |
 | `terminalUtils.test.ts` | 29 — inventory 自然排序 / edition label 4 种 / location 拼接 / group 分桶 / markets line |
+| `TerminalView.test.tsx` | 9 — 行 role=button + tabIndex / 点击 navigate / 键盘 Enter+Space / 其他键不触发 / 分组 heading + aria-hidden 装饰 / 紧凑字号 class / row.id 防御 / separator 对 SR 隐藏 |
 | `diasporaUtils.test.ts` | 30 — 节点关联 / 中心选择 tie-breaker / 同心环布局 / 边聚合 / tracked stat |
 | `DiasporaView.test.tsx` | 14 — 初始状态 / hover 预览 / hover 离开 / click pin / edition 行跳转 / view all 跳转 / 二次 click 取消 pin / 切换 pin / pin 时 hover 不干扰 / 无编号 edition / 空数据 / aria-pressed / 键盘 Enter / title_cn fallback |
 | `StrataView.test.tsx` | 11 — role=button 包裹 rect / aria-label 拼装 / click navigate / Enter / Space / 其它键不触发 / tabindex=0 / id 缺失 aria-disabled / viewBox 响应式 / hover tooltip / 空数据 |
@@ -132,6 +138,7 @@ src/components/visualize/
   ├── strataUtils.test.ts
   ├── MarketsView.tsx
   ├── TerminalView.tsx
+  ├── TerminalView.test.tsx
   └── DiasporaView.tsx
 src/locales/{zh,en}/visualize.json
 ```

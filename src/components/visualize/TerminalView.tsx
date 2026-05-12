@@ -52,7 +52,6 @@ export default function TerminalView({
   const { t } = useTranslation('visualize');
   const navigate = useNavigate();
   const [groupBy, setGroupBy] = useState<GroupBy>('none');
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   const rows = useMemo(
     () => buildRows(artworks, editions, locations),
@@ -114,12 +113,31 @@ export default function TerminalView({
     '  ' +
     col(t('terminal.header.price'), COL.price);
 
-  // 组标题（ASCII box-drawing）
-  const groupHeader = (key: string, count: number) => {
+  // 组标题（ASCII box-drawing）—— 拆成三段，装饰字符 aria-hidden
+  // 装饰部分（╭─ ... ─╮）对 screen reader 无意义，read out 会变成 "line drawings light arc down and right" 等
+  function renderGroupHeader(key: string, count: number) {
     const label = ` ${groupBy}: ${key} (${count}) `;
     const lineLen = Math.max(0, separator.length - label.length - 2);
-    return `╭─${label}${DASH.repeat(lineLen)}╮`;
-  };
+    const leftDeco = '╭─';
+    const rightDeco = DASH.repeat(lineLen) + '╮';
+    const a11yLabel = `${groupBy}: ${key} (${count} items)`;
+    return (
+      <span
+        role="heading"
+        aria-level={3}
+        aria-label={a11yLabel}
+        className="text-muted-foreground"
+      >
+        <span aria-hidden="true">{leftDeco}</span>
+        <span aria-hidden="true">{label}</span>
+        <span aria-hidden="true">{rightDeco}</span>
+      </span>
+    );
+  }
+
+  function handleRowActivate(id: string) {
+    navigate(`/editions/${id}`);
+  }
 
   return (
     <div className="space-y-4">
@@ -156,7 +174,10 @@ export default function TerminalView({
 
       {/* 主体终端输出 */}
       <div className="border border-border overflow-x-auto">
-        <pre className="font-mono text-xs leading-relaxed bg-muted/10 p-4 min-w-max">
+        <pre
+          // 紧凑字号：375px 屏先用 10px，>=640px 回到 xs(12px)。保留全部列。
+          className="font-mono text-[10px] sm:text-xs leading-relaxed bg-muted/10 p-4 min-w-max"
+        >
           {/* prompt 行 */}
           <span className="text-muted-foreground font-bold">{'$ '}</span>
           <span className="font-bold">{t('terminal.manifesto')}</span>
@@ -173,23 +194,24 @@ export default function TerminalView({
           {/* 列标题 */}
           <span className="text-foreground font-bold uppercase">{headerLine}</span>
           {'\n'}
-          <span className="text-muted-foreground">{separator}</span>
+          <span className="text-muted-foreground" aria-hidden="true">{separator}</span>
           {'\n'}
 
           {/* 数据行 */}
-          {groups.map((group) => (
-            <span key={group.key}>
+          {groups.map((group, gi) => (
+            <span key={group.key || `group-${gi}`}>
               {/* 分组标题（non-none） */}
               {groupBy !== 'none' && (
                 <>
                   {'\n'}
-                  <span className="text-muted-foreground">{groupHeader(group.key, group.rows.length)}</span>
+                  {renderGroupHeader(group.key, group.rows.length)}
                   {'\n'}
                 </>
               )}
 
-              {group.rows.map((row) => {
-                const isHovered = hoveredId === row.id;
+              {group.rows.map((row, ri) => {
+                // row.id 防御：DB schema NOT NULL，但用户提供数据若异常仍稳健回退到 array index
+                const safeKey = row.id || `${group.key}-${ri}`;
                 const isSold = row.status === 'sold' || row.status === 'gifted';
                 const rowText =
                   col(row.year, COL.year) +
@@ -206,17 +228,58 @@ export default function TerminalView({
                   '  ' +
                   col(row.priceLabel, COL.price, 'right');
 
+                // a11y row label：把列名拼回去，方便 SR 读出"年份 2024，类型 Installation…"
+                const ariaLabel = [
+                  row.year ? `${t('terminal.header.year')} ${row.year}` : null,
+                  row.type ? `${t('terminal.header.type')} ${row.type}` : null,
+                  row.inventoryNumber
+                    ? `${t('terminal.header.inv')} ${row.inventoryNumber}`
+                    : null,
+                  row.editionLabel
+                    ? `${t('terminal.header.edition')} ${row.editionLabel}`
+                    : null,
+                  `${t('terminal.header.status')} ${row.status}`,
+                  row.locationName
+                    ? `${t('terminal.header.location')} ${row.locationName}`
+                    : null,
+                  row.priceLabel
+                    ? `${t('terminal.header.price')} ${row.priceLabel}`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(', ');
+
+                // 用 span + role=button 而不是 <button>：
+                // <button> 会带 user-agent padding/border/font/background，破坏 <pre> 等宽对齐
+                // span + role=button + tabIndex=0 + onKeyDown 同样满足键盘可达
+                // 注意：row.id 可能（极端情况下）为空，禁用点击
+                const isActivatable = !!row.id;
                 return (
                   <span
-                    key={row.id}
+                    key={safeKey}
+                    {...(isActivatable
+                      ? {
+                          role: 'button',
+                          tabIndex: 0,
+                          'aria-label': ariaLabel,
+                          onClick: () => handleRowActivate(row.id),
+                          onKeyDown: (e: React.KeyboardEvent<HTMLSpanElement>) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              handleRowActivate(row.id);
+                            }
+                          },
+                        }
+                      : {})}
                     className={[
-                      'block cursor-pointer',
-                      isHovered ? 'bg-foreground/10' : '',
+                      'block',
+                      isActivatable
+                        ? 'cursor-pointer hover:bg-foreground/10 focus:bg-foreground/10 focus:outline-none focus-visible:outline-1 focus-visible:outline-foreground'
+                        : '',
                       isSold ? 'text-foreground' : 'text-muted-foreground',
-                    ].join(' ')}
-                    onClick={() => navigate(`/editions/${row.id}`)}
-                    onMouseEnter={() => setHoveredId(row.id)}
-                    onMouseLeave={() => setHoveredId(null)}
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
                   >
                     {rowText}
                   </span>
@@ -227,7 +290,7 @@ export default function TerminalView({
 
           {/* stat 区块 */}
           {'\n'}
-          <span className="text-muted-foreground">{separator}</span>
+          <span className="text-muted-foreground" aria-hidden="true">{separator}</span>
           {'\n\n'}
           <span className="text-muted-foreground font-bold">{'$ '}</span>
           <span className="font-bold">{'archive stat'}</span>
