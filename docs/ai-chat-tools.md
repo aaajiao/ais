@@ -258,22 +258,32 @@ search_editions internally matches by name, city, AND country.
 
 ---
 
-## Context Management（仅 Anthropic 路径）
+## Context Management（仅 compact-supported Claude 子集 + OpenAI 兜底）
 
-Claude 路径启用 Anthropic 官方 `contextManagement.compact_20260112`，由服务端按 token 自动压缩长上下文，替代客户端粗糙的 `JSON.stringify().length / 3` 估算截断。
+`contextManagement.compact_20260112` 是 Anthropic beta 特性，**只支持子集模型**（Sonnet 4.6+ / Opus 4.6+/4.7 / mythos-preview）。其他 Claude（Haiku 4.5 / Sonnet 4.5 / 老版本）即使是 Anthropic provider 也走客户端 token 截断兜底，跟 OpenAI 同款。
 
-| Provider | 长上下文处理 |
-|----------|-------------|
-| **Anthropic** | 服务端 `contextManagement.edits = [{ type: 'compact_20260112' }]` 自动压缩 |
-| **OpenAI** | 保留客户端 token 截断兜底（`api/lib/message-utils.ts:prepareMessagesForModel`），OpenAI 没有等效官方机制 |
+历史教训（v1.5.x 修复）：曾按 `provider === 'anthropic'` 一刀切注入 compact，把 Haiku 4.5 / Sonnet 4.5 当主聊天模型时直接报 "Conversation too long" —— **即使历史为空也失败**，因为服务端拒收 beta flag 时把错误包装成 context overflow，迷惑性极高。修复后用 `supportsCompactBeta(modelId)` 显式 gate。
 
-`pruneMessages`（去除重复工具调用）对两个 provider 都生效，与压缩/截断正交。
+| 路径 | 长上下文处理 |
+|------|-------------|
+| **Sonnet 4.6+ / Opus 4.6+/4.7 / mythos-preview** | 服务端 `contextManagement.edits = [{ type: 'compact_20260112' }]` 自动压缩；客户端截断兜底跳过 |
+| **Haiku 4.5 / Sonnet 4.5 / 老 Claude** | 客户端 token 截断兜底（`prepareMessagesForModel({ useServerSideCompaction: false })`），跟 OpenAI 同款 |
+| **OpenAI 全部** | 客户端 token 截断兜底；OpenAI 没有等效官方机制 |
+
+`pruneMessages`（去除重复工具调用）对所有路径生效，与压缩/截断正交。
 
 ### 关键文件
 
-- `api/chat.ts` —— 按 `getProviderName()` 分支注入 `contextManagement`
-- `api/lib/message-utils.ts:prepareMessagesForModel(messages, max, { provider })` —— Anthropic 跳过截断兜底
+- `api/lib/model-provider.ts:supportsCompactBeta(modelId)` —— 白名单单一真源，新模型必须在文档确认后扩
+- `api/chat.ts` —— `useCompact = provider === 'anthropic' && supportsCompactBeta(model)` 决定是否注入 + 决定 `useServerSideCompaction`
+- `api/lib/message-utils.ts:prepareMessagesForModel(messages, max, { useServerSideCompaction })` —— 显式 boolean，不要再用 provider 名字推断
 - `node_modules/@ai-sdk/anthropic/dist/index.d.ts:199-234` —— `contextManagement` 类型签名
+- 守护测试：`api/lib/__tests__/model-provider.test.ts`（白名单钉死） + `api/lib/__tests__/message-utils.test.ts`（两条路径行为对比）
+- Anthropic 文档：https://platform.claude.com/docs/en/build-with-claude/compaction
+
+### 多模型共存场景
+
+`searchExpansionModel`（默认 Haiku 4.5）和 `extractionModel` 通过 `generateText` 调用，**不注入** providerOptions，因此 Haiku 4.5 一直工作正常。问题只发生在用户把这些模型选作**主聊天模型**时（`api/chat.ts` 的 `streamText`）—— 修复后这条路径也自动降级到客户端截断兜底。
 
 ---
 

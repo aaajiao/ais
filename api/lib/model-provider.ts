@@ -9,6 +9,35 @@ export const DEFAULT_MODEL = 'claude-sonnet-4-6';
 export const DEFAULT_EXPANSION_MODEL = 'claude-haiku-4-5';
 
 /**
+ * Anthropic 服务端 compaction（`contextManagement.compact_20260112`）支持的模型列表。
+ *
+ * 官方文档：https://platform.claude.com/docs/en/build-with-claude/compaction
+ *
+ * 关键铁律：把 compact_20260112 发给**不在此列表**的 Claude 模型（如 Haiku 4.5、
+ * Sonnet 4.5）会被服务端拒，错误以 "context too long" 形式上抛 —— 即使对话历史
+ * 是空的也会失败，迷惑性极高（v1.x 实证）。
+ *
+ * 新版本发布时（如 Sonnet 4.7、Haiku 4.6 等）需要查 Anthropic compaction 文档
+ * 确认是否进入支持列表，再加入这里。**不要靠 startsWith 推断**。
+ */
+const COMPACT_SUPPORTED_MODELS: ReadonlySet<string> = new Set([
+  'claude-sonnet-4-6',
+  'claude-opus-4-6',
+  'claude-opus-4-7',
+  'claude-mythos-preview',
+]);
+
+/**
+ * 判断模型是否支持 `compact_20260112` 服务端 compaction。
+ * Caller 用这个返回值决定：
+ *   - true → 在 streamText 的 providerOptions 注入 contextManagement，跳过客户端截断
+ *   - false → 不注入 contextManagement，走 prepareMessagesForModel 客户端 token 截断兜底
+ */
+export function supportsCompactBeta(modelId: string): boolean {
+  return COMPACT_SUPPORTED_MODELS.has(modelId);
+}
+
+/**
  * 延迟创建 Anthropic provider 实例
  */
 export function getAnthropicProvider() {

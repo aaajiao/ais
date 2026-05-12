@@ -1,7 +1,7 @@
 import { streamText, stepCountIs, hasToolCall, type UIMessage } from 'ai';
 import type { ProviderOptions, SystemModelMessage } from '@ai-sdk/provider-utils';
 import { verifyAuth, unauthorizedResponse } from './lib/auth.js';
-import { getModel, getSupabase, getProviderName, getOpenAIReasoningEffort } from './lib/model-provider.js';
+import { getModel, getSupabase, getProviderName, getOpenAIReasoningEffort, supportsCompactBeta } from './lib/model-provider.js';
 import { getSystemPromptByProvider } from './lib/system-prompt.js';
 import { createTools } from './tools/index.js';
 import { prepareMessagesForModel } from './lib/message-utils.js';
@@ -229,15 +229,19 @@ export default async function handler(req: Request) {
     });
 
     // 4. 准备消息：
-    //    - Anthropic 路径：依赖服务端 contextManagement.compact 处理超长，跳过客户端 token 截断兜底
-    //    - OpenAI 路径：保留 prepareMessagesForModel 既有的 token 截断兜底
+    //    - 服务端 compaction 路径（Sonnet 4.6+ / Opus 4.6+/4.7）：跳过客户端截断
+    //    - 其他路径（OpenAI + Haiku 4.5 / Sonnet 4.5 等不支持 compact 的 Claude）：客户端 token 截断兜底
+    const useCompact = provider === 'anthropic' && supportsCompactBeta(model);
     const modelMessages = await prepareMessagesForModel(uiMessages as UIMessage[], 150000, {
-      provider,
+      useServerSideCompaction: useCompact,
     });
 
-    // 5. providerOptions：thinking + （仅 Anthropic）contextManagement
+    // 5. providerOptions：thinking + （仅支持 compact_20260112 的 Claude 模型注入 contextManagement）
+    // 不能用 `provider === 'anthropic'` 一刀切 —— compact_20260112 是 beta 特性，
+    // 只支持 Sonnet 4.6+ / Opus 4.6+/4.7。发给 Haiku 4.5 / Sonnet 4.5 会被服务端拒
+    // （表现为 "context too long" 即使历史为空），见 model-provider.supportsCompactBeta。
     const providerOptions = buildProviderOptions(thinkingEnabled, model, provider);
-    if (provider === 'anthropic') {
+    if (useCompact) {
       providerOptions.anthropic = {
         ...(providerOptions.anthropic ?? {}),
         contextManagement: {

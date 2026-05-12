@@ -28,13 +28,19 @@ export function estimateTokens(messages: UIMessage[]): number {
 
 export interface PrepareMessagesOptions {
   /**
-   * 当前 provider 名称。决定是否走客户端 token 截断兜底。
-   * - 'anthropic'：跳过客户端截断，依赖 streamText 的
-   *   providerOptions.anthropic.contextManagement.compact_20260112（服务端官方 compaction）
-   * - 'openai'：保留客户端 token 截断兜底（OpenAI 路径无对应官方机制）
-   * - 缺省：保守起见走 'openai' 路径（保留兜底，行为与历史版本一致）
+   * 当前请求是否走 Anthropic 服务端 compaction（`compact_20260112`）。决定是否
+   * 跳过客户端 token 截断兜底。
+   * - true：跳过客户端截断 —— 由 streamText providerOptions 注入的 contextManagement
+   *   在服务端按 token 数自动压缩历史。
+   * - false：保留客户端 token 截断兜底（OpenAI、以及不支持 compaction beta 的 Claude
+   *   模型如 Haiku 4.5 / Sonnet 4.5）。
+   * - 缺省：false，保守保留兜底（与历史 OpenAI 路径行为一致）。
+   *
+   * **重要**：caller 必须用 model-provider 的 `supportsCompactBeta(modelId)` 判断，
+   * **不能**用 `provider === 'anthropic'` —— compact_20260112 是 Anthropic 子集
+   * 模型的 beta 特性，给 Haiku 4.5 / Sonnet 4.5 发会被服务端拒（v1.x 实证）。
    */
-  provider?: 'anthropic' | 'openai';
+  useServerSideCompaction?: boolean;
 }
 
 /**
@@ -58,7 +64,7 @@ export async function prepareMessagesForModel(
   maxTokens: number = 150000,
   options: PrepareMessagesOptions = {}
 ) {
-  const provider = options.provider ?? 'openai';
+  const useServerSideCompaction = options.useServerSideCompaction ?? false;
 
   // 1. 先转换为 ModelMessage 格式
   const modelMessages = await convertToModelMessages(messages);
@@ -72,10 +78,10 @@ export async function prepareMessagesForModel(
     emptyMessages: 'remove',
   });
 
-  // 3. Anthropic 路径：依赖服务端 compaction，跳过客户端截断
-  if (provider === 'anthropic') {
+  // 3. 服务端 compaction 路径（Sonnet 4.6+ / Opus 4.6+/4.7）：跳过客户端截断
+  if (useServerSideCompaction) {
     if (prunedMessages.length < messages.length) {
-      console.log('[message-utils] Pruned messages (anthropic, server-side compaction)', {
+      console.log('[message-utils] Pruned messages (server-side compaction)', {
         originalCount: messages.length,
         prunedCount: prunedMessages.length,
       });
@@ -83,7 +89,7 @@ export async function prepareMessagesForModel(
     return prunedMessages;
   }
 
-  // 4. OpenAI 路径：保留旧的 token 截断兜底逻辑
+  // 4. 客户端截断兜底（OpenAI 全部 + 不支持 compact 的 Claude 模型）
   const estimated = estimateTokensFromModel(prunedMessages);
 
   if (estimated > maxTokens && prunedMessages.length > 2) {
