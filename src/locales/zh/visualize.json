@@ -40,10 +40,13 @@
     },
     "tooltip": {
       "noBuyer": "未记录买家",
-      "noDate": "未记录日期"
+      "noDate": "未记录日期",
+      "idleHint": "悬停或聚焦圆点查看交易详情"
     },
     "empty": "暂无已售版本",
-    "currenciesAvailable": "{{count}} 种货币"
+    "currenciesAvailable": "{{count}} 种货币",
+    "currencyLabel": "货币：{{currency}}",
+    "dotLabel": "{{inv}} · {{title}} · {{price}}"
   },
   "terminal": {
     "heading": "Terminal — 档案输出",

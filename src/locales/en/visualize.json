@@ -40,10 +40,13 @@
     },
     "tooltip": {
       "noBuyer": "no buyer recorded",
-      "noDate": "no date recorded"
+      "noDate": "no date recorded",
+      "idleHint": "Hover or focus a dot to see transaction details"
     },
     "empty": "No sold editions yet",
-    "currenciesAvailable": "{{count}} currencies"
+    "currenciesAvailable": "{{count}} currencies",
+    "currencyLabel": "Currency: {{currency}}",
+    "dotLabel": "{{inv}} · {{title}} · {{price}}"
   },
   "terminal": {
     "heading": "Terminal — Archive Output",

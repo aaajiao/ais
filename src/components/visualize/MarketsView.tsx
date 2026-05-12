@@ -14,7 +14,7 @@ export interface MarketsViewProps {
   editions: VizEdition[];
 }
 
-// 几何常量
+// 几何常量（SVG 内部坐标系，外层用 viewBox + className="w-full" 响应式缩放）
 const PANEL_H = 360;
 const COL_MIN_W = 120;
 const LEFT_PAD = 16;
@@ -25,6 +25,10 @@ const STAT_H = 56;         // 底部 stat 行高度
 const TOP_PAD = 8;
 
 const TOTAL_H = TOP_PAD + HEADER_H + PANEL_H + STAT_H;
+
+// hover opacity 与 Strata 对齐（locked design decision）：默认 0.65，hover 升 1.0
+const DOT_OPACITY_DEFAULT = 0.65;
+const DOT_OPACITY_HOVER = 1.0;
 
 function formatPrice(price: number, currency: string): string {
   try {
@@ -107,10 +111,9 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
 
       <div className="relative overflow-x-auto border border-border">
         <svg
-          width={totalW}
-          height={TOTAL_H}
           viewBox={`0 0 ${totalW} ${TOTAL_H}`}
-          className="block"
+          preserveAspectRatio="xMidYMid meet"
+          className="block w-full"
           role="img"
           aria-label={t('markets.heading')}
         >
@@ -139,7 +142,7 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
                   />
                 )}
 
-                {/* 货币代码标签 */}
+                {/* 货币代码标签（<title> 让 screen reader 念出货币名） */}
                 <text
                   x={xCenter}
                   y={TOP_PAD + HEADER_H - 8}
@@ -149,11 +152,13 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
                   fontWeight="bold"
                   fontFamily="ui-monospace, monospace"
                   letterSpacing="0.1em"
+                  aria-label={t('markets.currencyLabel', { currency })}
                 >
+                  <title>{t('markets.currencyLabel', { currency })}</title>
                   {currency}
                 </text>
 
-                {/* 散点 */}
+                {/* 散点：每个圆是可键盘聚焦的 button，Enter / Space 触发 navigate */}
                 {sales.map((ed) => {
                   const price = Number(ed.sale_price);
                   const r = priceToRadius(price, colMin, colMax);
@@ -165,18 +170,51 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
                   const cx = xColLeft + COL_PAD_X + r + jitter;
 
                   const isHovered = hoveredEdition?.id === ed.id;
+                  const artwork = artworkMap.get(ed.artwork_id);
+                  const dotLabel = t('markets.dotLabel', {
+                    inv: ed.inventory_number ?? '—',
+                    title:
+                      artwork?.title_en ||
+                      artwork?.title_cn ||
+                      ed.artwork_id,
+                    price: formatPrice(price, currency),
+                  });
+
                   return (
-                    <circle
+                    <g
                       key={ed.id}
-                      cx={cx}
-                      cy={cy}
-                      r={r}
-                      className="fill-foreground cursor-pointer transition-opacity"
-                      opacity={isHovered ? 1 : 0.55}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={dotLabel}
+                      aria-pressed={isHovered}
+                      data-testid="markets-dot"
+                      className="cursor-pointer outline-none focus-visible:[&>circle]:opacity-100"
                       onMouseEnter={() => setHoveredEdition(ed)}
                       onMouseLeave={() => setHoveredEdition(null)}
-                      onClick={() => navigate(`/editions/${ed.id}`)}
-                    />
+                      onFocus={() => setHoveredEdition(ed)}
+                      onBlur={() => setHoveredEdition(null)}
+                      onClick={() => {
+                        if (!ed.id) return;
+                        navigate(`/editions/${ed.id}`);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          if (!ed.id) return;
+                          navigate(`/editions/${ed.id}`);
+                        }
+                      }}
+                    >
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={r}
+                        className="fill-foreground transition-opacity hover:opacity-100"
+                        opacity={
+                          isHovered ? DOT_OPACITY_HOVER : DOT_OPACITY_DEFAULT
+                        }
+                      />
+                    </g>
                   );
                 })}
 
@@ -248,7 +286,7 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
             );
           })()
         ) : (
-          <div className="text-muted-foreground">{t('strata.tooltip.click')}</div>
+          <div className="text-muted-foreground">{t('markets.tooltip.idleHint')}</div>
         )}
       </div>
     </div>
