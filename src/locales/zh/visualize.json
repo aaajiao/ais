@@ -13,18 +13,14 @@
   },
   "strata": {
     "heading": "Strata — 档案地层",
-    "description": "横轴是创作年份，纵向堆叠该年作品。最上方为录入时间轴 — 显示档案在 2026 年才被人类记录的事实。",
+    "description": "按类型分层，每条带对应一种作品类型。带的厚薄反映该类型的作品数量。横轴是创作年份。",
     "axisYear": "创作年份",
     "axisHistory": "档案录入",
-    "legend": {
-      "title": "类型",
-      "more": "其他"
-    },
     "tooltip": {
       "yearLabel": "{{year}} 年",
       "count": "{{count}} 件作品",
       "editions": "{{count}} 个版本",
-      "click": "点击查看该年作品"
+      "click": "点击查看作品详情"
     },
     "gapNote": "记录时间 ≠ 创作时间。85 / 87 条历史在 2026 年的几周内集中产生。"
   },

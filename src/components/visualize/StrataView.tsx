@@ -3,69 +3,119 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type {
   VizArtwork,
-  VizEdition,
   VizHistory,
 } from '@/hooks/queries/useVisualizationData';
 import {
   buildHistoryMonthBuckets,
-  buildYearBuckets,
-  tierForType,
-  TIER_OPACITY,
-  type TypeTier,
+  buildSwimlanes,
+  swimlaneHeight,
+  stackPositionFor,
 } from './strataUtils';
 
 interface Props {
   artworks: VizArtwork[];
-  editions: VizEdition[];
   history: VizHistory[];
 }
 
-// 几何常量
-const BLOCK_W = 18;
-const BLOCK_H = 8;
-const BLOCK_GAP_X = 2;
-const BLOCK_GAP_Y = 2;
-const YEAR_GAP = 6;
-const Y_AXIS_PAD = 32; // 顶部留给最高的栈
-const X_AXIS_LABEL_H = 24;
-const HISTORY_BAR_H = 60;
-const HISTORY_GAP_H = 36;
-const LEFT_PAD = 16;
+// ─── 几何常量 ────────────────────────────────────────────────────────────────
+const BLOCK = 8;          // 方块边长
+const BLOCK_GAP = 2;      // 方块间距
+const SWIMLANE_MIN_H = 16;
+const SWIMLANE_MAX_H = 64;
+const LANE_GAP = 4;       // swimlane 行间距
+const LABEL_W = 164;      // 左侧 type label 列宽
 const RIGHT_PAD = 16;
-const TOP_PAD = 16;
+const HISTORY_H = 30;     // 顶部 history bar 高度
+const HISTORY_GAP = 24;   // history bar 与 swimlane 区域之间的间距
+const YEAR_LABEL_H = 20;  // 底部 year label 行高
+const TOP_PAD = 12;
+const BOTTOM_PAD = 8;
+
+// 默认全局 opacity 和 hover 时的 opacity
+const BLOCK_OPACITY_DEFAULT = 0.65;
 
 export default function StrataView({ artworks, history }: Props) {
   const { t } = useTranslation('visualize');
   const navigate = useNavigate();
-  const [hoveredYear, setHoveredYear] = useState<number | null>(null);
-  const [hoveredArtwork, setHoveredArtwork] = useState<VizArtwork | null>(null);
 
-  const yearData = useMemo(() => buildYearBuckets(artworks), [artworks]);
+  const [hoveredArtwork, setHoveredArtwork] = useState<VizArtwork | null>(null);
+  const [hoveredYear, setHoveredYear] = useState<number | null>(null);
+  const [hoveredLane, setHoveredLane] = useState<string | null>(null); // swimlane.type key
+
+  // ─── 数据变换 ──────────────────────────────────────────────────────────────
+  const { swimlanes, yearRange } = useMemo(
+    () => buildSwimlanes(artworks),
+    [artworks]
+  );
   const historyMonths = useMemo(
     () => buildHistoryMonthBuckets(history),
     [history]
   );
 
-  const { buckets, maxStack } = yearData;
-  const yearCount = buckets.length;
+  const maxCount = swimlanes.length > 0 ? swimlanes[0].count : 1;
+  const yearCount = yearRange.length;
 
-  // 每年一列宽度（含间距）
-  const colW = BLOCK_W + BLOCK_GAP_X * 2 + YEAR_GAP;
-  const stratumW = colW * yearCount;
-  const stratumH =
-    maxStack * (BLOCK_H + BLOCK_GAP_Y) + Y_AXIS_PAD + X_AXIS_LABEL_H;
+  // ─── swimlane 高度计算 ────────────────────────────────────────────────────
+  const laneHeights = useMemo(
+    () =>
+      swimlanes.map((sl) =>
+        swimlaneHeight(sl.count, maxCount, SWIMLANE_MIN_H, SWIMLANE_MAX_H)
+      ),
+    [swimlanes, maxCount]
+  );
 
-  const totalW = LEFT_PAD + stratumW + RIGHT_PAD;
-  const totalH = TOP_PAD + HISTORY_BAR_H + HISTORY_GAP_H + stratumH;
+  // swimlane 顶部 y 坐标（相对于 swimlane 区域顶端）
+  const laneTops = useMemo(() => {
+    const tops: number[] = [];
+    let y = 0;
+    for (const h of laneHeights) {
+      tops.push(y);
+      y += h + LANE_GAP;
+    }
+    return tops;
+  }, [laneHeights]);
 
-  // 历史轴 baseline（顶端）
-  const historyBaseY = TOP_PAD + HISTORY_BAR_H;
-  // 地层顶端
-  const stratumTopY = historyBaseY + HISTORY_GAP_H;
-  // 地层 baseline（年份标签上方）
-  const stratumBaseY = stratumTopY + stratumH - X_AXIS_LABEL_H;
+  const totalLanesH =
+    laneHeights.reduce((s, h) => s + h + LANE_GAP, 0) - LANE_GAP;
 
-  if (yearCount === 0) {
+  // ─── x 轴：year column 宽度自适应 ─────────────────────────────────────────
+  // SVG 总宽度固定 800（溢出则横向滚动）；列宽由可用宽度 / yearCount 决定
+  const CANVAS_W = Math.max(800, LABEL_W + yearCount * 20 + RIGHT_PAD);
+  const colW = yearCount > 0
+    ? Math.max(14, Math.floor((CANVAS_W - LABEL_W - RIGHT_PAD) / yearCount))
+    : 20;
+
+  // ─── SVG 总高度 ───────────────────────────────────────────────────────────
+  const totalH =
+    TOP_PAD +
+    HISTORY_H +
+    HISTORY_GAP +
+    totalLanesH +
+    YEAR_LABEL_H +
+    BOTTOM_PAD;
+
+  // swimlane 区域顶部 y（相对 SVG）
+  const laneAreaTop = TOP_PAD + HISTORY_H + HISTORY_GAP;
+
+  // ─── 按 (type, year) 建索引 ───────────────────────────────────────────────
+  // Map<type_key, Map<year, VizArtwork[]>>
+  const cellMap = useMemo(() => {
+    const m = new Map<string, Map<number, VizArtwork[]>>();
+    for (const sl of swimlanes) {
+      const inner = new Map<number, VizArtwork[]>();
+      for (const a of sl.artworks) {
+        const y = parseYearFromArtwork(a);
+        if (y === null) continue;
+        if (!inner.has(y)) inner.set(y, []);
+        inner.get(y)!.push(a);
+      }
+      m.set(sl.type, inner);
+    }
+    return m;
+  }, [swimlanes]);
+
+  // ─── 空状态 ────────────────────────────────────────────────────────────────
+  if (swimlanes.length === 0) {
     return (
       <div className="py-24 text-center text-muted-foreground text-sm">
         {t('empty')}
@@ -73,8 +123,15 @@ export default function StrataView({ artworks, history }: Props) {
     );
   }
 
+  // ─── year column hover: count artworks in that year ───────────────────────
+  const artworksInHoveredYear =
+    hoveredYear !== null
+      ? artworks.filter((a) => parseYearFromArtwork(a) === hoveredYear).length
+      : 0;
+
   return (
     <div className="space-y-4">
+      {/* ─── Header ─────────────────────────────────────────────────────── */}
       <header className="space-y-1">
         <h2 className="text-base font-bold uppercase tracking-wider">
           {t('strata.heading')}
@@ -84,175 +141,209 @@ export default function StrataView({ artworks, history }: Props) {
         </p>
       </header>
 
-      {/* 图例 */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
-        <span className="text-muted-foreground uppercase tracking-wider">
-          {t('strata.legend.title')}
-        </span>
-        {(['Installation', 'Video', 'Digital printing', 'other'] as TypeTier[]).map(
-          (tier) => (
-            <span key={tier} className="flex items-center gap-1.5">
-              <span
-                className="inline-block w-3 h-3 bg-foreground"
-                style={{ opacity: TIER_OPACITY[tier] }}
-              />
-              <span className="text-muted-foreground">
-                {tier === 'other' ? t('strata.legend.more') : tier}
-              </span>
-            </span>
-          )
-        )}
-      </div>
-
+      {/* ─── SVG ────────────────────────────────────────────────────────── */}
       <div className="relative overflow-x-auto border border-border">
         <svg
-          width={totalW}
+          width={CANVAS_W}
           height={totalH}
-          viewBox={`0 0 ${totalW} ${totalH}`}
+          viewBox={`0 0 ${CANVAS_W} ${totalH}`}
           className="block"
           role="img"
           aria-label={t('strata.heading')}
         >
-          {/* 历史录入轴 */}
-          {historyMonths.entries.map(([month, count], i) => {
-            const x = LEFT_PAD + i * 28;
-            const h = (count / historyMonths.max) * (HISTORY_BAR_H - 18);
+          {/* ─── History bar ─────────────────────────────────────────── */}
+          {historyMonths.entries.length > 0 && (
+            <>
+              <text
+                x={LABEL_W}
+                y={TOP_PAD + 10}
+                className="fill-muted-foreground"
+                fontSize="9"
+                fontFamily="ui-monospace, monospace"
+              >
+                {t('strata.axisHistory')}
+              </text>
+              {historyMonths.entries.map(([month, count], i) => {
+                const barW = Math.max(4, Math.floor((CANVAS_W - LABEL_W - RIGHT_PAD) / historyMonths.entries.length) - 2);
+                const x = LABEL_W + i * (barW + 2);
+                const h = historyMonths.max > 0
+                  ? Math.max(2, (count / historyMonths.max) * (HISTORY_H - 12))
+                  : 0;
+                const barY = TOP_PAD + HISTORY_H - h;
+                return (
+                  <g key={month}>
+                    <rect
+                      x={x}
+                      y={barY}
+                      width={barW}
+                      height={h}
+                      className="fill-foreground"
+                      opacity={0.5}
+                    />
+                    <title>{`${month}: ${count}`}</title>
+                  </g>
+                );
+              })}
+            </>
+          )}
+
+          {/* ─── Year column backgrounds (hover highlight) ───────────── */}
+          {yearRange.map((year, colIdx) => {
+            const x = LABEL_W + colIdx * colW;
+            const isYearHovered = hoveredYear === year;
             return (
-              <g key={month}>
-                <rect
-                  x={x}
-                  y={historyBaseY - h}
-                  width={22}
-                  height={h}
-                  className="fill-foreground"
-                  opacity={0.6}
-                />
+              <rect
+                key={year}
+                x={x}
+                y={laneAreaTop}
+                width={colW}
+                height={totalLanesH + YEAR_LABEL_H}
+                className={isYearHovered ? 'fill-foreground/5' : 'fill-transparent'}
+                onMouseEnter={() => setHoveredYear(year)}
+                onMouseLeave={() => setHoveredYear(null)}
+              />
+            );
+          })}
+
+          {/* ─── Swimlanes ───────────────────────────────────────────── */}
+          {swimlanes.map((sl, laneIdx) => {
+            const laneH = laneHeights[laneIdx];
+            const laneY = laneAreaTop + laneTops[laneIdx];
+            const isFocusedLane = hoveredLane !== null && hoveredLane === sl.type;
+            const isOtherLane = hoveredLane !== null && hoveredLane !== sl.type;
+
+            // Lane separator line (between lanes)
+            const showSep = laneIdx > 0;
+
+            return (
+              <g key={sl.type}>
+                {showSep && (
+                  <line
+                    x1={LABEL_W}
+                    y1={laneY - LANE_GAP / 2}
+                    x2={CANVAS_W - RIGHT_PAD}
+                    y2={laneY - LANE_GAP / 2}
+                    className="stroke-border"
+                    strokeWidth={0.5}
+                    opacity={0.5}
+                  />
+                )}
+
+                {/* Type label */}
                 <text
-                  x={x + 11}
-                  y={historyBaseY + 12}
-                  textAnchor="middle"
-                  className="fill-muted-foreground"
-                  fontSize="9"
+                  x={LABEL_W - 8}
+                  y={laneY + laneH / 2 + 4}
+                  textAnchor="end"
+                  className={isFocusedLane ? 'fill-foreground' : 'fill-muted-foreground'}
+                  fontSize="10"
                   fontFamily="ui-monospace, monospace"
+                  style={{ cursor: 'default' }}
+                  onMouseEnter={() => setHoveredLane(sl.type)}
+                  onMouseLeave={() => setHoveredLane(null)}
                 >
-                  {month}
+                  {sl.displayLabel} · {sl.count}
                 </text>
-                <text
-                  x={x + 11}
-                  y={historyBaseY - h - 4}
-                  textAnchor="middle"
-                  className="fill-foreground"
-                  fontSize="9"
-                  fontFamily="ui-monospace, monospace"
-                >
-                  {count}
-                </text>
+
+                {/* Blocks per year column */}
+                {yearRange.map((year, colIdx) => {
+                  const innerMap = cellMap.get(sl.type);
+                  const cellArtworks = innerMap?.get(year) ?? [];
+                  if (cellArtworks.length === 0) return null;
+
+                  const positions = stackPositionFor(
+                    cellArtworks.length,
+                    BLOCK,
+                    BLOCK_GAP,
+                    laneH
+                  );
+
+                  const colX = LABEL_W + colIdx * colW;
+
+                  return cellArtworks.map((a, i) => {
+                    const pos = positions[i];
+                    // 竖直堆叠：从 swimlane 底部向上
+                    const blockX = colX + pos.col * (BLOCK + BLOCK_GAP) + 1;
+                    const blockY =
+                      laneY + laneH - (pos.row + 1) * (BLOCK + BLOCK_GAP) + BLOCK_GAP;
+
+                    const isHoveredBlock = hoveredArtwork?.id === a.id;
+                    let opacity = BLOCK_OPACITY_DEFAULT;
+                    if (isFocusedLane) opacity = 1.0;
+                    else if (isOtherLane) opacity = 0.3;
+                    if (isHoveredBlock) opacity = 1.0;
+
+                    return (
+                      <rect
+                        key={a.id}
+                        x={blockX}
+                        y={blockY}
+                        width={BLOCK}
+                        height={BLOCK}
+                        className="fill-foreground cursor-pointer"
+                        opacity={opacity}
+                        style={{ transition: 'opacity 0.1s' }}
+                        onMouseEnter={() => {
+                          setHoveredArtwork(a);
+                          setHoveredYear(year);
+                        }}
+                        onMouseLeave={() => {
+                          setHoveredArtwork(null);
+                          setHoveredYear(null);
+                        }}
+                        onClick={() => navigate(`/artworks/${a.id}`)}
+                      />
+                    );
+                  });
+                })}
               </g>
             );
           })}
-          {historyMonths.entries.length > 0 && (
-            <text
-              x={LEFT_PAD}
-              y={TOP_PAD + 10}
-              className="fill-muted-foreground"
-              fontSize="10"
-              fontFamily="ui-monospace, monospace"
-            >
-              {t('strata.axisHistory')}
-            </text>
-          )}
 
-          {/* 断层连接线：从最早历史月份连到地层最右（最近年份） */}
-          {historyMonths.entries.length > 0 && yearCount > 0 && (
-            <line
-              x1={LEFT_PAD + 11}
-              y1={historyBaseY + 2}
-              x2={LEFT_PAD + stratumW - colW / 2}
-              y2={stratumBaseY - 4}
-              className="stroke-border"
-              strokeWidth={1}
-              strokeDasharray="2 3"
-            />
-          )}
+          {/* ─── Year labels (x axis) ────────────────────────────────── */}
+          {yearRange.map((year, colIdx) => {
+            const isFirst = colIdx === 0;
+            const isLast = colIdx === yearRange.length - 1;
+            const isHoveredYearCol = hoveredYear === year;
+            const showLabel =
+              year % 5 === 0 || isFirst || isLast || isHoveredYearCol;
 
-          {/* 地层 */}
-          {buckets.map((bucket, colIdx) => {
-            const xCol = LEFT_PAD + colIdx * colW + BLOCK_GAP_X;
-            const isHovered = hoveredYear === bucket.year;
-            const showYearLabel =
-              bucket.year % 5 === 0 ||
-              colIdx === 0 ||
-              colIdx === yearCount - 1 ||
-              isHovered;
+            if (!showLabel) return null;
+            const x = LABEL_W + colIdx * colW + colW / 2;
+            const y = laneAreaTop + totalLanesH + YEAR_LABEL_H - 4;
+
             return (
-              <g
-                key={bucket.year}
-                onMouseEnter={() => setHoveredYear(bucket.year)}
-                onMouseLeave={() => setHoveredYear(null)}
+              <text
+                key={year}
+                x={x}
+                y={y}
+                textAnchor="middle"
+                className={isHoveredYearCol ? 'fill-foreground' : 'fill-muted-foreground'}
+                fontSize="9"
+                fontFamily="ui-monospace, monospace"
               >
-                {/* 列背景（hover 时弱高亮） */}
-                <rect
-                  x={xCol - BLOCK_GAP_X}
-                  y={stratumTopY}
-                  width={colW}
-                  height={stratumH - X_AXIS_LABEL_H}
-                  className={
-                    isHovered ? 'fill-foreground/5' : 'fill-transparent'
-                  }
-                />
-                {bucket.artworks.map((a, stackIdx) => {
-                  const tier = tierForType(a.type);
-                  const y =
-                    stratumBaseY - (stackIdx + 1) * (BLOCK_H + BLOCK_GAP_Y);
-                  return (
-                    <rect
-                      key={a.id}
-                      x={xCol}
-                      y={y}
-                      width={BLOCK_W}
-                      height={BLOCK_H}
-                      className="fill-foreground cursor-pointer"
-                      opacity={TIER_OPACITY[tier]}
-                      onMouseEnter={() => setHoveredArtwork(a)}
-                      onMouseLeave={() => setHoveredArtwork(null)}
-                      onClick={() => navigate(`/artworks/${a.id}`)}
-                    />
-                  );
-                })}
-                {showYearLabel && (
-                  <text
-                    x={xCol + BLOCK_W / 2}
-                    y={stratumBaseY + 14}
-                    textAnchor="middle"
-                    className={
-                      isHovered ? 'fill-foreground' : 'fill-muted-foreground'
-                    }
-                    fontSize="9"
-                    fontFamily="ui-monospace, monospace"
-                  >
-                    {String(bucket.year).slice(2)}
-                  </text>
-                )}
-              </g>
+                {String(year).slice(2)}
+              </text>
             );
           })}
         </svg>
       </div>
 
-      {/* 断层注释 */}
+      {/* ─── 断层注释 ───────────────────────────────────────────────────── */}
       <p className="text-xs text-muted-foreground max-w-2xl italic">
         {t('strata.gapNote')}
       </p>
 
-      {/* hover tooltip：固定在画布下方信息条，避免遮挡 SVG */}
+      {/* ─── 底部 tooltip 信息条 ─────────────────────────────────────── */}
       <div className="min-h-[3.5rem] border-t border-border pt-3 text-xs font-mono space-y-0.5">
         {hoveredArtwork ? (
           <>
             <div className="font-bold">
-              {hoveredArtwork.title_en || hoveredArtwork.title_cn || hoveredArtwork.id}
+              {hoveredArtwork.title_en ||
+                hoveredArtwork.title_cn ||
+                hoveredArtwork.id}
             </div>
             <div className="text-muted-foreground">
-              {hoveredArtwork.year ?? '—'} · {hoveredArtwork.type ?? '—'}
+              {hoveredArtwork.year ?? '—'} · {hoveredArtwork.type ?? '(untyped)'}
             </div>
             <div className="text-muted-foreground">
               {t('strata.tooltip.click')}
@@ -264,11 +355,7 @@ export default function StrataView({ artworks, history }: Props) {
               {t('strata.tooltip.yearLabel', { year: hoveredYear })}
             </div>
             <div className="text-muted-foreground">
-              {t('strata.tooltip.count', {
-                count:
-                  buckets.find((b) => b.year === hoveredYear)?.artworks.length ??
-                  0,
-              })}
+              {t('strata.tooltip.count', { count: artworksInHoveredYear })}
             </div>
           </>
         ) : (
@@ -279,4 +366,14 @@ export default function StrataView({ artworks, history }: Props) {
       </div>
     </div>
   );
+}
+
+// ─── 内部辅助：从作品取 anchor year ─────────────────────────────────────────
+function parseYearFromArtwork(a: VizArtwork): number | null {
+  if (!a.year) return null;
+  const match = a.year.match(/(\d{4})/);
+  if (!match) return null;
+  const y = Number(match[1]);
+  if (Number.isNaN(y) || y < 1900 || y > 2100) return null;
+  return y;
 }

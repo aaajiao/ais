@@ -13,18 +13,14 @@
   },
   "strata": {
     "heading": "Strata — Archive Strata",
-    "description": "X axis is year of creation; blocks stack within each year. Top band shows when records were entered — the archive was written down only in 2026.",
+    "description": "Stratified by type — each band represents one artwork category. Band thickness reflects the number of works. X axis is year of creation.",
     "axisYear": "Year",
     "axisHistory": "Record entered",
-    "legend": {
-      "title": "Type",
-      "more": "Other"
-    },
     "tooltip": {
       "yearLabel": "{{year}}",
       "count": "{{count}} artworks",
       "editions": "{{count}} editions",
-      "click": "Click to view artworks from this year"
+      "click": "Click to view artwork detail"
     },
     "gapNote": "Record time ≠ creation time. 85 of 87 history rows were written in a few weeks of 2026."
   },
