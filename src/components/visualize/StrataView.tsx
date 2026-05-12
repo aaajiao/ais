@@ -242,14 +242,15 @@ export default function StrataView({ artworks, history }: Props) {
                   />
                 )}
 
-                {/* Type label */}
+                {/* Type label —— 字体与 Diaspora 节点 label 对齐：9px mono + fill-foreground + opacity 0.75/1.0 */}
                 <text
                   x={LABEL_W - 8}
                   y={laneY + laneH / 2 + 4}
                   textAnchor="end"
-                  className={isFocusedLane ? 'fill-foreground' : 'fill-muted-foreground'}
-                  fontSize="10"
+                  className="fill-foreground"
+                  fontSize="9"
                   fontFamily="ui-monospace, monospace"
+                  opacity={isFocusedLane ? 1 : 0.75}
                   style={{ cursor: 'default' }}
                   onMouseEnter={() => setHoveredLane(sl.type)}
                   onMouseLeave={() => setHoveredLane(null)}

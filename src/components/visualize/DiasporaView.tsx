@@ -66,12 +66,6 @@ function buildArtworkMap(artworks: VizArtwork[]): Map<string, VizArtwork> {
   return m;
 }
 
-/** 取 artwork 标题：title_en（非空） → title_cn → 'untitled' */
-function artworkTitle(artwork: VizArtwork | undefined): string {
-  if (!artwork) return 'untitled';
-  return artwork.title_en || artwork.title_cn || 'untitled';
-}
-
 export default function DiasporaView({
   artworks = [],
   editions,
@@ -322,7 +316,7 @@ export default function DiasporaView({
                 <g
                   key={node.id}
                   data-node={node.id}
-                  className="cursor-pointer"
+                  className="cursor-pointer focus:outline-none"
                   role="button"
                   tabIndex={0}
                   aria-label={`${node.name} — ${t('diaspora.tooltip.editions', { count: node.editionCount })}`}
@@ -339,16 +333,15 @@ export default function DiasporaView({
                 >
                   {/* SVG 原生 tooltip：hover 显示完整 name（label 被截断时尤其重要） */}
                   <title>{node.name}</title>
-                  {/* pin 外圈（仅 pin 状态显示，比 hover ring 更粗更明显） */}
+                  {/* pin 外圈（仅 pin 状态显示，动态脉冲） */}
                   {isPinned && (
                     <circle
                       cx={x}
                       cy={y}
                       r={r + 6}
                       fill="none"
-                      className="stroke-foreground"
-                      strokeWidth={2}
-                      opacity={0.9}
+                      className="stroke-foreground diaspora-pin-pulse"
+                      strokeWidth={1.5}
                     />
                   )}
                   {/* hover ring（仅 hover 预览时，细线） */}
@@ -368,7 +361,7 @@ export default function DiasporaView({
                     cy={y}
                     r={r}
                     className="fill-foreground"
-                    opacity={opacity}
+                    opacity={isPinned ? 1 : opacity}
                   />
                   {/* 节点名 */}
                   <text
@@ -408,7 +401,7 @@ export default function DiasporaView({
             return (
               <g
                 data-node={centerNodeObj.id}
-                className="cursor-pointer"
+                className="cursor-pointer focus:outline-none"
                 role="button"
                 tabIndex={0}
                 aria-label={`${centerNodeObj.name} — ${t('diaspora.tooltip.editions', { count: centerNodeObj.editionCount })}`}
@@ -425,16 +418,15 @@ export default function DiasporaView({
               >
                 {/* SVG 原生 tooltip：center node label 截断时也能看完整名 */}
                 <title>{centerNodeObj.name}</title>
-                {/* pin outer ring for center */}
+                {/* pin outer ring for center —— 动态脉冲 */}
                 {isCenterPinned && (
                   <circle
                     cx={layout.center.x}
                     cy={layout.center.y}
                     r={30}
                     fill="none"
-                    className="stroke-foreground"
-                    strokeWidth={2}
-                    opacity={0.9}
+                    className="stroke-foreground diaspora-pin-pulse"
+                    strokeWidth={1.5}
                   />
                 )}
                 {/* pulse ring */}
@@ -500,37 +492,33 @@ export default function DiasporaView({
               </div>
             </div>
 
-            {/* Edition 列表 */}
+            {/* Edition 列表 —— 横排 chips */}
             {pinnedEditions.length > 0 && (
-              <div className="space-y-0.5">
-                <div className="text-muted-foreground mb-1">
+              <div className="space-y-1.5">
+                <div className="text-muted-foreground">
                   {t('diaspora.pin.editionsAt', { count: pinnedEditions.length })}:
                 </div>
-                {pinnedEditions.map(({ edition, artwork, displayId }) => (
-                  <button
-                    key={edition.id}
-                    type="button"
-                    className="block w-full text-left px-2 py-1 hover:bg-muted/50 border border-transparent hover:border-border transition-colors cursor-pointer"
-                    onClick={(e) => {
-                      // 防御性 stopPropagation：pin 卡片在 SVG 外，理论上不会冒泡到 SVG unpin，
-                      // 但未来重构若把卡片移入 <foreignObject> 就会触发。预防为主。
-                      e.stopPropagation();
-                      navigate(`/editions/${edition.id}`);
-                    }}
-                  >
-                    <span className="font-mono">
-                      {displayId}
-                    </span>
-                    {artwork && (
+                <div className="flex flex-wrap gap-1.5">
+                  {pinnedEditions.map(({ edition, displayId }) => (
+                    <button
+                      key={edition.id}
+                      type="button"
+                      title={edition.status}
+                      className="font-mono border border-border px-1.5 py-0.5 hover:bg-muted/50 hover:border-foreground transition-colors cursor-pointer"
+                      onClick={(e) => {
+                        // 防御性 stopPropagation：pin 卡片在 SVG 外，理论上不会冒泡到 SVG unpin，
+                        // 但未来重构若把卡片移入 <foreignObject> 就会触发。预防为主。
+                        e.stopPropagation();
+                        navigate(`/editions/${edition.id}`);
+                      }}
+                    >
+                      <span>{displayId}</span>
                       <span className="text-muted-foreground ml-1.5">
-                        · {artworkTitle(artwork)}
+                        · {edition.status}
                       </span>
-                    )}
-                    <span className="text-muted-foreground ml-1.5">
-                      · {edition.status}
-                    </span>
-                  </button>
-                ))}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 

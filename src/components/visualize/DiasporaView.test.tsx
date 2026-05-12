@@ -420,17 +420,20 @@ describe('DiasporaView', () => {
     expect(screen.getByText(/查看此位置全部版本|View all editions/i)).toBeInTheDocument();
   });
 
-  it('pin 卡片中 artwork title 使用 title_cn fallback（title_en 为 null 时）', () => {
+  it('pin 卡片中每个 edition chip 显示 inventory + status', () => {
     renderDiaspora();
 
-    // Pin gallery — galleryEdition is artwork-2 which has title_en=null, title_cn='末日媒体'
+    // Pin gallery — galleryEdition 的 inventory_number 是 AAJ-2023-001，status 是 at_gallery
     const galleryGroup = screen.getByRole('button', {
       name: /Test Gallery Berlin/i,
     });
     fireEvent.click(galleryGroup);
 
-    // Should show cn title as fallback
-    expect(screen.getByText(/末日媒体/)).toBeInTheDocument();
+    // chip 内容应同时包含 inv 与 status
+    const chip = screen.getByRole('button', {
+      name: /AAJ-2023-001.*at_gallery/i,
+    });
+    expect(chip).toBeInTheDocument();
   });
 
   it('长名 location 节点渲染 SVG <title> 元素显示完整 name（label 被截断）', () => {

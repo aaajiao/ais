@@ -234,6 +234,21 @@ h1, h2, h3, .font-display {
   animation: pulse-ring 2s ease-out infinite;
 }
 
+/* Diaspora pin 节点：选中态闪烁脉冲（在 SVG circle 上用 opacity 动画，box-shadow 不支持） */
+@keyframes diaspora-pin-blink {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+.diaspora-pin-pulse {
+  animation: diaspora-pin-blink 1.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .diaspora-pin-pulse {
+    animation: none;
+    opacity: 0.9;
+  }
+}
+
 /* 卡片交互效果 - 仅桌面端 */
 @media (hover: hover) and (pointer: fine) {
   .card-interactive {
