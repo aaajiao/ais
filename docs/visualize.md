@@ -46,12 +46,62 @@ const [artworksRes, editionsRes, locationsRes, historyRes] = await Promise.all([
 
 ---
 
+## Per-view 设计决策
+
+每个 view 都有一两个非显而易见的选择，记录在这里防止未来重构时被推翻。
+
+### Strata
+
+- **type 用透明度而非彩色**：保留 Brutalist 单色调性，明暗主题自动适配。Installation 1.0 → other 0.22。
+- **缺失年份保留空列**：x 轴是真正的时间轴（不是密度图）。2014 没作品也画一个空 column，肉眼能看到节奏。
+- **year range 锚定到 start year**：`'2014-2015'` → 堆到 2014 列。range 内不重复堆，保持每个作品在档案里只有一个位置。
+- **顶部断层条**：history 月度密度作为单独的 SVG 层。85/87 条历史挤在 2026 年三个月——这是数据自己的故事，做成视觉断层就让"档案在 2026 年突然出现"立得住。
+
+### Markets
+
+- **每列独立 price scale**（不是全局统一）：CNY ¥50,000 按汇率约 USD $7,000，如果用全局 log scale，CNY 圆会大一倍，造成"中国市场贵"的视觉误导——而实际两者成交价值相近。**独立 scale 只传达列内相对价差，列间比较交给底部 stat 数字**。这条不要改回去。
+- **数据驱动列数**：`CurrencyType` schema 列了 7 种，但只渲染数据里实际出现的，按交易笔数降序。新增货币会自动出现一列，无需改代码。
+- **稳定抖动**：`stableJitter(edition.id, width)` 让同价位散点不重叠，但**确定性**——重渲染不抖动，状态切换不闪。
+
+### Terminal
+
+- **`<pre>` 而非 `<table>`**：terminal 美学要求等宽字符在 JS 层 `padEnd/padStart` 对齐，table 会引入 DOM 列网格的"结构感"破坏字符流。
+- **null 显示为 `─`（box-drawing U+2500，非减号）**：缺失本身是信息密度的一部分，不藏。这是档案"诚实"的核心 statement。
+- **group by 存 local state（不进 URL）**：URL 已被 `?view=` 占用；groupBy 是视图内临时偏好，刷新即丢弃符合直觉。
+- **状态用 text-foreground / text-muted-foreground 二元区分**（sold/gifted 加重，其他弱化）：替代彩色 status badge，保持单色调性。
+
+### Diaspora
+
+- **同心环非力导布局**：力导（d3-force 等）需要新依赖 + 迭代仿真 + 每次渲染坐标可能漂移。同心环纯算术 + 笛卡尔坐标，**中心永远是工作室**，稳定可预期。
+- **曲线 edge（二次贝塞尔）向外偏离圆心**：直线 edge 全过中心会变成一团乱码。控制点向外偏 30px 让弧线散开。
+- **"档案薄"显式声明**：顶部 stat bar 直接写 `27 / 137 editions have known location`，配 stateHint "数据会随系统使用而生长"。**不要把空白藏起来**——薄数据是当前 archive 的真实状态，本身是 statement。
+- **`from_location` / `to_location` 是 name（text）不是 UUID**：构建边时需要 name → id 反向映射。改 schema 时注意（见 `supabase/schema.sql` 的 trigger）。
+
+---
+
+## 测试覆盖
+
+| 文件 | 测试 |
+|---|---|
+| `useVisualizationData.test.ts` | 4 — 并行查 4 表 / RLS deleted_at / 聚合 / error 传播 |
+| `strataUtils.test.ts` | 15 — year 解析 / tier 分组 / bucket 连续填充 / 排序 |
+| `marketsUtils.test.ts` | 17 — 过滤 sold/有价 / 中位数 / 半径归一化 / 边界 |
+| `terminalUtils.test.ts` | 29 — inventory 自然排序 / edition label 4 种 / location 拼接 / group 分桶 / markets line |
+| `diasporaUtils.test.ts` | 30 — 节点关联 / 中心选择 tie-breaker / 同心环布局 / 边聚合 / tracked stat |
+| `Visualize.test.tsx` | 8 — loading / error / 4 个 view 默认渲染 / 非法 ?view 回落 / refetch 按钮 |
+| `visualize-parity.test.ts` | 2 — zh ⟷ en key 完全一致 / 核心段都存在 |
+
+不写每个 View 组件的视觉细节测试——SVG 几何细节用代码 review，回归靠 utils 测试 + smoke test 兜底。
+
+---
+
 ## 添加新 view
 
 1. 在 `src/components/visualize/` 新建 `MyView.tsx`，从 `VisualizationSnapshot` 选自己需要的字段做 props
 2. 在 `src/pages/Visualize.tsx` 加 lazy import + `VALID_VIEWS` 数组 + 渲染分支
-3. 在 `src/locales/{zh,en}/visualize.json` 加 `view.myView` + `myView.*` 文案
+3. 在 `src/locales/{zh,en}/visualize.json` 加 `view.myView` + `myView.*` 文案（**zh / en 同步**，否则 `visualize-parity.test.ts` 会失败）
 4. 纯数据变换抽到 `myViewUtils.ts`，写 vitest 单元测试
+5. 在 `Visualize.test.tsx` 加一行 smoke：`it('?view=myView 渲染 MyView 视图', ...)`
 
 ---
 
