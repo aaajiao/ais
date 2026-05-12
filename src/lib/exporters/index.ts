@@ -185,10 +185,12 @@ const HISTORY_ACTION_LABELS: Record<string, { zh: string; en: string }> = {
 };
 
 // 版本编号标签（"1/5" / "AP 1" / "Unique"）
+// fallbackTotal: artwork.edition_total 未声明时的备用分母（通常是该作品下 numbered 版本的实际数量）
 export function formatEditionLabel(
   edition: Edition,
   artwork: Artwork,
-  lang: 'zh' | 'en' = 'en'
+  lang: 'zh' | 'en' = 'en',
+  fallbackTotal?: number,
 ): string {
   if (edition.edition_type === 'unique') {
     return lang === 'zh' ? '独版' : 'Unique';
@@ -197,16 +199,22 @@ export function formatEditionLabel(
     return `AP ${edition.edition_number || ''}`.trim();
   }
   // numbered
-  return `${edition.edition_number || '?'}/${artwork.edition_total || '?'}`;
+  const num = edition.edition_number;
+  const total = artwork.edition_total ?? fallbackTotal;
+  if (num && total) return `${num}/${total}`;
+  if (num) return `#${num}`;                    // 有版号无总数：退化为 "#N" 而非 "N/?"
+  if (total) return `?/${total}`;               // 无版号有总数（理论上 numbered 不该发生）
+  return '#?';                                   // 都缺：兜底
 }
 
 // 版本标题（"### 1/5 · INV-001" 中的 "1/5 · INV-001" 部分）
 export function formatEditionHeading(
   edition: Edition,
   artwork: Artwork,
-  lang: 'zh' | 'en' = 'en'
+  lang: 'zh' | 'en' = 'en',
+  fallbackTotal?: number,
 ): string {
-  const label = formatEditionLabel(edition, artwork, lang);
+  const label = formatEditionLabel(edition, artwork, lang, fallbackTotal);
   if (edition.inventory_number) {
     return `${label} · ${edition.inventory_number}`;
   }
@@ -359,10 +367,11 @@ export function formatEditionBlock(
   files: EditionFile[] | undefined,
   history: EditionHistory[] | undefined,
   options: ExportOptions,
-  lang: 'zh' | 'en' = 'en'
+  lang: 'zh' | 'en' = 'en',
+  fallbackTotal?: number,
 ): string[] {
   const lines: string[] = [];
-  lines.push(`### ${formatEditionHeading(edition, artwork, lang)}`);
+  lines.push(`### ${formatEditionHeading(edition, artwork, lang, fallbackTotal)}`);
   lines.push('');
 
   const fields = formatEditionFields(edition, locations, options, lang);

@@ -123,6 +123,16 @@ describe('formatEditionLabel', () => {
   it('uses Chinese label for unique', () => {
     expect(formatEditionLabel(createEdition({ edition_type: 'unique' }), artwork, 'zh')).toBe('独版');
   });
+
+  it('uses fallbackTotal when artwork.edition_total is missing', () => {
+    const orphanArtwork = createArtwork({ edition_total: undefined });
+    expect(formatEditionLabel(createEdition({ edition_number: 1 }), orphanArtwork, 'en', 3)).toBe('1/3');
+  });
+
+  it('falls back to #N when both edition_total and fallbackTotal are missing (no more "1/?")', () => {
+    const orphanArtwork = createArtwork({ edition_total: undefined });
+    expect(formatEditionLabel(createEdition({ edition_number: 2 }), orphanArtwork, 'en')).toBe('#2');
+  });
 });
 
 // --- formatEditionHeading ---
@@ -397,6 +407,23 @@ describe('generateArtworkMarkdown', () => {
     const data = createExportData({ editions: [] });
     const md = generateArtworkMarkdown(data, allOnOptions);
     expect(md).not.toContain('## Editions');
+  });
+
+  it('infers denominator from numbered edition count when artwork.edition_total is missing', () => {
+    const data = createExportData({
+      artwork: createArtwork({ edition_total: undefined, ap_total: undefined }),
+      editions: [
+        createEdition({ id: 'e1', edition_number: 1 }),
+        createEdition({ id: 'e2', edition_number: 2 }),
+        createEdition({ id: 'e3', edition_number: 3 }),
+      ],
+    });
+    const md = generateArtworkMarkdown(data, allOnOptions);
+    expect(md).toContain('### 1/3');
+    expect(md).toContain('### 2/3');
+    expect(md).toContain('### 3/3');
+    expect(md).not.toContain('1/?');
+    expect(md).not.toContain('/?');
   });
 
   it('emits ## Editions section with H3 per edition', () => {

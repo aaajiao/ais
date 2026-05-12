@@ -61,10 +61,15 @@ export function generateArtworkMarkdown(
     lines.push('## Editions');
     lines.push('');
     const sorted = sortEditions(editions);
+    // artwork.edition_total 未声明时，用 numbered 版本的实际数量作为分母备份，
+    // 避免出现 "1/?"。AP / unique 不受影响。
+    const fallbackTotal = artwork.edition_total
+      ? undefined
+      : editions.filter(e => e.edition_type === 'numbered').length || undefined;
     for (const edition of sorted) {
       const files = filesByEdition.get(edition.id);
       const history = historyByEdition?.get(edition.id);
-      const block = formatEditionBlock(edition, artwork, locations, files, history, options, 'en');
+      const block = formatEditionBlock(edition, artwork, locations, files, history, options, 'en', fallbackTotal);
       lines.push(...block);
     }
   }
