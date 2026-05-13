@@ -118,7 +118,7 @@
   },
   "diaspora": {
     "heading": "Diaspora",
-    "description": "The studio sits at the centre; works radiate outward to 21 locations. Node size scales with edition count.",
+    "description": "The studio sits at the centre; works radiate outward to {{count}} locations. Node size scales with edition count.",
     "stat": {
       "trackedRatio": "{{tracked}} / {{total}} editions have known location ({{percent}}%)",
       "untrackedHint": "{{count}} editions awaiting location — click any to open"
@@ -171,7 +171,7 @@
         "artist": "Center node: aaajiao (artist)",
         "namedPrivate": "Private buyer {{name}}, {{count}} works",
         "ghost": "Edition awaiting location: {{title}} · {{inv}} · {{status}} (click to complete)",
-        "anonymous": "Anonymous outflow · {{date}} (click to add buyer_name)"
+        "anonymous": "Anonymous outflow · {{date}} (click to add buyer)"
       }
     }
   },

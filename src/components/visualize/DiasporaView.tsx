@@ -223,6 +223,13 @@ export default function DiasporaView({
 
   const totallyEmpty = constellationEmpty && fallbackNodes.length === 0;
 
+  // description "辐射至 N 处" 的 N = location 节点 + named private buyer 节点
+  // （所有 named entity 节点，不含 anonymous dust 和 ghost）。跟下方
+  // summary.overview 的 `{{locations}} 处机构 · {{namedPrivate}} 位私人买家`
+  // 同源数据，确保 tagline 与统计行一致。
+  const radiantNodeCount =
+    constellation.locations.length + constellation.namedPrivateBuyers.length;
+
   if (totallyEmpty) {
     return (
       <div className="space-y-4">
@@ -231,7 +238,7 @@ export default function DiasporaView({
             {t('diaspora.heading')}
           </h2>
           <p className="text-sm text-muted-foreground max-w-2xl leading-relaxed">
-            {t('diaspora.description')}
+            {t('diaspora.description', { count: radiantNodeCount })}
           </p>
         </header>
         <div className="border border-border p-3 text-sm space-y-1">
@@ -261,7 +268,7 @@ export default function DiasporaView({
           {t('diaspora.heading')}
         </h2>
         <p className="text-sm text-muted-foreground max-w-2xl leading-relaxed">
-          {t('diaspora.description')}
+          {t('diaspora.description', { count: radiantNodeCount })}
         </p>
       </header>
 
