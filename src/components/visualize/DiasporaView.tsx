@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowRight, Pin, X } from 'lucide-react';
+import { ArrowRight, Pin, X, Maximize2 } from 'lucide-react';
+import { useSvgZoomPan } from '@/hooks/useSvgZoomPan';
 import type {
   VizEdition,
   VizLocation,
@@ -77,6 +78,26 @@ export default function DiasporaView({
   // 形式："location:{loc.id}" / "named:{buyer_name}"
   const [pinnedNodeId, setPinnedNodeId] = useState<string | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+
+  // ─── Zoom / Pan ────────────────────────────────────────────────────────────
+  // 触摸板 + 鼠标滚轮 + 移动端 pinch 统一交互；wheel 不需要 modifier 快捷键
+  // （避免和浏览器 Cmd/Ctrl++ 缩放冲突）。drag pan 在节点上不触发（保留 click/pin）。
+  //
+  // 解构出来分别引用 —— 否则 React 19 ESLint react-compiler 把 `zoomPan.xxx`
+  // 整体推断为 ref-like，触发 "Cannot access refs during render" 误报。
+  const {
+    svgRef: zoomSvgRef,
+    viewBoxStr: zoomViewBox,
+    zoom: zoomLevel,
+    isZoomed,
+    reset: resetZoom,
+    handlers: zoomHandlers,
+  } = useSvgZoomPan({
+    initialWidth: W,
+    initialHeight: H,
+    minZoom: 0.5,
+    maxZoom: 4,
+  });
 
   // 兜底（暂未在 UI 用，prop 仅用于跨视图同步）
   void _onArtworkSelect;
@@ -343,14 +364,28 @@ export default function DiasporaView({
       </div>
 
       {/* ─── SVG Constellation 图 ────────────────────────────────────── */}
-      <div className="relative overflow-x-auto border border-border">
+      <div className="relative overflow-hidden border border-border">
+        {isZoomed && (
+          <button
+            type="button"
+            onClick={resetZoom}
+            aria-label={t('diaspora.zoom.resetAria')}
+            className="absolute top-2 right-2 z-10 flex items-center gap-1 px-2 py-1 bg-background/90 border border-border text-xs font-mono cursor-pointer hover:bg-muted transition-colors"
+          >
+            <Maximize2 className="w-3 h-3" />
+            <span>{zoomLevel.toFixed(2)}×</span>
+            <span className="text-muted-foreground">{t('diaspora.zoom.reset')}</span>
+          </button>
+        )}
         <svg
-          viewBox={`0 0 ${W} ${H}`}
-          className="block w-full"
-          style={{ maxHeight: '70vh' }}
+          ref={zoomSvgRef}
+          viewBox={zoomViewBox}
+          className="block w-full touch-none"
+          style={{ maxHeight: '70vh', cursor: 'grab' }}
           role="img"
           aria-label={t('diaspora.heading')}
           onClick={handleSvgClick}
+          {...zoomHandlers}
         >
           {/* ─── Time-spiral 参考圆（仅画 inner / outer-data / ghost；anonymous 不画） */}
           {(

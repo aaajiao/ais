@@ -123,6 +123,10 @@
       "trackedRatio": "{{tracked}} / {{total}} 版本有位置历史（{{percent}}%）",
       "untrackedHint": "还有 {{count}} 件待补全 → 点击节点跳到版本详情补 location"
     },
+    "zoom": {
+      "reset": "重置",
+      "resetAria": "重置缩放和平移"
+    },
     "stateHint": "档案还薄。位置流转数据会随系统使用而生长。",
     "legend": {
       "studio": "工作室",

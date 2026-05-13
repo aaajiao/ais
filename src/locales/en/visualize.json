@@ -123,6 +123,10 @@
       "trackedRatio": "{{tracked}} / {{total}} editions have known location ({{percent}}%)",
       "untrackedHint": "{{count}} editions awaiting location — click any to open"
     },
+    "zoom": {
+      "reset": "Reset",
+      "resetAria": "Reset zoom and pan"
+    },
     "stateHint": "The archive is thin. Location-flow data will grow as the system gets used.",
     "legend": {
       "studio": "Studio",
