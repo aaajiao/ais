@@ -873,14 +873,36 @@ describe('DiasporaView', () => {
     expect(named.getAttribute('aria-label')).toBeTruthy();
   });
 
-  it('anonymous dots 不可点击（无 role/tabIndex）', () => {
+  it('anonymous dots 可点击（v1.6.x 第三轮：跟 ghost 同构的"档案补全 inbox"语义）', () => {
     // v1.6.x: anonymous testid 从 index 改为 editionId（每条 anonymous edition
     // 一个独立 dust dot 进 time-spiral，不再有"第 i 个"的概念）。
+    // v1.6.x 第三轮：anonymous click → /editions/:id 补 buyer_name，跟 ghost
+    // click → 补 location 是同构的 inbox。role/tabIndex 挂在父 <g> 上。
     const { container } = renderDiaspora();
-    const anon = container.querySelector('[data-testid="constellation-anon-e8"]');
-    expect(anon).not.toBeNull();
-    expect(anon!.getAttribute('role')).toBeNull();
-    expect(anon!.getAttribute('tabindex')).toBeNull();
+    const anon = container.querySelector('[data-testid="constellation-anon-e8"]')!;
+    const parent = anon.parentElement!;
+    expect(parent.tagName.toLowerCase()).toBe('g');
+    expect(parent.getAttribute('role')).toBe('button');
+    expect(parent.getAttribute('tabindex')).toBe('0');
+  });
+
+  it('click anonymous dust → navigate /editions/:id（v1.6.x 第三轮）', () => {
+    const { container } = renderDiaspora();
+    const anon = container.querySelector('[data-testid="constellation-anon-e8"]')!;
+    const parent = anon.parentElement!;
+    fireEvent.click(parent);
+    expect(mockNavigate).toHaveBeenCalledWith('/editions/e8');
+  });
+
+  it('Enter / Space 键盘也触发 anonymous navigate', () => {
+    const { container } = renderDiaspora();
+    const anon = container.querySelector('[data-testid="constellation-anon-e8"]')!;
+    const parent = anon.parentElement!;
+    fireEvent.keyDown(parent, { key: 'Enter' });
+    expect(mockNavigate).toHaveBeenCalledWith('/editions/e8');
+    mockNavigate.mockClear();
+    fireEvent.keyDown(parent, { key: ' ' });
+    expect(mockNavigate).toHaveBeenCalledWith('/editions/e8');
   });
 
   it('点击 named_private node → pin 卡片显示 buyer 信息 + edition chip', () => {

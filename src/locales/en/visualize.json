@@ -165,7 +165,8 @@
       "aria": {
         "artist": "Center node: aaajiao (artist)",
         "namedPrivate": "Private buyer {{name}}, {{count}} works",
-        "ghost": "Edition awaiting location: {{title}} · {{inv}} · {{status}} (click to complete)"
+        "ghost": "Edition awaiting location: {{title}} · {{inv}} · {{status}} (click to complete)",
+        "anonymous": "Anonymous outflow · {{date}} (click to add buyer_name)"
       }
     }
   },

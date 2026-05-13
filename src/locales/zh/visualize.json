@@ -165,7 +165,8 @@
       "aria": {
         "artist": "中心节点：aaajiao（艺术家）",
         "namedPrivate": "私人买家 {{name}}，{{count}} 件作品",
-        "ghost": "待补全版本：{{title}} · {{inv}} · {{status}}（点击补 location）"
+        "ghost": "待补全版本：{{title}} · {{inv}} · {{status}}（点击补 location）",
+        "anonymous": "匿名流出 · {{date}}（点击补 buyer_name）"
       }
     }
   },

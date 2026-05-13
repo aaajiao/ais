@@ -296,20 +296,27 @@ export function buildConstellation(
 // 历史 ANONYMOUS_R = 310 常量保留导出（向后兼容），但 layout 不再使用。
 
 /**
- * 几何常量（坐标在 800×600 viewBox 内），固定值便于测试断言精确。
+ * 几何常量（坐标在 800×760 viewBox 内，v1.6.x 第三轮 H 600→760 + R 等比扩），
+ * 固定值便于测试断言精确。
  *
- * v1.6.x 起 R 全部内缩：旧值（70 / 240 / 280 / 310）让 R_GHOST=280 + node r=14-20
- * + label 直接出 viewBox（顶部/底部）。新值给 label 留 padding，时间螺旋整体居中
- * 不抵边。`ANONYMOUS_R` 保留导出仅向后兼容 —— anonymous 不再单独 ring，每条
- * anonymous edition 走时间螺旋（参见 layoutConstellation）。
+ * v1.6.x 一/二轮：viewBox 600 高，R 60/190/220。实测 37 个 entity 在 R_INNER=60
+ * 附近圆周太挤，跨类（location ↔ named_private）仍出现严重重叠：
+ *   - location × named_private  gap=-12.7 px
+ *   - location × named_private  gap=-12.4 px
+ * 第三轮把主圈整体放大 ~37%（R_INNER 60→80 / R_OUTER_DATA 190→260 / R_GHOST 220→
+ * 300）+ 把碰撞推开 step/iters/pad 加力，让相同 N 在更大圆周上散开。viewBox 高
+ * 也跟着拉到 760（800×760）给最外圈 ghost ring（R=340）+ label 留 padding。
+ *
+ * `ANONYMOUS_R` 保留导出仅向后兼容 —— anonymous 不再单独 ring，每条 anonymous
+ * edition 走时间螺旋（参见 layoutConstellation）。
  */
 export const TIME_SPIRAL_GEOMETRY = {
   /** 离 artist center 最近的有数据 entity 半径 */
-  R_INNER: 60,
+  R_INNER: 80,
   /** 有 sale_date 数据的 entity 最远径向距离 */
-  R_OUTER_DATA: 190,
+  R_OUTER_DATA: 260,
   /** 缺 sale_date 的 entity 推到这个外圈 */
-  R_GHOST: 220,
+  R_GHOST: 300,
   /** @deprecated v1.6.x anonymous 走时间螺旋；常量保留向后兼容仅 */
   ANONYMOUS_R: 310,
 } as const;
@@ -379,14 +386,25 @@ function isoToMs(iso: string): number {
 /** 黄金角（rad）：phyllotaxis 分布关键常数，~2.3999 rad（137.5°） */
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
-/** 碰撞推开：每次迭代把后落点的 entity 推开的角度增量（rad） */
-const COLLISION_REPEL_STEP = 0.06;
+/**
+ * 碰撞推开：每次迭代把后落点的 entity 推开的角度增量（rad）。
+ * v1.6.x 第三轮：0.06 → 0.10。旧 step × 8 iters = 27° 累计推开不足，跨类
+ * （location r≈14 ↔ named_private r≈7）实测仍留 gap=-12.7 px 重叠。
+ */
+const COLLISION_REPEL_STEP = 0.10;
 
-/** 碰撞推开：最多迭代次数（足够大避免漂移，但有限避免病态死循环） */
-const COLLISION_REPEL_MAX_ITERS = 8;
+/**
+ * 碰撞推开：最多迭代次数（足够大避免漂移，但有限避免病态死循环）。
+ * v1.6.x 第三轮：8 → 16。配合更大的 step + 更大的圆周（R_INNER 60→80），
+ * 总推开能力达 ~92° 累计，覆盖最严重 N=37 时间密集 case。
+ */
+const COLLISION_REPEL_MAX_ITERS = 16;
 
-/** 碰撞检测时两节点视觉半径之外的 padding（px），留出视觉呼吸距离 */
-const COLLISION_PAD = 4;
+/**
+ * 碰撞检测时两节点视觉半径之外的 padding（px），留出视觉呼吸距离。
+ * v1.6.x 第三轮：4 → 6，相邻 entity 之间留出更可读的空隙。
+ */
+const COLLISION_PAD = 6;
 
 /** 取 entity 节点视觉半径（与 view 渲染保持一致；anonymous 走升级后的 3.5） */
 function visualRadiusOf(
@@ -1178,7 +1196,11 @@ export interface GhostRingPoint {
 export interface GhostRingLayoutOptions {
   width: number;
   height: number;
-  /** 默认 245 —— Diaspora SVG 内部约定（R_GHOST=220 之外再外圈） */
+  /**
+   * 默认 340 —— Diaspora SVG 内部约定（R_GHOST=300 之外再外圈）。
+   * v1.6.x 第三轮：245 → 340，跟主圈整体放大（R 60→80 / 190→260 / 220→300）+
+   * viewBox H 600→760 同步。
+   */
   radius?: number;
 }
 
@@ -1186,7 +1208,7 @@ export interface GhostRingLayoutOptions {
  * Ghost editions 沿外圈均匀分布。
  *
  * - 中心 = (width/2, height/2)
- * - 默认半径 245（在 R_GHOST=220 与 viewBox 边之间）
+ * - 默认半径 340（在 R_GHOST=300 与 viewBox 边之间，v1.6.x 第三轮）
  * - 起点 12 点钟（-π/2），均匀分布 360°
  * - N=0 → 空数组（view 据此不渲染）
  *
@@ -1200,7 +1222,7 @@ export function layoutGhostRing(
   if (N === 0) return [];
   const cx = options.width / 2;
   const cy = options.height / 2;
-  const radius = options.radius ?? 245;
+  const radius = options.radius ?? 340;
 
   const points: GhostRingPoint[] = [];
   for (let i = 0; i < N; i++) {

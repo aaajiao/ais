@@ -36,8 +36,12 @@ export interface DiasporaViewProps {
 
 // SVG 内部坐标系（固定，用 viewBox 响应式缩放）
 // v1.6.x: H 从 560 → 600 给 top/bottom 节点 label 留余裕（R_GHOST 内缩同时进行）
+// v1.6.x 第三轮：H 600 → 760，配合主圈整体放大（R 60→80 / 190→260 / 220→300）
+//   + ghost ring 245→340，给跨类碰撞 (location ↔ named_private) 更大圆周散开
+//   空间。maxHeight: '70vh' 容器约束不变 —— 浏览器视觉高度不变，只是 viewBox
+//   单位空间变大让 layout 用得开。artist center r=12 不变。
 const W = 800;
-const H = 600;
+const H = 760;
 
 /** 从 VizArtwork 数组取得 artwork_id → artwork 的 Map */
 function buildArtworkMap(artworks: VizArtwork[]): Map<string, VizArtwork> {
@@ -442,15 +446,16 @@ export default function DiasporaView({
                 />
               ))}
 
-          {/* ─── Anonymous dust (按 sale_date 进 time-spiral，不可点击) ─── */}
+          {/* ─── Anonymous dust (按 sale_date 进 time-spiral，v1.6.x 第三轮可点击) ─── */}
           {/*
             v1.6.x：anonymous 不再聚合成外圈 ring，每条 anonymous outflow edition
             一个独立 dot，跟 location / namedPrivate 共享同一份时间映射。缺
             sale_date 的 anonymous 推 R_GHOST 外圈。
             v1.6.x 第二轮：r 升级 1.5→3.5 + opacity 0.3→0.55，灰实心几何小圆——
             "信息密度递减"三档视觉的中档（具象 blob > 灰实心 dust > 空心 ghost）。
-            不进 hover / pin / 不画 organic blob（仍太小做 blob 噪声大）。**带
-            <title>** 让 hover 看 sale_date（无名也保留时间）。selection 命中时
+            **v1.6.x 第三轮：可点击** → /editions/:id 让用户补 buyer_name，跟
+            ghost click 补 location 是同构的"档案补全 inbox"语义。视觉差异保住
+            （灰实心 = 已售但匿名 / 空心 = 未售无 location）。selection 命中时
             opacity=1（不画 ring：聚合 dust 无 entity 身份）。
           */}
           {layout.anonymousPoints.map((p) => {
@@ -458,7 +463,25 @@ export default function DiasporaView({
             const isSelected =
               !!selectedArtworkId && p.artworkId === selectedArtworkId;
             return (
-              <g key={`anon-${p.editionId}`}>
+              <g
+                key={`anon-${p.editionId}`}
+                role="button"
+                tabIndex={0}
+                className="cursor-pointer focus:outline-none"
+                aria-label={t('diaspora.constellation.aria.anonymous', {
+                  date: p.sale_date ?? '—',
+                })}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/editions/${p.editionId}`);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    navigate(`/editions/${p.editionId}`);
+                  }
+                }}
+              >
                 <title>
                   {p.sale_date
                     ? t('diaspora.tooltip.anonymousWithDate', {
@@ -473,6 +496,7 @@ export default function DiasporaView({
                   r={visual.r}
                   className="fill-foreground"
                   opacity={isSelected ? 1 : visual.opacity}
+                  pointerEvents="all"
                 />
               </g>
             );
