@@ -6,6 +6,7 @@ import {
   priceToY,
   filterSalesByDateCutoff,
   getSalesWithoutPrice,
+  buildActivityHistogram,
 } from './marketsUtils';
 import type { VizEdition } from '@/hooks/queries/useVisualizationData';
 
@@ -257,5 +258,67 @@ describe('getSalesWithoutPrice', () => {
       makeEdition({ id: 'b', status: 'sold', sale_price: 2000 }),
     ];
     expect(getSalesWithoutPrice(editions)).toEqual([]);
+  });
+});
+
+describe('buildActivityHistogram', () => {
+  it('空数组 → null', () => {
+    expect(buildActivityHistogram([])).toBeNull();
+  });
+
+  it('过滤格式不合法的 ISO date', () => {
+    const hist = buildActivityHistogram(['2024-01-01', 'not-a-date', '']);
+    expect(hist?.bins.length).toBe(1);
+    expect(hist?.kind).toBe('month');
+  });
+
+  it('跨度 ≥ 5 年 → 年分桶（连续年份含空年）', () => {
+    // 2018 - 2024 = 6 年跨度 → 年分桶
+    const dates = ['2018-01-01', '2020-06-01', '2024-12-31'];
+    const hist = buildActivityHistogram(dates)!;
+    expect(hist.kind).toBe('year');
+    // bins 含 2018,2019,2020,2021,2022,2023,2024 = 7 个
+    expect(hist.bins.length).toBe(7);
+    expect(hist.bins[0]).toMatchObject({ startISO: '2018-01-01', label: '2018', count: 1 });
+    expect(hist.bins[2]).toMatchObject({ label: '2020', count: 1 });
+    expect(hist.bins[6]).toMatchObject({ label: '2024', count: 1 });
+    // 空年份 = count 0（保留连续轴）
+    expect(hist.bins[1].count).toBe(0);
+    expect(hist.bins[3].count).toBe(0);
+  });
+
+  it('跨度 < 5 年 → 月分桶（连续月份含空月）', () => {
+    const dates = ['2023-03-15', '2023-05-20', '2023-12-01'];
+    const hist = buildActivityHistogram(dates)!;
+    expect(hist.kind).toBe('month');
+    // bins 含 2023-03..2023-12 = 10 个
+    expect(hist.bins.length).toBe(10);
+    expect(hist.bins[0]).toMatchObject({ label: '2023-03', count: 1 });
+    expect(hist.bins[2]).toMatchObject({ label: '2023-05', count: 1 });
+    expect(hist.bins[9]).toMatchObject({ label: '2023-12', count: 1 });
+    expect(hist.bins[1].count).toBe(0);
+  });
+
+  it('同一 bin 多次命中 → count 累加', () => {
+    const dates = ['2023-03-15', '2023-03-20', '2023-03-25'];
+    const hist = buildActivityHistogram(dates)!;
+    expect(hist.bins[0].count).toBe(3);
+  });
+
+  it('maxCount 是所有 bin 里最大的 count', () => {
+    const dates = [
+      '2023-01-01',
+      '2023-06-01', '2023-06-15', '2023-06-30', // 6 月 3 次
+      '2023-12-01',
+    ];
+    const hist = buildActivityHistogram(dates)!;
+    expect(hist.maxCount).toBe(3);
+  });
+
+  it('minISO / maxISO = 排序后的首尾', () => {
+    const dates = ['2024-05-01', '2020-01-15', '2022-09-30'];
+    const hist = buildActivityHistogram(dates)!;
+    expect(hist.minISO).toBe('2020-01-15');
+    expect(hist.maxISO).toBe('2024-05-01');
   });
 });

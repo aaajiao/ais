@@ -3,7 +3,9 @@ import { screen, fireEvent } from '@testing-library/react';
 import { renderWithClient } from '@/test/test-utils';
 import MarketsTimelineRibbon from './MarketsTimelineRibbon';
 
-function renderRibbon(overrides: Partial<React.ComponentProps<typeof MarketsTimelineRibbon>> = {}) {
+function renderRibbon(
+  overrides: Partial<React.ComponentProps<typeof MarketsTimelineRibbon>> = {}
+) {
   const props = {
     dates: ['2020-01-15', '2021-06-01', '2022-09-30', '2023-04-12', '2024-12-01'],
     currentDate: '2023-04-12',
@@ -12,8 +14,7 @@ function renderRibbon(overrides: Partial<React.ComponentProps<typeof MarketsTime
     axisWidth: 500,
     playBtnX: 520,
     yTop: 8,
-    ribbonH: 32,
-    dropLineH: 400,
+    ribbonH: 40,
     playing: false,
     onPlayToggle: vi.fn(),
     ...overrides,
@@ -38,32 +39,61 @@ describe('MarketsTimelineRibbon', () => {
   it('正常多 sale_date → 渲染 ribbon <g> + 当前日期 (YYYY-MM)', () => {
     renderRibbon();
     expect(screen.getByTestId('visualize-timeline')).toBeInTheDocument();
-    // currentDate=2023-04-12 → slice(0,7) = 2023-04
-    expect(screen.getByTestId('visualize-timeline-current').textContent).toBe('2023-04');
+    expect(screen.getByTestId('visualize-timeline-current').textContent).toBe(
+      '2023-04'
+    );
   });
 
-  it('▼ marker 落在 cutoff 对应的 tick x（含 tick width 居中偏移）', () => {
-    // currentIdx=3, axisWidth=500, len=5 → tickW=100, x = 3*100 + 50 = 350
+  it('histogram bars 渲染：每个非空 bin 一个 bar', () => {
+    // dates span 2020..2024 → yearSpan=4 < 5 → month bins
+    // 但只有 5 个 distinct dates，所以多数 bin 是空，只有 5 个非空 bar
     const { container } = renderRibbon();
-    const polygon = container.querySelector(
-      'polygon[class*="fill-foreground"]'
+    const ribbonG = container.querySelector(
+      '[data-testid="visualize-timeline"]'
+    )!;
+    const bars = Array.from(ribbonG.querySelectorAll('rect')).filter(
+      (r) => r.getAttribute('data-testid')?.startsWith('hist-bar-')
     );
-    expect(polygon).toBeTruthy();
-    expect(polygon!.getAttribute('points')!.startsWith('350,')).toBe(true);
-
-    const dropLine = Array.from(container.querySelectorAll('line')).find(
-      (l) => l.getAttribute('stroke-dasharray') === '2 3'
-    );
-    expect(dropLine).toBeTruthy();
-    expect(dropLine!.getAttribute('x1')).toBe('350');
+    expect(bars.length).toBe(5);
   });
 
-  it('dropLineH=0 → 不渲染 drop line（无 noPrice lane 但也无主散点的极端情况）', () => {
-    const { container } = renderRibbon({ dropLineH: 0 });
-    const dashedLine = Array.from(container.querySelectorAll('line')).find(
+  it('cutoff 之后的 bin 走 future opacity 0.15', () => {
+    // currentDate=2023-04-12 → bin >= 2023-05 应该 dim
+    const { container } = renderRibbon();
+    const ribbonG = container.querySelector(
+      '[data-testid="visualize-timeline"]'
+    )!;
+    const bars = Array.from(ribbonG.querySelectorAll('rect')).filter(
+      (r) => r.getAttribute('data-testid')?.startsWith('hist-bar-')
+    );
+    // bars 含 2020-01-15, 2021-06-01, 2022-09-30, 2023-04-12 (≤ cutoff), 2024-12-01 (> cutoff)
+    const future = bars.filter((b) => b.getAttribute('opacity') === '0.15');
+    const past = bars.filter((b) => b.getAttribute('opacity') === '1');
+    expect(past.length).toBe(4);
+    expect(future.length).toBe(1);
+  });
+
+  it('▼ marker 落在 cutoff 对应的连续时间轴位置', () => {
+    // dates: 2020-01-15..2024-12-01. cutoff 2023-04-12.
+    // markerX = (cutoff_ms - min_ms) / (max_ms - min_ms) * 500
+    // 大致在 65% 位置（约 320~340）
+    const { container } = renderRibbon();
+    const marker = container.querySelector(
+      '[data-testid="visualize-timeline-marker"]'
+    );
+    expect(marker).toBeTruthy();
+    const points = marker!.getAttribute('points')!;
+    const markerX = Number(points.split(',')[0]);
+    expect(markerX).toBeGreaterThan(300);
+    expect(markerX).toBeLessThan(360);
+  });
+
+  it('不渲染 drop line（M1.5 改造后 Markets ribbon 不向下穿透 chart）', () => {
+    const { container } = renderRibbon();
+    const dashedLines = Array.from(container.querySelectorAll('line')).filter(
       (l) => l.getAttribute('stroke-dasharray') === '2 3'
     );
-    expect(dashedLine).toBeUndefined();
+    expect(dashedLines.length).toBe(0);
   });
 
   it('拖动 slider → 触发 onDateChange(dates[idx])', () => {
@@ -87,36 +117,37 @@ describe('MarketsTimelineRibbon', () => {
     expect(onPlayToggle).toHaveBeenCalledTimes(1);
   });
 
-  it('tick label 稀疏（不每个 date 都标，避免视觉过密）', () => {
-    // 20 个日期，predicted: 应该最多有 ~6-7 个 label（含首尾 + current）
-    const dates = Array.from({ length: 20 }, (_, i) =>
+  it('tick label 稀疏（含首尾 + 中间均匀采样，bin 多时不全部标）', () => {
+    // 12 个月数据 → yearSpan=0 → 月分桶 12 个 bin
+    const dates = Array.from({ length: 12 }, (_, i) =>
       `2020-${String(i + 1).padStart(2, '0')}-01`
     );
     const { container } = renderRibbon({
       dates,
-      currentDate: dates[10],
+      currentDate: dates[6],
     });
-    const ribbonG = container.querySelector('[data-testid="visualize-timeline"]');
-    const allTextLabels = Array.from(ribbonG!.querySelectorAll('text')).filter(
+    const ribbonG = container.querySelector(
+      '[data-testid="visualize-timeline"]'
+    );
+    const tickLabels = Array.from(ribbonG!.querySelectorAll('text')).filter(
       (n) =>
         n.getAttribute('data-testid') !== 'visualize-timeline-current' &&
-        /^\d{4}-\d{2}$/.test(n.textContent ?? '')
+        /^\d{4}(-\d{2})?$/.test(n.textContent ?? '')
     );
-    // labels 应严格少于 dates.length（稀疏化生效）
-    expect(allTextLabels.length).toBeLessThan(dates.length);
-    expect(allTextLabels.length).toBeGreaterThanOrEqual(2);
+    expect(tickLabels.length).toBeLessThan(dates.length);
+    expect(tickLabels.length).toBeGreaterThanOrEqual(2);
   });
 
   it('颜色全用 currentColor / fill-foreground', () => {
     const { container } = renderRibbon();
-    const svgRoot = container.querySelector(
+    const ribbonG = container.querySelector(
       '[data-testid="visualize-timeline"]'
     );
-    const baseline = Array.from(svgRoot!.querySelectorAll('line')).find(
+    const baseline = Array.from(ribbonG!.querySelectorAll('line')).find(
       (l) => l.getAttribute('stroke') === 'currentColor'
     );
     expect(baseline).toBeTruthy();
-    const marker = svgRoot!.querySelector('polygon');
+    const marker = ribbonG!.querySelector('polygon');
     expect(marker?.getAttribute('class')).toMatch(/fill-foreground/);
   });
 });

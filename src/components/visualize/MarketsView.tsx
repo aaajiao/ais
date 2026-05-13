@@ -29,7 +29,8 @@ const STAT_H = 56;         // 底部 stat 行高度
 const TOP_PAD = 8;
 // 顶层时间播头 ribbon（M1.5）—— 嵌入 SVG 内（取代 v1.5 之前的 widget Timeline）。
 // 仅在 saleDates.length > 1 时显示；不显示时 ribbonOffset=0，原有布局像素级保持。
-const RIBBON_H = 32;
+// Markets ribbon 用 activity histogram，比 Strata 高一些：22 直方图 + 2 间距 + 12 label
+const RIBBON_H = 40;
 const RIBBON_GAP = 8;
 // M2: 缺价横条 —— 跨整宽，置于 stat 行下方。只在有缺价 sold edition 时占用空间。
 const NOPRICE_LANE_H = 28;
@@ -226,8 +227,6 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
               playBtnX={totalW - LEFT_PAD - 16}
               yTop={TOP_PAD}
               ribbonH={RIBBON_H}
-              // drop line 贯穿 HEADER + 主散点 PANEL，止于 stat 行上方
-              dropLineH={RIBBON_GAP + HEADER_H + PANEL_H}
               playing={playing}
               onPlayToggle={() => {
                 if (playing) {

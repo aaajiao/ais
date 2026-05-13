@@ -108,3 +108,92 @@ export function priceToY(
   // t=1（最新）→ y=0（顶部）；t=0（最早）→ y=panelHeight（底部）
   return panelHeight * (1 - t);
 }
+
+// ─── Activity histogram（M1.5 优化）─────────────────────────────────────────
+// Markets ribbon 用 histogram 表达"市场活跃节奏"——bin 高 = 该时段交易笔数。
+// Strata 的"地层切片"语义在 Markets 不成立（X 轴是货币 nominal，时间跟空间正交），
+// 所以 Markets 改用"活动密度直方图"，跟 Strata 视觉不同步。
+
+export type ActivityBinKind = 'year' | 'month';
+
+export interface ActivityBin {
+  /** Bin start ISO date (inclusive)，用于 x 轴定位与 cutoff 比较 */
+  startISO: string;
+  /** 显示 label：'2024' 或 '2024-03' */
+  label: string;
+  /** 该 bin 内的 sale_date 数 */
+  count: number;
+}
+
+export interface ActivityHistogram {
+  bins: ActivityBin[];
+  kind: ActivityBinKind;
+  /** 全数据起始日 ISO（用于连续时间轴定位 marker） */
+  minISO: string;
+  /** 全数据终止日 ISO */
+  maxISO: string;
+  /** 任意 bin 的最大 count（用于 bar 高度归一化） */
+  maxCount: number;
+}
+
+/** ISO 'YYYY-MM-DD' → 年（整数）。直接 slice 避免 timezone 漂移。 */
+function isoYear(d: string): number {
+  return Number(d.slice(0, 4));
+}
+
+/** ISO → 月（1-12） */
+function isoMonth(d: string): number {
+  return Number(d.slice(5, 7));
+}
+
+/** 给定 sale_date 数组，按年或月分桶，返回连续时间轴的 histogram（含空 bin）。 */
+export function buildActivityHistogram(saleDates: string[]): ActivityHistogram | null {
+  const valid = saleDates.filter((d) => d && /^\d{4}-\d{2}-\d{2}/.test(d));
+  if (valid.length === 0) return null;
+  const sorted = [...valid].sort();
+  const minISO = sorted[0];
+  const maxISO = sorted[sorted.length - 1];
+  const minY = isoYear(minISO);
+  const maxY = isoYear(maxISO);
+  const yearSpan = maxY - minY;
+
+  // 跨度 ≥ 5 年 → 按年分桶（避免月桶太多挤）；否则按月分桶
+  const kind: ActivityBinKind = yearSpan >= 5 ? 'year' : 'month';
+
+  const bins: ActivityBin[] = [];
+  if (kind === 'year') {
+    for (let y = minY; y <= maxY; y++) {
+      bins.push({ startISO: `${y}-01-01`, label: String(y), count: 0 });
+    }
+    for (const d of sorted) {
+      const idx = isoYear(d) - minY;
+      bins[idx].count++;
+    }
+  } else {
+    // month bins：从 minY-minM 起到 maxY-maxM
+    const minM = isoMonth(minISO);
+    const maxM = isoMonth(maxISO);
+    let y = minY;
+    let m = minM;
+    while (y < maxY || (y === maxY && m <= maxM)) {
+      const mm = String(m).padStart(2, '0');
+      bins.push({ startISO: `${y}-${mm}-01`, label: `${y}-${mm}`, count: 0 });
+      m++;
+      if (m > 12) {
+        m = 1;
+        y++;
+      }
+    }
+    for (const d of sorted) {
+      const dy = isoYear(d);
+      const dm = isoMonth(d);
+      const idx = (dy - minY) * 12 + (dm - minM);
+      if (idx >= 0 && idx < bins.length) bins[idx].count++;
+    }
+  }
+
+  let maxCount = 0;
+  for (const b of bins) if (b.count > maxCount) maxCount = b.count;
+
+  return { bins, kind, minISO, maxISO, maxCount };
+}

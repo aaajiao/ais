@@ -78,10 +78,12 @@ interface UseTimelineScrubberResult<T> {
 
 包含 rAF play (6s)、index 推进、cancel-on-unmount、`enabled = values.length > 1` 单点隐藏判断。**不接 URL/view state**——URL `?t=` 解析与写入留在各 view 的 useSearchParams 自管。
 
-**`StrataTimelineRibbon.tsx` / `MarketsTimelineRibbon.tsx`** —— 视觉层，**SVG 内嵌**（作为父 view SVG 的 `<g transform="translate(...)">` 子节点），跟主 chart 共享 viewBox + 坐标系：
+**`StrataTimelineRibbon.tsx` / `MarketsTimelineRibbon.tsx`** —— 视觉层，**SVG 内嵌**（作为父 view SVG 的 `<g transform="translate(...)">` 子节点），跟主 chart 共享 viewBox + 坐标系。**两个 ribbon 视觉故意不同步**——各自贴合自己 view 的数据语义：
 
-- **Strata ribbon**：年份标签本身就是 tick marks，垂直对齐到下方 swimlane 的 year 列。`▼` marker 落在对应年份，**marker 下方一条 dashed 垂直参考线**（`stroke-dasharray="2 3" opacity=0.3`）穿过整个 strata 区域——"现在的切片在哪"立刻可见。
-- **Markets ribbon**：顶部 date axis（稀疏 YYYY-MM tick，避免每 sale_date 一个标过密），`▼` marker 同上，drop line **只贯穿主散点 canvas**，**不进 noPrice lane**（无价没有时间维度，参考线在那里没意义）。
+- **Strata ribbon = 地层切片**：年份标签本身就是 tick marks，垂直对齐到下方 swimlane 的 year 列。`▼` marker 落在对应年份，**marker 下方一条 dashed 垂直参考线**（`stroke-dasharray="2 3" opacity=0.3`）穿过整个 strata 区域——"现在的切片在哪"立刻可见。Strata 的 X 轴本来就是 year，scrubber 跟 chart X 轴**几何同源**，drop line 有真实对应。
+- **Markets ribbon = 活动密度直方图**：顶部一个迷你 chart（`buildActivityHistogram` 按年/月分桶 + 显示 count 高度），bin 高 = 该时段交易笔数。cutoff 之后的 bin 走 `FUTURE_OPACITY = 0.15`（跟 dot dim 同步）。`▼` marker 在 ribbon 内，**不向下穿透 chart**。Markets X 轴是 nominal（货币），跟时间正交——drop line 在 Markets 里没有几何对应，强加只是视觉噪音。histogram 本身让 idle 态有信息密度（一眼看到哪几年是市场高峰、哪几年沉寂），跟 Strata ribbon 的"信息密度低、靠 drop line 表达 state"形成对照。Marker x 用**连续时间映射**（`(currentMs - minMs) / span * width`）而非 index-step，让 marker 跟 histogram bin 在时间轴上对齐。
+
+**这条原则不要回退**：Markets ribbon 不要"为对齐 Strata 风格"而加 drop line——viz 不同 view 用不同视觉词汇是回应数据语义不同。Strata 和 Markets 都用同一个 `useTimelineScrubber` hook（共享逻辑），但视觉各自。
 
 **交互**：透明 `<input type="range">` 嵌在 SVG `<foreignObject>` 中覆盖 ribbon 区域 → native a11y / 键盘 / 触屏全免费；SVG marker / drop line 跟随 input value 渲染。Play 按钮也在独立 `<foreignObject>` 里，纯 Lucide `Play` / `Pause` icon 无边框。
 
@@ -148,7 +150,8 @@ i18n keys 走各 view 自己段：`strata.legend.*` / `markets.legend.*` / `dias
 - **SVG 响应式 viewBox + `className="w-full"`**：不写死 `width` / `height` px。外层 `overflow-x-auto` 兜底窄屏下水平滚动。这样窄屏 (mobile) 自动缩放、宽屏 (desktop) 自动撑满，跟 Diaspora 一致。
 - **散点 a11y**：每个圆包一层 `<g role="button" tabIndex={0} aria-label="..." aria-pressed={hovered}>`，Enter / Space 触发 navigate，focus 也走 hover 视觉态。货币列标签内嵌 `<title>` 让 screen reader 念出 "Currency: USD"。模仿 DiasporaView 节点 a11y pattern。
 - **summary 用自己段下的 key**：info bar idle 态走 `t('markets.summary.overview', { sales, currencies })`，**不**复用其他 view 的 summary key——跨 view i18n 借用是 ticking bomb（参见 CLAUDE.md 关于 i18n 隔离的 pitfall）。`Strata` 和 `Diaspora` 各自维护 `*.summary.overview`，结构相似但物理隔离。守护测试 `MarketsView.test.tsx` 的"不借其他 view 的 key"断言。
-- **时间播头（M1）**：顶部 `Timeline` scrubber 按 `editions.sale_date` ISO 字符串播——transaction time 而非 `created_at`。`values` = `filterSalesByDateCutoff(editions, max)` 取所有 sold + 有 `sale_date` 的 distinct dates 升序；超出 cutoff 的散点走 const `DOT_OPACITY_FUTURE = 0.15`。`sale_date` 缺失的 sold edition **不显示**（保守，不构造伪日期）——这是有意的，跟原则 4「缺失数据不藏」一致：缺日期的成交在播头里就是不存在，回到 t=max 才看见，info bar 总览仍包含它。
+- **时间播头（M1）**：顶部 `MarketsTimelineRibbon` 按 `editions.sale_date` ISO 字符串播——transaction time 而非 `created_at`。`values` = `filterSalesByDateCutoff(editions, max)` 取所有 sold + 有 `sale_date` 的 distinct dates 升序；超出 cutoff 的散点走 const `DOT_OPACITY_FUTURE = 0.15`。`sale_date` 缺失的 sold edition **不显示**（保守，不构造伪日期）——这是有意的，跟原则 4「缺失数据不藏」一致：缺日期的成交在播头里就是不存在，回到 t=max 才看见，info bar 总览仍包含它。
+- **ribbon 视觉 = activity histogram，不学 Strata 加 drop line（M1.5 优化）**：Markets X 轴是 nominal（货币），跟时间正交，drop line 在 Markets 里没几何意义。改用顶部活动密度直方图（`buildActivityHistogram` 跨度 ≥5 年 → 年桶；< 5 年 → 月桶；连续轴含空桶；空桶 count=0 不画 bar）+ marker ▼ 在 ribbon 内。bar height = `(count / maxCount) * HIST_AREA_H`，bin 在 cutoff 之后走 `FUTURE_OPACITY = 0.15`（跟 dot dim 同步）。Marker x 用**连续时间映射**对齐 histogram bin。RIBBON_H = 40（比 Strata 高 8px 容 histogram + 标签）。回退到 drop line 等于丢失这个视觉词汇差异，**不要**。
 - **缺价 lane（M2）**：sold 但 `sale_price=null` 的 edition 走主 canvas 下方独立横条 lane，**不进任何 currency 列**（无价无法定位到任何 scale）。`getSalesWithoutPrice(editions)` 抽出，count > 0 才渲染（无缺价时不画空 lane）。Lane label `markets.noPriceLane` (zh: "未记录价格 ({{count}})") + stroke-only `<circle fill="none" stroke-foreground>` jitter 排开；圆点仍可 navigate `/editions/{id}` 保持 a11y pattern。时间播头不过滤此 lane（无价 = 没法按时间播）。pattern id `viz-markets-pattern-dots` 跟 Strata 命名空间隔离。
 
 ### Terminal
@@ -184,7 +187,7 @@ i18n keys 走各 view 自己段：`strata.legend.*` / `markets.legend.*` / `dias
 |---|---|
 | `useVisualizationData.test.ts` | 4 — 并行查 4 表 / RLS deleted_at / 聚合 / error 传播 |
 | `strataUtils.test.ts` | 26 — year 解析 / swimlane 分组 + 排序 / `(untyped)` 处理 / 高度 log scale / stack 满了水平蔓延 |
-| `marketsUtils.test.ts` | 29 — 过滤 sold/有价 / 中位数 / 半径归一化 / 边界 / `filterSalesByDateCutoff`（M1）/ `getSalesWithoutPrice`（M2） |
+| `marketsUtils.test.ts` | 36 — 过滤 sold/有价 / 中位数 / 半径归一化 / 边界 / `filterSalesByDateCutoff`（M1）/ `getSalesWithoutPrice`（M2）/ `buildActivityHistogram`（M1.5 优化：年/月 kind 切换 / 连续空桶 / 同 bin 多命中累加 / maxCount / minISO maxISO） |
 | `terminalUtils.test.ts` | 29 — inventory 自然排序 / edition label 4 种 / location 拼接 / group 分桶 / markets line |
 | `TerminalView.test.tsx` | 9 — 行 role=button + tabIndex / 点击 navigate / 键盘 Enter+Space / 其他键不触发 / 分组 heading + aria-hidden 装饰 / 紧凑字号 class / row.id 防御 / separator 对 SR 隐藏 |
 | `diasporaUtils.test.ts` | 35 — 节点关联 / 中心选择 tie-breaker / 同心环布局 / 边聚合 / tracked stat / `getGhostNodes`（M2） |
@@ -193,7 +196,7 @@ i18n keys 走各 view 自己段：`strata.legend.*` / `markets.legend.*` / `dias
 | `MarketsView.test.tsx` | 21 — 货币列降序 / 散点 a11y / 空状态 / summary 段隔离 / 多 sale_date 渲染 Timeline（M1）/ 单点不渲染 Timeline（M1）/ 默认 t=max 不 dim（M1）/ scrub 后 dim（M1）/ noPrice lane 渲染（M2）/ count=0 不画 lane（M2）/ stroke-only 圆 + label（M2）/ noPrice 圆可 navigate（M2）/ noPrice 圆带 pointerEvents=all（M2 fix）/ legend 2 项（M2.5） |
 | `useTimelineScrubber.test.ts` | 8 — enabled 计算 / setIdx 边界 / togglePlay / rAF 推进 / unmount cancel / 单点禁用 / play 复位 / play complete |
 | `StrataTimelineRibbon.test.tsx` | 9 — SVG `<g>` 渲染 / marker 三角 + 当前 year label / drop line 长度对齐 swimlane / Play 按钮 toggle / 透明 input 可拖 / 单年份返 null / aria 属性 / play complete URL 落地 / testid 保留 |
-| `MarketsTimelineRibbon.test.tsx` | 9 — 同 Strata 结构但 ISO date 轴 / 稀疏 YYYY-MM tick / drop line 只到主 canvas 不进 noPrice |
+| `MarketsTimelineRibbon.test.tsx` | 11 — 渲染 / 单点返 null / histogram bar 数 = 非空 bin / cutoff 之后 bin opacity 0.15 / marker 连续时间轴位置 / 不渲染 drop line（M1.5 优化）/ slider onChange / a11y / Play / 稀疏 tick label / 颜色全 currentColor |
 | `Legend.test.tsx` | 5 — 渲染所有 item / glyph testid / separatorBefore 插入 `│` / 不传 separator 时无 `│` / 空数组 |
 | `Visualize.test.tsx` | 10 — loading / error / 4 个 view 默认渲染 / 非法 ?view 回落 / refetch 按钮 / 容器断点 lg: / `?view=strata&t=2024` smoke（M1） |
 | `visualize-parity.test.ts` | 2 — zh ⟷ en key 完全一致 / 核心段都存在 |
@@ -232,7 +235,7 @@ src/components/visualize/
   ├── strataUtils.ts                 # 含 filterArtworksByYearCutoff (M1) + getArtworkOwnershipState / getUnknownYearArtworks (M2)
   ├── strataUtils.test.ts
   ├── MarketsView.tsx
-  ├── marketsUtils.ts                # 含 filterSalesByDateCutoff (M1) + getSalesWithoutPrice (M2)
+  ├── marketsUtils.ts                # 含 filterSalesByDateCutoff (M1) + getSalesWithoutPrice (M2) + buildActivityHistogram (M1.5 优化)
   ├── marketsUtils.test.ts
   ├── TerminalView.tsx
   ├── TerminalView.test.tsx

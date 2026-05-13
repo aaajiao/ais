@@ -1,35 +1,31 @@
 import { useTranslation } from 'react-i18next';
 import { Play, Pause } from 'lucide-react';
 import { useTimelineScrubber } from './useTimelineScrubber';
+import { buildActivityHistogram } from './marketsUtils';
 
 /**
- * MarketsTimelineRibbon — Markets 视图顶部的"date axis"播头。
+ * MarketsTimelineRibbon — Markets 视图顶部的"活动密度直方图 + 时间播头"。
  *
- * 跟 Strata 的视觉词汇对齐：baseline + ticks + ▼ marker + drop line + 右上 Play 按钮。
+ * 跟 Strata 视觉**有意不同步**：
+ *   - Strata 的时间是 chart X 轴（年份列），scrubber 是"地层切片"——drop line 进 chart 有几何意义。
+ *   - Markets X 轴是 nominal（货币），时间跟空间正交——drop line 强加无意义。
  *
- * 差异：
- *   - tick label 是 ISO date（YYYY-MM），稀疏标签（自动选 N≈5~7 个均匀 tick）
- *   - drop line 只贯穿主散点 canvas（不进 noPrice lane） —— 由 dropLineH 控
- *   - values 是按时间升序的 distinct sale_date 字符串
+ * 改用 histogram：bin 高 = 该时段交易笔数，cutoff 之后的 bin dim 0.15（跟 dot 同步）。
+ * ribbon 自包含，不向下穿透 chart 区域；marker 只在 ribbon 内、连续时间轴上定位。
  */
 
 export interface MarketsTimelineRibbonProps {
-  /** ISO date strings，升序 */
+  /** ISO date strings，升序 —— 仍是 scrubber 的离散停留点 */
   dates: string[];
   currentDate: string;
   onDateChange: (d: string) => void;
-  /** ribbon 在父 SVG 中的 x 起点 */
   xOffset: number;
-  /** axis 区域宽度，tick 均分 */
+  /** axis 区域宽度 */
   axisWidth: number;
-  /** Play 按钮 x（相对 ribbon <g>），在 axis 之外 */
+  /** Play 按钮 x（相对 ribbon <g>） */
   playBtnX: number;
-  /** ribbon 顶端在父 SVG 中的 y */
   yTop: number;
-  /** ribbon 自身高度 */
   ribbonH: number;
-  /** 垂直 drop line 长度（= 主散点 canvas 高度，不含 noPrice lane） */
-  dropLineH: number;
   playing: boolean;
   onPlayToggle: () => void;
   onPlayComplete?: () => void;
@@ -37,12 +33,26 @@ export interface MarketsTimelineRibbonProps {
 
 const MARKER_SIZE = 7;
 const PLAY_BTN_SIZE = 16;
+/** 直方图 bar 区域占 ribbon 顶部的高度 */
+const HIST_AREA_H = 22;
+/** baseline 与 histogram 间的小间距（marker 三角伸入空间） */
+const BASELINE_GAP = 0;
 /** 目标显示 tick label 数量（含首尾） */
 const TARGET_TICK_LABELS = 6;
+/** 未来 bin / future-cutoff 的 opacity（跟 DOT_OPACITY_FUTURE 同步） */
+const FUTURE_OPACITY = 0.15;
 
-/** ISO date → 'YYYY-MM' for label display */
+/** ISO date → 'YYYY-MM' for display label */
 function formatYearMonth(d: string): string {
   return d.slice(0, 7);
+}
+
+/** ISO date → ms (slice + Date.UTC 避免 timezone 漂移) */
+function isoToMs(d: string): number {
+  const y = Number(d.slice(0, 4));
+  const m = Number(d.slice(5, 7)) - 1;
+  const day = Number(d.slice(8, 10)) || 1;
+  return Date.UTC(y, m, day);
 }
 
 export default function MarketsTimelineRibbon(props: MarketsTimelineRibbonProps) {
@@ -55,7 +65,6 @@ export default function MarketsTimelineRibbon(props: MarketsTimelineRibbonProps)
     playBtnX,
     yTop,
     ribbonH,
-    dropLineH,
     playing,
     onPlayToggle,
     onPlayComplete,
@@ -72,30 +81,65 @@ export default function MarketsTimelineRibbon(props: MarketsTimelineRibbonProps)
 
   if (!enabled) return null;
 
-  const len = dates.length;
-  const tickW = axisWidth / len;
-  const idxToX = (idx: number) => idx * tickW + tickW / 2;
+  const histogram = buildActivityHistogram(dates);
+  if (!histogram) return null;
 
-  const baselineY = ribbonH - 6;
-  const markerCx = idxToX(currentIdx);
+  const { bins, minISO, maxISO, maxCount } = histogram;
+  const minMs = isoToMs(minISO);
+  const maxMs = isoToMs(maxISO);
+  const cutoffMs = isoToMs(currentDate);
+  const timeSpan = Math.max(1, maxMs - minMs);
+
+  /** ISO date → x（连续时间轴定位） */
+  const dateToX = (iso: string): number => {
+    const ms = isoToMs(iso);
+    return ((ms - minMs) / timeSpan) * axisWidth;
+  };
+
+  const baselineY = HIST_AREA_H + BASELINE_GAP;
+  const markerCx = dateToX(currentDate);
   const markerTopY = baselineY - MARKER_SIZE;
+  const labelY = baselineY + 10;
+  const tickEndY = baselineY + 3;
 
-  /** 稀疏 tick label：均匀挑选 ~TARGET_TICK_LABELS 个，含首尾，外加 current */
+  /** bin 宽度：把全时间跨度按 bin 平均划分；连续时间轴下 bin 等宽 */
+  const binW = axisWidth / bins.length;
+
+  /** 稀疏 tick label：每隔 step 标一个 + 首尾 + current bin */
+  const labelStep = Math.max(1, Math.floor(bins.length / (TARGET_TICK_LABELS - 1)));
   const labelIdxSet = new Set<number>();
   labelIdxSet.add(0);
-  labelIdxSet.add(len - 1);
-  labelIdxSet.add(currentIdx);
-  if (len > 2) {
-    const step = Math.max(1, Math.floor(len / (TARGET_TICK_LABELS - 1)));
-    for (let i = step; i < len - 1; i += step) labelIdxSet.add(i);
-  }
+  labelIdxSet.add(bins.length - 1);
+  for (let i = labelStep; i < bins.length - 1; i += labelStep) labelIdxSet.add(i);
 
   return (
     <g
       data-testid="visualize-timeline"
       transform={`translate(${xOffset}, ${yTop})`}
     >
-      {/* baseline */}
+      {/* ─── histogram bars ────────────────────────────────────────────── */}
+      {bins.map((bin, i) => {
+        if (bin.count === 0) return null;
+        const x = i * binW;
+        const h = Math.max(1, (bin.count / Math.max(1, maxCount)) * HIST_AREA_H);
+        const y = HIST_AREA_H - h;
+        const binMs = isoToMs(bin.startISO);
+        const isFuture = binMs > cutoffMs;
+        return (
+          <rect
+            key={`hbar-${i}`}
+            data-testid={`hist-bar-${i}`}
+            x={x + 0.5}
+            y={y}
+            width={Math.max(0.5, binW - 1)}
+            height={h}
+            className="fill-foreground"
+            opacity={isFuture ? FUTURE_OPACITY : 1}
+          />
+        );
+      })}
+
+      {/* ─── baseline ──────────────────────────────────────────────────── */}
       <line
         x1={0}
         y1={baselineY}
@@ -107,45 +151,45 @@ export default function MarketsTimelineRibbon(props: MarketsTimelineRibbonProps)
         className="text-foreground"
       />
 
-      {/* 全 tick mark（短竖线），稀疏 label */}
-      {dates.map((d, idx) => {
-        const x = idxToX(idx);
-        const isCurrent = idx === currentIdx;
+      {/* ─── bin tick marks + 稀疏 label ────────────────────────────────── */}
+      {bins.map((bin, i) => {
+        const x = i * binW + binW / 2;
         return (
-          <g key={`${d}-${idx}`}>
+          <g key={`tick-${i}`}>
             <line
               x1={x}
-              y1={baselineY - 3}
+              y1={baselineY}
               x2={x}
-              y2={baselineY}
+              y2={tickEndY}
               stroke="currentColor"
               strokeWidth={1}
-              opacity={isCurrent ? 0.9 : 0.3}
+              opacity={0.3}
               className="text-foreground"
             />
-            {labelIdxSet.has(idx) && !isCurrent && (
+            {labelIdxSet.has(i) && (
               <text
                 x={x}
-                y={baselineY - 8}
+                y={labelY}
                 textAnchor="middle"
                 fontSize="9"
                 fontFamily="ui-monospace, monospace"
                 className="fill-muted-foreground"
                 opacity={0.7}
               >
-                {formatYearMonth(d)}
+                {bin.label}
               </text>
             )}
           </g>
         );
       })}
 
-      {/* ▼ marker */}
+      {/* ─── ▼ marker（apex 在 baseline，向 histogram 区域伸入） ─────────── */}
       <polygon
+        data-testid="visualize-timeline-marker"
         points={`${markerCx},${baselineY} ${markerCx - MARKER_SIZE / 2},${markerTopY} ${markerCx + MARKER_SIZE / 2},${markerTopY}`}
         className="fill-foreground"
       />
-      {/* current date label —— 在 marker 上方加粗 */}
+      {/* current date 浮动 label —— 在 marker 三角之上、histogram 顶部 */}
       <text
         x={markerCx}
         y={markerTopY - 4}
@@ -158,33 +202,18 @@ export default function MarketsTimelineRibbon(props: MarketsTimelineRibbonProps)
         {formatYearMonth(currentDate)}
       </text>
 
-      {/* 垂直 drop line：贯穿散点主区，止于 noPrice lane 顶部之前 */}
-      {dropLineH > 0 && (
-        <line
-          x1={markerCx}
-          y1={baselineY}
-          x2={markerCx}
-          y2={baselineY + dropLineH}
-          stroke="currentColor"
-          strokeWidth={1}
-          opacity={0.3}
-          strokeDasharray="2 3"
-          className="text-foreground pointer-events-none"
-        />
-      )}
-
-      {/* 透明 input 覆盖 axis 区，native a11y / 键盘 / 触屏 */}
+      {/* ─── 透明 input 覆盖 ribbon 区，native a11y / 键盘 / 触屏 ──────── */}
       <foreignObject x={0} y={0} width={axisWidth} height={ribbonH}>
         <input
           type="range"
           min={0}
-          max={len - 1}
+          max={dates.length - 1}
           step={1}
           value={currentIdx}
           onChange={(e) => setIdx(Number(e.target.value))}
           aria-label={t('timeline.ariaSlider')}
           aria-valuemin={0}
-          aria-valuemax={len - 1}
+          aria-valuemax={dates.length - 1}
           aria-valuenow={currentIdx}
           aria-valuetext={formatYearMonth(currentDate)}
           style={{
@@ -199,7 +228,7 @@ export default function MarketsTimelineRibbon(props: MarketsTimelineRibbonProps)
         />
       </foreignObject>
 
-      {/* Play 按钮 —— 跟 axis 解耦，落在 view 算好的位置 */}
+      {/* ─── Play 按钮 ─────────────────────────────────────────────────── */}
       <foreignObject
         x={playBtnX}
         y={(ribbonH - PLAY_BTN_SIZE) / 2}
@@ -230,3 +259,9 @@ export default function MarketsTimelineRibbon(props: MarketsTimelineRibbonProps)
     </g>
   );
 }
+
+/**
+ * 关于 minMs/maxMs 单点 fallback：
+ * - `enabled` flag 已经在 dates.length <= 1 时返 null，所以此处不必额外保护
+ * - `timeSpan = max(1, maxMs - minMs)` 是双重保险（任何"两点同日"也不会除零）
+ */
