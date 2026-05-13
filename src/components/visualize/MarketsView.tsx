@@ -7,6 +7,7 @@ import {
   computeCurrencyStats,
   priceToRadius,
   priceToY,
+  getSalesWithoutPrice,
 } from './marketsUtils';
 import Timeline from './Timeline';
 
@@ -24,8 +25,13 @@ const COL_PAD_X = 24;      // 每列内部水平内边距（圆点不贴边）
 const HEADER_H = 32;       // 货币代码标签高度
 const STAT_H = 56;         // 底部 stat 行高度
 const TOP_PAD = 8;
+// M2: 缺价横条 —— 跨整宽，置于 stat 行下方。只在有缺价 sold edition 时占用空间。
+const NOPRICE_LANE_H = 28;
+const NOPRICE_DOT_R = 4;
+const NOPRICE_GAP_TOP = 8;
 
-const TOTAL_H = TOP_PAD + HEADER_H + PANEL_H + STAT_H;
+// M2: dot pattern + stroke-only dot 共用
+const DOT_PATTERN_ID = 'viz-markets-pattern-dots';
 
 // hover opacity 与 Strata 对齐（locked design decision）：默认 0.65，hover 升 1.0
 const DOT_OPACITY_DEFAULT = 0.65;
@@ -62,6 +68,9 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
   }, [artworks]);
 
   const groups = useMemo(() => groupEditionsByCurrency(editions), [editions]);
+  // M2: sold 但无价的版本 —— 渲染在主 canvas 下方的横条，stroke-only 圆，不分货币
+  const noPriceSales = useMemo(() => getSalesWithoutPrice(editions), [editions]);
+  const hasNoPriceLane = noPriceSales.length > 0;
 
   // 全局日期范围（所有货币共用，y 轴时间线一致）
   const dateRange = useMemo(() => {
@@ -122,7 +131,7 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
 
   const effectiveCutoff = playing ? playingCutoff ?? cutoffDate : cutoffDate;
 
-  if (currencyCount === 0) {
+  if (currencyCount === 0 && !hasNoPriceLane) {
     return (
       <div className="py-24 text-center text-muted-foreground text-sm">
         {t('markets.empty')}
@@ -131,11 +140,20 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
   }
 
   // 列宽自适应，不足 COL_MIN_W 出现水平滚动
-  const colW = Math.max(
-    COL_MIN_W,
-    Math.floor((800 - LEFT_PAD - RIGHT_PAD) / currencyCount)
-  );
-  const totalW = LEFT_PAD + colW * currencyCount + RIGHT_PAD;
+  // currencyCount === 0 但 hasNoPriceLane === true 时：颗 col 都没有，但仍需要画 lane
+  const colW =
+    currencyCount > 0
+      ? Math.max(
+          COL_MIN_W,
+          Math.floor((800 - LEFT_PAD - RIGHT_PAD) / currencyCount)
+        )
+      : 0;
+  const totalW =
+    currencyCount > 0 ? LEFT_PAD + colW * currencyCount + RIGHT_PAD : 800;
+  // 主面板底部 y（stat 行结束）
+  const panelEndY = TOP_PAD + HEADER_H + PANEL_H + STAT_H;
+  const noPriceLaneY = panelEndY + NOPRICE_GAP_TOP;
+  const totalH = panelEndY + (hasNoPriceLane ? NOPRICE_GAP_TOP + NOPRICE_LANE_H : 0);
 
   return (
     <div className="space-y-4">
@@ -187,12 +205,25 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
 
       <div className="relative overflow-x-auto border border-border">
         <svg
-          viewBox={`0 0 ${totalW} ${TOTAL_H}`}
+          viewBox={`0 0 ${totalW} ${totalH}`}
           preserveAspectRatio="xMidYMid meet"
           className="block w-full"
           role="img"
           aria-label={t('markets.heading')}
         >
+          {/* M2: dot pattern for future-use parity with Strata（暂未在 Markets 用，
+              但保留 def 让两 view 视觉词汇可移植 / 不重名）。
+              当前 Markets 状态维度退化（全 sold = departed），主要新增是缺价横条。 */}
+          <defs>
+            <pattern
+              id={DOT_PATTERN_ID}
+              patternUnits="userSpaceOnUse"
+              width="3"
+              height="3"
+            >
+              <circle cx="1" cy="1" r="0.7" fill="currentColor" />
+            </pattern>
+          </defs>
           {groups.map(({ currency, sales }, colIdx) => {
             const stats = computeCurrencyStats(sales);
             const xColLeft = LEFT_PAD + colIdx * colW;
@@ -212,7 +243,7 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
                     x1={xColLeft}
                     y1={TOP_PAD}
                     x2={xColLeft}
-                    y2={TOTAL_H - 4}
+                    y2={panelEndY - 4}
                     className="stroke-border"
                     strokeWidth={1}
                   />
@@ -339,6 +370,82 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
               </g>
             );
           })}
+
+          {/* ─── M2: 缺价 sold 横条 ─────────────────────────────────── */}
+          {/* 跨整宽，独立横条；圆点 stroke-only，不分货币、不按时间过滤、
+              jitter 排开避免重叠。点击 → /editions/{id}（沿用 a11y pattern）。 */}
+          {hasNoPriceLane && (
+            <g data-testid="markets-noprice-lane">
+              {/* 上分隔线 */}
+              <line
+                x1={LEFT_PAD}
+                y1={noPriceLaneY}
+                x2={totalW - RIGHT_PAD}
+                y2={noPriceLaneY}
+                className="stroke-border"
+                strokeWidth={1}
+              />
+              {/* label —— 左对齐 */}
+              <text
+                x={LEFT_PAD + 4}
+                y={noPriceLaneY + 12}
+                className="fill-muted-foreground"
+                fontSize="9"
+                fontFamily="ui-monospace, monospace"
+                opacity={0.85}
+              >
+                {t('markets.noPriceLane')} ({noPriceSales.length})
+              </text>
+              {/* 圆点：在 label 右侧的可用范围内 jitter 排开 */}
+              {(() => {
+                const dotsLeft = LEFT_PAD + 160; // 给 label 留 160px
+                const dotsRight = totalW - RIGHT_PAD - NOPRICE_DOT_R;
+                const range = Math.max(0, dotsRight - dotsLeft);
+                const dotCY = noPriceLaneY + NOPRICE_LANE_H / 2;
+                return noPriceSales.map((ed) => {
+                  const cx = dotsLeft + stableJitter(ed.id, range);
+                  const artwork = artworkMap.get(ed.artwork_id);
+                  const inv = ed.inventory_number ?? '—';
+                  const title =
+                    artwork?.title_en ||
+                    artwork?.title_cn ||
+                    ed.artwork_id;
+                  const ariaLabel = `${inv} · ${title}`;
+                  return (
+                    <g
+                      key={ed.id || `nop-${cx}`}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={ariaLabel}
+                      data-testid="markets-noprice-dot"
+                      className="cursor-pointer outline-none focus-visible:[&>circle]:opacity-100"
+                      onClick={() => {
+                        if (!ed.id) return;
+                        navigate(`/editions/${ed.id}`);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          if (!ed.id) return;
+                          navigate(`/editions/${ed.id}`);
+                        }
+                      }}
+                    >
+                      <circle
+                        cx={cx}
+                        cy={dotCY}
+                        r={NOPRICE_DOT_R}
+                        fill="none"
+                        className="stroke-foreground hover:stroke-[2px]"
+                        strokeWidth={1.5}
+                        opacity={0.75}
+                      />
+                    </g>
+                  );
+                });
+              })()}
+            </g>
+          )}
         </svg>
       </div>
 

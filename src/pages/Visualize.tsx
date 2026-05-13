@@ -108,6 +108,7 @@ export default function Visualize() {
           {activeView === 'strata' && (
             <StrataView
               artworks={data.artworks}
+              editions={data.editions}
               history={data.history}
             />
           )}

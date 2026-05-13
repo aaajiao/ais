@@ -77,6 +77,19 @@ export function filterSalesByDateCutoff(
   });
 }
 
+// ─── 缺价已售（M2 缺失数据态）──────────────────────────────────────────────
+// 当前 groupEditionsByCurrency 会把无 sale_price 的 sold edition silent drop。
+// 这条 util 反向暴露这部分：sold 但 sale_price 无效（null / 0 / 负）→ "未记录价格"。
+// 不要求 currency 有效——sold 没价格的 edition 本身就没货币意义；视觉上铺一条独立横条。
+export function getSalesWithoutPrice(editions: VizEdition[]): VizEdition[] {
+  return editions.filter((ed) => {
+    if (ed.status !== 'sold') return false;
+    const price = Number(ed.sale_price);
+    if (Number.isFinite(price) && price > 0) return false;
+    return true;
+  });
+}
+
 // y 轴是 sale_date 时间轴（顶部 = 最新，底部 = 最早）。
 // 没有 sale_date 的版本用 created_at fallback，还没有则居中。
 export function priceToY(

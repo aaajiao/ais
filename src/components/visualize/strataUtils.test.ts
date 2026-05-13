@@ -6,8 +6,15 @@ import {
   swimlaneHeight,
   stackPositionFor,
   filterArtworksByYearCutoff,
+  getArtworkOwnershipState,
+  getUnknownYearArtworks,
+  OWNERSHIP_STATUS_MAP,
 } from './strataUtils';
-import type { VizArtwork } from '@/hooks/queries/useVisualizationData';
+import type {
+  VizArtwork,
+  VizEdition,
+} from '@/hooks/queries/useVisualizationData';
+import type { EditionStatus } from '@/lib/database.types';
 
 function makeArtwork(overrides: Partial<VizArtwork>): VizArtwork {
   return {
@@ -303,5 +310,239 @@ describe('filterArtworksByYearCutoff', () => {
 
   it('空输入 → 空数组', () => {
     expect(filterArtworksByYearCutoff([], 2024)).toEqual([]);
+  });
+});
+
+// ─── M2: getArtworkOwnershipState ───────────────────────────────────────────
+
+function makeEdition(
+  id: string,
+  artworkId: string,
+  status: EditionStatus
+): VizEdition {
+  return {
+    id,
+    artwork_id: artworkId,
+    inventory_number: id,
+    edition_type: 'numbered',
+    edition_number: 1,
+    status,
+    location_id: null,
+    sale_price: null,
+    sale_currency: null,
+    sale_date: null,
+    buyer_name: null,
+    created_at: '2024-01-01T00:00:00Z',
+  };
+}
+
+describe('OWNERSHIP_STATUS_MAP（数据驱动入口）', () => {
+  // 把 status enum 真实值显式列出，让"未来新增 status 漏更新 map"在 typecheck 之外
+  // 还能被 runtime 测试挡一次。
+  it('覆盖所有 9 个 EditionStatus 枚举值', () => {
+    const expected: EditionStatus[] = [
+      'in_production',
+      'in_studio',
+      'at_gallery',
+      'at_museum',
+      'in_transit',
+      'sold',
+      'gifted',
+      'lost',
+      'damaged',
+    ];
+    for (const s of expected) {
+      expect(OWNERSHIP_STATUS_MAP[s]).toBeDefined();
+    }
+  });
+
+  it('held 桶 = in_production + in_studio', () => {
+    expect(OWNERSHIP_STATUS_MAP.in_production.bucket).toBe('held');
+    expect(OWNERSHIP_STATUS_MAP.in_studio.bucket).toBe('held');
+  });
+
+  it('external 桶 = at_gallery + at_museum + in_transit', () => {
+    expect(OWNERSHIP_STATUS_MAP.at_gallery.bucket).toBe('external');
+    expect(OWNERSHIP_STATUS_MAP.at_museum.bucket).toBe('external');
+    expect(OWNERSHIP_STATUS_MAP.in_transit.bucket).toBe('external');
+  });
+
+  it('departed 桶 = sold + gifted + lost + damaged', () => {
+    expect(OWNERSHIP_STATUS_MAP.sold.bucket).toBe('departed');
+    expect(OWNERSHIP_STATUS_MAP.gifted.bucket).toBe('departed');
+    expect(OWNERSHIP_STATUS_MAP.lost.bucket).toBe('departed');
+    expect(OWNERSHIP_STATUS_MAP.damaged.bucket).toBe('departed');
+  });
+
+  it('degenerate 标记 = lost + damaged，其余为 false', () => {
+    expect(OWNERSHIP_STATUS_MAP.lost.degenerate).toBe(true);
+    expect(OWNERSHIP_STATUS_MAP.damaged.degenerate).toBe(true);
+    expect(OWNERSHIP_STATUS_MAP.in_studio.degenerate).toBe(false);
+    expect(OWNERSHIP_STATUS_MAP.sold.degenerate).toBe(false);
+    expect(OWNERSHIP_STATUS_MAP.at_gallery.degenerate).toBe(false);
+  });
+});
+
+describe('getArtworkOwnershipState', () => {
+  const artwork = { id: 'art-1' };
+
+  it('无 edition → held + isDegenerate=false', () => {
+    expect(getArtworkOwnershipState(artwork, [])).toEqual({
+      bucket: 'held',
+      isDegenerate: false,
+    });
+  });
+
+  it('单 edition in_studio → held', () => {
+    expect(
+      getArtworkOwnershipState(artwork, [makeEdition('e1', 'art-1', 'in_studio')])
+    ).toEqual({ bucket: 'held', isDegenerate: false });
+  });
+
+  it('单 edition at_gallery → external', () => {
+    expect(
+      getArtworkOwnershipState(artwork, [
+        makeEdition('e1', 'art-1', 'at_gallery'),
+      ])
+    ).toEqual({ bucket: 'external', isDegenerate: false });
+  });
+
+  it('单 edition in_transit → external（也算外溢）', () => {
+    expect(
+      getArtworkOwnershipState(artwork, [
+        makeEdition('e1', 'art-1', 'in_transit'),
+      ])
+    ).toEqual({ bucket: 'external', isDegenerate: false });
+  });
+
+  it('单 edition sold → departed', () => {
+    expect(
+      getArtworkOwnershipState(artwork, [makeEdition('e1', 'art-1', 'sold')])
+    ).toEqual({ bucket: 'departed', isDegenerate: false });
+  });
+
+  it('混合：held + external → external（外溢优先）', () => {
+    const eds = [
+      makeEdition('e1', 'art-1', 'in_studio'),
+      makeEdition('e2', 'art-1', 'at_gallery'),
+    ];
+    expect(getArtworkOwnershipState(artwork, eds)).toEqual({
+      bucket: 'external',
+      isDegenerate: false,
+    });
+  });
+
+  it('混合：external + departed → departed（最外溢）', () => {
+    const eds = [
+      makeEdition('e1', 'art-1', 'at_gallery'),
+      makeEdition('e2', 'art-1', 'sold'),
+    ];
+    expect(getArtworkOwnershipState(artwork, eds)).toEqual({
+      bucket: 'departed',
+      isDegenerate: false,
+    });
+  });
+
+  it('混合：held + external + departed → departed', () => {
+    const eds = [
+      makeEdition('e1', 'art-1', 'in_production'),
+      makeEdition('e2', 'art-1', 'in_transit'),
+      makeEdition('e3', 'art-1', 'gifted'),
+    ];
+    expect(getArtworkOwnershipState(artwork, eds).bucket).toBe('departed');
+  });
+
+  it('degenerate 叠加：lost 出现 → isDegenerate=true，bucket=departed', () => {
+    const eds = [
+      makeEdition('e1', 'art-1', 'in_studio'),
+      makeEdition('e2', 'art-1', 'lost'),
+    ];
+    expect(getArtworkOwnershipState(artwork, eds)).toEqual({
+      bucket: 'departed',
+      isDegenerate: true,
+    });
+  });
+
+  it('degenerate 叠加：damaged 与 held 共存 → bucket=departed + degenerate', () => {
+    const eds = [
+      makeEdition('e1', 'art-1', 'in_studio'),
+      makeEdition('e2', 'art-1', 'damaged'),
+    ];
+    expect(getArtworkOwnershipState(artwork, eds)).toEqual({
+      bucket: 'departed',
+      isDegenerate: true,
+    });
+  });
+
+  it('忽略其他 artwork 的 edition', () => {
+    const eds = [
+      makeEdition('e1', 'art-1', 'in_studio'),
+      makeEdition('e2', 'other-art', 'sold'), // 不该影响 art-1
+    ];
+    expect(getArtworkOwnershipState(artwork, eds).bucket).toBe('held');
+  });
+
+  it('全部 lost → bucket=departed + degenerate', () => {
+    const eds = [
+      makeEdition('e1', 'art-1', 'lost'),
+      makeEdition('e2', 'art-1', 'lost'),
+    ];
+    expect(getArtworkOwnershipState(artwork, eds)).toEqual({
+      bucket: 'departed',
+      isDegenerate: true,
+    });
+  });
+});
+
+// ─── M2: getUnknownYearArtworks ─────────────────────────────────────────────
+
+describe('getUnknownYearArtworks', () => {
+  function makeArtworkLocal(overrides: Partial<VizArtwork>): VizArtwork {
+    return {
+      id: 'a',
+      title_en: 'untitled',
+      title_cn: null,
+      year: null,
+      type: null,
+      thumbnail_url: null,
+      edition_total: null,
+      ap_total: null,
+      is_unique: false,
+      created_at: '2024-01-01T00:00:00Z',
+      ...overrides,
+    };
+  }
+
+  it('过滤出 year 不可解析的作品', () => {
+    const arts = [
+      makeArtworkLocal({ id: 'a1', year: '2020' }),
+      makeArtworkLocal({ id: 'a2', year: null }),
+      makeArtworkLocal({ id: 'a3', year: 'unknown' }),
+      makeArtworkLocal({ id: 'a4', year: '' }),
+      makeArtworkLocal({ id: 'a5', year: '2018-2019' }),
+    ];
+    const result = getUnknownYearArtworks(arts);
+    const ids = result.map((a) => a.id).sort();
+    expect(ids).toEqual(['a2', 'a3', 'a4']);
+  });
+
+  it('全部有合法 year → 空数组', () => {
+    const result = getUnknownYearArtworks([
+      makeArtworkLocal({ id: 'a1', year: '2020' }),
+      makeArtworkLocal({ id: 'a2', year: 'circa 2010' }),
+    ]);
+    expect(result).toEqual([]);
+  });
+
+  it('全部 year 缺失 → 全部返回', () => {
+    const arts = [
+      makeArtworkLocal({ id: 'a1', year: null }),
+      makeArtworkLocal({ id: 'a2', year: 'unknown' }),
+    ];
+    expect(getUnknownYearArtworks(arts)).toHaveLength(2);
+  });
+
+  it('空输入 → 空数组', () => {
+    expect(getUnknownYearArtworks([])).toEqual([]);
   });
 });

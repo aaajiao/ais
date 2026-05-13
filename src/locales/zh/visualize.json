@@ -59,7 +59,8 @@
     "empty": "暂无已售版本",
     "currenciesAvailable": "{{count}} 种货币",
     "currencyLabel": "货币：{{currency}}",
-    "dotLabel": "{{inv}} · {{title}} · {{price}}"
+    "dotLabel": "{{inv}} · {{title}} · {{price}}",
+    "noPriceLane": "未记录价格"
   },
   "terminal": {
     "heading": "Terminal — 档案输出",

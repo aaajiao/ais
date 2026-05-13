@@ -5,6 +5,7 @@ import {
   priceToRadius,
   priceToY,
   filterSalesByDateCutoff,
+  getSalesWithoutPrice,
 } from './marketsUtils';
 import type { VizEdition } from '@/hooks/queries/useVisualizationData';
 
@@ -208,5 +209,53 @@ describe('filterSalesByDateCutoff', () => {
   it('cutoff 同日 → 包含该日期的 edition', () => {
     const result = filterSalesByDateCutoff(editions, '2020-03-15');
     expect(result.map((e) => e.id)).toEqual(['e1']);
+  });
+});
+
+// ─── M2: getSalesWithoutPrice ───────────────────────────────────────────────
+
+describe('getSalesWithoutPrice', () => {
+  it('只返回 sold 且无有效 sale_price 的 edition', () => {
+    const editions = [
+      makeEdition({ id: 'e1', status: 'sold', sale_price: 5000 }),
+      makeEdition({ id: 'e2', status: 'sold', sale_price: null }),
+      makeEdition({ id: 'e3', status: 'sold', sale_price: 0 }),
+      makeEdition({ id: 'e4', status: 'in_studio', sale_price: null }),
+      makeEdition({ id: 'e5', status: 'gifted', sale_price: null }),
+    ];
+    const result = getSalesWithoutPrice(editions);
+    const ids = result.map((e) => e.id).sort();
+    // e2 / e3 是 sold 但无价；e1 有价；e4 / e5 不是 sold
+    expect(ids).toEqual(['e2', 'e3']);
+  });
+
+  it('sale_price 负数也视为无价（防御）', () => {
+    const editions = [
+      makeEdition({ id: 'neg', status: 'sold', sale_price: -1 }),
+    ];
+    expect(getSalesWithoutPrice(editions)).toHaveLength(1);
+  });
+
+  it('sale_price NaN（字符串转数失败）视为无价', () => {
+    const editions = [
+      makeEdition({
+        id: 'nan',
+        status: 'sold',
+        sale_price: 'abc' as unknown as number,
+      }),
+    ];
+    expect(getSalesWithoutPrice(editions)).toHaveLength(1);
+  });
+
+  it('空输入 → 空数组', () => {
+    expect(getSalesWithoutPrice([])).toEqual([]);
+  });
+
+  it('全部有价的 sold → 空数组', () => {
+    const editions = [
+      makeEdition({ id: 'a', status: 'sold', sale_price: 1000 }),
+      makeEdition({ id: 'b', status: 'sold', sale_price: 2000 }),
+    ];
+    expect(getSalesWithoutPrice(editions)).toEqual([]);
   });
 });

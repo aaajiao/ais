@@ -16,6 +16,7 @@ import {
   computeTrackedStat,
   countryToISO2,
   nodeRadius,
+  getGhostNodes,
   TYPE_OPACITY,
   type LocationNode,
 } from './diasporaUtils';
@@ -101,6 +102,18 @@ export default function DiasporaView({
   );
   const edges = useMemo(() => buildEdges(history, nodes), [history, nodes]);
   const stat = useMemo(() => computeTrackedStat(editions, locations), [editions, locations]);
+
+  // M2: 鬼影圆 —— 无 location_id 的 edition 在最外环之外铺一圈 stroke-only 小圆。
+  // 不可点击、不进 hover 状态机。0 个时不渲染（避免画空环）。
+  const ghost = useMemo(
+    () =>
+      getGhostNodes(editions, locations, {
+        cx: W / 2,
+        cy: H / 2,
+        radius: Math.min(W, H) * 0.48,
+      }),
+    [editions, locations]
+  );
 
   // 节点 id → 坐标（用于边的起止点查找）
   const coordMap = useMemo(() => {
@@ -269,6 +282,26 @@ export default function DiasporaView({
               opacity={0.25}
             />
           ))}
+
+          {/* ─── M2: ghost 环 —— 无 location_id 的 edition ─── */}
+          {/* 不可点击 / 不进 hover 状态机；count=0 时不渲染（防止画空环）。
+              这是"档案里的盲区"的视觉化：能数出来但定位不到。 */}
+          {ghost.count > 0 && (
+            <g data-testid="diaspora-ghost-ring" aria-hidden="true">
+              {ghost.positions.map((p, i) => (
+                <circle
+                  key={i}
+                  cx={p.x}
+                  cy={p.y}
+                  r={3}
+                  fill="none"
+                  className="stroke-foreground"
+                  strokeWidth={1}
+                  opacity={0.3}
+                />
+              ))}
+            </g>
+          )}
 
           {/* ─── edges ──────────────────────────────────────────── */}
           {layout &&

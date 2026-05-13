@@ -5,8 +5,10 @@ import { renderWithClient } from '@/test/test-utils';
 import StrataView from './StrataView';
 import type {
   VizArtwork,
+  VizEdition,
   VizHistory,
 } from '@/hooks/queries/useVisualizationData';
+import type { EditionStatus } from '@/lib/database.types';
 
 // Mock react-router-dom useNavigate
 const mockNavigate = vi.fn();
@@ -85,11 +87,13 @@ const sampleHistory: VizHistory[] = [
 function renderStrata(
   overrides: Partial<{
     artworks: VizArtwork[];
+    editions: VizEdition[];
     history: VizHistory[];
   }> = {}
 ) {
   const props = {
     artworks: sampleArtworks,
+    editions: overrides.editions ?? [],
     history: sampleHistory,
     ...overrides,
   };
@@ -98,6 +102,28 @@ function renderStrata(
       <StrataView {...props} />
     </MemoryRouter>
   );
+}
+
+// M2 helper：构造一个 edition fixture
+function makeStrataEdition(
+  id: string,
+  artworkId: string,
+  status: EditionStatus
+): VizEdition {
+  return {
+    id,
+    artwork_id: artworkId,
+    inventory_number: id,
+    edition_type: 'numbered',
+    edition_number: 1,
+    status,
+    location_id: null,
+    sale_price: null,
+    sale_currency: null,
+    sale_date: null,
+    buyer_name: null,
+    created_at: '2024-01-01T00:00:00Z',
+  };
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -306,5 +332,138 @@ describe('StrataView', () => {
     }
     expect(futureCount).toBeGreaterThan(0);
     expect(activeCount).toBeGreaterThan(0);
+  });
+
+  // ─── M2 状态编码 ─────────────────────────────────────────────────────────
+
+  it('HELD 作品（in_studio edition）→ stroke-only（fill=none + stroke-foreground）', () => {
+    const editions = [makeStrataEdition('e1', 'aw-1', 'in_studio')];
+    renderStrata({ editions });
+    const svg = screen.getByRole('img', { name: /Strata/i });
+    // aw-1 是 Guard, I…（2024）
+    const block = svg.querySelector(
+      'g[role="button"][data-ownership="held"]'
+    )!;
+    expect(block).not.toBeNull();
+    const rect = block.querySelector('rect')!;
+    expect(rect.getAttribute('fill')).toBe('none');
+    const cls = rect.getAttribute('class') ?? '';
+    expect(cls).toContain('stroke-foreground');
+  });
+
+  it('EXTERNAL 作品（at_gallery edition）→ pattern fill', () => {
+    const editions = [makeStrataEdition('e1', 'aw-1', 'at_gallery')];
+    renderStrata({ editions });
+    const svg = screen.getByRole('img', { name: /Strata/i });
+    const block = svg.querySelector(
+      'g[role="button"][data-ownership="external"]'
+    )!;
+    expect(block).not.toBeNull();
+    const rect = block.querySelector('rect')!;
+    expect(rect.getAttribute('fill')).toMatch(/url\(#viz-strata-pattern-dots\)/);
+  });
+
+  it('DEPARTED 作品（sold edition）→ solid fill-foreground，无 stroke', () => {
+    const editions = [makeStrataEdition('e1', 'aw-1', 'sold')];
+    renderStrata({ editions });
+    const svg = screen.getByRole('img', { name: /Strata/i });
+    const block = svg.querySelector(
+      'g[role="button"][data-ownership="departed"]'
+    )!;
+    expect(block).not.toBeNull();
+    const rect = block.querySelector('rect')!;
+    const cls = rect.getAttribute('class') ?? '';
+    expect(cls).toContain('fill-foreground');
+    // 非 stroke-only：不应有 stroke-foreground
+    expect(cls).not.toContain('stroke-foreground');
+  });
+
+  it('DEGENERATE 叠加：lost edition → 主形 + X 标记线（两条 line）', () => {
+    const editions = [makeStrataEdition('e1', 'aw-1', 'lost')];
+    renderStrata({ editions });
+    const svg = screen.getByRole('img', { name: /Strata/i });
+    const block = svg.querySelector(
+      'g[role="button"][data-degenerate="true"]'
+    )!;
+    expect(block).not.toBeNull();
+    // 主桶 = departed（lost → departed + degenerate）
+    expect(block.getAttribute('data-ownership')).toBe('departed');
+    // X 标记：g[data-mark="degenerate"] 包两条 <line>
+    const xGroup = block.querySelector('g[data-mark="degenerate"]');
+    expect(xGroup).not.toBeNull();
+    const lines = xGroup!.querySelectorAll('line');
+    expect(lines.length).toBe(2);
+  });
+
+  it('混合 edition：at_gallery + sold → 聚合为 departed', () => {
+    const editions = [
+      makeStrataEdition('e1', 'aw-1', 'at_gallery'),
+      makeStrataEdition('e2', 'aw-1', 'sold'),
+    ];
+    renderStrata({ editions });
+    const svg = screen.getByRole('img', { name: /Strata/i });
+    const block = svg.querySelector(
+      'g[role="button"][data-ownership="departed"][aria-label*="Guard"]'
+    );
+    expect(block).not.toBeNull();
+  });
+
+  it('SVG <defs> 含 dot pattern（id=viz-strata-pattern-dots）', () => {
+    renderStrata();
+    const svg = screen.getByRole('img', { name: /Strata/i });
+    const pattern = svg.querySelector('defs pattern#viz-strata-pattern-dots');
+    expect(pattern).not.toBeNull();
+  });
+
+  // ─── M2 缺失 year 列 ─────────────────────────────────────────────────────
+
+  it('有缺 year 作品 → 渲染 unknown-year 列 + 列头 "?"', () => {
+    const artworks: VizArtwork[] = [
+      ...sampleArtworks,
+      {
+        ...installation2024,
+        id: 'aw-noyear',
+        title_en: 'Untitled (no year)',
+        year: null,
+      },
+    ];
+    renderStrata({ artworks });
+    const svg = screen.getByRole('img', { name: /Strata/i });
+    const col = svg.querySelector('[data-testid="strata-unknown-year-col"]');
+    expect(col).not.toBeNull();
+    // 列头有 "?" 字符
+    const headerTexts = Array.from(col!.querySelectorAll('text')).map(
+      (t) => t.textContent
+    );
+    expect(headerTexts).toContain('?');
+  });
+
+  it('缺 year 列中的方块强制 stroke-only（即使 ownership = departed）', () => {
+    // 缺 year 作品，给一个 sold edition —— 正常情况下应 solid，但缺失态优先 → stroke-only
+    const noYearArtwork: VizArtwork = {
+      ...installation2024,
+      id: 'aw-noyear-sold',
+      title_en: 'Sold no-year',
+      year: null,
+    };
+    const artworks = [...sampleArtworks, noYearArtwork];
+    const editions = [makeStrataEdition('e1', 'aw-noyear-sold', 'sold')];
+    renderStrata({ artworks, editions });
+    const svg = screen.getByRole('img', { name: /Strata/i });
+    const block = svg.querySelector(
+      'g[role="button"][data-unknown-year="true"]'
+    );
+    expect(block).not.toBeNull();
+    const rect = block!.querySelector('rect')!;
+    expect(rect.getAttribute('fill')).toBe('none');
+    const cls = rect.getAttribute('class') ?? '';
+    expect(cls).toContain('stroke-foreground');
+  });
+
+  it('无缺 year 作品 → 不渲染 unknown-year 列', () => {
+    renderStrata(); // sampleArtworks 全有 year
+    const svg = screen.getByRole('img', { name: /Strata/i });
+    const col = svg.querySelector('[data-testid="strata-unknown-year-col"]');
+    expect(col).toBeNull();
   });
 });

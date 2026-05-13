@@ -59,7 +59,8 @@
     "empty": "No sold editions yet",
     "currenciesAvailable": "{{count}} currencies",
     "currencyLabel": "Currency: {{currency}}",
-    "dotLabel": "{{inv}} · {{title}} · {{price}}"
+    "dotLabel": "{{inv}} · {{title}} · {{price}}",
+    "noPriceLane": "no price recorded"
   },
   "terminal": {
     "heading": "Terminal — Archive Output",

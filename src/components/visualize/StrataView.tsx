@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import type {
   VizArtwork,
+  VizEdition,
   VizHistory,
 } from '@/hooks/queries/useVisualizationData';
 import {
@@ -11,13 +12,24 @@ import {
   buildSwimlanes,
   swimlaneHeight,
   stackPositionFor,
+  getArtworkOwnershipState,
+  getUnknownYearArtworks,
+  type ArtworkOwnershipState,
 } from './strataUtils';
 import Timeline from './Timeline';
 
 interface Props {
   artworks: VizArtwork[];
+  editions?: VizEdition[];
   history: VizHistory[];
 }
+
+// ─── M2 状态编码 ────────────────────────────────────────────────────────────
+// SVG defs 里的 dot pattern id —— 与 Markets 隔离避免重名（v1.6 共享 viewBox 同根 SVG 时此名都可见）
+const DOT_PATTERN_ID = 'viz-strata-pattern-dots';
+// X 标记线宽细于 stroke（1.5）
+const X_MARK_STROKE = 0.8;
+const X_MARK_OPACITY = 0.6;
 
 // ─── 几何常量 ────────────────────────────────────────────────────────────────
 const BLOCK = 8;          // 方块边长
@@ -43,7 +55,7 @@ const BLOCK_OTHER_LANE_CLS = 'opacity-[0.3] dark:opacity-[0.4]';
 // 播头之后的"未来"方块：保留鬼影，0.15 让形状仍可见但不抢视觉重心
 const BLOCK_FUTURE_CLS = 'opacity-[0.15] dark:opacity-[0.2]';
 
-export default function StrataView({ artworks, history }: Props) {
+export default function StrataView({ artworks, editions = [], history }: Props) {
   const { t } = useTranslation('visualize');
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -124,14 +136,54 @@ export default function StrataView({ artworks, history }: Props) {
   const totalLanesH =
     laneHeights.reduce((s, h) => s + h + LANE_GAP, 0) - LANE_GAP;
 
+  // ─── M2: ownership state per artwork (artworkId → state) ─────────────────
+  // 一次性算好，避免每个方块重复扫 editions。空 editions 时所有作品 fallback held。
+  const ownershipMap = useMemo(() => {
+    const m = new Map<string, ArtworkOwnershipState>();
+    for (const a of artworks) {
+      m.set(a.id, getArtworkOwnershipState(a, editions));
+    }
+    return m;
+  }, [artworks, editions]);
+
+  // ─── M2: 缺失 year 作品（年表外的特殊列）───────────────────────────────────
+  const unknownYearArtworks = useMemo(
+    () => getUnknownYearArtworks(artworks),
+    [artworks]
+  );
+
+  // unknown year 作品按 swimlane.type 分桶，方便在该列内按 type 排列
+  const unknownYearBySwimlane = useMemo(() => {
+    const m = new Map<string, VizArtwork[]>();
+    for (const a of unknownYearArtworks) {
+      const key = a.type ?? '__untyped__';
+      if (!m.has(key)) m.set(key, []);
+      m.get(key)!.push(a);
+    }
+    return m;
+  }, [unknownYearArtworks]);
+
   // ─── x 轴：year column 宽度自适应 ─────────────────────────────────────────
   // viewBox 内部坐标：保留 800 为最小逻辑宽度，由 yearCount 决定向上扩展
   // SVG 外层用 className="w-full" 响应式缩放（参考 Diaspora）；
   // overflow-x-auto 兜底极端窄屏（虽然 w-full 缩放后通常不触发）
-  const CANVAS_W = Math.max(800, LABEL_W + yearCount * 20 + RIGHT_PAD);
-  const colW = yearCount > 0
-    ? Math.max(14, Math.floor((CANVAS_W - LABEL_W - RIGHT_PAD) / yearCount))
-    : 20;
+  //
+  // M2: unknown-year 列宽度 = colW，添加在最后；只在有 unknown-year 作品时占位
+  const hasUnknownYearCol = unknownYearArtworks.length > 0;
+  const extraCols = hasUnknownYearCol ? 1 : 0;
+  const CANVAS_W = Math.max(
+    800,
+    LABEL_W + (yearCount + extraCols) * 20 + RIGHT_PAD
+  );
+  const colW =
+    yearCount + extraCols > 0
+      ? Math.max(
+          14,
+          Math.floor((CANVAS_W - LABEL_W - RIGHT_PAD) / (yearCount + extraCols))
+        )
+      : 20;
+  // unknown-year 列 x 起点（在所有 year 列之后）
+  const unknownColX = LABEL_W + yearCount * colW;
 
   // ─── SVG 总高度 ───────────────────────────────────────────────────────────
   const totalH =
@@ -237,6 +289,19 @@ export default function StrataView({ artworks, history }: Props) {
           role="img"
           aria-label={t('strata.heading')}
         >
+          {/* ─── M2: dot pattern for EXTERNAL state ──────────────────── */}
+          {/* 颜色用 currentColor，让 dark mode 自动适配 fill-foreground 的 CSS 变量 */}
+          <defs>
+            <pattern
+              id={DOT_PATTERN_ID}
+              patternUnits="userSpaceOnUse"
+              width="3"
+              height="3"
+            >
+              <circle cx="1" cy="1" r="0.7" fill="currentColor" />
+            </pattern>
+          </defs>
+
           {/* ─── History bar ─────────────────────────────────────────── */}
           {historyMonths.entries.length > 0 && (
             <>
@@ -374,6 +439,12 @@ export default function StrataView({ artworks, history }: Props) {
                       title,
                     });
 
+                    const ownership =
+                      ownershipMap.get(a.id) ?? {
+                        bucket: 'held' as const,
+                        isDegenerate: false,
+                      };
+
                     return (
                       <g
                         key={a.id ?? `${sl.type}-${year}-${i}`}
@@ -381,6 +452,8 @@ export default function StrataView({ artworks, history }: Props) {
                         tabIndex={disabled ? -1 : 0}
                         aria-label={ariaLabel}
                         aria-disabled={disabled || undefined}
+                        data-ownership={ownership.bucket}
+                        data-degenerate={ownership.isDegenerate || undefined}
                         className={cn(
                           'focus:outline-none focus-visible:outline-2 focus-visible:outline-foreground',
                           !disabled && 'cursor-pointer'
@@ -402,15 +475,13 @@ export default function StrataView({ artworks, history }: Props) {
                           }
                         }}
                       >
-                        <rect
+                        <OwnershipBlock
                           x={blockX}
                           y={blockY}
-                          width={BLOCK}
-                          height={BLOCK}
-                          className={cn(
-                            'fill-foreground transition-opacity duration-100',
-                            stateCls
-                          )}
+                          size={BLOCK}
+                          ownership={ownership}
+                          stateCls={stateCls}
+                          forceStrokeOnly={false}
                         />
                       </g>
                     );
@@ -419,6 +490,94 @@ export default function StrataView({ artworks, history }: Props) {
               </g>
             );
           })}
+
+          {/* ─── M2: Unknown year column ─────────────────────────────── */}
+          {/* 时间播头 cutoff 不过滤这一列（year 缺失 = 时间维度不存在）。
+              整列方块强制 stroke-only —— 缺失态优先级高于 ownership。 */}
+          {hasUnknownYearCol && (
+            <g data-testid="strata-unknown-year-col">
+              {/* 列 header："?" 单字符，居中，低透明度，与 year label 同字号 */}
+              <text
+                x={unknownColX + colW / 2}
+                y={laneAreaTop + totalLanesH + YEAR_LABEL_H - 4}
+                textAnchor="middle"
+                className="fill-muted-foreground"
+                fontSize="9"
+                fontFamily="ui-monospace, monospace"
+                opacity={0.6}
+              >
+                ?
+              </text>
+
+              {/* 每个 swimlane 把缺 year 的同类型作品堆在这一列底部 */}
+              {swimlanes.map((sl, laneIdx) => {
+                const cellArtworks = unknownYearBySwimlane.get(sl.type) ?? [];
+                if (cellArtworks.length === 0) return null;
+                const laneH = laneHeights[laneIdx];
+                const laneY = laneAreaTop + laneTops[laneIdx];
+                const positions = stackPositionFor(
+                  cellArtworks.length,
+                  BLOCK,
+                  BLOCK_GAP,
+                  laneH
+                );
+                return cellArtworks.map((a, i) => {
+                  const pos = positions[i];
+                  const blockX = unknownColX + pos.col * (BLOCK + BLOCK_GAP) + 1;
+                  const blockY =
+                    laneY + laneH - (pos.row + 1) * (BLOCK + BLOCK_GAP) + BLOCK_GAP;
+                  const ownership =
+                    ownershipMap.get(a.id) ?? {
+                      bucket: 'held' as const,
+                      isDegenerate: false,
+                    };
+                  const disabled = !a.id;
+                  const title =
+                    a.title_en || a.title_cn || t('strata.aria.untitled');
+                  const ariaLabel = t('strata.aria.blockLabel', {
+                    type: sl.displayLabel,
+                    year: '?',
+                    title,
+                  });
+                  return (
+                    <g
+                      key={a.id ?? `${sl.type}-unknown-${i}`}
+                      role="button"
+                      tabIndex={disabled ? -1 : 0}
+                      aria-label={ariaLabel}
+                      aria-disabled={disabled || undefined}
+                      data-ownership={ownership.bucket}
+                      data-degenerate={ownership.isDegenerate || undefined}
+                      data-unknown-year="true"
+                      className={cn(
+                        'focus:outline-none focus-visible:outline-2 focus-visible:outline-foreground',
+                        !disabled && 'cursor-pointer'
+                      )}
+                      onMouseEnter={() => setHoveredArtwork(a)}
+                      onMouseLeave={() => setHoveredArtwork(null)}
+                      onClick={() => handleBlockActivate(a)}
+                      onKeyDown={(e) => {
+                        if (disabled) return;
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleBlockActivate(a);
+                        }
+                      }}
+                    >
+                      <OwnershipBlock
+                        x={blockX}
+                        y={blockY}
+                        size={BLOCK}
+                        ownership={ownership}
+                        stateCls={BLOCK_DEFAULT_CLS}
+                        forceStrokeOnly={true}
+                      />
+                    </g>
+                  );
+                });
+              })}
+            </g>
+          )}
 
           {/* ─── Year labels (x axis) ────────────────────────────────── */}
           {yearRange.map((year, colIdx) => {
@@ -492,6 +651,93 @@ export default function StrataView({ artworks, history }: Props) {
         )}
       </div>
     </div>
+  );
+}
+
+// ─── M2 内部辅助：按 ownership state 渲染方块 ───────────────────────────────
+// HELD / 强制 stroke-only —— fill=none + stroke-foreground
+// EXTERNAL                 —— fill = url(#dot pattern)
+// DEPARTED                 —— solid fill-foreground（当前默认）
+// DEGENERATE 叠加层         —— 上层画两条 X 线（细，opacity 0.6），不影响主 fill
+//
+// stateCls 是 lane focus / time cutoff future 维度的 opacity className（沿用原逻辑）
+function OwnershipBlock(props: {
+  x: number;
+  y: number;
+  size: number;
+  ownership: ArtworkOwnershipState;
+  stateCls: string;
+  forceStrokeOnly: boolean;
+}) {
+  const { x, y, size, ownership, stateCls, forceStrokeOnly } = props;
+  const strokeOnly = forceStrokeOnly || ownership.bucket === 'held';
+
+  // 主形：fill / stroke 决定 ownership bucket 的视觉
+  const mainShape = strokeOnly ? (
+    <rect
+      x={x + 0.75}
+      y={y + 0.75}
+      width={size - 1.5}
+      height={size - 1.5}
+      fill="none"
+      className={cn(
+        'stroke-foreground transition-opacity duration-100',
+        stateCls
+      )}
+      strokeWidth={1.5}
+    />
+  ) : ownership.bucket === 'external' ? (
+    <rect
+      x={x}
+      y={y}
+      width={size}
+      height={size}
+      fill={`url(#${DOT_PATTERN_ID})`}
+      // text-foreground 提供 pattern circle 的 currentColor 值
+      className={cn('text-foreground transition-opacity duration-100', stateCls)}
+    />
+  ) : (
+    // departed (默认 solid)
+    <rect
+      x={x}
+      y={y}
+      width={size}
+      height={size}
+      className={cn('fill-foreground transition-opacity duration-100', stateCls)}
+    />
+  );
+
+  // X 标记：lost / damaged 在主形之上叠加。X 长度 = size 的 80%，居中。
+  const xMark = ownership.isDegenerate ? (
+    <g
+      data-mark="degenerate"
+      className={cn(
+        'stroke-foreground pointer-events-none transition-opacity duration-100',
+        stateCls
+      )}
+      strokeWidth={X_MARK_STROKE}
+      opacity={X_MARK_OPACITY}
+    >
+      <line
+        x1={x + size * 0.1}
+        y1={y + size * 0.1}
+        x2={x + size * 0.9}
+        y2={y + size * 0.9}
+      />
+      <line
+        x1={x + size * 0.9}
+        y1={y + size * 0.1}
+        x2={x + size * 0.1}
+        y2={y + size * 0.9}
+      />
+    </g>
+  ) : null;
+
+  return (
+    <>
+      {mainShape}
+      {xMark}
+    </>
   );
 }
 

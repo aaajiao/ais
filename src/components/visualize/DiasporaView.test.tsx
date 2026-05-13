@@ -485,6 +485,87 @@ describe('DiasporaView', () => {
     // we cover this with a dedicated spy test below.
   });
 
+  // ─── M2 ghost ring ────────────────────────────────────────────────────────
+
+  it('有 location_id 缺失的 edition → 渲染 ghost 环（圆数 = 缺失数）', () => {
+    const ghostEditions: VizEdition[] = [
+      ...allEditions,
+      {
+        id: 'ghost-1',
+        artwork_id: 'artwork-1',
+        inventory_number: 'AAJ-GH-1',
+        edition_type: 'numbered',
+        edition_number: 99,
+        status: 'in_studio',
+        location_id: null,
+        sale_price: null,
+        sale_currency: null,
+        sale_date: null,
+        buyer_name: null,
+        created_at: '2024-01-01T00:00:00Z',
+      },
+      {
+        id: 'ghost-2',
+        artwork_id: 'artwork-1',
+        inventory_number: 'AAJ-GH-2',
+        edition_type: 'numbered',
+        edition_number: 100,
+        status: 'in_studio',
+        location_id: null,
+        sale_price: null,
+        sale_currency: null,
+        sale_date: null,
+        buyer_name: null,
+        created_at: '2024-01-01T00:00:00Z',
+      },
+    ];
+    const { container } = renderDiaspora({ editions: ghostEditions });
+    const ring = container.querySelector('[data-testid="diaspora-ghost-ring"]');
+    expect(ring).not.toBeNull();
+    const circles = ring!.querySelectorAll('circle');
+    expect(circles.length).toBe(2);
+  });
+
+  it('ghost 圆 stroke-only + 不可点击（aria-hidden + 无 role / 无 tabIndex）', () => {
+    const ghostEditions: VizEdition[] = [
+      ...allEditions,
+      {
+        id: 'ghost-1',
+        artwork_id: 'artwork-1',
+        inventory_number: 'AAJ-GH-1',
+        edition_type: 'numbered',
+        edition_number: 99,
+        status: 'in_studio',
+        location_id: null,
+        sale_price: null,
+        sale_currency: null,
+        sale_date: null,
+        buyer_name: null,
+        created_at: '2024-01-01T00:00:00Z',
+      },
+    ];
+    const { container } = renderDiaspora({ editions: ghostEditions });
+    const ring = container.querySelector('[data-testid="diaspora-ghost-ring"]')!;
+    // aria-hidden 让 screen reader 忽略（鬼影不进可达性树）
+    expect(ring.getAttribute('aria-hidden')).toBe('true');
+    // 没有 role="button" / aria-pressed / tabIndex
+    expect(ring.querySelector('[role="button"]')).toBeNull();
+    expect(ring.querySelector('[aria-pressed]')).toBeNull();
+    expect(ring.querySelector('[tabindex]')).toBeNull();
+    // stroke-only
+    const circle = ring.querySelector('circle')!;
+    expect(circle.getAttribute('fill')).toBe('none');
+    const cls = circle.getAttribute('class') ?? '';
+    expect(cls).toContain('stroke-foreground');
+  });
+
+  it('所有 edition 都有 location_id → 不渲染 ghost 环（不画空环）', () => {
+    // allEditions 都有 location_id
+    const { container } = renderDiaspora();
+    const ring = container.querySelector('[data-testid="diaspora-ghost-ring"]');
+    expect(ring).toBeNull();
+  });
+
   it('pin 卡片按钮 onClick 调用 stopPropagation（spy 验证）', () => {
     renderDiaspora();
 

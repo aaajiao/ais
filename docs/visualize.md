@@ -20,6 +20,8 @@
 5. **跟随主题**：所有 SVG 颜色用 `fill-foreground` / `fill-muted-foreground` / `fill-border`，明暗模式自动适配。所有 view 都用单色 + 透明度做区分（绝不用彩色）。**Strata 不再用透明度区分 type**——type 身份由 swimlane 行位置承担，方块全部用统一 `fill-foreground` 0.65。
 6. **信息条不引导、展示总览**（v1.5.x 起）：底部 info bar 的 idle 态 **不**写"点击查看详情"/"悬停看节点"这类引导文字——元素本身可点击就是可点击，`cursor: pointer` + hover 高亮已经表达。idle 态改成展示该 view 的**当前总览数据**（如 Strata 的 `N 件作品 · N 种类型 · 年份跨度`、Markets 的 `N 笔交易 · N 种货币`、Diaspora 的 `N 处位置 · N 条流转`），同时填满 idle 态空间。可点击之外的非显然操作（如 Diaspora 的 pin / unpin）用 **Lucide icon** 表达，不写出来——见 Diaspora 决策。这条原则不要回退，回退会让 viz 重新被 nudge 文字稀释。
 7. **时间作为播头（M1, v1.6.x 起）**：Strata 用 `artworks.year` 播艺术创作时间，Markets 用 `editions.sale_date` 播交易发生时间——让 archive 的 *becoming* 视觉化。**Diaspora 不播**：`edition_history.created_at` 是**录入时间**而非事件发生时间（85/87 条 history 集中在 2026 几周内是铁证），按它播会变成"2026 前一片死寂、几周内全炸"的伪叙事，扭曲艺术家真实流散史。播头默认 `t=max` 等于现在，初始载入跟改造前像素级一致——这是不破坏现有快照测试的必要条件。**超出 cutoff 的元素 `dim opacity 0.15` 不 hide**——保留"未来的鬼影"，让 archive 的边界本身可见（呼应原则 4「缺失数据不藏」的扩展：未来即"尚未发生的缺失"）。共享 `Timeline` 组件实现，见下方。
+8. **状态编码用 stroke / pattern / X，不用色彩（M2, v1.6.x 起）**：viz 单色铁律不变，但增加了 4 个视觉轴讲"作品跟艺术家关系"的故事：`fill="none" + stroke-foreground`（**held** — 在艺术家手里：in_studio / in_production）/ `fill={url(#pattern-dots)}`（**external** — 在外但艺术家仍持有：at_gallery / at_museum / in_transit）/ `solid fill-foreground`（**departed** — 已离开艺术家：sold / gifted）/ 独立 `<g>` X 叠加（**degenerate** — lost / damaged，在任一桶之上叠加，`pointer-events-none` 不阻挡点击）。聚合规则：per-artwork 按"最外溢优先级" held → external → departed，独立 X 由任一 degenerate edition 触发。判断走 `OWNERSHIP_STATUS_MAP: Record<EditionStatus, ...>`，TS 强制覆盖（新增 status enum 会编译失败，不会沉默漏分桶）。**绝对不要回退到色彩区分 status**——色彩破坏 brutalist 调性，且 9 个 status 用色无解。
+9. **缺失态画出来，不 silent drop（M2 强化原则 4）**：以前 viz 工具把"无法解析"的数据 silent filter（year 不可解析 / sold 无价 / 无 location_id 的 edition），现在改成画**专属的 stroke-only 区域**承载它们——Strata 最右"unknown year" 列、Markets 底部"no price" lane、Diaspora 最外圈 ghost 环。这些区域的形状都是 stroke-only outline（`fill="none"`），跟 ownership held 视觉同义但语义不同（held=数据完整但还在手里；缺失=数据维度不存在）。**缺失态优先级 > ownership 桶**——unknown-year 列里即使 ownership=departed 也强制 stroke-only，因为这件作品"没法被放在时间地图上"是更基础的事实。时间播头不过滤这些区域（缺失=时间维度不存在）。
 
 ---
 
@@ -109,6 +111,8 @@ interface TimelineProps<T> {
 - **顶部断层条**：history 月度密度作为单独的 SVG 层。85/87 条历史挤在 2026 年三个月——这是数据自己的故事，做成视觉断层就让"档案在 2026 年突然出现"立得住。
 - **跟 Markets 视觉对称**：Markets 是垂直列 × 散点；Strata 是水平带 × 方块。两者镜像。
 - **时间播头（M1）**：顶部 `Timeline` scrubber 按 `artworks.year` 播——artistic time 而非 `created_at`（后者跟 history 同病：录入时间集中在 2026）。超出 cutoff 的方块走 `BLOCK_FUTURE_CLS = 'opacity-[0.15]'`——dim 不 hide，保留"未来鬼影"。`values` 数组复用 `yearRange` 已算好的连续年份列（含空年份），跟 swimlane x 轴一致。
+- **Ownership 编码（M2）**：方块走 `OwnershipBlock` 组件按 `getArtworkOwnershipState(artwork, editions)` 四态渲染：`held` = `<rect fill="none" stroke-foreground strokeWidth=1.5>`；`external` = `<rect fill={url(#viz-strata-pattern-dots)}>`（pattern 在 SVG `<defs>` 内定义，id 命名空间隔离避免跨 view 撞名，`<circle>` 用 `currentColor` 由 Tailwind dark mode 自动适配）；`departed` = `<rect fill-foreground>`；degenerate 是独立 `<g data-mark="degenerate">` 叠加两条对角 `<line>`（80% 边长、`opacity=X_MARK_OPACITY`、`pointer-events-none`）。播头 dim 通过 `BLOCK_FUTURE_CLS` 叠加在以上之上——它改 opacity，不动 fill/stroke，两条轴正交。
+- **Unknown year 列（M2）**：year 无法解析的作品收进最右侧的 `UNKNOWN_YEAR_KEY = '__unknown_year__'` 列（`getUnknownYearArtworks(artworks)` 抽出），列头单字符 `?` opacity 较低。该列所有方块强制 `forceStrokeOnly={true}`——**缺失态优先级 > ownership 桶**（"无法被放进时间地图"是比"是否离开艺术家"更基础的事实）。时间播头不过滤此列。`data-unknown-year="true"` 给测试断言用。
 
 ### Markets
 
@@ -120,6 +124,7 @@ interface TimelineProps<T> {
 - **散点 a11y**：每个圆包一层 `<g role="button" tabIndex={0} aria-label="..." aria-pressed={hovered}>`，Enter / Space 触发 navigate，focus 也走 hover 视觉态。货币列标签内嵌 `<title>` 让 screen reader 念出 "Currency: USD"。模仿 DiasporaView 节点 a11y pattern。
 - **summary 用自己段下的 key**：info bar idle 态走 `t('markets.summary.overview', { sales, currencies })`，**不**复用其他 view 的 summary key——跨 view i18n 借用是 ticking bomb（参见 CLAUDE.md 关于 i18n 隔离的 pitfall）。`Strata` 和 `Diaspora` 各自维护 `*.summary.overview`，结构相似但物理隔离。守护测试 `MarketsView.test.tsx` 的"不借其他 view 的 key"断言。
 - **时间播头（M1）**：顶部 `Timeline` scrubber 按 `editions.sale_date` ISO 字符串播——transaction time 而非 `created_at`。`values` = `filterSalesByDateCutoff(editions, max)` 取所有 sold + 有 `sale_date` 的 distinct dates 升序；超出 cutoff 的散点走 const `DOT_OPACITY_FUTURE = 0.15`。`sale_date` 缺失的 sold edition **不显示**（保守，不构造伪日期）——这是有意的，跟原则 4「缺失数据不藏」一致：缺日期的成交在播头里就是不存在，回到 t=max 才看见，info bar 总览仍包含它。
+- **缺价 lane（M2）**：sold 但 `sale_price=null` 的 edition 走主 canvas 下方独立横条 lane，**不进任何 currency 列**（无价无法定位到任何 scale）。`getSalesWithoutPrice(editions)` 抽出，count > 0 才渲染（无缺价时不画空 lane）。Lane label `markets.noPriceLane` (zh: "未记录价格 ({{count}})") + stroke-only `<circle fill="none" stroke-foreground>` jitter 排开；圆点仍可 navigate `/editions/{id}` 保持 a11y pattern。时间播头不过滤此 lane（无价 = 没法按时间播）。pattern id `viz-markets-pattern-dots` 跟 Strata 命名空间隔离。
 
 ### Terminal
 
@@ -140,6 +145,8 @@ interface TimelineProps<T> {
 - **"档案薄"显式声明**：顶部 stat bar 直接写 `27 / 137 editions have known location`，配 stateHint "数据会随系统使用而生长"。**不要把空白藏起来**——薄数据是当前 archive 的真实状态，本身是 statement。
 - **`from_location` / `to_location` 是 name（text）不是 UUID**：构建边时需要 name → id 反向映射。改 schema 时注意（见 `supabase/schema.sql` 的 trigger）。
 - **双态交互：hover = 预览，click = pin**：`hoveredNodeId` 只在无 pin 时驱动预览信息条；`pinnedNodeId` 驱动完整 pin 卡片（位置信息 + edition 列表 + "view all"链接）。两次点同一节点或点 SVG 空白取消 pin。**pin 卡片中每一行 edition（inventory_number · 标题 · status）都是可点击的 `<button>`，navigate 到 `/editions/{id}`；底部 "view all" 按钮 navigate 到 `/editions?locationId={id}`**。这条不要退回到只显示 `<span>` inventory_number 的旧实现。
+- **Ghost 环（M2）**：无 `location_id` 的 edition（"137 中只有 27 个有 location" 的另外 110 个）画在最外环之外，`radius = min(W,H) * 0.48` 圆周均匀分布，stroke-only `<circle fill="none" stroke-foreground r=3 opacity=0.3>`。**`aria-hidden="true"` 不可点击、不进 hover 状态机**——它们没有 navigate 目标，是"档案的薄"本身被画出来。`ghost.count > 0` 才渲染（避免画空环）。`getGhostNodes(editions, locations, {cx, cy, radius})` 在 `diasporaUtils.ts`。顶部 stat bar 的"27/137 known location"文案保留——文字 + 视觉双轨表达同一事实。
+- **Edge 状态编码 M2 调研后放弃**：`buildEdges` 把 `edition_history.location_change` 事件聚合成 `{ fromNodeId, toNodeId, count }`，丢失了 per-event 时间与 status 关联；`editions.status` 是 edition 当前状态、不绑定 edge。想画 "已落位 vs 在途" dashed 区分得改回 per-edition 当前 location + 当前 status——**这是 schema/聚合重构而非渲染层叠加**。M2 跳过；M5/M6 重做 edge 数据模型时再加。
 - **pin / unpin / view-all 用 Lucide icon 而非文字**（v1.5.x 起）：hover 预览卡片右上角放 `Pin` icon（`w-3 h-3 opacity-60`），不写"点击固定此节点"——图钉符号本身就是 affordance。pin 激活后，pin 卡片右上角放 `X` 按钮触发 `setPinnedNodeId(null)`，不写"再次点击节点或点击空白处取消固定"——X 按钮是 popover 解除的标准模式。"点击空白处取消" 的 `handleSvgClick` 逻辑**保留代码不删**，只是不再写出来，用户会试。pin 卡片底部 chips 块下方放右对齐的 `ArrowRight` icon button，navigate 到 `/editions?locationId={id}`——取代旧的 "查看此位置全部版本 →" 下划线文字，与右上 `X` 形成 unpin / view-all 的视觉对称。**用 `flex justify-end` 占独立一行而非 `absolute` 定位**——chips wrap 时 absolute 会重叠。aria-label 走 `t('diaspora.pin.unpinAria')` 和 `t('diaspora.pin.viewAllAria')` 给屏幕阅读器。这跟全局原则 6（信息条不引导）配套，不要回退到文字提示。
 - **长名 label 用 SVG `<title>` 做原生 tooltip**：节点可见 label 超过 18 字符会截断为 16+`…`（避免覆盖相邻节点）。每个 `<g data-node>` 内的第一个子元素是 `<title>{node.name}</title>`，浏览器 hover 节点时显示完整名（中心节点同样处理）。这是无依赖、跨浏览器、零样式开销的方案，不要换成自定义 HTML tooltip。
 - **pin 卡片按钮防御性 `stopPropagation`**：edition 行按钮和 "view all" 按钮的 `onClick` 都调 `e.stopPropagation()`。当前 pin 卡片在 SVG 外不会冒泡到 `handleSvgClick`，但未来重构若把卡片移入 `<foreignObject>`（为了和 SVG 同坐标系联动），点击就会冒泡触发 unpin。预防为主，省得调试。
@@ -152,13 +159,13 @@ interface TimelineProps<T> {
 |---|---|
 | `useVisualizationData.test.ts` | 4 — 并行查 4 表 / RLS deleted_at / 聚合 / error 传播 |
 | `strataUtils.test.ts` | 26 — year 解析 / swimlane 分组 + 排序 / `(untyped)` 处理 / 高度 log scale / stack 满了水平蔓延 |
-| `marketsUtils.test.ts` | 24 — 过滤 sold/有价 / 中位数 / 半径归一化 / 边界 / `filterSalesByDateCutoff`（M1） |
+| `marketsUtils.test.ts` | 29 — 过滤 sold/有价 / 中位数 / 半径归一化 / 边界 / `filterSalesByDateCutoff`（M1）/ `getSalesWithoutPrice`（M2） |
 | `terminalUtils.test.ts` | 29 — inventory 自然排序 / edition label 4 种 / location 拼接 / group 分桶 / markets line |
 | `TerminalView.test.tsx` | 9 — 行 role=button + tabIndex / 点击 navigate / 键盘 Enter+Space / 其他键不触发 / 分组 heading + aria-hidden 装饰 / 紧凑字号 class / row.id 防御 / separator 对 SR 隐藏 |
-| `diasporaUtils.test.ts` | 30 — 节点关联 / 中心选择 tie-breaker / 同心环布局 / 边聚合 / tracked stat |
-| `DiasporaView.test.tsx` | 18 — 初始状态 / hover 预览 / hover 离开 / click pin / edition 行跳转 / view all 跳转 / 二次 click 取消 pin / 切换 pin / pin 时 hover 不干扰 / 无编号 edition / 空数据 / aria-pressed / 键盘 Enter / title_cn fallback / 长名 SVG `<title>` / center node `<title>` / pin 卡片 stopPropagation / spy stopPropagation |
-| `StrataView.test.tsx` | 15 — role=button 包裹 rect / aria-label 拼装 / click navigate / Enter / Space / 其它键不触发 / tabindex=0 / id 缺失 aria-disabled / viewBox 响应式 / hover tooltip / 空数据 / 多年份渲染 Timeline（M1）/ 单年份不渲染 Timeline（M1）/ 默认 t=max 不 dim（M1）/ scrub 到中段部分 dim（M1） |
-| `MarketsView.test.tsx` | 15 — 货币列降序 / 散点 a11y / 空状态 / summary 段隔离 / 多 sale_date 渲染 Timeline（M1）/ 单点不渲染 Timeline（M1）/ 默认 t=max 不 dim（M1）/ scrub 后 dim（M1） |
+| `diasporaUtils.test.ts` | 35 — 节点关联 / 中心选择 tie-breaker / 同心环布局 / 边聚合 / tracked stat / `getGhostNodes`（M2） |
+| `DiasporaView.test.tsx` | 21 — 初始状态 / hover 预览 / hover 离开 / click pin / edition 行跳转 / view all 跳转 / 二次 click 取消 pin / 切换 pin / pin 时 hover 不干扰 / 无编号 edition / 空数据 / aria-pressed / 键盘 Enter / title_cn fallback / 长名 SVG `<title>` / center node `<title>` / pin 卡片 stopPropagation / spy stopPropagation / ghost 环渲染（M2）/ ghost count=0 不画（M2）/ ghost aria-hidden（M2） |
+| `StrataView.test.tsx` | 24 — role=button 包裹 rect / aria-label 拼装 / click navigate / Enter / Space / 其它键不触发 / tabindex=0 / id 缺失 aria-disabled / viewBox 响应式 / hover tooltip / 空数据 / 多年份渲染 Timeline（M1）/ 单年份不渲染 Timeline（M1）/ 默认 t=max 不 dim（M1）/ scrub 到中段部分 dim（M1）/ ownership held = stroke-only（M2）/ external = pattern fill（M2）/ departed = solid（M2）/ degenerate X 叠加（M2）/ unknown-year 列渲染（M2）/ unknown-year 强制 stroke-only（M2）/ unknown-year 不被播头过滤（M2）/ pattern defs 命名空间（M2） |
+| `MarketsView.test.tsx` | 19 — 货币列降序 / 散点 a11y / 空状态 / summary 段隔离 / 多 sale_date 渲染 Timeline（M1）/ 单点不渲染 Timeline（M1）/ 默认 t=max 不 dim（M1）/ scrub 后 dim（M1）/ noPrice lane 渲染（M2）/ count=0 不画 lane（M2）/ stroke-only 圆 + label（M2）/ noPrice 圆可 navigate（M2） |
 | `Timeline.test.tsx` | 9 — render / 单点返 null / 拖拽 onChange / play 触发 onPlayToggle / aria slider attrs / format prop / index-step / 默认值 / className prop |
 | `Visualize.test.tsx` | 10 — loading / error / 4 个 view 默认渲染 / 非法 ?view 回落 / refetch 按钮 / 容器断点 lg: / `?view=strata&t=2024` smoke（M1） |
 | `visualize-parity.test.ts` | 2 — zh ⟷ en key 完全一致 / 核心段都存在 |

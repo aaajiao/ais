@@ -295,3 +295,52 @@ export const TYPE_OPACITY: Record<LocationNode['type'], number> = {
   museum: 0.7,
   other: 0.4,
 };
+
+// ─── Ghost nodes (M2 缺失数据态) ──────────────────────────────────────────────
+// 没有 location_id 的 edition —— 在最外环外铺一圈鬼影小圆。
+// 视觉本意：用空间表达"档案里有 N 件作品我们不知道在哪"，把 stat 文案的"X / Y"
+// 翻译成图形。鬼影圆**不可点击**（无 navigate 目标），**不进 hover 状态机**。
+//
+// 位置：从顶部 12 点钟方向开始顺时针均匀分布在大半径上。
+// 0 个时返回空数组——调用方据此决定不渲染这一环（避免画空环）。
+export interface GhostNodePosition {
+  x: number;
+  y: number;
+}
+
+export interface GhostNodes {
+  count: number;
+  positions: GhostNodePosition[];
+}
+
+export function getGhostNodes(
+  editions: VizEdition[],
+  // locations 暂未使用，但保留入参形状以匹配 buildNodes / computeTrackedStat，
+  // 方便未来扩展（比如"有 location 但 location 不在 nodes 集合里的孤儿"）。
+  locations: VizLocation[],
+  options?: {
+    cx?: number;
+    cy?: number;
+    radius?: number;
+  }
+): GhostNodes {
+  void locations;
+  const ghostEditions = editions.filter((e) => !e.location_id);
+  const count = ghostEditions.length;
+  if (count === 0) return { count: 0, positions: [] };
+
+  const cx = options?.cx ?? 400;
+  const cy = options?.cy ?? 280;
+  const radius = options?.radius ?? Math.min(800, 560) * 0.48;
+
+  const positions: GhostNodePosition[] = [];
+  // 从 -π/2（12 点方向）开始，顺时针均匀分布
+  for (let i = 0; i < count; i++) {
+    const angle = -Math.PI / 2 + (2 * Math.PI * i) / count;
+    positions.push({
+      x: cx + radius * Math.cos(angle),
+      y: cy + radius * Math.sin(angle),
+    });
+  }
+  return { count, positions };
+}

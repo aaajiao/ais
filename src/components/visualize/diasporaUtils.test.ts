@@ -7,6 +7,7 @@ import {
   computeTrackedStat,
   countryToISO2,
   nodeRadius,
+  getGhostNodes,
 } from './diasporaUtils';
 import type { LocationNode } from './diasporaUtils';
 import type {
@@ -446,5 +447,56 @@ describe('nodeRadius', () => {
   it('随 editionCount 增大而增大', () => {
     expect(nodeRadius(1)).toBeLessThan(nodeRadius(10));
     expect(nodeRadius(10)).toBeLessThan(nodeRadius(100));
+  });
+});
+
+// ─── M2: getGhostNodes ──────────────────────────────────────────────────────
+
+describe('getGhostNodes', () => {
+  it('无 location_id 的 edition 计入 count', () => {
+    const editions = [
+      makeEdition('e1', null),
+      makeEdition('e2', null),
+      makeEdition('e3', 'loc-1'),
+    ];
+    const ghost = getGhostNodes(editions, []);
+    expect(ghost.count).toBe(2);
+    expect(ghost.positions).toHaveLength(2);
+  });
+
+  it('全部有 location_id → count=0 且 positions 空数组（不画空环）', () => {
+    const editions = [makeEdition('e1', 'loc-1'), makeEdition('e2', 'loc-2')];
+    const ghost = getGhostNodes(editions, []);
+    expect(ghost.count).toBe(0);
+    expect(ghost.positions).toEqual([]);
+  });
+
+  it('空输入 → count=0', () => {
+    expect(getGhostNodes([], [])).toEqual({ count: 0, positions: [] });
+  });
+
+  it('位置均匀分布在大半径上（每个点到中心距离 = radius）', () => {
+    const editions = Array.from({ length: 8 }, (_, i) =>
+      makeEdition(`e${i}`, null)
+    );
+    const cx = 400;
+    const cy = 280;
+    const radius = 250;
+    const { positions } = getGhostNodes(editions, [], { cx, cy, radius });
+    for (const p of positions) {
+      const d = Math.sqrt((p.x - cx) ** 2 + (p.y - cy) ** 2);
+      expect(d).toBeCloseTo(radius, 4);
+    }
+  });
+
+  it('首个 ghost 在 12 点钟方向（angle = -π/2 → x=cx, y=cy-radius）', () => {
+    const editions = [makeEdition('e1', null)];
+    const { positions } = getGhostNodes(editions, [], {
+      cx: 100,
+      cy: 100,
+      radius: 50,
+    });
+    expect(positions[0].x).toBeCloseTo(100, 4);
+    expect(positions[0].y).toBeCloseTo(50, 4); // 12 点钟 = 上方
   });
 });

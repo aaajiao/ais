@@ -248,6 +248,121 @@ describe('MarketsView', () => {
     }
   });
 
+  // ─── M2 缺价横条 ─────────────────────────────────────────────────────────
+
+  it('有 sold 但无 sale_price 的 edition → 渲染 noPrice 横条 + i18n label + count', () => {
+    const editionsWithMissing: VizEdition[] = [
+      makeSale('e1', 'AAJ-001', 'USD', 5000, '2024-03-01'),
+      // sold 但 sale_price=null —— 当前 makeSale 不允许 null，手工构造
+      {
+        id: 'enp',
+        artwork_id: artwork.id,
+        inventory_number: 'AAJ-NP',
+        edition_type: 'numbered',
+        edition_number: 2,
+        status: 'sold',
+        location_id: null,
+        sale_price: null,
+        sale_currency: null,
+        sale_date: null,
+        buyer_name: null,
+        created_at: '2024-01-01T00:00:00Z',
+      },
+      {
+        id: 'enp2',
+        artwork_id: artwork.id,
+        inventory_number: 'AAJ-NP-2',
+        edition_type: 'numbered',
+        edition_number: 3,
+        status: 'sold',
+        location_id: null,
+        sale_price: null,
+        sale_currency: 'USD',
+        sale_date: null,
+        buyer_name: null,
+        created_at: '2024-01-01T00:00:00Z',
+      },
+    ];
+    renderWithClient(
+      <MemoryRouter>
+        <MarketsView artworks={[artwork]} editions={editionsWithMissing} />
+      </MemoryRouter>
+    );
+    const lane = screen.getByTestId('markets-noprice-lane');
+    expect(lane).toBeInTheDocument();
+    // i18n label + count，zh "未记录价格 (2)" / en "no price recorded (2)"
+    const labelText = lane.querySelector('text')?.textContent ?? '';
+    expect(labelText).toMatch(/未记录价格|no price recorded/);
+    expect(labelText).toContain('(2)');
+  });
+
+  it('noPrice 横条圆点 stroke-only（fill=none + stroke-foreground）', () => {
+    renderWithClient(
+      <MemoryRouter>
+        <MarketsView
+          artworks={[artwork]}
+          editions={[
+            {
+              id: 'enp',
+              artwork_id: artwork.id,
+              inventory_number: 'AAJ-NP',
+              edition_type: 'numbered',
+              edition_number: 1,
+              status: 'sold',
+              location_id: null,
+              sale_price: null,
+              sale_currency: null,
+              sale_date: null,
+              buyer_name: null,
+              created_at: '2024-01-01T00:00:00Z',
+            },
+          ]}
+        />
+      </MemoryRouter>
+    );
+    const dots = screen.getAllByTestId('markets-noprice-dot');
+    expect(dots.length).toBe(1);
+    const circle = dots[0].querySelector('circle')!;
+    expect(circle.getAttribute('fill')).toBe('none');
+    const cls = circle.getAttribute('class') ?? '';
+    expect(cls).toContain('stroke-foreground');
+  });
+
+  it('noPrice 圆点点击 → navigate /editions/{id}', () => {
+    renderWithClient(
+      <MemoryRouter>
+        <MarketsView
+          artworks={[artwork]}
+          editions={[
+            {
+              id: 'np-clickable',
+              artwork_id: artwork.id,
+              inventory_number: 'AAJ-CLICK',
+              edition_type: 'numbered',
+              edition_number: 1,
+              status: 'sold',
+              location_id: null,
+              sale_price: null,
+              sale_currency: null,
+              sale_date: null,
+              buyer_name: null,
+              created_at: '2024-01-01T00:00:00Z',
+            },
+          ]}
+        />
+      </MemoryRouter>
+    );
+    const dot = screen.getByTestId('markets-noprice-dot');
+    fireEvent.click(dot);
+    expect(mockNavigate).toHaveBeenCalledWith('/editions/np-clickable');
+  });
+
+  it('无缺价 sold edition → 不渲染 noPrice 横条', () => {
+    // editions 全部有价
+    renderMarkets();
+    expect(screen.queryByTestId('markets-noprice-lane')).toBeNull();
+  });
+
   it('拖动 scrubber 到中段 → 之后的散点 opacity=0.15，之前的保持 0.65', () => {
     renderMarkets();
     const slider = screen.getByRole('slider');
