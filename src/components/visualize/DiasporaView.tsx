@@ -57,10 +57,14 @@ function buildArtworkMap(artworks: VizArtwork[]): Map<string, VizArtwork> {
   return m;
 }
 
+/** 中心点 pin key —— 跟 location:/named: 同构的复合 id（hard-coded 单值） */
+const ARTIST_NODE_KEY = 'artist:center';
+
 /** 当前激活节点 metadata（用于底部 info bar） */
 type ActiveNodeMeta =
   | { kind: 'location'; node: LocationConstellationNode }
-  | { kind: 'named_private'; node: NamedPrivateNode };
+  | { kind: 'named_private'; node: NamedPrivateNode }
+  | { kind: 'artist' };
 
 export default function DiasporaView({
   artworks = [],
@@ -145,6 +149,9 @@ export default function DiasporaView({
 
   const activeMeta = useMemo<ActiveNodeMeta | null>(() => {
     if (!activeNodeId) return null;
+    if (activeNodeId === ARTIST_NODE_KEY) {
+      return { kind: 'artist' };
+    }
     if (activeNodeId.startsWith('location:')) {
       const id = activeNodeId.slice('location:'.length);
       const node = constellation.locations.find((n) => n.id === id);
@@ -161,9 +168,14 @@ export default function DiasporaView({
   }, [activeNodeId, constellation]);
 
   // pin 卡片显示用的 edition 列表（按节点过滤，附带 artwork 信息）
+  // artist 中心点 → constellation.artist.heldEditionIds（在库 + 制作中 + 在途）
+  // location / named_private → 该节点 editionIds（流出去的）
   const pinnedEditions = useMemo(() => {
     if (!pinnedNodeId || !activeMeta) return [];
-    const ids = activeMeta.node.editionIds;
+    const ids =
+      activeMeta.kind === 'artist'
+        ? constellation.artist.heldEditionIds
+        : activeMeta.node.editionIds;
     return editions
       .filter((e) => ids.includes(e.id))
       .map((e) => ({
@@ -173,7 +185,14 @@ export default function DiasporaView({
           e.inventory_number ??
           `${e.id.slice(0, 8)}${t('diaspora.pin.noInventory')}`,
       }));
-  }, [pinnedNodeId, activeMeta, editions, artworkMap, t]);
+  }, [
+    pinnedNodeId,
+    activeMeta,
+    editions,
+    artworkMap,
+    constellation.artist.heldEditionIds,
+    t,
+  ]);
 
   // ─── Selection (Phase 2: M3a) ───────────────────────────────────────────────
   // 选中 artwork → 找该 artwork 所有 editions → 这些 editions 归类到哪些 node。
@@ -831,50 +850,116 @@ export default function DiasporaView({
             );
           })}
 
-          {/* ─── Center: artist node ────────────────────────────── */}
-          <g
-            data-node="aaajiao"
-            data-testid="constellation-artist"
-            aria-label={t('diaspora.constellation.aria.artist')}
-          >
-            <title>{t('diaspora.constellation.centerLabel')}</title>
-            <circle
-              cx={layout.center.x}
-              cy={layout.center.y}
-              r={14}
-              fill="none"
-              className="stroke-foreground"
-              strokeWidth={0.5}
-              opacity={0.4}
-            />
-            <circle
-              cx={layout.center.x}
-              cy={layout.center.y}
-              r={12}
-              className="fill-foreground"
-              opacity={1}
-            />
-            <text
-              x={layout.center.x}
-              y={layout.center.y + 26}
-              textAnchor="middle"
-              className="fill-foreground"
-              fontSize="9"
-              fontFamily="ui-monospace, monospace"
-            >
-              {t('diaspora.constellation.centerLabel')}
-            </text>
-            <text
-              x={layout.center.x}
-              y={layout.center.y + 36}
-              textAnchor="middle"
-              className="fill-muted-foreground"
-              fontSize="8"
-              fontFamily="ui-monospace, monospace"
-            >
-              {constellation.artist.totalOutflowCount}
-            </text>
-          </g>
+          {/* ─── Center: artist node ──────────────────────────────
+              点击 → pin 卡片显示 studios + 当前持有版本（status ∈ in_studio
+              / in_production / in_transit）。视觉保持原 brutalist 调子，
+              加 hover ring / pinned pulse 跟其他节点对齐。 */}
+          {(() => {
+            const isArtistPinned = pinnedNodeId === ARTIST_NODE_KEY;
+            const isArtistHovered =
+              hoveredNodeId === ARTIST_NODE_KEY && !pinnedNodeId;
+            const heldCount = constellation.artist.heldEditionIds.length;
+            const studioCount = constellation.artist.studios.length;
+            const outflow = constellation.artist.totalOutflowCount;
+            const subLabel =
+              studioCount === 0 && heldCount === 0
+                ? t('diaspora.constellation.centerSubLabelEmpty', {
+                    outflow,
+                  })
+                : studioCount === 0
+                  ? t('diaspora.constellation.centerSubLabelNoStudio', {
+                      held: heldCount,
+                      outflow,
+                    })
+                  : t('diaspora.constellation.centerSubLabel', {
+                      studios: studioCount,
+                      held: heldCount,
+                      outflow,
+                    });
+            return (
+              <g
+                data-node="aaajiao"
+                data-testid="constellation-artist"
+                role="button"
+                tabIndex={0}
+                aria-label={t('diaspora.constellation.aria.artistAction')}
+                aria-pressed={isArtistPinned}
+                className="cursor-pointer focus:outline-none"
+                onMouseEnter={() => handleNodeMouseEnter(ARTIST_NODE_KEY)}
+                onMouseLeave={handleNodeMouseLeave}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleNodeClick(ARTIST_NODE_KEY);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleNodeClick(ARTIST_NODE_KEY);
+                  }
+                }}
+              >
+                <title>{t('diaspora.constellation.centerLabel')}</title>
+                {isArtistPinned && (
+                  <circle
+                    cx={layout.center.x}
+                    cy={layout.center.y}
+                    r={20}
+                    fill="none"
+                    className="stroke-foreground diaspora-pin-pulse"
+                    strokeWidth={1.5}
+                  />
+                )}
+                {isArtistHovered && (
+                  <circle
+                    cx={layout.center.x}
+                    cy={layout.center.y}
+                    r={17}
+                    fill="none"
+                    className="stroke-foreground"
+                    strokeWidth={0.5}
+                    opacity={0.5}
+                  />
+                )}
+                <circle
+                  cx={layout.center.x}
+                  cy={layout.center.y}
+                  r={14}
+                  fill="none"
+                  className="stroke-foreground"
+                  strokeWidth={0.5}
+                  opacity={0.4}
+                />
+                <circle
+                  cx={layout.center.x}
+                  cy={layout.center.y}
+                  r={12}
+                  className="fill-foreground"
+                  opacity={1}
+                  pointerEvents="all"
+                />
+                <text
+                  x={layout.center.x}
+                  y={layout.center.y + 26}
+                  textAnchor="middle"
+                  className="fill-foreground"
+                  fontSize="9"
+                  fontFamily="ui-monospace, monospace"
+                >
+                  {t('diaspora.constellation.centerLabel')}
+                </text>
+                <text
+                  x={layout.center.x}
+                  y={layout.center.y + 36}
+                  textAnchor="middle"
+                  className="fill-muted-foreground"
+                  fontSize="8"
+                  fontFamily="ui-monospace, monospace"
+                >
+                  {subLabel}
+                </text>
+              </g>
+            );
+          })()}
         </svg>
       </div>
 
@@ -894,66 +979,157 @@ export default function DiasporaView({
             >
               <X className="w-3 h-3" />
             </button>
-            <div className="flex items-baseline justify-between gap-2">
-              <div>
-                <span className="font-bold">{activeMeta.node.name}</span>
-                <span className="text-muted-foreground ml-2">
-                  {activeMeta.kind === 'location'
-                    ? t(`diaspora.legend.${activeMeta.node.type}`)
-                    : t('diaspora.legend.namedPrivateBadge')}
-                  {activeMeta.kind === 'location' && activeMeta.node.city
-                    ? ` · ${activeMeta.node.city}`
-                    : ''}
-                  {activeMeta.kind === 'location' && activeMeta.node.country
-                    ? ` · ${activeMeta.node.country}`
-                    : ''}
-                </span>
-              </div>
-            </div>
 
-            {pinnedEditions.length > 0 && (
-              <div className="space-y-1.5">
-                <div className="text-muted-foreground">
-                  {t('diaspora.pin.editionsAt', {
-                    count: pinnedEditions.length,
-                  })}
-                  :
+            {activeMeta.kind === 'artist' ? (
+              /* ── Artist center pin card ─────────────────────────── */
+              <div data-testid="diaspora-pin-artist" className="space-y-2">
+                <div>
+                  <span className="font-bold">
+                    {t('diaspora.constellation.centerLabel')}
+                  </span>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {pinnedEditions.map(({ edition, displayId }) => (
+
+                {constellation.artist.studios.length > 0 ? (
+                  <div className="space-y-1">
+                    <div className="text-muted-foreground">
+                      {t('diaspora.pin.studios', {
+                        count: constellation.artist.studios.length,
+                      })}
+                      :
+                    </div>
+                    <ul className="space-y-1">
+                      {constellation.artist.studios.map((studio) => (
+                        <li key={studio.id}>
+                          <button
+                            type="button"
+                            data-testid={`diaspora-pin-studio-${studio.id}`}
+                            aria-label={t('diaspora.pin.viewStudioAria', {
+                              name: studio.name,
+                            })}
+                            className="text-left hover:text-foreground transition-colors cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(
+                                `/editions?locationId=${studio.id}`
+                              );
+                            }}
+                          >
+                            <span className="text-muted-foreground">
+                              ·{' '}
+                            </span>
+                            {studio.city
+                              ? t('diaspora.pin.studioRowWithCity', {
+                                  name: studio.name,
+                                  city: studio.city,
+                                  count: studio.heldEditionCount,
+                                })
+                              : t('diaspora.pin.studioRow', {
+                                  name: studio.name,
+                                  count: studio.heldEditionCount,
+                                })}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <div className="text-muted-foreground italic">
+                    {t('diaspora.pin.noStudios')}
+                  </div>
+                )}
+
+                {pinnedEditions.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="text-muted-foreground">
+                      {t('diaspora.pin.heldEditions', {
+                        count: pinnedEditions.length,
+                      })}
+                      :
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {pinnedEditions.map(({ edition, displayId }) => (
+                        <button
+                          key={edition.id}
+                          type="button"
+                          title={tStatus(edition.status)}
+                          className="font-mono border border-border px-1.5 py-0.5 hover:bg-muted/50 hover:border-foreground transition-colors cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/editions/${edition.id}`);
+                          }}
+                        >
+                          {displayId}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* ── Location / Named-private pin card ─────────────── */
+              <>
+                <div className="flex items-baseline justify-between gap-2">
+                  <div>
+                    <span className="font-bold">{activeMeta.node.name}</span>
+                    <span className="text-muted-foreground ml-2">
+                      {activeMeta.kind === 'location'
+                        ? t(`diaspora.legend.${activeMeta.node.type}`)
+                        : t('diaspora.legend.namedPrivateBadge')}
+                      {activeMeta.kind === 'location' && activeMeta.node.city
+                        ? ` · ${activeMeta.node.city}`
+                        : ''}
+                      {activeMeta.kind === 'location' && activeMeta.node.country
+                        ? ` · ${activeMeta.node.country}`
+                        : ''}
+                    </span>
+                  </div>
+                </div>
+
+                {pinnedEditions.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="text-muted-foreground">
+                      {t('diaspora.pin.editionsAt', {
+                        count: pinnedEditions.length,
+                      })}
+                      :
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {pinnedEditions.map(({ edition, displayId }) => (
+                        <button
+                          key={edition.id}
+                          type="button"
+                          title={tStatus(edition.status)}
+                          className="font-mono border border-border px-1.5 py-0.5 hover:bg-muted/50 hover:border-foreground transition-colors cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/editions/${edition.id}`);
+                          }}
+                        >
+                          {displayId}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {activeMeta.kind === 'location' && (
+                  <div className="flex justify-end">
                     <button
-                      key={edition.id}
                       type="button"
-                      title={tStatus(edition.status)}
-                      className="font-mono border border-border px-1.5 py-0.5 hover:bg-muted/50 hover:border-foreground transition-colors cursor-pointer"
+                      aria-label={t('diaspora.pin.viewAllAria')}
+                      className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                       onClick={(e) => {
                         e.stopPropagation();
-                        navigate(`/editions/${edition.id}`);
+                        navigate(
+                          `/editions?locationId=${activeMeta.node.id}`
+                        );
                       }}
                     >
-                      {displayId}
+                      <ArrowRight className="w-3.5 h-3.5" />
                     </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {activeMeta.kind === 'location' && (
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  aria-label={t('diaspora.pin.viewAllAria')}
-                  className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(
-                      `/editions?locationId=${activeMeta.node.id}`
-                    );
-                  }}
-                >
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         ) : activeMeta ? (
@@ -963,9 +1139,18 @@ export default function DiasporaView({
               className="absolute top-0 right-0 w-3 h-3 text-muted-foreground opacity-60"
               aria-hidden="true"
             />
-            <div className="font-bold">{activeMeta.node.name}</div>
-            {activeMeta.kind === 'location' ? (
+            {activeMeta.kind === 'artist' ? (
               <>
+                <div className="font-bold">
+                  {t('diaspora.constellation.centerLabel')}
+                </div>
+                <div className="text-muted-foreground">
+                  {t('diaspora.constellation.aria.artistAction')}
+                </div>
+              </>
+            ) : activeMeta.kind === 'location' ? (
+              <>
+                <div className="font-bold">{activeMeta.node.name}</div>
                 <div className="text-muted-foreground">
                   {t('diaspora.tooltip.editions', {
                     count: activeMeta.node.editionCount,
@@ -980,12 +1165,15 @@ export default function DiasporaView({
                 </div>
               </>
             ) : (
-              <div className="text-muted-foreground">
-                {t('diaspora.constellation.tooltip.namedPrivate', {
-                  name: activeMeta.node.name,
-                  count: activeMeta.node.editionCount,
-                })}
-              </div>
+              <>
+                <div className="font-bold">{activeMeta.node.name}</div>
+                <div className="text-muted-foreground">
+                  {t('diaspora.constellation.tooltip.namedPrivate', {
+                    name: activeMeta.node.name,
+                    count: activeMeta.node.editionCount,
+                  })}
+                </div>
+              </>
             )}
           </div>
         ) : (

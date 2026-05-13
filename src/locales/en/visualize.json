@@ -155,10 +155,19 @@
       "editionsAt": "{{count}} editions here",
       "viewAllAria": "View all editions at this location",
       "noInventory": "(no inv)",
-      "unpinAria": "Unpin"
+      "unpinAria": "Unpin",
+      "studios": "Studios ({{count}})",
+      "heldEditions": "Currently held ({{count}})",
+      "studioRow": "{{name}} · {{count}} in studio",
+      "studioRowWithCity": "{{name}} · {{city}} · {{count}} in studio",
+      "viewStudioAria": "View all editions at {{name}}",
+      "noStudios": "No studio locations registered"
     },
     "constellation": {
       "centerLabel": "aaajiao",
+      "centerSubLabelEmpty": "none held · {{outflow}} departed",
+      "centerSubLabel": "{{held}} in {{studios}} studios · {{outflow}} departed",
+      "centerSubLabelNoStudio": "{{held}} held · {{outflow}} departed",
       "ringLabel": {
         "inner": "Institutions",
         "middle": "Private buyers",
@@ -173,6 +182,7 @@
       },
       "aria": {
         "artist": "Center node: aaajiao (artist)",
+        "artistAction": "Center node: aaajiao — click to view studios and held editions",
         "namedPrivate": "Private buyer {{name}}, {{count}} works",
         "ghost": "Edition awaiting location: {{title}} · {{inv}} · {{status}} (click to complete)",
         "anonymous": "Anonymous outflow · {{date}} (click to add buyer)"

@@ -41,12 +41,40 @@ export interface LocationNode {
 // 第一次交易时间（老→近 center），节点 size 表示 type + editionCount。
 // 见 layoutTimeSpiralConstellation。
 
+/** 工作室聚合视图：location.type === 'studio' 的每一处 + 在该工作室的"在库"
+ *  editions 数（status ∈ in_studio / in_production / in_transit）。
+ *  Diaspora 中心点 pin 卡片用这个数据列工作室。 */
+export interface StudioInfo {
+  id: string;
+  name: string;
+  city: string | null;
+  country: string | null;
+  /** 此工作室当前 in_studio / in_production / in_transit 的 edition 数 */
+  heldEditionCount: number;
+}
+
 export interface ArtistCenterNode {
   kind: 'artist';
   id: 'aaajiao';
   /** 流出去的 editions 总数（sold + gifted），用于中心 label */
   totalOutflowCount: number;
+  /** 所有 location.type === 'studio' 的位置，按 heldEditionCount desc 排序 */
+  studios: StudioInfo[];
+  /** "还在艺术家手里"的 editions：status ∈ {in_studio, in_production, in_transit}，
+   *  含 location_id 落在 studio 上的 + 没有 location_id 的（孤儿在库）。不含
+   *  at_gallery / at_museum（那是外借中，已经在 location 节点里反映）。 */
+  heldEditionIds: string[];
+  /** heldEditionIds 涉及的 artwork id 集合（去重） */
+  heldArtworkIds: string[];
 }
+
+/** "在艺术家手里" 的 status 集合 —— 中心点持有版本判定。
+ *  at_gallery / at_museum 不算（那是外借出去的状态，由 location 节点承载语义）。 */
+const HELD_STATUSES: ReadonlySet<VizEdition['status']> = new Set([
+  'in_studio',
+  'in_production',
+  'in_transit',
+]);
 
 export interface LocationConstellationNode {
   kind: 'location';
@@ -161,8 +189,29 @@ export function buildConstellation(
   const anonArtworkIds = new Set<string>();
   const anonItems: AnonymousItem[] = [];
   let totalOutflowCount = 0;
+  // 中心点"在艺术家手里"的 editions —— 按 studio location 桶聚合 + 一个孤儿桶
+  // （held 但没有 location_id，或 location_id 指向非 studio 时也归到这里 ——
+  // 视为艺术家流转中的版本）
+  const studioBuckets = new Map<string, { count: number }>();
+  const heldEditionIds: string[] = [];
+  const heldArtworkIds = new Set<string>();
 
   for (const ed of editions) {
+    // 先处理"在艺术家手里"的 editions：与 outflow 不冲突（status 互斥）
+    if (HELD_STATUSES.has(ed.status)) {
+      heldEditionIds.push(ed.id);
+      heldArtworkIds.add(ed.artwork_id);
+      if (ed.location_id) {
+        const loc = locById.get(ed.location_id);
+        if (loc && loc.type === 'studio') {
+          const bucket = studioBuckets.get(loc.id) ?? { count: 0 };
+          bucket.count++;
+          studioBuckets.set(loc.id, bucket);
+        }
+      }
+      continue;
+    }
+
     if (!isOutflow(ed.status)) continue;
     totalOutflowCount++;
 
@@ -256,11 +305,33 @@ export function buildConstellation(
     }))
     .sort((a, b) => b.editionCount - a.editionCount);
 
+  // 物化 studios：从 locations 表里取所有 type === 'studio'，附上各自的
+  // heldEditionCount（0 也保留 —— 工作室存在但当前没作品也是有意义的状态）。
+  // 按 heldEditionCount desc 排，tie 时按 name asc 稳定排序。
+  const studios: StudioInfo[] = locations
+    .filter((loc) => loc.type === 'studio')
+    .map((loc) => ({
+      id: loc.id,
+      name: loc.name,
+      city: loc.city,
+      country: loc.country,
+      heldEditionCount: studioBuckets.get(loc.id)?.count ?? 0,
+    }))
+    .sort((a, b) => {
+      if (b.heldEditionCount !== a.heldEditionCount) {
+        return b.heldEditionCount - a.heldEditionCount;
+      }
+      return a.name.localeCompare(b.name);
+    });
+
   return {
     artist: {
       kind: 'artist',
       id: 'aaajiao',
       totalOutflowCount,
+      studios,
+      heldEditionIds,
+      heldArtworkIds: Array.from(heldArtworkIds),
     },
     locations: locationsArr,
     namedPrivateBuyers: namedArr,

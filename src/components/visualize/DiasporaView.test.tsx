@@ -1275,4 +1275,84 @@ describe('DiasporaView', () => {
       container.querySelector('[data-testid="constellation-location-loc-undated"]')
     ).not.toBeNull();
   });
+
+  // ─── v1.6.x 第十一轮: artist center 可点击 + studios pin 卡片 ─────────────
+
+  it('artist center 是 role=button + tabIndex（可点击 / 键盘可达）', () => {
+    renderDiaspora();
+    const center = screen.getByTestId('constellation-artist');
+    expect(center.getAttribute('role')).toBe('button');
+    expect(center.getAttribute('tabindex')).toBe('0');
+  });
+
+  it('点击 artist center → pin 卡片打开 + 列出 studio location', () => {
+    renderDiaspora();
+    const center = screen.getByTestId('constellation-artist');
+    fireEvent.click(center);
+    // pin 卡片渲染（artist 分支独立 testid）
+    expect(screen.getByTestId('diaspora-pin-artist')).toBeInTheDocument();
+    // studio 节点列出（id = loc-studio，fixture 里的 aaajiao Shanghai Studio）
+    expect(
+      screen.getByTestId('diaspora-pin-studio-loc-studio')
+    ).toBeInTheDocument();
+  });
+
+  it('pin 卡片显示当前持有版本 chip（status ∈ in_studio / in_production / in_transit）', () => {
+    renderDiaspora();
+    fireEvent.click(screen.getByTestId('constellation-artist'));
+    // fixture: AAJ-2024-001 / AAJ-2024-002 是 in_studio；e3 in_production 无 inv
+    expect(
+      screen.getByRole('button', { name: 'AAJ-2024-001' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'AAJ-2024-002' })
+    ).toBeInTheDocument();
+    // 流出的 edition（e4 sold to gallery）不在 chip 列表
+    expect(
+      screen.queryByRole('button', { name: 'AAJ-2023-001' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('点击 studio 行 → navigate 到 /editions?locationId=:id', () => {
+    renderDiaspora();
+    fireEvent.click(screen.getByTestId('constellation-artist'));
+    const studioBtn = screen.getByTestId('diaspora-pin-studio-loc-studio');
+    fireEvent.click(studioBtn);
+    expect(mockNavigate).toHaveBeenCalledWith(
+      '/editions?locationId=loc-studio'
+    );
+  });
+
+  it('无 studio location → pin 卡片显示 noStudios 提示', () => {
+    renderDiaspora({
+      // 移除 studioLocation，保留 gallery / museum
+      locations: [galleryLocation, museumLocation],
+      // 也移除 studio 内部 editions，避免 ghost / location_id 残留
+      editions: [
+        gallerySoldEdition,
+        museumSoldEdition,
+        namedBuyerEdition,
+        anonSoldEdition,
+      ],
+    });
+    fireEvent.click(screen.getByTestId('constellation-artist'));
+    // 中英 i18n 任一匹配
+    expect(
+      screen.getByText(/未登记工作室位置|No studio locations registered/i)
+    ).toBeInTheDocument();
+  });
+
+  it('中心节点 sub-label 反映 studio 数 / held / outflow 三段数据', () => {
+    const { container } = renderDiaspora();
+    const center = screen.getByTestId('constellation-artist');
+    // fixture 数据：1 个 studio · 3 件 held · 4 件 outflow
+    // sub-label 走 t('diaspora.constellation.centerSubLabel')
+    // 验证最关键的三个数字都出现在 sub-label 里
+    const labelText = center.textContent ?? '';
+    expect(labelText).toMatch(/1/); // studios
+    expect(labelText).toMatch(/3/); // held
+    expect(labelText).toMatch(/4/); // outflow
+    // 防御：原 totalOutflowCount 单数字裸输出已删（不再只显示一个数字）
+    void container;
+  });
 });
