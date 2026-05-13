@@ -173,7 +173,9 @@ export default function Locations() {
               onClick={() => handleTypeFilter(type)}
               aria-pressed={isActive}
               className={
-                'text-left bg-card border rounded-lg p-4 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50 ' +
+                // 用 focus-visible 而非 focus —— 否则 mouse click 后焦点滞留
+                // 让 ring 一直在；focus-visible 只在键盘 Tab focus 时显示 ring。
+                'text-left bg-card border rounded-lg p-4 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ' +
                 (isActive
                   ? 'border-foreground ring-1 ring-foreground'
                   : 'border-border hover:border-foreground/40')
