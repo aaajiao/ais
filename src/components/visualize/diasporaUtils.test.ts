@@ -771,21 +771,23 @@ describe('buildConstellation firstSaleDate', () => {
 // ─── v1.6 layoutConstellation (time-spiral) ────────────────────────────────
 
 describe('layoutConstellation (time-spiral)', () => {
-  it('artist center 落在 viewport 正中 (800×760 → (400, 380))', () => {
+  it('artist center 落在 viewport 正中 (1200×680 → (600, 340)，v1.6.x 第四轮椭圆化 viewBox)', () => {
     const c = buildConstellation([], []);
-    const layout = layoutConstellation(c, { width: 800, height: 760 });
-    expect(layout.center.x).toBe(400);
-    expect(layout.center.y).toBe(380);
+    const layout = layoutConstellation(c, { width: 1200, height: 680 });
+    expect(layout.center.x).toBe(600);
+    expect(layout.center.y).toBe(340);
   });
 
-  it('geometry 暴露 TIME_SPIRAL_GEOMETRY 常量（v1.6.x 第三轮放大：80 / 260 / 300）', () => {
+  it('geometry 暴露 TIME_SPIRAL_GEOMETRY 常量（R 不变 80 / 260 / 300，第四轮加 ASPECT_X=1.55）', () => {
     const c = buildConstellation([], []);
-    const layout = layoutConstellation(c, { width: 800, height: 760 });
+    const layout = layoutConstellation(c, { width: 1200, height: 680 });
     expect(layout.geometry.rInner).toBe(80);
     expect(layout.geometry.rOuterData).toBe(260);
     expect(layout.geometry.rGhost).toBe(300);
     // ANONYMOUS_R 仍导出向后兼容，但 layout 不再使用
     expect(layout.geometry.rAnonymous).toBe(TIME_SPIRAL_GEOMETRY.ANONYMOUS_R);
+    // v1.6.x 第四轮新增：ASPECT_X 椭圆化系数
+    expect(TIME_SPIRAL_GEOMETRY.ASPECT_X).toBe(1.55);
   });
 
   it('dated entity 按时间映射径向：earliest → r=R_INNER + 12 点钟（phyllotaxis i=0 起点）；latest → r=R_OUTER_DATA + angle 按 i×GOLDEN_ANGLE 分配', () => {
@@ -803,16 +805,18 @@ describe('layoutConstellation (time-spiral)', () => {
       makeLocation('loc-late', 'Late Museum', 'museum'),
     ];
     const c = buildConstellation(editions, locations);
-    const layout = layoutConstellation(c, { width: 800, height: 760 });
+    const layout = layoutConstellation(c, { width: 1200, height: 680 });
 
     const early = layout.locationPoints.find((p) => p.node.id === 'loc-early')!;
     const late = layout.locationPoints.find((p) => p.node.id === 'loc-late')!;
 
     // earliest → r ≈ R_INNER (80), angle = -π/2（i=0 phyllotaxis 起点）
+    // 12 点钟方向：cos(-π/2)=0 → x = cx = 600（ASPECT_X 在 cos=0 处不显影响）
+    // sin(-π/2)=-1 → y = cy - R_INNER = 340 - 80 = 260
     expect(early.r).toBeCloseTo(TIME_SPIRAL_GEOMETRY.R_INNER, 4);
     expect(early.angle).toBeCloseTo(-Math.PI / 2, 4);
-    expect(early.x).toBeCloseTo(400, 4);
-    expect(early.y).toBeCloseTo(380 - TIME_SPIRAL_GEOMETRY.R_INNER, 4);
+    expect(early.x).toBeCloseTo(600, 4);
+    expect(early.y).toBeCloseTo(340 - TIME_SPIRAL_GEOMETRY.R_INNER, 4);
 
     // latest → r ≈ R_OUTER_DATA (260), angle = -π/2 + 1·GOLDEN_ANGLE
     // R_INNER=80 与 R_OUTER_DATA=260 距离已超过两节点视觉半径之和，碰撞推开不会触发
@@ -829,16 +833,17 @@ describe('layoutConstellation (time-spiral)', () => {
     ];
     const locations = [makeLocation('loc-only', 'Only Gallery', 'gallery')];
     const c = buildConstellation(editions, locations);
-    const layout = layoutConstellation(c, { width: 800, height: 760 });
+    const layout = layoutConstellation(c, { width: 1200, height: 680 });
     const p = layout.locationPoints[0];
     const midR =
       TIME_SPIRAL_GEOMETRY.R_INNER +
       (TIME_SPIRAL_GEOMETRY.R_OUTER_DATA - TIME_SPIRAL_GEOMETRY.R_INNER) / 2;
     expect(p.r).toBeCloseTo(midR, 4);
     expect(p.angle).toBeCloseTo(-Math.PI / 2, 4);
-    expect(p.x).toBeCloseTo(400, 4);
-    // cy = 760/2 = 380, 12 点钟方向 → y = cy − midR
-    expect(p.y).toBeCloseTo(380 - midR, 4);
+    // cx = 1200/2 = 600；12 点钟 → cos=0 → x = cx 不受 ASPECT_X 影响
+    expect(p.x).toBeCloseTo(600, 4);
+    // cy = 680/2 = 340, 12 点钟方向 → y = cy − midR
+    expect(p.y).toBeCloseTo(340 - midR, 4);
   });
 
   it('所有 dated entity firstSaleDate 完全相同 → span=0 fallback 到径向中点', () => {
@@ -851,7 +856,7 @@ describe('layoutConstellation (time-spiral)', () => {
       makeLocation('loc-b', 'B', 'museum'),
     ];
     const c = buildConstellation(editions, locations);
-    const layout = layoutConstellation(c, { width: 800, height: 760 });
+    const layout = layoutConstellation(c, { width: 1200, height: 680 });
     const midR =
       TIME_SPIRAL_GEOMETRY.R_INNER +
       (TIME_SPIRAL_GEOMETRY.R_OUTER_DATA - TIME_SPIRAL_GEOMETRY.R_INNER) / 2;
@@ -874,14 +879,18 @@ describe('layoutConstellation (time-spiral)', () => {
       makeLocation('loc-3', 'C', 'private_collection'),
     ];
     const c = buildConstellation(editions, locations);
-    const layout = layoutConstellation(c, { width: 800, height: 760 });
+    const layout = layoutConstellation(c, { width: 1200, height: 680 });
     expect(layout.locationPoints).toHaveLength(3);
+    // v1.6.x 第四轮：椭圆化后点不在圆上，在 ellipse 上：
+    // ((x-cx)/(R·ASPECT_X))² + ((y-cy)/R)² = 1
+    // cx=600, cy=340, R=R_GHOST=300, ASPECT_X=1.55
+    const { R_GHOST, ASPECT_X } = TIME_SPIRAL_GEOMETRY;
     for (const p of layout.locationPoints) {
-      expect(p.r).toBeCloseTo(TIME_SPIRAL_GEOMETRY.R_GHOST, 4);
+      expect(p.r).toBeCloseTo(R_GHOST, 4);
       expect(p.isUndated).toBe(true);
-      // cy = 760/2 = 380
-      const d = Math.sqrt((p.x - 400) ** 2 + (p.y - 380) ** 2);
-      expect(d).toBeCloseTo(TIME_SPIRAL_GEOMETRY.R_GHOST, 2);
+      const nx = (p.x - 600) / (R_GHOST * ASPECT_X);
+      const ny = (p.y - 340) / R_GHOST;
+      expect(nx * nx + ny * ny).toBeCloseTo(1, 2);
     }
     // 第一个 undated entity 落在 12 点钟方向
     const first = layout.locationPoints[0];
@@ -909,7 +918,7 @@ describe('layoutConstellation (time-spiral)', () => {
       makeLocation('loc-g1', 'Gallery', 'gallery'),
     ];
     const c = buildConstellation(editions, locations);
-    const layout = layoutConstellation(c, { width: 800, height: 760 });
+    const layout = layoutConstellation(c, { width: 1200, height: 680 });
     expect(layout.locationPoints).toHaveLength(2);
     expect(layout.namedPoints).toHaveLength(1);
     // earliest (loc-m1) r ≈ R_INNER；latest (loc-g1) r ≈ R_OUTER_DATA
@@ -959,7 +968,7 @@ describe('layoutConstellation (time-spiral)', () => {
       makeEdition('e3', null, { status: 'sold', sale_date: '2024-12-31' }),
     ];
     const c = buildConstellation(editions, []);
-    const layout = layoutConstellation(c, { width: 800, height: 760 });
+    const layout = layoutConstellation(c, { width: 1200, height: 680 });
     expect(layout.anonymousPoints).toHaveLength(3);
     // 三条都按时间螺旋落点
     for (const p of layout.anonymousPoints) {
@@ -978,7 +987,7 @@ describe('layoutConstellation (time-spiral)', () => {
       makeEdition('e2', null, { status: 'gifted', sale_date: null }),
     ];
     const c = buildConstellation(editions, []);
-    const layout = layoutConstellation(c, { width: 800, height: 760 });
+    const layout = layoutConstellation(c, { width: 1200, height: 680 });
     expect(layout.anonymousPoints).toHaveLength(2);
     for (const p of layout.anonymousPoints) {
       expect(p.r).toBeCloseTo(TIME_SPIRAL_GEOMETRY.R_GHOST, 4);
@@ -1007,7 +1016,7 @@ describe('layoutConstellation (time-spiral)', () => {
     const c = buildConstellation(editions, [
       makeLocation('loc-mid', 'Mid Gallery', 'gallery'),
     ]);
-    const layout = layoutConstellation(c, { width: 800, height: 760 });
+    const layout = layoutConstellation(c, { width: 1200, height: 680 });
     const locP = layout.locationPoints[0];
     // 2020 在 2015→2025 中点 → t≈0.5 → r 在 R_INNER/R_OUTER_DATA 中段
     const midR =
@@ -1026,7 +1035,7 @@ describe('layoutConstellation (time-spiral)', () => {
     const c = buildConstellation(editions, [
       makeLocation('loc-late', 'Late', 'gallery'),
     ]);
-    const layout = layoutConstellation(c, { width: 800, height: 760 });
+    const layout = layoutConstellation(c, { width: 1200, height: 680 });
     expect(layout.anonymousPoints).toHaveLength(1);
     const anonP = layout.anonymousPoints[0];
     expect(anonP.r).toBeCloseTo(TIME_SPIRAL_GEOMETRY.R_INNER, 4);
@@ -1047,7 +1056,7 @@ describe('layoutConstellation (time-spiral)', () => {
       makeEdition('e5', null, { status: 'sold', sale_date: '2024-02-15', buyer_name: 'E' }),
     ];
     const c = buildConstellation(editions, []);
-    const layout = layoutConstellation(c, { width: 800, height: 760 });
+    const layout = layoutConstellation(c, { width: 1200, height: 680 });
     // 5 个 named buyer 全是 dated → 都在 namedPoints
     expect(layout.namedPoints).toHaveLength(5);
     // 所有 angle 互异（无 entity 落同一点）
@@ -1073,7 +1082,7 @@ describe('layoutConstellation (time-spiral)', () => {
       makeLocation('loc-b', 'B', 'gallery'),
       makeLocation('loc-c', 'C', 'gallery'),
     ]);
-    const layout = layoutConstellation(c, { width: 800, height: 760 });
+    const layout = layoutConstellation(c, { width: 1200, height: 680 });
     const a = layout.locationPoints.find((p) => p.node.id === 'loc-a')!;
     const b = layout.locationPoints.find((p) => p.node.id === 'loc-b')!;
     const cP = layout.locationPoints.find((p) => p.node.id === 'loc-c')!;
@@ -1128,7 +1137,7 @@ describe('layoutConstellation (time-spiral)', () => {
       makeLocation('loc-g', 'G', 'gallery'),
     ];
     const c = buildConstellation(editions, locations);
-    const layout = layoutConstellation(c, { width: 800, height: 760 });
+    const layout = layoutConstellation(c, { width: 1200, height: 680 });
 
     // 收集所有 dated point + 视觉半径
     const all: Array<{ x: number; y: number; r: number; id: string }> = [];
@@ -1410,29 +1419,29 @@ describe('layoutGhostRing', () => {
   }
 
   it('N=0 → 空数组（view 据此不渲染）', () => {
-    expect(layoutGhostRing([], { width: 800, height: 760 })).toEqual([]);
+    expect(layoutGhostRing([], { width: 1200, height: 680 })).toEqual([]);
   });
 
-  it('默认 radius=340，center 取 (width/2, height/2)（v1.6.x 第三轮：245→340，viewBox 600→760）', () => {
+  it('默认 radius=340，center 取 (width/2, height/2)（v1.6.x 第四轮 viewBox 1200×680 → center (600, 340)）', () => {
     const ghosts = [makeGhost('e1')];
-    const pts = layoutGhostRing(ghosts, { width: 800, height: 760 });
+    const pts = layoutGhostRing(ghosts, { width: 1200, height: 680 });
     expect(pts).toHaveLength(1);
-    // 第一点 angle = -π/2，落 (400, 380 - 340) = (400, 40)
+    // 第一点 angle = -π/2 → cos=0，ASPECT_X 不影响 x；落 (600, 340 - 340) = (600, 0)
     expect(pts[0].angle).toBeCloseTo(-Math.PI / 2, 4);
-    expect(pts[0].x).toBeCloseTo(400, 4);
-    expect(pts[0].y).toBeCloseTo(40, 4);
+    expect(pts[0].x).toBeCloseTo(600, 4);
+    expect(pts[0].y).toBeCloseTo(0, 4);
   });
 
   it('N>0 第一点 angle = -π/2（12 点钟起点）', () => {
     const ghosts = [makeGhost('e1'), makeGhost('e2'), makeGhost('e3')];
-    const pts = layoutGhostRing(ghosts, { width: 800, height: 760 });
+    const pts = layoutGhostRing(ghosts, { width: 1200, height: 680 });
     expect(pts[0].angle).toBeCloseTo(-Math.PI / 2, 4);
   });
 
   it('N 个点均匀分布 360°（相邻 angle 差 = 2π/N）', () => {
     const N = 5;
     const ghosts = Array.from({ length: N }, (_, i) => makeGhost(`e${i}`));
-    const pts = layoutGhostRing(ghosts, { width: 800, height: 760 });
+    const pts = layoutGhostRing(ghosts, { width: 1200, height: 680 });
     expect(pts).toHaveLength(N);
     const expectedStep = (2 * Math.PI) / N;
     for (let i = 1; i < N; i++) {
@@ -1440,25 +1449,29 @@ describe('layoutGhostRing', () => {
     }
   });
 
-  it('每个点到 center 距离 = radius（默认 340）', () => {
+  it('每个点落在 ellipse 上：((x-cx)/(r·ASPECT_X))² + ((y-cy)/r)² = 1（v1.6.x 第四轮椭圆化）', () => {
     const ghosts = [makeGhost('e1'), makeGhost('e2'), makeGhost('e3'), makeGhost('e4')];
-    const pts = layoutGhostRing(ghosts, { width: 800, height: 760 });
+    const pts = layoutGhostRing(ghosts, { width: 1200, height: 680 });
+    const radius = 340;
+    const { ASPECT_X } = TIME_SPIRAL_GEOMETRY;
     for (const p of pts) {
-      // cy = 760/2 = 380
-      const d = Math.sqrt((p.x - 400) ** 2 + (p.y - 380) ** 2);
-      expect(d).toBeCloseTo(340, 4);
+      // cx=600, cy=340；ellipse 不变量
+      const nx = (p.x - 600) / (radius * ASPECT_X);
+      const ny = (p.y - 340) / radius;
+      expect(nx * nx + ny * ny).toBeCloseTo(1, 4);
     }
   });
 
   it('自定义 radius option 生效', () => {
     const ghosts = [makeGhost('e1')];
-    const pts = layoutGhostRing(ghosts, { width: 800, height: 760, radius: 380 });
-    expect(pts[0].y).toBeCloseTo(0, 4); // 12 点钟方向 cy - radius = 380 - 380 = 0
+    // cy = 680/2 = 340，自定义 radius = 340 让 12 点钟方向落到 y=0
+    const pts = layoutGhostRing(ghosts, { width: 1200, height: 680, radius: 340 });
+    expect(pts[0].y).toBeCloseTo(0, 4); // 12 点钟方向 cy - radius = 340 - 340 = 0
   });
 
   it('每个 GhostRingPoint 带 ghost meta（用于 view 渲染 + click 跳转）', () => {
     const ghosts = [makeGhost('e1', 'in_production')];
-    const pts = layoutGhostRing(ghosts, { width: 800, height: 760 });
+    const pts = layoutGhostRing(ghosts, { width: 1200, height: 680 });
     expect(pts[0].ghost.editionId).toBe('e1');
     expect(pts[0].ghost.status).toBe('in_production');
   });

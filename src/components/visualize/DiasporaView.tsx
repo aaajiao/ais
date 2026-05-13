@@ -37,11 +37,17 @@ export interface DiasporaViewProps {
 // SVG 内部坐标系（固定，用 viewBox 响应式缩放）
 // v1.6.x: H 从 560 → 600 给 top/bottom 节点 label 留余裕（R_GHOST 内缩同时进行）
 // v1.6.x 第三轮：H 600 → 760，配合主圈整体放大（R 60→80 / 190→260 / 220→300）
-//   + ghost ring 245→340，给跨类碰撞 (location ↔ named_private) 更大圆周散开
-//   空间。maxHeight: '70vh' 容器约束不变 —— 浏览器视觉高度不变，只是 viewBox
-//   单位空间变大让 layout 用得开。artist center r=12 不变。
-const W = 800;
-const H = 760;
+//   + ghost ring 245→340，给跨类碰撞 (location ↔ named_private) 更大圆周散开。
+// v1.6.x 第四轮：**viewBox 椭圆化** —— W 800 → 1200，H 760 → 680（16:9 黄金近似）。
+//   第三轮 800×760 接近正方形，但页面容器 ≈ 1280 横宽 vs maxHeight: 70vh ≈ 740 →
+//   横向空间浪费严重。第四轮把 viewBox 拉成 1200×680，配合
+//   `TIME_SPIRAL_GEOMETRY.ASPECT_X = 1.55` 把 spiral 的 x 坐标拉伸 —— 主圈变椭圆，
+//   填满 viewBox 横向。**节点的 organic blob 形状不变**（只对 layout 拉伸，不对
+//   shape 拉伸）；anonymous / ghost dust 仍是规则几何圆。"椭圆化是 organic 哲学
+//   的扩展：节点不规则 + 整体不规则圆 = 两层 brutalist organic"。
+// artist center r=12 不变（在 center 点，不受 ASPECT_X 影响）。
+const W = 1200;
+const H = 680;
 
 /** 从 VizArtwork 数组取得 artwork_id → artwork 的 Map */
 function buildArtworkMap(artworks: VizArtwork[]): Map<string, VizArtwork> {
@@ -284,15 +290,20 @@ export default function DiasporaView({
           ] as Array<[LocationNode['type'], number]>
         ).map(([type, opacity]) => (
           <span key={type} className="flex items-center gap-1.5">
+            {/*
+              chip 放大到 20×20 + baseR=8 让 ±25% organic 扰动可见
+              (12×12 baseR=5 → 视觉扰动 1.25px 太小看不出；20×20 baseR=8
+              → 视觉扰动 2px，肉眼能识别 5 个 type 各自的 organic 指纹)。
+            */}
             <svg
-              width="12"
-              height="12"
-              viewBox="0 0 12 12"
+              width="20"
+              height="20"
+              viewBox="0 0 20 20"
               aria-hidden="true"
-              className="text-foreground"
+              className="text-foreground shrink-0"
             >
               <path
-                d={generateOrganicPath(6, 6, 5, type)}
+                d={generateOrganicPath(10, 10, 8, type)}
                 fill="currentColor"
                 opacity={opacity}
               />

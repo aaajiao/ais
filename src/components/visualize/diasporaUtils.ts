@@ -296,27 +296,42 @@ export function buildConstellation(
 // 历史 ANONYMOUS_R = 310 常量保留导出（向后兼容），但 layout 不再使用。
 
 /**
- * 几何常量（坐标在 800×760 viewBox 内，v1.6.x 第三轮 H 600→760 + R 等比扩），
+ * 几何常量（坐标在 1200×680 viewBox 内，v1.6.x 第四轮椭圆化），
  * 固定值便于测试断言精确。
  *
  * v1.6.x 一/二轮：viewBox 600 高，R 60/190/220。实测 37 个 entity 在 R_INNER=60
- * 附近圆周太挤，跨类（location ↔ named_private）仍出现严重重叠：
- *   - location × named_private  gap=-12.7 px
- *   - location × named_private  gap=-12.4 px
- * 第三轮把主圈整体放大 ~37%（R_INNER 60→80 / R_OUTER_DATA 190→260 / R_GHOST 220→
- * 300）+ 把碰撞推开 step/iters/pad 加力，让相同 N 在更大圆周上散开。viewBox 高
- * 也跟着拉到 760（800×760）给最外圈 ghost ring（R=340）+ label 留 padding。
+ * 附近圆周太挤，跨类（location ↔ named_private）仍出现严重重叠。
+ *
+ * 第三轮：主圈整体放大 ~37%（R_INNER 60→80 / R_OUTER_DATA 190→260 / R_GHOST 220→
+ * 300）+ 碰撞推开 step/iters/pad 加力。viewBox 高 600→760。
+ *
+ * **第四轮：viewBox 横向化 + 椭圆 layout**。第三轮 viewBox 800×760 接近正方形，
+ * 页面 container ≈ 1280 横宽但 maxHeight: 70vh ≈ 740 → 横向空间浪费严重。第四轮
+ * 改 viewBox 为 **1200×680**（16:9 黄金近似），并加 `ASPECT_X` 让所有 spiral 点的
+ * x 坐标乘 ~1.55 —— **R 不变，layout 椭圆化**。节点的 organic blob 形状不变
+ * （只对 layout 拉伸，不对 shape 拉伸）；anonymous / ghost dust 仍是规则几何圆。
+ * "椭圆化是 organic 哲学的扩展：节点不规则 + 整体不规则圆 = 两层 brutalist organic"。
  *
  * `ANONYMOUS_R` 保留导出仅向后兼容 —— anonymous 不再单独 ring，每条 anonymous
  * edition 走时间螺旋（参见 layoutConstellation）。
  */
 export const TIME_SPIRAL_GEOMETRY = {
-  /** 离 artist center 最近的有数据 entity 半径 */
+  /** 离 artist center 最近的有数据 entity 半径（径向，未经 x 拉伸） */
   R_INNER: 80,
-  /** 有 sale_date 数据的 entity 最远径向距离 */
+  /** 有 sale_date 数据的 entity 最远径向距离（径向，未经 x 拉伸） */
   R_OUTER_DATA: 260,
-  /** 缺 sale_date 的 entity 推到这个外圈 */
+  /** 缺 sale_date 的 entity 推到这个外圈（径向，未经 x 拉伸） */
   R_GHOST: 300,
+  /**
+   * x 维度拉伸系数（v1.6.x 第四轮）—— viewBox 是 1200×680 横向宽，主圈变椭圆。
+   * 节点 x 坐标 = cx + r·cos·ASPECT_X，y 坐标 = cy + r·sin（不变）。
+   * 1.55 ≈ 1200/680 ≈ viewBox aspect ratio，让圆环填满 viewBox 横向。
+   *
+   * **碰撞推开**：因为 x 拉伸了，两节点真实笛卡尔距离 = √((Δx)²+(Δy)²) 仍正确
+   * （Δx 已含 ASPECT_X 放大效果）。推开后 j 的 angle 改变 → 重新算 x 时仍乘
+   * ASPECT_X，闭环一致。
+   */
+  ASPECT_X: 1.55,
   /** @deprecated v1.6.x anonymous 走时间螺旋；常量保留向后兼容仅 */
   ANONYMOUS_R: 310,
 } as const;
@@ -460,7 +475,8 @@ export function layoutConstellation(
   const { width, height } = options;
   const cx = width / 2;
   const cy = height / 2;
-  const { R_INNER, R_OUTER_DATA, R_GHOST, ANONYMOUS_R } = TIME_SPIRAL_GEOMETRY;
+  const { R_INNER, R_OUTER_DATA, R_GHOST, ANONYMOUS_R, ASPECT_X } =
+    TIME_SPIRAL_GEOMETRY;
 
   // ─── 1. 三类 entity 合并收集（dated / undated 分桶）──────────────────────
   type DatedRef =
@@ -533,15 +549,16 @@ export function layoutConstellation(
       }
 
       // ─── 4. 碰撞推开（迭代）─────────────────────────────────────────
-      // chord = 2·R·sin((|θ_i − θ_j|)/2) 在不同 R 时不严格，但实际节点对
-      // r 接近时 (R 几乎相同) 已足够；我们直接用笛卡尔距离判断更可靠。
+      // chord 检查用真实渲染距离（含 ASPECT_X 椭圆化）—— 不然 repel 会和
+      // 屏幕上看到的间距不一致，pre-stretch 圆距下"夹紧"的两点 stretch 后
+      // 其实 x 已松开，repel 会过度推开 angle。第四轮椭圆化后必须用 stretched x。
       for (let iter = 0; iter < COLLISION_REPEL_MAX_ITERS; iter++) {
         let movedAny = false;
         for (let i = 0; i < N; i++) {
-          const xi = datedR[i] * Math.cos(datedAngle[i]);
+          const xi = datedR[i] * Math.cos(datedAngle[i]) * ASPECT_X;
           const yi = datedR[i] * Math.sin(datedAngle[i]);
           for (let j = i + 1; j < N; j++) {
-            const xj = datedR[j] * Math.cos(datedAngle[j]);
+            const xj = datedR[j] * Math.cos(datedAngle[j]) * ASPECT_X;
             const yj = datedR[j] * Math.sin(datedAngle[j]);
             const dx = xj - xi;
             const dy = yj - yi;
@@ -568,7 +585,8 @@ export function layoutConstellation(
     const ref = dated[i];
     const r = datedR[i];
     const angle = datedAngle[i];
-    const x = cx + r * Math.cos(angle);
+    // v1.6.x 第四轮：x 维度乘 ASPECT_X 把圆环拉成椭圆，利用 viewBox 横向空间
+    const x = cx + r * Math.cos(angle) * ASPECT_X;
     const y = cy + r * Math.sin(angle);
     if (ref.kind === 'location') {
       locationPoints.push({ node: ref.node, x, y, angle, r, isUndated: false });
@@ -593,7 +611,8 @@ export function layoutConstellation(
     const ref = undated[i];
     const angle = -Math.PI / 2 + (2 * Math.PI * i) / Math.max(1, undatedN);
     const r = R_GHOST;
-    const x = cx + r * Math.cos(angle);
+    // v1.6.x 第四轮：同样椭圆化（保持与 dated entity 一致的 x 拉伸）
+    const x = cx + r * Math.cos(angle) * ASPECT_X;
     const y = cy + r * Math.sin(angle);
     if (ref.kind === 'location') {
       locationPoints.push({ node: ref.node, x, y, angle, r, isUndated: true });
@@ -1223,13 +1242,16 @@ export function layoutGhostRing(
   const cx = options.width / 2;
   const cy = options.height / 2;
   const radius = options.radius ?? 340;
+  // v1.6.x 第四轮：跟 layoutConstellation 同步用 ASPECT_X 椭圆化 x 坐标，
+  // 保持 ghost ring 与主时间螺旋的视觉同源（都是 ellipse 不是 circle）。
+  const { ASPECT_X } = TIME_SPIRAL_GEOMETRY;
 
   const points: GhostRingPoint[] = [];
   for (let i = 0; i < N; i++) {
     const angle = -Math.PI / 2 + (2 * Math.PI * i) / N;
     points.push({
       ghost: ghosts[i],
-      x: cx + radius * Math.cos(angle),
+      x: cx + radius * Math.cos(angle) * ASPECT_X,
       y: cy + radius * Math.sin(angle),
       angle,
     });

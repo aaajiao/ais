@@ -825,19 +825,24 @@ describe('DiasporaView', () => {
       '[data-testid^="constellation-anon-"]'
     );
     expect(anons).toHaveLength(4);
-    // 收集所有 anonymous 中心到 viewport center 的距离
-    const dists = Array.from(anons).map((el) => {
-      const cx = parseFloat(el.getAttribute('cx') ?? '0');
-      const cy = parseFloat(el.getAttribute('cy') ?? '0');
-      const dx = cx - 400;
-      const dy = cy - 300;
-      return Math.sqrt(dx * dx + dy * dy);
+    // v1.6.x 第四轮：viewBox 1200×680 → center (600, 340)；layout 椭圆化 ASPECT_X=1.55
+    // 每个 anonymous 点都落在 ellipse((x-600)/(r·1.55))² + ((y-340)/r)² = 1 上
+    // 这里收集 |y - 340| 作为 r·|sin(angle)| 的代理：4 个点 r 不同 → |y - 340| 不同。
+    const ASPECT_X = 1.55;
+    const points = Array.from(anons).map((el) => {
+      const px = parseFloat(el.getAttribute('cx') ?? '0');
+      const py = parseFloat(el.getAttribute('cy') ?? '0');
+      return { px, py };
     });
-    // 不再全部固定一个半径（旧实现全 = ANONYMOUS_R 310）
-    const uniqDists = new Set(dists.map((d) => d.toFixed(2)));
-    expect(uniqDists.size).toBeGreaterThan(1);
-    // 缺 sale_date 的那个落 R_GHOST = 220
-    const hasGhost = dists.some((d) => Math.abs(d - 220) < 0.5);
+    // 每点反解 r：r² = ((x-cx)/ASPECT_X)² + (y-cy)²
+    const rs = points.map(({ px, py }) =>
+      Math.sqrt(((px - 600) / ASPECT_X) ** 2 + (py - 340) ** 2)
+    );
+    // 4 个点 r 不再全一样（旧实现全 = ANONYMOUS_R 310）
+    const uniqRs = new Set(rs.map((r) => r.toFixed(1)));
+    expect(uniqRs.size).toBeGreaterThan(1);
+    // 缺 sale_date 的那个落 R_GHOST = 300（v1.6.x 第三轮 220→300）
+    const hasGhost = rs.some((r) => Math.abs(r - 300) < 0.5);
     expect(hasGhost).toBe(true);
   });
 
