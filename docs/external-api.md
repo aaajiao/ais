@@ -98,7 +98,7 @@ GET /api/external/v1/schema
 | 参数 | 类型 | 说明 |
 |------|------|------|
 | query | string | 名称或城市 |
-| type | string | studio, gallery, museum, other |
+| type | string | studio, gallery, museum, private_collection, other |
 | country | string | 国家 |
 
 ### search_history

@@ -220,7 +220,7 @@ users (用户)
 |------|------|---------|------|
 | `id` | UUID | - | 主键 |
 | `name` | TEXT | 位置对话框 | 名称（必填） |
-| `type` | ENUM | 位置对话框 | studio/gallery/museum/other |
+| `type` | ENUM | 位置对话框 | studio/gallery/museum/private_collection/other |
 | `aliases` | TEXT[] | 位置对话框（高级） | 别名列表 |
 | `city` | TEXT | 位置对话框（高级） | 城市 |
 | `country` | TEXT | 位置对话框（高级） | 国家 |
@@ -462,7 +462,7 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 |--------|------|----------|
 | `user_role` | admin, editor | users 表（暂未使用） |
 | `user_status` | active, inactive | users 表（暂未使用） |
-| `location_type` | studio, gallery, museum, other | locations 表 |
+| `location_type` | studio, gallery, museum, private_collection, other | locations 表（v1.6.x 加 private_collection — Akeroyd / Sigg 类机构化的私人收藏） |
 | `edition_type` | numbered, ap, unique | editions 表 |
 | `edition_status` | in_production, in_studio, at_gallery, at_museum, in_transit, sold, gifted, lost, damaged | editions 表 |
 | `condition_type` | excellent, good, fair, poor, damaged | editions 表 |

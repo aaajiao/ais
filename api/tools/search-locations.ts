@@ -5,7 +5,7 @@ import { sanitizeSearchTerm } from '../lib/search-utils.js';
 import { createT } from '../lib/i18n.js';
 import { normalizeString, normalizeEnum } from '../lib/normalize-filters.js';
 
-const LOCATION_TYPES = ['studio', 'gallery', 'museum', 'other'] as const;
+const LOCATION_TYPES = ['studio', 'gallery', 'museum', 'private_collection', 'other'] as const;
 
 /**
  * 创建搜索位置工具

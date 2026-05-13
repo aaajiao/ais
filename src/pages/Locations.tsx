@@ -14,13 +14,14 @@ import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
-import { Home, Image, Building2, MapPin, X, Plus } from 'lucide-react';
+import { Home, Image, Building2, Library, MapPin, X, Plus } from 'lucide-react';
 
 // 位置类型图标组件
 const LOCATION_TYPE_ICONS: Record<LocationType, ReactNode> = {
   studio: <Home className="w-5 h-5" />,
   gallery: <Image className="w-5 h-5" />,
   museum: <Building2 className="w-5 h-5" />,
+  private_collection: <Library className="w-5 h-5" />,
   other: <MapPin className="w-5 h-5" />,
 };
 
@@ -156,7 +157,7 @@ export default function Locations() {
 
       {/* 统计卡片 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        {(['studio', 'gallery', 'museum', 'other'] as LocationType[]).map(type => (
+        {(['studio', 'gallery', 'museum', 'private_collection', 'other'] as LocationType[]).map(type => (
           <div
             key={type}
             className="bg-card border border-border rounded-lg p-4"
@@ -223,7 +224,7 @@ export default function Locations() {
         </div>
       ) : (
         <div className="space-y-6">
-          {(['studio', 'gallery', 'museum', 'other'] as LocationType[]).map(type => {
+          {(['studio', 'gallery', 'museum', 'private_collection', 'other'] as LocationType[]).map(type => {
             const filteredLocs = filterLocations(locationsByType[type] || []);
             if (filteredLocs.length === 0) return null;
 

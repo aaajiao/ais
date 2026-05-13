@@ -276,7 +276,7 @@ AI: [调用 search_artworks { materials: "磁铁" }]
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `query` | string | 否 | 搜索关键词（匹配名称或城市） |
-| `type` | enum | 否 | 位置类型：`studio` / `gallery` / `museum` / `other` |
+| `type` | enum | 否 | 位置类型：`studio` / `gallery` / `museum` / `private_collection` / `other` |
 | `country` | string | 否 | 国家 |
 
 **返回**

@@ -5,7 +5,7 @@ export type UserRole = 'admin' | 'editor';
 export type UserStatus = 'active' | 'inactive';
 
 // 位置类型
-export type LocationType = 'studio' | 'gallery' | 'museum' | 'other';
+export type LocationType = 'studio' | 'gallery' | 'museum' | 'private_collection' | 'other';
 
 // 版本类型
 export type EditionType = 'numbered' | 'ap' | 'unique';

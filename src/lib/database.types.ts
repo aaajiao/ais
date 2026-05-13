@@ -11,7 +11,7 @@ export type Json =
 // 枚举类型
 export type UserRole = 'admin' | 'editor';
 export type UserStatus = 'active' | 'inactive';
-export type LocationType = 'studio' | 'gallery' | 'museum' | 'other';
+export type LocationType = 'studio' | 'gallery' | 'museum' | 'private_collection' | 'other';
 export type EditionType = 'numbered' | 'ap' | 'unique';
 export type EditionStatus =
   | 'in_production'

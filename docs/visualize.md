@@ -106,7 +106,7 @@ interface UseTimelineScrubberResult<T> {
 
 - **Strata**：5 项 — held（stroke-only）/ external（dot pattern）/ departed（solid）/ degenerate（solid + X）/ unknownYear（stroke-only + `?`）。`separatorBefore="unknownYear"` 用 `│` 把 ownership 4 态跟"缺失态"分组。
 - **Markets**：2 项 — priced（solid circle）/ noPrice（stroke-only circle）
-- **Diaspora**：5 项 — studio / gallery / museum / other（按 location.type 染 opacity）+ `│` + ghost（stroke-only 圆，呼应 M2 ghost 环）
+- **Diaspora**：6 项 — studio / gallery / museum / private_collection / other（按 location.type 染 opacity，private_collection 跟 gallery/museum 同档 0.7）+ `│` + ghost（stroke-only 圆，呼应 M2 ghost 环）
 
 位置：Strata + Markets 的 Legend 在 SVG 下方、info bar 上方，作为 `border-t` block；Diaspora 的 legend 保留 M2 之前的位置（stat bar 之后、SVG 之前），加 ghost 项即可。
 

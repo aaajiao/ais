@@ -9,7 +9,7 @@ import type {
 export interface LocationNode {
   id: string;
   name: string;
-  type: 'studio' | 'gallery' | 'museum' | 'other';
+  type: 'studio' | 'gallery' | 'museum' | 'private_collection' | 'other';
   city: string | null;
   country: string | null;
   editionCount: number;
@@ -293,6 +293,7 @@ export const TYPE_OPACITY: Record<LocationNode['type'], number> = {
   studio: 1.0,
   gallery: 0.7,
   museum: 0.7,
+  private_collection: 0.7,
   other: 0.4,
 };
 

@@ -6,7 +6,7 @@ import { useState, useCallback, useRef, useEffect, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next';
 import { useLocations, type Location, type LocationSearchResult } from '@/hooks/useLocations';
 import type { LocationType } from '@/lib/database.types';
-import { Home, Image, Building2, MapPin, X, ChevronUp, ChevronDown, Plus, Check } from 'lucide-react';
+import { Home, Image, Building2, Library, MapPin, X, ChevronUp, ChevronDown, Plus, Check } from 'lucide-react';
 
 interface LocationPickerProps {
   value: string | null;
@@ -23,6 +23,7 @@ const TYPE_ICONS: Record<LocationType, ReactNode> = {
   studio: <Home className="w-4 h-4" />,
   gallery: <Image className="w-4 h-4" />,
   museum: <Building2 className="w-4 h-4" />,
+  private_collection: <Library className="w-4 h-4" />,
   other: <MapPin className="w-4 h-4" />,
 };
 

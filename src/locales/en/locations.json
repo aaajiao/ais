@@ -13,6 +13,7 @@
     "studio": "Studio",
     "gallery": "Gallery",
     "museum": "Museum",
+    "private_collection": "Private collection",
     "other": "Other"
   },
   "fields": {

@@ -127,6 +127,7 @@
       "studio": "Studio",
       "gallery": "Gallery",
       "museum": "Museum",
+      "private_collection": "Private collection",
       "other": "Other",
       "ghost": "no location (ghost)"
     },

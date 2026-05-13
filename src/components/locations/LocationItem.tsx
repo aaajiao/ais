@@ -10,7 +10,7 @@ import type { Location } from '@/hooks/useLocations';
 import type { LocationType } from '@/lib/database.types';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
-import { Home, Image, Building2, MapPin, Pencil, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Home, Image, Building2, Library, MapPin, Pencil, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface LocationItemProps {
   location: Location;
@@ -24,6 +24,7 @@ const TYPE_ICONS: Record<LocationType, ReactNode> = {
   studio: <Home className="w-5 h-5" />,
   gallery: <Image className="w-5 h-5" />,
   museum: <Building2 className="w-5 h-5" />,
+  private_collection: <Library className="w-5 h-5" />,
   other: <MapPin className="w-5 h-5" />,
 };
 

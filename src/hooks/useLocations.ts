@@ -237,6 +237,7 @@ export function useLocations() {
       studio: [],
       gallery: [],
       museum: [],
+      private_collection: [],
       other: [],
     };
 
@@ -252,6 +253,7 @@ export function useLocations() {
     studio: '工作室',
     gallery: '画廊',
     museum: '美术馆',
+    private_collection: '私人收藏',
     other: '其他',
   };
 

@@ -12,7 +12,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE TYPE user_role AS ENUM ('admin', 'editor');
 CREATE TYPE user_status AS ENUM ('active', 'inactive');
-CREATE TYPE location_type AS ENUM ('studio', 'gallery', 'museum', 'other');
+CREATE TYPE location_type AS ENUM ('studio', 'gallery', 'museum', 'private_collection', 'other');
 CREATE TYPE edition_type AS ENUM ('numbered', 'ap', 'unique');
 CREATE TYPE edition_status AS ENUM (
   'in_production',

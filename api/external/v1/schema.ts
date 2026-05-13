@@ -74,7 +74,7 @@ const SCHEMA = {
       description: 'Search locations/galleries by name, city, type, country.',
       params: {
         query: { type: 'string', nullable: true, description: 'Search keywords (name or city)' },
-        type: { type: 'string', nullable: true, enum: ['studio', 'gallery', 'museum', 'other'], description: 'Location type' },
+        type: { type: 'string', nullable: true, enum: ['studio', 'gallery', 'museum', 'private_collection', 'other'], description: 'Location type' },
         country: { type: 'string', nullable: true, description: 'Country' },
       },
     },

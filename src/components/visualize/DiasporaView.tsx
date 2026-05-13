@@ -243,6 +243,7 @@ export default function DiasporaView({
             ['studio', 1.0],
             ['gallery', 0.7],
             ['museum', 0.7],
+            ['private_collection', 0.7],
             ['other', 0.4],
           ] as Array<[LocationNode['type'], number]>
         ).map(([type, opacity]) => (

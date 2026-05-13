@@ -9,7 +9,7 @@ import type { LocationType } from '@/lib/database.types';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
-import { Home, Image, Building2, MapPin, X, ChevronDown, ChevronRight } from 'lucide-react';
+import { Home, Image, Building2, Library, MapPin, X, ChevronDown, ChevronRight } from 'lucide-react';
 
 interface LocationDialogProps {
   isOpen: boolean;
@@ -26,11 +26,12 @@ const LOCATION_TYPE_ICONS: Record<LocationType, ReactNode> = {
   studio: <Home className="w-4 h-4" />,
   gallery: <Image className="w-4 h-4" />,
   museum: <Building2 className="w-4 h-4" />,
+  private_collection: <Library className="w-4 h-4" />,
   other: <MapPin className="w-4 h-4" />,
 };
 
 // 位置类型值
-const LOCATION_TYPE_VALUES: LocationType[] = ['studio', 'gallery', 'museum', 'other'];
+const LOCATION_TYPE_VALUES: LocationType[] = ['studio', 'gallery', 'museum', 'private_collection', 'other'];
 
 export default function LocationDialog({
   isOpen,
