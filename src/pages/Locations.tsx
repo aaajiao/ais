@@ -42,6 +42,13 @@ export default function Locations() {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [locationUsage, setLocationUsage] = useState<Record<string, number>>({});
+  // 顶部分类卡 = 可点击 filter；null = 显示全部，再点同 type 关闭回 null
+  const [selectedType, setSelectedType] = useState<LocationType | null>(null);
+
+  // toggle 分类卡：未选 → 设为该 type；已选 → 清空回 null
+  const handleTypeFilter = useCallback((type: LocationType) => {
+    setSelectedType((prev) => (prev === type ? null : type));
+  }, []);
 
   // 加载每个位置的使用次数
   useEffect(() => {
@@ -155,20 +162,35 @@ export default function Locations() {
         </Button>
       </div>
 
-      {/* 统计卡片 */}
+      {/* 统计卡片：可点击 filter —— 点一个选中、再点取消、点别的切换 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        {(['studio', 'gallery', 'museum', 'private_collection', 'other'] as LocationType[]).map(type => (
-          <div
-            key={type}
-            className="bg-card border border-border rounded-lg p-4"
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-muted-foreground">{LOCATION_TYPE_ICONS[type]}</span>
-              <span className="text-sm text-muted-foreground">{t(`types.${type}`)}</span>
-            </div>
-            <p className="text-2xl font-semibold">{typeCounts[type] || 0}</p>
-          </div>
-        ))}
+        {(['studio', 'gallery', 'museum', 'private_collection', 'other'] as LocationType[]).map(type => {
+          const isActive = selectedType === type;
+          return (
+            <button
+              key={type}
+              type="button"
+              onClick={() => handleTypeFilter(type)}
+              aria-pressed={isActive}
+              className={
+                'text-left bg-card border rounded-lg p-4 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50 ' +
+                (isActive
+                  ? 'border-foreground ring-1 ring-foreground'
+                  : 'border-border hover:border-foreground/40')
+              }
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span className={isActive ? 'text-foreground' : 'text-muted-foreground'}>
+                  {LOCATION_TYPE_ICONS[type]}
+                </span>
+                <span className={'text-sm ' + (isActive ? 'text-foreground' : 'text-muted-foreground')}>
+                  {t(`types.${type}`)}
+                </span>
+              </div>
+              <p className="text-2xl font-semibold">{typeCounts[type] || 0}</p>
+            </button>
+          );
+        })}
       </div>
 
       {/* 搜索框 */}
@@ -224,7 +246,12 @@ export default function Locations() {
         </div>
       ) : (
         <div className="space-y-6">
-          {(['studio', 'gallery', 'museum', 'private_collection', 'other'] as LocationType[]).map(type => {
+          {(
+            // selectedType 非空 → 只渲染该 type；否则渲染全部 5 个 section
+            selectedType
+              ? [selectedType]
+              : (['studio', 'gallery', 'museum', 'private_collection', 'other'] as LocationType[])
+          ).map(type => {
             const filteredLocs = filterLocations(locationsByType[type] || []);
             if (filteredLocs.length === 0) return null;
 
