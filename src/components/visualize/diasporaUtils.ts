@@ -761,15 +761,35 @@ export function generateOrganicPath(
     });
   }
 
-  // v1.6.x 第五轮：从 quadratic bezier midpoint 写法换成 8 段 L polygon。
-  // 旧写法 `Q ctrl=cur end=midpoint(cur,next)` 让 path **只经过 midpoints**，
-  // 相邻 perturbed points 的扰动 ±25% 在 midpoint 上被平均化抵消 → 视觉
-  // 上仍接近圆。新写法 path **直接经过每个 perturbed point**，扰动完整
-  // 体现 —— 8 个不等径向的顶点形成"碎石形"，跟 viewBox 椭圆化的"非规则
-  // 圆"哲学统一（节点不规则 + 整体不规则圆 = 两层 brutalist organic）。
+  // v1.6.x 第六轮：Catmull-Rom spline 转 cubic bezier，path 平滑经过每个
+  // perturbed point。
+  //
+  // 演化轨迹：
+  // - 一轮 Q midpoint bezier → 扰动被 midpoint 平均化 → 形状似圆
+  // - 五轮 L polygon → 扰动完整体现但棱角太硬 → 不是 organic 流体
+  // - 六轮 Catmull-Rom C cubic → smooth flow + 扰动完整体现 = 流体不规则形
+  //
+  // Catmull-Rom 公式（tension=1/6 标准值）：
+  //   段 i 从 p_i 到 p_{i+1}：
+  //   ctrl1 = p_i + (p_{i+1} - p_{i-1}) / 6
+  //   ctrl2 = p_{i+1} - (p_{i+2} - p_i) / 6
+  //   C ctrl1 ctrl2 p_{i+1}
+  // 跨边界用 modulo 取环形邻居（首尾 perturbed point 平滑闭合）。
+  const tension = 1 / 6;
   let path = `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
-  for (let i = 1; i < segments; i++) {
-    path += ` L ${points[i].x.toFixed(2)} ${points[i].y.toFixed(2)}`;
+  for (let i = 0; i < segments; i++) {
+    const p0 = points[(i - 1 + segments) % segments];
+    const p1 = points[i];
+    const p2 = points[(i + 1) % segments];
+    const p3 = points[(i + 2) % segments];
+    const c1x = p1.x + (p2.x - p0.x) * tension;
+    const c1y = p1.y + (p2.y - p0.y) * tension;
+    const c2x = p2.x - (p3.x - p1.x) * tension;
+    const c2y = p2.y - (p3.y - p1.y) * tension;
+    path +=
+      ` C ${c1x.toFixed(2)} ${c1y.toFixed(2)}` +
+      ` ${c2x.toFixed(2)} ${c2y.toFixed(2)}` +
+      ` ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`;
   }
   return path + ' Z';
 }

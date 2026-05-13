@@ -1250,35 +1250,45 @@ describe('generateOrganicPath', () => {
     expect(a).not.toBe(b);
   });
 
-  it('path format: 以 M 开头、Z 结尾、7 段 L（v1.6.x 第五轮：8 段 polygon = 1 M + 7 L + 1 Z）', () => {
+  it('path format: 以 M 开头、Z 结尾、8 段 C cubic bezier（v1.6.x 第六轮：Catmull-Rom smooth）', () => {
     const path = generateOrganicPath(100, 100, 20, 'x');
     expect(path.startsWith('M ')).toBe(true);
     expect(path.endsWith(' Z')).toBe(true);
-    const lCount = (path.match(/\sL\s/g) ?? []).length;
-    expect(lCount).toBe(7);
-    // 第五轮：从 Q midpoint bezier 换成 L polygon，让 perturbation ±25% 真正
-    // 体现在视觉上（旧 bezier midpoint 把相邻 perturbed points 的扰动平均化抵消）
+    const cCount = (path.match(/\sC\s/g) ?? []).length;
+    expect(cCount).toBe(8);
+    // 第六轮：L polygon → C cubic Catmull-Rom，path 平滑经过每个 perturbed point
+    // 同时保留 ±25% 扰动完整体现（既不是平均化掉的圆，也不是棱角硬 polygon）
     expect(path).not.toMatch(/\sQ\s/);
+    expect(path).not.toMatch(/\sL\s/);
   });
 
-  it('bounding box 大致 baseR ± 25%（路径所有点到中心距离 ≤ baseR × 1.25 + 浮点容差；v1.6.x 第二轮 ±15→±25）', () => {
+  it('bounding box 大致 baseR ± 25%（perturbed points 到中心距离 ≤ baseR × 1.25 + 浮点容差；控制点可能轻微 overshoot 但已 round-trip 回 anchor）', () => {
     const cx = 200;
     const cy = 150;
     const baseR = 18;
     const path = generateOrganicPath(cx, cy, baseR, 'akeroyd-collection');
-    // 解析所有 number（M cx cy / L x y）
-    const nums = path
-      .replace(/[MLZ,]/g, ' ')
-      .split(/\s+/)
-      .filter(Boolean)
-      .map(Number);
-    // 配对成 (x, y) 坐标
-    expect(nums.length % 2).toBe(0);
+    // 解析 path 命令 + 数值（M cx cy / C c1x c1y c2x c2y endX endY）。
+    // Catmull-Rom 控制点可能比 baseR × 1.25 略微 overshoot（这是 smooth 的代价），
+    // 所以只验证 anchor points（M 和每个 C 段的 end point = perturbed point）。
+    const tokens = path.split(/\s+/).filter(Boolean);
+    const anchorPoints: Array<{ x: number; y: number }> = [];
+    let i = 0;
+    while (i < tokens.length) {
+      const cmd = tokens[i];
+      if (cmd === 'M') {
+        anchorPoints.push({ x: +tokens[i + 1], y: +tokens[i + 2] });
+        i += 3;
+      } else if (cmd === 'C') {
+        // C c1x c1y c2x c2y endX endY —— 只取 endpoint
+        anchorPoints.push({ x: +tokens[i + 5], y: +tokens[i + 6] });
+        i += 7;
+      } else {
+        i += 1; // Z 等
+      }
+    }
     const allowedMaxDist = baseR * 1.25 + 1; // +1 浮点容差
-    for (let i = 0; i < nums.length; i += 2) {
-      const dx = nums[i] - cx;
-      const dy = nums[i + 1] - cy;
-      const d = Math.sqrt(dx * dx + dy * dy);
+    for (const p of anchorPoints) {
+      const d = Math.hypot(p.x - cx, p.y - cy);
       expect(d).toBeLessThanOrEqual(allowedMaxDist);
     }
   });
