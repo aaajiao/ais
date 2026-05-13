@@ -34,8 +34,18 @@ export interface MarketsTimelineRibbonProps {
 
 const MARKER_SIZE = 7;
 const PLAY_BTN_SIZE = 16;
-/** 直方图 bar 区域占 ribbon 顶部的高度 */
-const HIST_AREA_H = 22;
+/**
+ * 顶部 caption 行高 —— "YYYY-MM" 浮动 label 独占空间。
+ *
+ * v1.6.x 修复：之前 caption 用 `fill-foreground font-bold` 跟 histogram bar
+ * 同色，且 caption y≈11 在 histogram 区 [0, HIST_AREA_H] 内 —— marker 落在
+ * max-count bin 时 bar 从 y=0 满高画到 HIST_AREA_H，caption 整段被同色 bar
+ * 吞掉看不见。物理腾空间：caption 独占 ribbon 顶部一行，histogram 整体下移
+ * `TOP_LABEL_H`，保证 caption 永远在 histogram 之上。
+ */
+const TOP_LABEL_H = 12;
+/** 直方图 bar 区域占 ribbon 中段的高度（从 TOP_LABEL_H 起算） */
+const HIST_AREA_H = 20;
 /** baseline 与 histogram 间的小间距（marker 三角伸入空间） */
 const BASELINE_GAP = 0;
 /** 目标显示 tick label 数量（含首尾） */
@@ -135,7 +145,9 @@ export default function MarketsTimelineRibbon(props: MarketsTimelineRibbonProps)
     if (next !== currentDate) onDateChange(next);
   };
 
-  const baselineY = HIST_AREA_H + BASELINE_GAP;
+  // baseline 位置：先让出 TOP_LABEL_H 顶部行给 caption，再画 histogram，
+  // 然后是 baseline。改 TOP_LABEL_H / HIST_AREA_H 时下面所有派生量自动跟。
+  const baselineY = TOP_LABEL_H + HIST_AREA_H + BASELINE_GAP;
   const markerCx = dateToX(currentDate);
   const markerTopY = baselineY - MARKER_SIZE;
   const labelY = baselineY + 10;
@@ -156,27 +168,33 @@ export default function MarketsTimelineRibbon(props: MarketsTimelineRibbonProps)
       data-testid="visualize-timeline"
       transform={`translate(${xOffset}, ${yTop})`}
     >
-      {/* ─── histogram bars ────────────────────────────────────────────── */}
-      {bins.map((bin, i) => {
-        if (bin.count === 0) return null;
-        const x = i * binW;
-        const h = Math.max(1, (bin.count / Math.max(1, maxCount)) * HIST_AREA_H);
-        const y = HIST_AREA_H - h;
-        const binMs = isoToMs(bin.startISO);
-        const isFuture = binMs > cutoffMs;
-        return (
-          <rect
-            key={`hbar-${i}`}
-            data-testid={`hist-bar-${i}`}
-            x={x + 0.5}
-            y={y}
-            width={Math.max(0.5, binW - 1)}
-            height={h}
-            className="fill-foreground"
-            opacity={isFuture ? FUTURE_OPACITY : 1}
-          />
-        );
-      })}
+      {/* ─── histogram bars ────────────────────────────────────────────
+          整体下移 TOP_LABEL_H：caption 独占 ribbon 顶部一行（y ∈ [0, TOP_LABEL_H]），
+          bars 落在 y ∈ [TOP_LABEL_H, TOP_LABEL_H + HIST_AREA_H]，永远不跟 caption
+          几何重叠 —— 修 v1.6.x 之前 max-count bar 同色吞掉 caption 的 bug。
+          内部 bar 本地坐标 y = HIST_AREA_H - h 不动，只让外层 group 平移。 */}
+      <g transform={`translate(0, ${TOP_LABEL_H})`}>
+        {bins.map((bin, i) => {
+          if (bin.count === 0) return null;
+          const x = i * binW;
+          const h = Math.max(1, (bin.count / Math.max(1, maxCount)) * HIST_AREA_H);
+          const y = HIST_AREA_H - h;
+          const binMs = isoToMs(bin.startISO);
+          const isFuture = binMs > cutoffMs;
+          return (
+            <rect
+              key={`hbar-${i}`}
+              data-testid={`hist-bar-${i}`}
+              x={x + 0.5}
+              y={y}
+              width={Math.max(0.5, binW - 1)}
+              height={h}
+              className="fill-foreground"
+              opacity={isFuture ? FUTURE_OPACITY : 1}
+            />
+          );
+        })}
+      </g>
 
       {/* ─── baseline ──────────────────────────────────────────────────── */}
       <line
@@ -228,10 +246,14 @@ export default function MarketsTimelineRibbon(props: MarketsTimelineRibbonProps)
         points={`${markerCx},${baselineY} ${markerCx - MARKER_SIZE / 2},${markerTopY} ${markerCx + MARKER_SIZE / 2},${markerTopY}`}
         className="fill-foreground"
       />
-      {/* current date 浮动 label —— 在 marker 三角之上、histogram 顶部 */}
+      {/* current date 浮动 label —— 独占 ribbon 顶部一行 [0, TOP_LABEL_H]，
+          物理上**在** histogram 区之上（histogram 起始 y = TOP_LABEL_H），
+          所以即使 marker 落在 max-count bin，caption 也不会被同色 bar 遮挡。
+          baseline y = TOP_LABEL_H - 3 = 9，字号 10，文字大致占 y ∈ [1, 9]，
+          整段保持在 y < TOP_LABEL_H 范围内。 */}
       <text
         x={markerCx}
-        y={markerTopY - 4}
+        y={TOP_LABEL_H - 3}
         textAnchor="middle"
         fontSize="10"
         fontFamily="ui-monospace, monospace"

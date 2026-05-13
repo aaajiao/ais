@@ -14,7 +14,7 @@ function renderRibbon(
     axisWidth: 500,
     playBtnX: 520,
     yTop: 8,
-    ribbonH: 40,
+    ribbonH: 44,
     playing: false,
     onPlayToggle: vi.fn(),
     ...overrides,
@@ -127,9 +127,9 @@ describe('MarketsTimelineRibbon', () => {
         left: 0,
         top: 0,
         right: 500,
-        bottom: 40,
+        bottom: 44,
         width: 500,
-        height: 40,
+        height: 44,
         x: 0,
         y: 0,
         toJSON: () => ({}),
@@ -149,9 +149,9 @@ describe('MarketsTimelineRibbon', () => {
         left: 0,
         top: 0,
         right: 500,
-        bottom: 40,
+        bottom: 44,
         width: 500,
-        height: 40,
+        height: 44,
         x: 0,
         y: 0,
         toJSON: () => ({}),
@@ -184,9 +184,9 @@ describe('MarketsTimelineRibbon', () => {
         left: 0,
         top: 0,
         right: 500,
-        bottom: 40,
+        bottom: 44,
         width: 500,
-        height: 40,
+        height: 44,
         x: 0,
         y: 0,
         toJSON: () => ({}),
@@ -213,9 +213,9 @@ describe('MarketsTimelineRibbon', () => {
         left: 0,
         top: 0,
         right: 500,
-        bottom: 40,
+        bottom: 44,
         width: 500,
-        height: 40,
+        height: 44,
         x: 0,
         y: 0,
         toJSON: () => ({}),
@@ -247,9 +247,9 @@ describe('MarketsTimelineRibbon', () => {
         left: 0,
         top: 0,
         right: 500,
-        bottom: 40,
+        bottom: 44,
         width: 500,
-        height: 40,
+        height: 44,
         x: 0,
         y: 0,
         toJSON: () => ({}),
@@ -269,7 +269,7 @@ describe('MarketsTimelineRibbon', () => {
           axisWidth={500}
           playBtnX={520}
           yTop={8}
-          ribbonH={40}
+          ribbonH={44}
           playing={false}
           onPlayToggle={vi.fn()}
         />
@@ -335,6 +335,38 @@ describe('MarketsTimelineRibbon', () => {
     );
     expect(tickLabels.length).toBeLessThan(dates.length);
     expect(tickLabels.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('caption (YYYY-MM) 几何上独占顶行，不被 histogram bar 遮挡', () => {
+    // v1.6.x 回归：之前 caption y≈11 落在 histogram 区 [0, HIST_AREA_H=22] 内，
+    // 跟 bar 同色 fill-foreground，max-count bin 满高时 caption 被吞。
+    // 修复后 caption 独占 y ∈ [0, TOP_LABEL_H=12]，histogram 整体下移到
+    // y ∈ [12, 12+HIST_AREA_H=32]。
+    const { container } = renderRibbon();
+    const caption = container.querySelector(
+      '[data-testid="visualize-timeline-current"]'
+    );
+    expect(caption).toBeTruthy();
+    const captionY = Number(caption!.getAttribute('y'));
+    // caption 的 baseline 必须 ≤ TOP_LABEL_H（12）
+    expect(captionY).toBeLessThanOrEqual(12);
+
+    // 每根 hist-bar 的 y（在带 translate(0, TOP_LABEL_H) 的 group 里本地坐标
+    // 是 HIST_AREA_H - h；getBBox 在 jsdom 不可靠，所以验证父 group 的
+    // transform 携带正确的 translate）
+    const bars = Array.from(
+      container.querySelectorAll('[data-testid^="hist-bar-"]')
+    );
+    expect(bars.length).toBeGreaterThan(0);
+    for (const bar of bars) {
+      const parentG = bar.parentElement as Element | null;
+      expect(parentG?.getAttribute('transform')).toBe('translate(0, 12)');
+      // bar 本地 y >= 0（HIST_AREA_H - h，h ≤ HIST_AREA_H）
+      const barY = Number(bar.getAttribute('y'));
+      expect(barY).toBeGreaterThanOrEqual(0);
+      // 加上父 group 的 translate 后，bar 在 ribbon 内的绝对 y ≥ TOP_LABEL_H
+      expect(barY + 12).toBeGreaterThanOrEqual(12);
+    }
   });
 
   it('颜色全用 currentColor / fill-foreground', () => {

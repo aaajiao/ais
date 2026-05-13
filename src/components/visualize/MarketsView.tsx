@@ -29,8 +29,13 @@ const STAT_H = 56;         // 底部 stat 行高度
 const TOP_PAD = 8;
 // 顶层时间播头 ribbon（M1.5）—— 嵌入 SVG 内（取代 v1.5 之前的 widget Timeline）。
 // 仅在 saleDates.length > 1 时显示；不显示时 ribbonOffset=0，原有布局像素级保持。
-// Markets ribbon 用 activity histogram，比 Strata 高一些：22 直方图 + 2 间距 + 12 label
-const RIBBON_H = 40;
+// Markets ribbon 高度分配（v1.6.x）：
+//   12 顶部 caption 行（"YYYY-MM"，独占一行，避免被 histogram bar 同色遮挡）
+// + 20 histogram bar 区
+// +  3 tick mark + 间距
+// +  9 tick label 字号下沿
+// = 44 总高
+const RIBBON_H = 44;
 const RIBBON_GAP = 8;
 // M2: 缺价横条 —— 跨整宽，置于 stat 行下方。只在有缺价 sold edition 时占用空间。
 const NOPRICE_LANE_H = 28;
