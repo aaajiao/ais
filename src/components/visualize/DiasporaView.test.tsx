@@ -658,6 +658,82 @@ describe('DiasporaView', () => {
     expect(screen.queryByTestId('diaspora-legend-ghost')).toBeNull();
   });
 
+  it('Legend 5 个 type chip 用 <svg><path> organic blob 渲染（149dbd1：与主图节点视觉同源）', () => {
+    // type chips 必须是 generateOrganicPath 出的 inline SVG path（baseR=8 在 20×20 viewBox）
+    // —— 跟主图 location 节点同 hash 函数 + 同形状。回归到旧 `rounded-full` <span>
+    // block（圆 chip）会破坏"图例跟视觉编码同步"原则（视觉指南 #10）。
+    const { container } = renderDiaspora();
+    // 取 Legend 容器（在主 SVG 之前的 flex-wrap div，含 diaspora-legend-* testid）
+    const anonymousChip = container.querySelector(
+      '[data-testid="diaspora-legend-anonymous"]'
+    )!;
+    const legendContainer = anonymousChip.parentElement!;
+    // type chips 各自是一个含 <svg> 的 span（非 testid 名义节点，按结构选）
+    const typeSvgs = legendContainer.querySelectorAll(
+      'svg[aria-hidden="true"][viewBox="0 0 20 20"]'
+    );
+    expect(typeSvgs).toHaveLength(5); // studio / gallery / museum / private_collection / other
+    for (const svg of Array.from(typeSvgs)) {
+      const path = svg.querySelector('path');
+      expect(path).not.toBeNull();
+      const d = path!.getAttribute('d') ?? '';
+      expect(d.startsWith('M ')).toBe(true);
+      expect(d.endsWith(' Z')).toBe(true);
+      // 同主图节点：Catmull-Rom cubic bezier（v1.6.x 第六/七轮），不出现 Q / L 段
+      expect(d).not.toMatch(/\sQ\s/);
+      expect(d).not.toMatch(/\sL\s/);
+    }
+  });
+
+  it('Legend 不渲染裸 "type" 字符串（45c8d9d anti-regression：删除硬编码 "type" 标签）', () => {
+    // commit 45c8d9d 删掉了 Legend 上方一行硬编码英文 "type" 标签。回归会让
+    // 中文界面出现孤立英文单词 "type"，是 i18n 漏网典型症状。
+    // 容忍 "type" 出现在 inline aria/title/JSON attribute 里（这些不可见）；
+    // 只检查 Legend 容器**可见 textContent** 不含独立 "type" 单词。
+    const { container } = renderDiaspora();
+    const anonymousChip = container.querySelector(
+      '[data-testid="diaspora-legend-anonymous"]'
+    )!;
+    const legendContainer = anonymousChip.parentElement!;
+    // 用 word boundary 匹配，避免误伤 "private_collection" / "anonymous" 等单词
+    expect(legendContainer.textContent).not.toMatch(/\btype\b/i);
+  });
+
+  it('Ghost ring 顶节点完全在 viewBox 内（763f26f：R=320 修顶部 y<0 出界 bug）', () => {
+    // viewBox H=680 / cy=340 / radius 默认 320 / 顶点视觉 r=4
+    // → 12 点钟节点 cy = 340 - 320 = 20，circle r=4 顶边 = 20 - 4 = 16 ≥ 0
+    // R=340（旧值）会让顶点 cy=0、circle 顶 = -4 → 出 viewBox。
+    // 这条断言把"R 改回 340"或"H 改小"任何回归直接挡掉。
+    const ghostEditions: VizEdition[] = [
+      ...allEditions,
+      {
+        id: 'ghost-top',
+        artwork_id: 'artwork-1',
+        inventory_number: 'GH-TOP',
+        edition_type: 'numbered',
+        edition_number: 99,
+        status: 'in_studio',
+        location_id: null,
+        sale_price: null,
+        sale_currency: null,
+        sale_date: null,
+        buyer_name: null,
+        created_at: '2024-12-01T00:00:00Z', // 只有 1 个 ghost → 必落 12 点钟
+      },
+    ];
+    const { container } = renderDiaspora({ editions: ghostEditions });
+    const g = container.querySelector(
+      '[data-testid="constellation-ghost-ghost-top"]'
+    )!;
+    const circle = g.querySelector('circle')!;
+    const cy = parseFloat(circle.getAttribute('cy') ?? '0');
+    const r = parseFloat(circle.getAttribute('r') ?? '0');
+    // 节点视觉顶边 cy - r 必须 ≥ 0（落在 viewBox 内）
+    expect(cy - r).toBeGreaterThanOrEqual(0);
+    // 节点视觉底边 cy + r 必须 ≤ H=680（防对称回归）
+    expect(cy + r).toBeLessThanOrEqual(680);
+  });
+
   it('stat 区显示 untrackedHint 当有 ghost editions 时（v1.6.x 第二轮）', () => {
     const ghostEditions: VizEdition[] = [
       ...allEditions,

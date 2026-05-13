@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useParams, useLocation, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useBackToList } from '@/hooks/useBackToList';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -21,25 +22,6 @@ import {
   getAvailableEditionSlots,
   createNewEditionFromSlot,
 } from '@/components/artwork';
-
-/**
- * "返回"按钮 history-aware 处理：跟 EditionDetail 同模式。
- * - location.key === 'default' = entry/deep-link/reload → fallback 跳默认列表
- * - 否则 navigate(-1) 回上一页（从 visualize 来回 visualize）
- */
-function useBackToList(fallback: string) {
-  const navigate = useNavigate();
-  const location = useLocation();
-  return (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
-    e.preventDefault();
-    if (location.key === 'default') {
-      navigate(fallback);
-    } else {
-      navigate(-1);
-    }
-  };
-}
 
 export default function ArtworkDetail() {
   const { t } = useTranslation('artworkDetail');

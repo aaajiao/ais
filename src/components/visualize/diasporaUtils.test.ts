@@ -1318,6 +1318,11 @@ describe('generateOrganicPath', () => {
     // 大多 seed (>= 3/5) 应有显著差异 ratio > 1.5
     const significant = ratios.filter((r) => r > 1.5).length;
     expect(significant).toBeGreaterThanOrEqual(3);
+    // 至少 1 个 seed ratio > 1.8（防止 hash 函数 silent degradation —— 阈值 1.5
+    // 只 catch "完全退化到 polynomial-hash 似圆"，但 hash 实现 subtle 退化可能
+    // 让 ratio 从 1.5-2.0 范围塌缩到 1.5-1.6 全挤在临界值。加 max > 1.8 守住
+    // "至少有一个 seed 形态显著扰动"的下限，hash 实现回归更早暴露）。
+    expect(Math.max(...ratios)).toBeGreaterThan(1.8);
   });
 });
 
