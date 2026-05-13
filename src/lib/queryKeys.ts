@@ -10,6 +10,10 @@ export interface EditionFilters {
   status?: EditionStatus | 'all';
   search?: string;
   locationId?: string;
+  /** 服务端 .ilike('buyer_name', `%${value}%`) 模糊匹配；
+   *  跟 search 不同 —— search 跨多列 OR，buyerName 是 buyer 单列精确入口。
+   *  跳转入口：Diaspora named_private pin "查看全部"。 */
+  buyerName?: string;
 }
 
 // Query key factory

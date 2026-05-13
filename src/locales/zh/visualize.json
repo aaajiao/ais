@@ -154,6 +154,7 @@
     "pin": {
       "editionsAt": "此处 {{count}} 个版本",
       "viewAllAria": "查看此位置全部版本",
+      "viewAllBuyerAria": "查看 {{name}} 全部版本",
       "noInventory": "（无编号）",
       "unpinAria": "取消固定",
       "studios": "工作室 ({{count}})",

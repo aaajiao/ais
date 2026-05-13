@@ -7,7 +7,7 @@ import { StatusIndicator } from '@/components/ui/StatusIndicator';
 import ListEndIndicator from '@/components/ui/ListEndIndicator';
 import { ToggleChip } from '@/components/ui/toggle-chip';
 import { SearchInput } from '@/components/ui/SearchInput';
-import { Image, X, MapPin } from 'lucide-react';
+import { Image, X, MapPin, User } from 'lucide-react';
 import { queryKeys } from '@/lib/queryKeys';
 import { supabase } from '@/lib/supabase';
 import {
@@ -46,6 +46,9 @@ export default function Editions() {
   const initialFilter =
     (searchParams.get('status') as FilterStatus) || 'all';
   const locationIdParam = searchParams.get('locationId');
+  // ?buyerName= 跳转入口：Diaspora named_private pin "查看全部" 跳过来时按 buyer
+  // 模糊匹配。跟 locationId 同模式（URL 单值参数 + active chip + 清除按钮）。
+  const buyerNameParam = searchParams.get('buyerName');
 
   const [filter, setFilter] = useState<FilterStatus>(initialFilter);
   const [searchQuery, setSearchQuery] = useState('');
@@ -76,8 +79,9 @@ export default function Editions() {
       status: filter,
       search: debouncedSearchQuery,
       locationId: locationIdParam ?? undefined,
+      buyerName: buyerNameParam ?? undefined,
     }),
-    [filter, debouncedSearchQuery, locationIdParam]
+    [filter, debouncedSearchQuery, locationIdParam, buyerNameParam]
   );
 
   const queryFn = useEditionsQueryFn(filters);
@@ -121,6 +125,14 @@ export default function Editions() {
   const handleClearLocation = useCallback(() => {
     const next = new URLSearchParams(searchParams);
     next.delete('locationId');
+    setSearchParams(next);
+    parentRef.current?.scrollTo(0, 0);
+  }, [searchParams, setSearchParams, parentRef]);
+
+  // 清除 buyer 筛选 —— 同 location 模式
+  const handleClearBuyerName = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('buyerName');
     setSearchParams(next);
     parentRef.current?.scrollTo(0, 0);
   }, [searchParams, setSearchParams, parentRef]);
@@ -191,6 +203,24 @@ export default function Editions() {
             <MapPin className="w-3.5 h-3.5" />
             <span>
               {t('filters.locationLabel')}: {filterLocation?.name || locationIdParam}
+            </span>
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* buyer 过滤 active chip —— 从 Diaspora named_private 跳转过来时显示 */}
+      {buyerNameParam && (
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={handleClearBuyerName}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors text-sm"
+            aria-label={t('filters.clearBuyerName')}
+          >
+            <User className="w-3.5 h-3.5" />
+            <span>
+              {t('filters.buyerNameLabel')}: {buyerNameParam}
             </span>
             <X className="w-3.5 h-3.5" />
           </button>

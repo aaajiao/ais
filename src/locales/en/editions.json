@@ -12,7 +12,9 @@
     "inTransit": "In Transit",
     "sold": "Sold",
     "locationLabel": "Location",
-    "clearLocation": "Clear location filter"
+    "clearLocation": "Clear location filter",
+    "buyerNameLabel": "Buyer",
+    "clearBuyerName": "Clear buyer filter"
   },
   "editionNumber": "Edition #",
   "status": "Status",

@@ -1006,7 +1006,7 @@ export default function DiasporaView({
                             aria-label={t('diaspora.pin.viewStudioAria', {
                               name: studio.name,
                             })}
-                            className="text-left hover:text-foreground transition-colors cursor-pointer"
+                            className="group inline-flex items-center gap-1.5 text-left hover:text-foreground transition-colors cursor-pointer"
                             onClick={(e) => {
                               e.stopPropagation();
                               navigate(
@@ -1014,19 +1014,23 @@ export default function DiasporaView({
                               );
                             }}
                           >
-                            <span className="text-muted-foreground">
-                              ·{' '}
+                            <span className="text-muted-foreground">·</span>
+                            <span>
+                              {studio.city
+                                ? t('diaspora.pin.studioRowWithCity', {
+                                    name: studio.name,
+                                    city: studio.city,
+                                    count: studio.heldEditionCount,
+                                  })
+                                : t('diaspora.pin.studioRow', {
+                                    name: studio.name,
+                                    count: studio.heldEditionCount,
+                                  })}
                             </span>
-                            {studio.city
-                              ? t('diaspora.pin.studioRowWithCity', {
-                                  name: studio.name,
-                                  city: studio.city,
-                                  count: studio.heldEditionCount,
-                                })
-                              : t('diaspora.pin.studioRow', {
-                                  name: studio.name,
-                                  count: studio.heldEditionCount,
-                                })}
+                            <ArrowRight
+                              className="w-3 h-3 text-muted-foreground/60 group-hover:text-foreground transition-colors"
+                              aria-hidden="true"
+                            />
                           </button>
                         </li>
                       ))}
@@ -1122,6 +1126,27 @@ export default function DiasporaView({
                         e.stopPropagation();
                         navigate(
                           `/editions?locationId=${activeMeta.node.id}`
+                        );
+                      }}
+                    >
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {activeMeta.kind === 'named_private' && (
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      data-testid="diaspora-pin-view-all-buyer"
+                      aria-label={t('diaspora.pin.viewAllBuyerAria', {
+                        name: activeMeta.node.name,
+                      })}
+                      className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(
+                          `/editions?buyerName=${encodeURIComponent(activeMeta.node.name)}`
                         );
                       }}
                     >

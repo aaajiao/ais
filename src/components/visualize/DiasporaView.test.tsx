@@ -997,12 +997,34 @@ describe('DiasporaView', () => {
     expect(
       screen.getByRole('button', { name: 'AAJ-NAMED-001' })
     ).toBeInTheDocument();
-    // named_private pin 卡片没有 "view all" 按钮（无 locationId）
+    // named_private pin 卡片不显示 "查看此位置全部版本" 按钮（那是 location 专属）
     expect(
       screen.queryByRole('button', {
-        name: /查看此位置全部版本|View all editions/i,
+        name: /查看此位置全部版本|View all editions at this location/i,
       })
     ).not.toBeInTheDocument();
+  });
+
+  it('named_private pin 卡片有 "查看全部" 箭头 → navigate /editions?buyerName=...', () => {
+    renderDiaspora();
+    const named = screen.getByRole('button', { name: /Liliana Gao/i });
+    fireEvent.click(named);
+    const viewAll = screen.getByTestId('diaspora-pin-view-all-buyer');
+    expect(viewAll).toBeInTheDocument();
+    // aria-label 含 buyer name（中英任一）
+    expect(viewAll.getAttribute('aria-label')).toMatch(/Liliana Gao/);
+    fireEvent.click(viewAll);
+    expect(mockNavigate).toHaveBeenCalledWith(
+      '/editions?buyerName=Liliana%20Gao'
+    );
+  });
+
+  it('studio 行渲染 ArrowRight 箭头 affordance（视觉提示可点击）', () => {
+    renderDiaspora();
+    fireEvent.click(screen.getByTestId('constellation-artist'));
+    const studioBtn = screen.getByTestId('diaspora-pin-studio-loc-studio');
+    // ArrowRight 是内嵌 svg，class 含 'lucide-arrow-right' 或 lucide icon 标识
+    expect(studioBtn.querySelector('svg')).not.toBeNull();
   });
 
   // ─── Phase 2: M3a selection ring on Diaspora ────────────────────────────

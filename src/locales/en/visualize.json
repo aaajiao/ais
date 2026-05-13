@@ -154,6 +154,7 @@
     "pin": {
       "editionsAt": "{{count}} editions here",
       "viewAllAria": "View all editions at this location",
+      "viewAllBuyerAria": "View all editions by {{name}}",
       "noInventory": "(no inv)",
       "unpinAria": "Unpin",
       "studios": "Studios ({{count}})",

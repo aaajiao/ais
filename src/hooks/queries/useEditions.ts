@@ -73,6 +73,14 @@ export async function fetchEditionsPaginated(params: {
     query = query.eq('location_id', filters.locationId);
   }
 
+  // Apply buyer_name filter (server-side) —— 从 Diaspora named_private pin 跳过来时
+  // 按 buyer 模糊匹配。.ilike 既容错（大小写 / 首尾空格）又精确（只查 buyer_name
+  // 单列，不像 search 跨多列 OR 容易误中）。
+  if (filters.buyerName) {
+    const sanitized = sanitizeIlikeForOr(filters.buyerName);
+    query = query.ilike('buyer_name', `%${sanitized}%`);
+  }
+
   // Apply search filter (server-side, OR across edition columns + matched artwork/location ids).
   // Pre-fetch artwork and location ids in parallel so the main query can filter by `.in(...)`.
   const search = filters.search?.trim();
