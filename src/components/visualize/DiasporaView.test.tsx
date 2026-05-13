@@ -210,7 +210,7 @@ describe('DiasporaView', () => {
     expect(screen.getByRole('heading', { name: /Diaspora|流散/i })).toBeInTheDocument();
 
     // No pin card visible initially
-    expect(screen.queryByText(/查看此位置全部版本|View all editions/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /查看此位置全部版本|View all editions/i })).not.toBeInTheDocument();
 
     // Default summary shown (2 locations, 1 flow)
     expect(screen.getByText(/处位置.*条流转|locations.*flows/i)).toBeInTheDocument();
@@ -267,7 +267,7 @@ describe('DiasporaView', () => {
       screen.getByText('Test Gallery Berlin', { selector: 'div,span' })
     ).toBeInTheDocument();
     // View all link
-    expect(screen.getByText(/查看此位置全部版本|View all editions/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /查看此位置全部版本|View all editions/i })).toBeInTheDocument();
     // Edition inventory chip
     expect(screen.getByRole('button', { name: 'AAJ-2023-001' })).toBeInTheDocument();
   });
@@ -316,11 +316,11 @@ describe('DiasporaView', () => {
     });
     fireEvent.click(galleryGroup);
     // Pinned
-    expect(screen.getByText(/查看此位置全部版本|View all editions/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /查看此位置全部版本|View all editions/i })).toBeInTheDocument();
 
     fireEvent.click(galleryGroup);
     // Unpinned
-    expect(screen.queryByText(/查看此位置全部版本|View all editions/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /查看此位置全部版本|View all editions/i })).not.toBeInTheDocument();
     expect(screen.getByText(/处位置.*条流转|locations.*flows/i)).toBeInTheDocument();
   });
 
@@ -348,7 +348,7 @@ describe('DiasporaView', () => {
     ).toBeInTheDocument();
     // Gallery node name should not be in pin card position
     // Check "view all" still present (still pinned, just to different location)
-    expect(screen.getByText(/查看此位置全部版本|View all editions/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /查看此位置全部版本|View all editions/i })).toBeInTheDocument();
   });
 
   it('pin 状态下 hover 其他节点 → pin 卡片保持，不显示预览', () => {
@@ -359,7 +359,7 @@ describe('DiasporaView', () => {
       name: /Test Gallery Berlin/i,
     });
     fireEvent.click(galleryGroup);
-    expect(screen.getByText(/查看此位置全部版本|View all editions/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /查看此位置全部版本|View all editions/i })).toBeInTheDocument();
 
     // Hover studio node
     const studioGroup = screen.getByRole('button', {
@@ -368,7 +368,7 @@ describe('DiasporaView', () => {
     fireEvent.mouseEnter(studioGroup);
 
     // Pin card still visible (gallery pin not disturbed)
-    expect(screen.getByText(/查看此位置全部版本|View all editions/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /查看此位置全部版本|View all editions/i })).toBeInTheDocument();
   });
 
   it('edition 无 inventory_number 时显示 id 前缀 + noInventory 标记', () => {
@@ -413,7 +413,7 @@ describe('DiasporaView', () => {
     });
     fireEvent.keyDown(galleryGroup, { key: 'Enter' });
 
-    expect(screen.getByText(/查看此位置全部版本|View all editions/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /查看此位置全部版本|View all editions/i })).toBeInTheDocument();
   });
 
   it('pin 卡片中每个 edition chip 只显示 inventory 号（status 仅作 title）', () => {
@@ -473,7 +473,7 @@ describe('DiasporaView', () => {
       name: /Test Gallery Berlin/i,
     });
     fireEvent.click(galleryGroup);
-    expect(screen.getByText(/查看此位置全部版本|View all editions/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /查看此位置全部版本|View all editions/i })).toBeInTheDocument();
 
     // Click the edition row — should navigate but NOT unpin
     const editionBtn = screen.getByRole('button', { name: /AAJ-2023-001/i });

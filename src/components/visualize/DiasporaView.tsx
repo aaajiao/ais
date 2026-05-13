@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Pin, X } from 'lucide-react';
+import { ArrowRight, Pin, X } from 'lucide-react';
 import type {
   VizEdition,
   VizLocation,
@@ -533,17 +533,19 @@ export default function DiasporaView({
               </div>
             )}
 
-            {/* View all 链接 */}
-            <button
-              type="button"
-              className="text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2 cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/editions?locationId=${pinnedNodeId}`);
-              }}
-            >
-              {t('diaspora.pin.viewAll')}
-            </button>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                aria-label={t('diaspora.pin.viewAllAria')}
+                className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/editions?locationId=${pinnedNodeId}`);
+                }}
+              >
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         ) : previewNode ? (
           /* ── Hover 预览 ─────────────────────────────────────────── */

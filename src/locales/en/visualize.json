@@ -101,7 +101,7 @@
     },
     "pin": {
       "editionsAt": "{{count}} editions here",
-      "viewAll": "View all editions at this location →",
+      "viewAllAria": "View all editions at this location",
       "noInventory": "(no inv)",
       "unpinAria": "Unpin"
     }
