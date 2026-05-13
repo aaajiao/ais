@@ -134,7 +134,7 @@
       "museum": "美术馆",
       "private_collection": "私人收藏",
       "other": "其他",
-      "anonymous": "匿名流出",
+      "anonymous": "匿名流向",
       "untracked": "无位置待补全"
     },
     "tooltip": {
@@ -170,7 +170,7 @@
         "artist": "中心节点：aaajiao（艺术家）",
         "namedPrivate": "私人买家 {{name}}，{{count}} 件作品",
         "ghost": "待补全版本：{{title}} · {{inv}} · {{status}}（点击补 location）",
-        "anonymous": "匿名流出 · {{date}}（点击补 buyer_name）"
+        "anonymous": "匿名流向 · {{date}}（点击补 buyer_name）"
       }
     }
   },
