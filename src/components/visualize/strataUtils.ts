@@ -116,6 +116,36 @@ export function buildHistoryMonthBuckets(
   return { entries, max };
 }
 
+// ─── buildHistoryDensityYear ────────────────────────────────────────────────
+// gapNote 数据：找历史记录最密集的那一年。recent = 该年的记录数，total = 全部
+// 记录数，year = 该年份。total === 0 / 全部 year 解析失败时返回 null（让组件
+// 隐藏 gapNote 而不是显示 "0 / 0 条历史在 NaN 年的几周内"）。
+export function buildHistoryDensityYear(
+  history: { created_at: string }[]
+): { recent: number; total: number; year: number } | null {
+  if (history.length === 0) return null;
+  const yearCount = new Map<number, number>();
+  let total = 0;
+  for (const h of history) {
+    const m = (h.created_at ?? '').match(/^(\d{4})/);
+    if (!m) continue;
+    const y = Number(m[1]);
+    if (Number.isNaN(y)) continue;
+    yearCount.set(y, (yearCount.get(y) ?? 0) + 1);
+    total += 1;
+  }
+  if (total === 0 || yearCount.size === 0) return null;
+  let topYear = -1;
+  let topCount = -1;
+  for (const [y, c] of yearCount.entries()) {
+    if (c > topCount) {
+      topCount = c;
+      topYear = y;
+    }
+  }
+  return { recent: topCount, total, year: topYear };
+}
+
 // ─── Swimlane ───────────────────────────────────────────────────────────────
 
 export interface Swimlane {

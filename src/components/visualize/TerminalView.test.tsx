@@ -170,18 +170,19 @@ describe('TerminalView a11y & responsive', () => {
     const statusChip = screen.getByRole('button', { name: /^(按状态|Status)$/ });
     fireEvent.click(statusChip);
 
-    // 找出 heading 节点（aria-label 是 "status: sold (1 items)" 等）
+    // 找出 heading 节点（aria-label 形如 "按状态: 已售 (1)" / "Status: sold (1)"，
+    // groupBy label 走 visualize i18n，status enum 走 status namespace）
     const headings = screen.getAllByRole('heading', { level: 3 });
     expect(headings.length).toBeGreaterThan(0);
 
-    // 至少有一个 aria-label 含 "items"（人类可读形式）
-    const itemsHeadings = headings.filter((h) =>
-      h.getAttribute('aria-label')?.includes('items')
+    // groupBy label 必须出现在 aria-label 里（中英任一匹配）
+    const groupedHeadings = headings.filter((h) =>
+      /按状态|Status/.test(h.getAttribute('aria-label') ?? '')
     );
-    expect(itemsHeadings.length).toBeGreaterThan(0);
+    expect(groupedHeadings.length).toBeGreaterThan(0);
 
     // 装饰字符 ╭─ / ╮ 应被 aria-hidden 包裹
-    const deco = itemsHeadings[0].querySelectorAll('[aria-hidden="true"]');
+    const deco = groupedHeadings[0].querySelectorAll('[aria-hidden="true"]');
     expect(deco.length).toBeGreaterThan(0);
   });
 

@@ -56,6 +56,7 @@ export default function TerminalView({
   onArtworkSelect: _onArtworkSelect,
 }: TerminalViewProps) {
   const { t } = useTranslation('visualize');
+  const { t: tStatus } = useTranslation('status');
   const navigate = useNavigate();
   const [groupBy, setGroupBy] = useState<GroupBy>('none');
   // selection 由 URL state 驱动；prop 占位
@@ -124,11 +125,16 @@ export default function TerminalView({
   // 组标题（ASCII box-drawing）—— 拆成三段，装饰字符 aria-hidden
   // 装饰部分（╭─ ... ─╮）对 screen reader 无意义，read out 会变成 "line drawings light arc down and right" 等
   function renderGroupHeader(key: string, count: number) {
-    const label = ` ${groupBy}: ${key} (${count}) `;
+    // groupBy 标签走 i18n（"按状态" / "按年份" / "按位置"）；status 分组的 key
+    // 是 DB enum，走 status namespace 翻译；year / location 是用户数据原样显示。
+    const groupLabel = t(`terminal.groupBy.${groupBy}`);
+    const displayKey =
+      groupBy === 'status' ? tStatus(key) : key;
+    const label = ` ${groupLabel}: ${displayKey} (${count}) `;
     const lineLen = Math.max(0, separator.length - label.length - 2);
     const leftDeco = '╭─';
     const rightDeco = DASH.repeat(lineLen) + '╮';
-    const a11yLabel = `${groupBy}: ${key} (${count} items)`;
+    const a11yLabel = `${groupLabel}: ${displayKey} (${count})`;
     return (
       <span
         role="heading"
@@ -191,11 +197,10 @@ export default function TerminalView({
           <span className="font-bold">{t('terminal.manifesto')}</span>
           {'\n'}
           <span className="text-muted-foreground">
-            {'# aaajiao archive · '}
-            {todayStr}
-            {' · '}
-            {stats.editionsTotal}
-            {' rows'}
+            {t('terminal.commentLine', {
+              date: todayStr,
+              count: stats.editionsTotal,
+            })}
           </span>
           {'\n\n'}
 
@@ -312,29 +317,27 @@ export default function TerminalView({
           <span className="text-muted-foreground" aria-hidden="true">{separator}</span>
           {'\n\n'}
           <span className="text-muted-foreground font-bold">{'$ '}</span>
-          <span className="font-bold">{'archive stat'}</span>
+          <span className="font-bold">{t('terminal.statPrompt')}</span>
           {'\n'}
           <span className="text-muted-foreground">
-            {'Artworks '}
-            <span className="text-foreground">{stats.artworksWithEditions}</span>
-            {' / '}
-            <span className="text-foreground">{stats.artworksTotal}</span>
-            {' have editions'}
+            {t('terminal.stat.artworks', {
+              withEditions: stats.artworksWithEditions,
+              total: stats.artworksTotal,
+            })}
           </span>
           {'\n'}
           <span className="text-muted-foreground">
-            {'Editions '}
-            <span className="text-foreground">{stats.editionsTotal}</span>
+            {t('terminal.stat.editions', { count: stats.editionsTotal })}
           </span>
           {'\n'}
           <span className="text-muted-foreground">
-            {'Markets '}
-            <span className="text-foreground">{stats.marketsLine}</span>
+            {stats.marketsLine === '─'
+              ? t('terminal.stat.marketsEmpty')
+              : t('terminal.stat.markets', { line: stats.marketsLine })}
           </span>
           {'\n'}
           <span className="text-muted-foreground">
-            {'Fetched at '}
-            <span className="text-foreground">{fetchedAtFormatted}</span>
+            {t('terminal.stat.fetched', { time: fetchedAtFormatted })}
           </span>
           {'\n'}
           <span className="text-muted-foreground font-bold">{'$ _'}</span>

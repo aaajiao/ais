@@ -60,7 +60,7 @@
         "yearSpanEmpty": "跨度 —"
       }
     },
-    "gapNote": "记录时间 ≠ 创作时间。85 / 87 条历史在 2026 年的几周内集中产生。"
+    "gapNote": "记录时间 ≠ 创作时间。{{recent}} / {{total}} 条历史在 {{year}} 年的几周内集中产生。"
   },
   "markets": {
     "heading": "Markets — 货币分布",
@@ -99,10 +99,13 @@
       "year": "按年份",
       "location": "按位置"
     },
+    "commentLine": "# aaajiao 档案 · {{date}} · 共 {{count}} 行",
+    "statPrompt": "archive stat",
     "stat": {
       "artworks": "作品 {{withEditions}} / {{total}} 有版本",
       "editions": "版本 {{count}}",
-      "markets": "市场 CNY {{cny}} / USD {{usd}} / EUR {{eur}}",
+      "markets": "市场 {{line}}",
+      "marketsEmpty": "市场 ─",
       "fetched": "拉取于 {{time}}"
     },
     "header": {
@@ -118,7 +121,7 @@
   },
   "diaspora": {
     "heading": "Diaspora — 流散",
-    "description": "中心是工作室，作品向外辐射至 {{count}} 处。节点大小按版本数量。",
+    "description": "中心是工作室，作品向外辐射至 {{locations}} 处机构 · {{namedPrivate}} 位买家。节点大小按版本数量。",
     "stat": {
       "trackedRatio": "{{tracked}} / {{total}} 版本有位置历史（{{percent}}%）",
       "untrackedHint": "还有 {{count}} 件待补全 → 点击节点跳到版本详情补位置"
@@ -136,7 +139,8 @@
       "private_collection": "私人收藏",
       "other": "其他",
       "anonymous": "匿名流向",
-      "untracked": "无位置待补全"
+      "untracked": "无位置待补全",
+      "namedPrivateBadge": "私人"
     },
     "tooltip": {
       "editions": "{{count}} 个版本在此",

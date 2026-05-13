@@ -71,6 +71,7 @@ export default function DiasporaView({
   onArtworkSelect: _onArtworkSelect,
 }: DiasporaViewProps) {
   const { t } = useTranslation('visualize');
+  const { t: tStatus } = useTranslation('status');
   const navigate = useNavigate();
 
   // ─── 交互状态 ──────────────────────────────────────────────────────────────
@@ -223,12 +224,12 @@ export default function DiasporaView({
 
   const totallyEmpty = constellationEmpty && fallbackNodes.length === 0;
 
-  // description "辐射至 N 处" 的 N = location 节点 + named private buyer 节点
-  // （所有 named entity 节点，不含 anonymous dust 和 ghost）。跟下方
-  // summary.overview 的 `{{locations}} 处机构 · {{namedPrivate}} 位私人买家`
-  // 同源数据，确保 tagline 与统计行一致。
-  const radiantNodeCount =
-    constellation.locations.length + constellation.namedPrivateBuyers.length;
+  // description 拆双量词：机构走 "处"，私人买家走 "位"，跟下方
+  // constellation.summary.overview 同源数据
+  const descriptionVars = {
+    locations: constellation.locations.length,
+    namedPrivate: constellation.namedPrivateBuyers.length,
+  };
 
   if (totallyEmpty) {
     return (
@@ -238,7 +239,7 @@ export default function DiasporaView({
             {t('diaspora.heading')}
           </h2>
           <p className="text-sm text-muted-foreground max-w-2xl leading-relaxed">
-            {t('diaspora.description', { count: radiantNodeCount })}
+            {t('diaspora.description', descriptionVars)}
           </p>
         </header>
         <div className="border border-border p-3 text-sm space-y-1">
@@ -268,7 +269,7 @@ export default function DiasporaView({
           {t('diaspora.heading')}
         </h2>
         <p className="text-sm text-muted-foreground max-w-2xl leading-relaxed">
-          {t('diaspora.description', { count: radiantNodeCount })}
+          {t('diaspora.description', descriptionVars)}
         </p>
       </header>
 
@@ -457,7 +458,7 @@ export default function DiasporaView({
               aria-label={t('diaspora.constellation.aria.ghost', {
                 title: ghost.title ?? '—',
                 inv: ghost.inventoryNumber ?? '—',
-                status: ghost.status,
+                status: tStatus(ghost.status),
               })}
               onClick={(e) => {
                 e.stopPropagation();
@@ -470,7 +471,7 @@ export default function DiasporaView({
                 }
               }}
             >
-              <title>{`${ghost.title ?? '—'} · ${ghost.inventoryNumber ?? '—'} · ${ghost.status}`}</title>
+              <title>{`${ghost.title ?? '—'} · ${ghost.inventoryNumber ?? '—'} · ${tStatus(ghost.status)}`}</title>
               <circle
                 cx={x}
                 cy={y}
@@ -897,7 +898,9 @@ export default function DiasporaView({
               <div>
                 <span className="font-bold">{activeMeta.node.name}</span>
                 <span className="text-muted-foreground ml-2">
-                  {activeMeta.kind === 'location' ? activeMeta.node.type : 'private'}
+                  {activeMeta.kind === 'location'
+                    ? t(`diaspora.legend.${activeMeta.node.type}`)
+                    : t('diaspora.legend.namedPrivateBadge')}
                   {activeMeta.kind === 'location' && activeMeta.node.city
                     ? ` · ${activeMeta.node.city}`
                     : ''}
@@ -921,7 +924,7 @@ export default function DiasporaView({
                     <button
                       key={edition.id}
                       type="button"
-                      title={edition.status}
+                      title={tStatus(edition.status)}
                       className="font-mono border border-border px-1.5 py-0.5 hover:bg-muted/50 hover:border-foreground transition-colors cursor-pointer"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -973,7 +976,7 @@ export default function DiasporaView({
                     : ''}
                 </div>
                 <div className="text-muted-foreground">
-                  {activeMeta.node.type}
+                  {t(`diaspora.legend.${activeMeta.node.type}`)}
                 </div>
               </>
             ) : (

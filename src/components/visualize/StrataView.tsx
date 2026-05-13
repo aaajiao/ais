@@ -9,6 +9,7 @@ import type {
 } from '@/hooks/queries/useVisualizationData';
 import {
   buildHistoryMonthBuckets,
+  buildHistoryDensityYear,
   buildSwimlanes,
   swimlaneHeight,
   stackPositionFor,
@@ -105,6 +106,12 @@ export default function StrataView({
   );
   const historyMonths = useMemo(
     () => buildHistoryMonthBuckets(history),
+    [history]
+  );
+  // gapNote 数据：历史记录最密集的那一年（recent / total / year）。
+  // 返回 null 时组件隐藏 gapNote（避免显示 "0 / 0 条历史在 NaN 年..."）。
+  const historyDensity = useMemo(
+    () => buildHistoryDensityYear(history),
     [history]
   );
 
@@ -748,9 +755,11 @@ export default function StrataView({
       </div>
 
       {/* ─── 断层注释 ───────────────────────────────────────────────────── */}
-      <p className="text-xs text-muted-foreground max-w-2xl italic">
-        {t('strata.gapNote')}
-      </p>
+      {historyDensity && (
+        <p className="text-xs text-muted-foreground max-w-2xl italic">
+          {t('strata.gapNote', historyDensity)}
+        </p>
+      )}
 
       {/* ─── 图例 (M2.5) ────────────────────────────────────────────── */}
       <Legend

@@ -477,7 +477,8 @@ describe('DiasporaView', () => {
 
     const chip = screen.getByRole('button', { name: 'AAJ-2023-001' });
     expect(chip).toBeInTheDocument();
-    expect(chip).toHaveAttribute('title', 'sold');
+    // status 走 useTranslation('status') 翻译；中英任一匹配防止 locale 切换 break
+    expect(chip.getAttribute('title')).toMatch(/^(已售|sold)$/);
   });
 
   it('长名 location 节点渲染 SVG <title> 元素显示完整 name（label 被截断）', () => {

@@ -60,7 +60,7 @@
         "yearSpanEmpty": "spans —"
       }
     },
-    "gapNote": "Record time ≠ creation time. 85 of 87 history rows were written in a few weeks of 2026."
+    "gapNote": "Record time ≠ creation time. {{recent}} of {{total}} history rows were written in a few weeks of {{year}}."
   },
   "markets": {
     "heading": "Markets — Currency Distribution",
@@ -99,10 +99,13 @@
       "year": "Year",
       "location": "Location"
     },
+    "commentLine": "# aaajiao archive · {{date}} · {{count}} rows",
+    "statPrompt": "archive stat",
     "stat": {
       "artworks": "Artworks {{withEditions}} / {{total}} have editions",
       "editions": "Editions {{count}}",
-      "markets": "Markets CNY {{cny}} / USD {{usd}} / EUR {{eur}}",
+      "markets": "Markets {{line}}",
+      "marketsEmpty": "Markets ─",
       "fetched": "Fetched at {{time}}"
     },
     "header": {
@@ -118,7 +121,7 @@
   },
   "diaspora": {
     "heading": "Diaspora",
-    "description": "The studio sits at the centre; works radiate outward to {{count}} locations. Node size scales with edition count.",
+    "description": "The studio sits at the centre; works radiate outward to {{locations}} institutions and {{namedPrivate}} private buyers. Node size scales with edition count.",
     "stat": {
       "trackedRatio": "{{tracked}} / {{total}} editions have known location ({{percent}}%)",
       "untrackedHint": "{{count}} editions awaiting location — click any to open"
@@ -136,7 +139,8 @@
       "private_collection": "Private collection",
       "other": "Other",
       "anonymous": "Anonymous outflow",
-      "untracked": "No location (to complete)"
+      "untracked": "No location (to complete)",
+      "namedPrivateBadge": "private"
     },
     "tooltip": {
       "editions": "{{count}} editions here",
