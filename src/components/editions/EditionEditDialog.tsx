@@ -80,7 +80,8 @@ export default function EditionEditDialog({
   const { data: siblingEditions = [] } = useEditionsByArtwork(edition?.artwork_id);
 
   // 状态选项：当前状态 + 合法的下一步状态
-  // 终态（sold/gifted/lost/damaged）只能保留为自身，不允许转出
+  // 业务终态（sold/gifted/lost/damaged）UI 允许纠正回 in_studio 或在终态间切换，
+  // 具体放宽规则见 lib/editionStatus.ts 的 VALID_TRANSITIONS
   const statusOptions = useMemo<EditionStatus[]>(() => {
     if (!edition) return [];
     return [edition.status, ...getValidNextStatuses(edition.status)];
@@ -338,11 +339,17 @@ export default function EditionEditDialog({
               </div>
             </div>
 
-            {/* 销售详情（仅已售状态显示） */}
-            {formData.status === 'sold' && (
+            {/* 销售 / 赠送详情（sold 或 gifted 状态显示）
+                注意：schema 上无 gift_date 字段，gifted 复用 sale_date，仅 label 切换；
+                buyer_name 也共用（"买家" vs "受赠人" label 切换尚未实现，i18n key 仍用 buyer） */}
+            {(formData.status === 'sold' || formData.status === 'gifted') && (
               <>
                 <div>
-                  <label className="block text-sm font-medium mb-1">{t('editDialog.saleDate')}</label>
+                  <label className="block text-sm font-medium mb-1">
+                    {formData.status === 'sold'
+                      ? t('editDialog.saleDate')
+                      : t('editDialog.giftDate')}
+                  </label>
                   <input
                     type="date"
                     value={formData.sale_date}
@@ -352,6 +359,8 @@ export default function EditionEditDialog({
                 </div>
 
                 <div>
+                  {/* TODO: buyer label 在 gifted 时是否应切换为"受赠人"？当前保持 "买家"，
+                      用户未明确要求；如要切换需同时引入 editDialog.recipient i18n key */}
                   <label className="block text-sm font-medium mb-1">{t('editDialog.buyer')}</label>
                   <input
                     type="text"

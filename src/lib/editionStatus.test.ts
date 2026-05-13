@@ -124,20 +124,79 @@ describe('isValidTransition', () => {
     });
   });
 
-  describe('from terminal statuses', () => {
-    const terminalStatuses: EditionStatus[] = ['sold', 'gifted', 'lost', 'damaged'];
-    const allStatuses: EditionStatus[] = [
-      'in_production', 'in_studio', 'at_gallery', 'at_museum',
-      'in_transit', 'sold', 'gifted', 'lost', 'damaged'
-    ];
+  describe('from terminal statuses (UI 纠错放宽矩阵)', () => {
+    // 业务终态仍是终态（isTerminalStatus === true），但 UI 编辑允许"纠正"。
+    // 矩阵详见 lib/editionStatus.ts 中各终态条目。
 
-    terminalStatuses.forEach(terminal => {
-      allStatuses.forEach(target => {
-        if (terminal !== target) {
-          it(`should reject transition from ${terminal} to ${target}`, () => {
-            expect(isValidTransition(terminal, target)).toBe(false);
-          });
-        }
+    describe('from sold', () => {
+      it('should allow correction back to in_studio', () => {
+        expect(isValidTransition('sold', 'in_studio')).toBe(true);
+      });
+      it('should allow correction to gifted (登记错误)', () => {
+        expect(isValidTransition('sold', 'gifted')).toBe(true);
+      });
+      it('should allow transition to lost / damaged', () => {
+        expect(isValidTransition('sold', 'lost')).toBe(true);
+        expect(isValidTransition('sold', 'damaged')).toBe(true);
+      });
+      it('should reject non-correction transitions', () => {
+        expect(isValidTransition('sold', 'in_production')).toBe(false);
+        expect(isValidTransition('sold', 'at_gallery')).toBe(false);
+        expect(isValidTransition('sold', 'at_museum')).toBe(false);
+        expect(isValidTransition('sold', 'in_transit')).toBe(false);
+      });
+    });
+
+    describe('from gifted', () => {
+      it('should allow correction back to in_studio', () => {
+        expect(isValidTransition('gifted', 'in_studio')).toBe(true);
+      });
+      it('should allow correction to sold (登记错误)', () => {
+        expect(isValidTransition('gifted', 'sold')).toBe(true);
+      });
+      it('should allow transition to lost / damaged', () => {
+        expect(isValidTransition('gifted', 'lost')).toBe(true);
+        expect(isValidTransition('gifted', 'damaged')).toBe(true);
+      });
+      it('should reject non-correction transitions', () => {
+        expect(isValidTransition('gifted', 'in_production')).toBe(false);
+        expect(isValidTransition('gifted', 'at_gallery')).toBe(false);
+        expect(isValidTransition('gifted', 'at_museum')).toBe(false);
+        expect(isValidTransition('gifted', 'in_transit')).toBe(false);
+      });
+    });
+
+    describe('from lost', () => {
+      it('should allow recovery to in_studio', () => {
+        expect(isValidTransition('lost', 'in_studio')).toBe(true);
+      });
+      it('should allow transition to damaged', () => {
+        expect(isValidTransition('lost', 'damaged')).toBe(true);
+      });
+      it('should reject transitions back to sold / gifted (寻回后需先回 in_studio 再走流程)', () => {
+        expect(isValidTransition('lost', 'sold')).toBe(false);
+        expect(isValidTransition('lost', 'gifted')).toBe(false);
+      });
+      it('should reject other transitions', () => {
+        expect(isValidTransition('lost', 'in_production')).toBe(false);
+        expect(isValidTransition('lost', 'at_gallery')).toBe(false);
+        expect(isValidTransition('lost', 'at_museum')).toBe(false);
+        expect(isValidTransition('lost', 'in_transit')).toBe(false);
+      });
+    });
+
+    describe('from damaged', () => {
+      it('should allow recovery to in_studio (修复后)', () => {
+        expect(isValidTransition('damaged', 'in_studio')).toBe(true);
+      });
+      it('should reject all other transitions (损坏后需先回 in_studio 再走流程)', () => {
+        expect(isValidTransition('damaged', 'in_production')).toBe(false);
+        expect(isValidTransition('damaged', 'at_gallery')).toBe(false);
+        expect(isValidTransition('damaged', 'at_museum')).toBe(false);
+        expect(isValidTransition('damaged', 'in_transit')).toBe(false);
+        expect(isValidTransition('damaged', 'sold')).toBe(false);
+        expect(isValidTransition('damaged', 'gifted')).toBe(false);
+        expect(isValidTransition('damaged', 'lost')).toBe(false);
       });
     });
   });
@@ -213,11 +272,12 @@ describe('getValidNextStatuses', () => {
     expect(result).toHaveLength(7);
   });
 
-  it('should return empty array for terminal statuses', () => {
-    expect(getValidNextStatuses('sold')).toEqual([]);
-    expect(getValidNextStatuses('gifted')).toEqual([]);
-    expect(getValidNextStatuses('lost')).toEqual([]);
-    expect(getValidNextStatuses('damaged')).toEqual([]);
+  it('should return correction matrix for terminal statuses (UI 纠错用)', () => {
+    // 业务终态 UI 允许纠正回 in_studio 或在终态间切换
+    expect(getValidNextStatuses('sold')).toEqual(['in_studio', 'gifted', 'lost', 'damaged']);
+    expect(getValidNextStatuses('gifted')).toEqual(['in_studio', 'sold', 'lost', 'damaged']);
+    expect(getValidNextStatuses('lost')).toEqual(['in_studio', 'damaged']);
+    expect(getValidNextStatuses('damaged')).toEqual(['in_studio']);
   });
 
   it('should return a new array (not reference)', () => {

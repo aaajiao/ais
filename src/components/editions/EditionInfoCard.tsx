@@ -145,7 +145,7 @@ export const EditionInfoCard = memo(function EditionInfoCard({
               );
             })()}
 
-            {/* Price info */}
+            {/* Price info（gifted 没有价格语义，保持 sold-only soldPrice 显示） */}
             {edition.sale_price && (
               <p>
                 <span className="text-muted-foreground">
@@ -157,13 +157,15 @@ export const EditionInfoCard = memo(function EditionInfoCard({
               </p>
             )}
 
-            {/* Sale details (sold status only) */}
-            {edition.status === 'sold' && (
+            {/* Sale / Gift details（sold 或 gifted 状态显示；schema 共用 sale_date / buyer_name） */}
+            {(edition.status === 'sold' || edition.status === 'gifted') && (
               <>
                 {edition.sale_date && (
                   <p>
                     <span className="text-muted-foreground">
-                      {t('info.saleDate')}
+                      {edition.status === 'sold'
+                        ? t('info.saleDate')
+                        : t('info.giftDate')}
                     </span>
                     {formatDate(edition.sale_date, i18n.language)}
                   </p>

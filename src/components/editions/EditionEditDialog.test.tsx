@@ -150,7 +150,7 @@ describe('EditionEditDialog', () => {
     expect(optionValues).not.toContain('in_production');
   });
 
-  it('终态（sold）：状态下拉只有当前状态，不能转出', () => {
+  it('终态（sold）：UI 允许纠正回 in_studio / 切换到其他终态', () => {
     renderWithClient(
       <EditionEditDialog
         isOpen
@@ -165,7 +165,89 @@ describe('EditionEditDialog', () => {
     ) as HTMLSelectElement;
     expect(statusSelect).toBeDefined();
     const optionValues = Array.from(statusSelect.options).map((o) => o.value);
-    expect(optionValues).toEqual(['sold']);
+    // 当前状态 + 纠错矩阵：in_studio / gifted / lost / damaged
+    expect(optionValues).toEqual(['sold', 'in_studio', 'gifted', 'lost', 'damaged']);
+  });
+
+  it('终态（gifted）：状态下拉包含纠错目标（in_studio / sold / lost / damaged）', () => {
+    renderWithClient(
+      <EditionEditDialog
+        isOpen
+        edition={makeEdition({ artwork: null, status: 'gifted' })}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />
+    );
+
+    const statusSelect = screen.getAllByRole('combobox').find(
+      (el) => (el as HTMLSelectElement).value === 'gifted'
+    ) as HTMLSelectElement;
+    expect(statusSelect).toBeDefined();
+    const optionValues = Array.from(statusSelect.options).map((o) => o.value);
+    // 当前状态 + 纠错矩阵：in_studio / sold / lost / damaged
+    expect(optionValues).toEqual(['gifted', 'in_studio', 'sold', 'lost', 'damaged']);
+    // 业务流转目的地（at_gallery / at_museum / in_transit / in_production）不应出现
+    expect(optionValues).not.toContain('at_gallery');
+    expect(optionValues).not.toContain('at_museum');
+    expect(optionValues).not.toContain('in_transit');
+    expect(optionValues).not.toContain('in_production');
+  });
+
+  it('终态（gifted）：渲染赠出日期输入（复用 sale_date，使用 giftDate label）', () => {
+    renderWithClient(
+      <EditionEditDialog
+        isOpen
+        edition={makeEdition({
+          artwork: null,
+          status: 'gifted',
+          sale_date: '2025-03-15',
+        })}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />
+    );
+
+    // gifted 状态下应渲染"赠出日期"label，且不出现"售出日期"
+    expect(screen.getByText('赠出日期')).toBeInTheDocument();
+    expect(screen.queryByText('售出日期')).not.toBeInTheDocument();
+
+    // 同时确认 buyer 字段也渲染了（gifted 复用 buyer_name，label 仍是"买家"）
+    expect(screen.getByText('买家')).toBeInTheDocument();
+
+    // sale_date input 也应该接收到值
+    const dateInputs = screen
+      .getAllByDisplayValue('2025-03-15')
+      .filter((el) => (el as HTMLInputElement).type === 'date');
+    expect(dateInputs.length).toBeGreaterThan(0);
+  });
+
+  it('终态（sold）：渲染售出日期输入（使用 saleDate label，不渲染 giftDate）', () => {
+    renderWithClient(
+      <EditionEditDialog
+        isOpen
+        edition={makeEdition({ artwork: null, status: 'sold' })}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('售出日期')).toBeInTheDocument();
+    expect(screen.queryByText('赠出日期')).not.toBeInTheDocument();
+  });
+
+  it('非 sold/gifted 状态：不渲染 sale/gift 日期与买家字段', () => {
+    renderWithClient(
+      <EditionEditDialog
+        isOpen
+        edition={makeEdition({ artwork: null, status: 'in_studio' })}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByText('售出日期')).not.toBeInTheDocument();
+    expect(screen.queryByText('赠出日期')).not.toBeInTheDocument();
+    expect(screen.queryByText('买家')).not.toBeInTheDocument();
   });
 
   it('in_production 状态：只能转 in_studio 或 damaged', () => {
