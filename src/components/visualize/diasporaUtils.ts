@@ -1275,7 +1275,10 @@ export interface GhostRingLayoutOptions {
  * Ghost editions 沿外圈均匀分布。
  *
  * - 中心 = (width/2, height/2)
- * - 默认半径 340（在 R_GHOST=300 与 viewBox 边之间，v1.6.x 第三轮）
+ * - 默认半径 320（v1.6.x 第八轮：340 → 320 修顶部节点 y=-4 出 viewBox bug。
+ *   viewBox H=680 / cy=340，R=340 → 顶节点 y=0 节点 r=4 顶到 y=-4 被裁。
+ *   R=320 → 顶节点 y=20 给 16px padding 安全。仍在 R_GHOST=300 外侧形成
+ *   独立 ring，视觉间距 20px 足够区分 anonymous undated 与待补全 ghost）
  * - 起点 12 点钟（-π/2），均匀分布 360°
  * - N=0 → 空数组（view 据此不渲染）
  *
@@ -1289,7 +1292,7 @@ export function layoutGhostRing(
   if (N === 0) return [];
   const cx = options.width / 2;
   const cy = options.height / 2;
-  const radius = options.radius ?? 340;
+  const radius = options.radius ?? 320;
   // v1.6.x 第四轮：跟 layoutConstellation 同步用 ASPECT_X 椭圆化 x 坐标，
   // 保持 ghost ring 与主时间螺旋的视觉同源（都是 ellipse 不是 circle）。
   const { ASPECT_X } = TIME_SPIRAL_GEOMETRY;

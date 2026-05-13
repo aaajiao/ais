@@ -1462,14 +1462,14 @@ describe('layoutGhostRing', () => {
     expect(layoutGhostRing([], { width: 1200, height: 680 })).toEqual([]);
   });
 
-  it('默认 radius=340，center 取 (width/2, height/2)（v1.6.x 第四轮 viewBox 1200×680 → center (600, 340)）', () => {
+  it('默认 radius=320，center 取 (width/2, height/2)（v1.6.x 第八轮 340→320 修顶部节点出 viewBox bug）', () => {
     const ghosts = [makeGhost('e1')];
     const pts = layoutGhostRing(ghosts, { width: 1200, height: 680 });
     expect(pts).toHaveLength(1);
-    // 第一点 angle = -π/2 → cos=0，ASPECT_X 不影响 x；落 (600, 340 - 340) = (600, 0)
+    // 第一点 angle = -π/2 → cos=0，ASPECT_X 不影响 x；落 (600, 340 - 320) = (600, 20)
     expect(pts[0].angle).toBeCloseTo(-Math.PI / 2, 4);
     expect(pts[0].x).toBeCloseTo(600, 4);
-    expect(pts[0].y).toBeCloseTo(0, 4);
+    expect(pts[0].y).toBeCloseTo(20, 4);
   });
 
   it('N>0 第一点 angle = -π/2（12 点钟起点）', () => {
@@ -1492,7 +1492,7 @@ describe('layoutGhostRing', () => {
   it('每个点落在 ellipse 上：((x-cx)/(r·ASPECT_X))² + ((y-cy)/r)² = 1（v1.6.x 第四轮椭圆化）', () => {
     const ghosts = [makeGhost('e1'), makeGhost('e2'), makeGhost('e3'), makeGhost('e4')];
     const pts = layoutGhostRing(ghosts, { width: 1200, height: 680 });
-    const radius = 340;
+    const radius = 320; // 第八轮：340 → 320 修顶部出界 bug
     const { ASPECT_X } = TIME_SPIRAL_GEOMETRY;
     for (const p of pts) {
       // cx=600, cy=340；ellipse 不变量
