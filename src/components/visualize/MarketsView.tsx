@@ -16,6 +16,10 @@ import { PricedDotGlyph, NoPriceDotGlyph } from './legendGlyphs';
 export interface MarketsViewProps {
   artworks: VizArtwork[];
   editions: VizEdition[];
+  /** Phase 2: M3a — 跨视图选中的 artwork id；该作品所有散点放大 + ring */
+  selectedArtworkId?: string | null;
+  /** 选中作品的 callback —— 当前 Markets 仍走 navigate 模式不主动 setSelection */
+  onArtworkSelect?: (artworkId: string | null) => void;
 }
 
 // 几何常量（SVG 内部坐标系，外层用 viewBox + className="w-full" 响应式缩放）
@@ -63,11 +67,18 @@ function formatPrice(price: number, currency: string): string {
   }
 }
 
-export default function MarketsView({ artworks, editions }: MarketsViewProps) {
+export default function MarketsView({
+  artworks,
+  editions,
+  selectedArtworkId = null,
+  onArtworkSelect: _onArtworkSelect,
+}: MarketsViewProps) {
   const { t } = useTranslation('visualize');
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [hoveredEdition, setHoveredEdition] = useState<VizEdition | null>(null);
+  // selection 由 URL state 驱动；prop 占位，避免 unused param warning
+  void _onArtworkSelect;
   const [playing, setPlaying] = useState(false);
   // play 中只在内存里推进 cutoff（避免 URL 抖动），stop 时落 URL 并清掉
   const [playingCutoff, setPlayingCutoff] = useState<string | null>(null);
@@ -319,6 +330,11 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
                     price: formatPrice(price, currency),
                   });
 
+                  const isSelected =
+                    selectedArtworkId !== null &&
+                    ed.artwork_id === selectedArtworkId;
+                  // selection 散点放大 1.5×（保持 jitter / cy 不变，仅 r 放大）
+                  const effectiveR = isSelected ? r * 1.5 : r;
                   return (
                     <g
                       key={ed.id}
@@ -327,6 +343,7 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
                       aria-label={dotLabel}
                       aria-pressed={isHovered}
                       data-testid="markets-dot"
+                      data-selected={isSelected || undefined}
                       className="cursor-pointer outline-none focus-visible:[&>circle]:opacity-100"
                       onMouseEnter={() => setHoveredEdition(ed)}
                       onMouseLeave={() => setHoveredEdition(null)}
@@ -347,7 +364,7 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
                       <circle
                         cx={cx}
                         cy={cy}
-                        r={r}
+                        r={effectiveR}
                         className="fill-foreground transition-opacity hover:opacity-100"
                         opacity={
                           isFuture
@@ -357,6 +374,19 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
                             : DOT_OPACITY_DEFAULT
                         }
                       />
+                      {/* Phase 2: selection ring —— dashed 圆包住散点 */}
+                      {isSelected && (
+                        <circle
+                          data-testid={`markets-selection-ring-${ed.id}`}
+                          cx={cx}
+                          cy={cy}
+                          r={effectiveR + 3}
+                          fill="none"
+                          className="stroke-foreground pointer-events-none"
+                          strokeWidth={1.2}
+                          strokeDasharray="2 2"
+                        />
+                      )}
                     </g>
                   );
                 })}
@@ -438,6 +468,9 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
                     artwork?.title_cn ||
                     ed.artwork_id;
                   const ariaLabel = `${inv} · ${title}`;
+                  const isSelected =
+                    selectedArtworkId !== null &&
+                    ed.artwork_id === selectedArtworkId;
                   return (
                     <g
                       key={ed.id || `nop-${cx}`}
@@ -445,6 +478,7 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
                       tabIndex={0}
                       aria-label={ariaLabel}
                       data-testid="markets-noprice-dot"
+                      data-selected={isSelected || undefined}
                       className="cursor-pointer outline-none focus-visible:[&>circle]:opacity-100"
                       onClick={() => {
                         if (!ed.id) return;
@@ -468,6 +502,18 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
                         strokeWidth={1.5}
                         opacity={0.75}
                       />
+                      {isSelected && (
+                        <circle
+                          data-testid={`markets-selection-ring-${ed.id}`}
+                          cx={cx}
+                          cy={dotCY}
+                          r={NOPRICE_DOT_R + 3}
+                          fill="none"
+                          className="stroke-foreground pointer-events-none"
+                          strokeWidth={1.2}
+                          strokeDasharray="2 2"
+                        />
+                      )}
                     </g>
                   );
                 });

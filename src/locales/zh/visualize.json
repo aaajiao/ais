@@ -143,6 +143,28 @@
       "viewAllAria": "查看此位置全部版本",
       "noInventory": "（无编号）",
       "unpinAria": "取消固定"
+    },
+    "constellation": {
+      "centerLabel": "aaajiao",
+      "ringLabel": {
+        "inner": "机构",
+        "middle": "私人买家",
+        "outer": "匿名"
+      },
+      "tooltip": {
+        "namedPrivate": "{{name}} · {{count}} 件"
+      },
+      "summary": {
+        "overview": "{{locations}} 处机构 · {{namedPrivate}} 位私人买家 · {{anonymous}} 件匿名流向"
+      },
+      "aria": {
+        "artist": "中心节点：aaajiao（艺术家）",
+        "namedPrivate": "私人买家 {{name}}，{{count}} 件作品"
+      }
     }
+  },
+  "selection": {
+    "label": "已选中",
+    "clear": "清除选择"
   }
 }

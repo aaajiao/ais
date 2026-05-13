@@ -9,16 +9,18 @@ import type {
   VizArtwork,
 } from '@/hooks/queries/useVisualizationData';
 import {
+  buildConstellation,
+  layoutConstellation,
+  namedNodeRadius,
   buildNodes,
-  pickCenterNode,
-  radialLayout,
-  buildEdges,
   computeTrackedStat,
   countryToISO2,
   nodeRadius,
   getGhostNodes,
   TYPE_OPACITY,
   type LocationNode,
+  type LocationConstellationNode,
+  type NamedPrivateNode,
 } from './diasporaUtils';
 
 export interface DiasporaViewProps {
@@ -26,41 +28,15 @@ export interface DiasporaViewProps {
   editions: VizEdition[];
   locations: VizLocation[];
   history: VizHistory[];
+  /** 跨视图选中的 artwork id（Phase 2: M3a），驱动 selection ring + dashed edges */
+  selectedArtworkId?: string | null;
+  /** 选中作品的回调（点击 location / named buyer 节点时可选触发；当前实现仅作 prop 通透） */
+  onArtworkSelect?: (artworkId: string | null) => void;
 }
 
 // SVG 内部坐标系（固定，用 viewBox 响应式缩放）
 const W = 800;
 const H = 560;
-
-// 同心环辅助圆半径（纯视觉参考）—— 必须与 diasporaUtils.ts 的 RING_RADII 同步
-// 外环 0.42 留出节点半径 + label 高度的安全边距，避免上下边缘节点被裁
-const RING_GUIDE_RADII = [
-  Math.min(W, H) * 0.22,
-  Math.min(W, H) * 0.34,
-  Math.min(W, H) * 0.42,
-];
-
-/** 二次贝塞尔控制点：把 from→to 曲线偏向中心以外，避免所有线交叉在原点 */
-function curvedPath(
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
-  cx: number,
-  cy: number
-): string {
-  // 控制点 = 中点偏离圆心方向，让曲线向外弧出
-  const mx = (x1 + x2) / 2;
-  const my = (y1 + y2) / 2;
-  // 从圆心到中点的方向
-  const dx = mx - cx;
-  const dy = my - cy;
-  const len = Math.sqrt(dx * dx + dy * dy) || 1;
-  // 控制点稍微向外偏
-  const qx = mx + (dx / len) * 30;
-  const qy = my + (dy / len) * 30;
-  return `M ${x1.toFixed(1)} ${y1.toFixed(1)} Q ${qx.toFixed(1)} ${qy.toFixed(1)} ${x2.toFixed(1)} ${y2.toFixed(1)}`;
-}
 
 /** 从 VizArtwork 数组取得 artwork_id → artwork 的 Map */
 function buildArtworkMap(artworks: VizArtwork[]): Map<string, VizArtwork> {
@@ -69,98 +45,139 @@ function buildArtworkMap(artworks: VizArtwork[]): Map<string, VizArtwork> {
   return m;
 }
 
+/** 当前激活节点 metadata（用于底部 info bar） */
+type ActiveNodeMeta =
+  | { kind: 'location'; node: LocationConstellationNode }
+  | { kind: 'named_private'; node: NamedPrivateNode };
+
 export default function DiasporaView({
   artworks = [],
   editions,
   locations,
   history,
+  selectedArtworkId = null,
+  onArtworkSelect: _onArtworkSelect,
 }: DiasporaViewProps) {
   const { t } = useTranslation('visualize');
   const navigate = useNavigate();
 
   // ─── 交互状态 ──────────────────────────────────────────────────────────────
-  // pinnedNodeId: 点击固定的节点 id（null = 无 pin）
-  // hoveredNodeId: hover 的节点 id（仅 pin 为 null 时有效）
-  // 当前展示节点 = pinnedNodeId ?? hoveredNodeId
+  // pinnedNodeId / hoveredNodeId 用 "kind:id" 复合 key 区分 location vs named_private
+  // 形式："location:{loc.id}" / "named:{buyer_name}"
   const [pinnedNodeId, setPinnedNodeId] = useState<string | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
 
+  // 兜底（暂未在 UI 用，prop 仅用于跨视图同步）
+  void _onArtworkSelect;
+
   // ─── 数据变换 ──────────────────────────────────────────────────────────────
   const artworkMap = useMemo(() => buildArtworkMap(artworks), [artworks]);
-  const nodes = useMemo(() => buildNodes(editions, locations), [editions, locations]);
-  const centerNode = useMemo(() => pickCenterNode(nodes), [nodes]);
-  const outerNodes = useMemo(
-    () => (centerNode ? nodes.filter((n) => n.id !== centerNode.id) : nodes),
-    [nodes, centerNode]
+  const constellation = useMemo(
+    () => buildConstellation(editions, locations),
+    [editions, locations]
   );
   const layout = useMemo(
-    () =>
-      centerNode
-        ? radialLayout(centerNode, outerNodes, { width: W, height: H })
-        : null,
-    [centerNode, outerNodes]
+    () => layoutConstellation(constellation, { width: W, height: H }),
+    [constellation]
   );
-  const edges = useMemo(() => buildEdges(history, nodes), [history, nodes]);
-  const stat = useMemo(() => computeTrackedStat(editions, locations), [editions, locations]);
-
-  // M2: 鬼影圆 —— 无 location_id 的 edition 在最外环之外铺一圈 stroke-only 小圆。
-  // 不可点击、不进 hover 状态机。0 个时不渲染（避免画空环）。
-  const ghost = useMemo(
-    () =>
-      getGhostNodes(editions, locations, {
-        cx: W / 2,
-        cy: H / 2,
-        radius: Math.min(W, H) * 0.48,
-      }),
+  // 保留旧 stat —— "X / Y editions have known location"
+  const stat = useMemo(
+    () => computeTrackedStat(editions, locations),
     [editions, locations]
   );
 
-  // 节点 id → 坐标（用于边的起止点查找）
-  const coordMap = useMemo(() => {
-    const m = new Map<string, { x: number; y: number }>();
-    if (!layout) return m;
-    m.set(layout.center.node.id, { x: layout.center.x, y: layout.center.y });
-    for (const p of layout.ring) {
-      m.set(p.node.id, { x: p.x, y: p.y });
-    }
-    return m;
-  }, [layout]);
+  // M2 残留：保留 ghost 环（无 location_id 且非 outflow 的 edition 仍可能存在）。
+  // 改成只对"非 outflow + 无 location"的 editions 显示，避免和 Outer ring (anonymous outflow)
+  // 视觉冲突。outflow + 无 location 的已经在 anonymous ring 表达了。
+  const nonOutflowNoLoc = useMemo(
+    () =>
+      editions.filter(
+        (e) =>
+          !e.location_id &&
+          e.status !== 'sold' &&
+          e.status !== 'gifted'
+      ),
+    [editions]
+  );
+  const ghost = useMemo(
+    () =>
+      getGhostNodes(nonOutflowNoLoc, locations, {
+        cx: W / 2,
+        cy: H / 2,
+        radius: Math.min(W, H) * 0.52,
+      }),
+    [nonOutflowNoLoc, locations]
+  );
 
-  // 当前激活节点 id（pin 优先，否则 hover 预览）
+  // 旧 buildNodes（仅供 empty-state 判断 fallback；Constellation 数据空时仍可能
+  // 有 in_studio editions 让 stat 的 tracked > 0，但 view body 空白）
+  const fallbackNodes = useMemo(
+    () => buildNodes(editions, locations),
+    [editions, locations]
+  );
+
+  // ─── pin / hover 解析 ─────────────────────────────────────────────────────
   const activeNodeId = pinnedNodeId ?? hoveredNodeId;
 
-  // pin 卡片用的 edition 列表（按 location 过滤，附带 artwork 信息）
+  const activeMeta = useMemo<ActiveNodeMeta | null>(() => {
+    if (!activeNodeId) return null;
+    if (activeNodeId.startsWith('location:')) {
+      const id = activeNodeId.slice('location:'.length);
+      const node = constellation.locations.find((n) => n.id === id);
+      if (node) return { kind: 'location', node };
+      return null;
+    }
+    if (activeNodeId.startsWith('named:')) {
+      const id = activeNodeId.slice('named:'.length);
+      const node = constellation.namedPrivateBuyers.find((n) => n.id === id);
+      if (node) return { kind: 'named_private', node };
+      return null;
+    }
+    return null;
+  }, [activeNodeId, constellation]);
+
+  // pin 卡片显示用的 edition 列表（按节点过滤，附带 artwork 信息）
   const pinnedEditions = useMemo(() => {
-    if (!pinnedNodeId) return [];
+    if (!pinnedNodeId || !activeMeta) return [];
+    const ids = activeMeta.node.editionIds;
     return editions
-      .filter((e) => e.location_id === pinnedNodeId)
+      .filter((e) => ids.includes(e.id))
       .map((e) => ({
         edition: e,
         artwork: artworkMap.get(e.artwork_id),
-        displayId: e.inventory_number ?? `${e.id.slice(0, 8)}${t('diaspora.pin.noInventory')}`,
+        displayId:
+          e.inventory_number ??
+          `${e.id.slice(0, 8)}${t('diaspora.pin.noInventory')}`,
       }));
-  }, [pinnedNodeId, editions, artworkMap, t]);
+  }, [pinnedNodeId, activeMeta, editions, artworkMap, t]);
 
-  // hover 预览用的 node（仅无 pin 时显示）
-  const previewNode: LocationNode | null = useMemo(() => {
-    if (pinnedNodeId) return null; // pin 时不显示预览
-    if (!hoveredNodeId) return null;
-    return nodes.find((n) => n.id === hoveredNodeId) ?? null;
-  }, [pinnedNodeId, hoveredNodeId, nodes]);
-
-  // pin 节点对应的 LocationNode
-  const pinnedNode: LocationNode | null = useMemo(() => {
-    if (!pinnedNodeId) return null;
-    return nodes.find((n) => n.id === pinnedNodeId) ?? null;
-  }, [pinnedNodeId, nodes]);
+  // ─── Selection (Phase 2: M3a) ───────────────────────────────────────────────
+  // 选中 artwork → 找该 artwork 所有 editions → 这些 editions 归类到哪些 node。
+  // 每种 node 加 selection ring；从 artist center 画 dashed edge 到选中节点。
+  // anonymous 是聚合圈，整体不加 ring（无个体性）。
+  const selectedNodeIds = useMemo(() => {
+    const set = new Set<string>();
+    if (!selectedArtworkId) return set;
+    for (const loc of constellation.locations) {
+      if (loc.artworkIds.includes(selectedArtworkId)) {
+        set.add(`location:${loc.id}`);
+      }
+    }
+    for (const named of constellation.namedPrivateBuyers) {
+      if (named.artworkIds.includes(selectedArtworkId)) {
+        set.add(`named:${named.id}`);
+      }
+    }
+    return set;
+  }, [selectedArtworkId, constellation]);
 
   // ─── 事件处理 ──────────────────────────────────────────────────────────────
-  function handleNodeClick(nodeId: string) {
-    setPinnedNodeId((prev) => (prev === nodeId ? null : nodeId));
+  function handleNodeClick(key: string) {
+    setPinnedNodeId((prev) => (prev === key ? null : key));
   }
 
-  function handleNodeMouseEnter(nodeId: string) {
-    setHoveredNodeId(nodeId);
+  function handleNodeMouseEnter(key: string) {
+    setHoveredNodeId(key);
   }
 
   function handleNodeMouseLeave() {
@@ -168,16 +185,22 @@ export default function DiasporaView({
   }
 
   function handleSvgClick(e: React.MouseEvent<SVGSVGElement>) {
-    // 只有点击 SVG 背景（target 是 svg 或 circle/path 等非交互元素）才取消 pin
-    // 节点 <g> 已阻止冒泡，所以这里只有"真正点 SVG 空白"才会触发
     const target = e.target as Element;
-    // 如果 target 是节点 g 或其子元素，不取消 pin（节点自己处理）
     if (target.closest('g[data-node]')) return;
     setPinnedNodeId(null);
   }
 
   // ─── 空状态 ────────────────────────────────────────────────────────────────
-  if (nodes.length === 0) {
+  // Constellation 完全空时退化到原 empty 信息条；保留旧 stat（"X / Y editions
+  // have known location"）始终显示
+  const constellationEmpty =
+    constellation.locations.length === 0 &&
+    constellation.namedPrivateBuyers.length === 0 &&
+    constellation.anonymous.count === 0;
+
+  const totallyEmpty = constellationEmpty && fallbackNodes.length === 0;
+
+  if (totallyEmpty) {
     return (
       <div className="space-y-4">
         <header className="space-y-1">
@@ -274,7 +297,7 @@ export default function DiasporaView({
         </span>
       </div>
 
-      {/* ─── SVG 同心环关系图 ────────────────────────────────────────── */}
+      {/* ─── SVG Constellation 图 ────────────────────────────────────── */}
       <div className="relative overflow-x-auto border border-border">
         <svg
           viewBox={`0 0 ${W} ${H}`}
@@ -284,24 +307,24 @@ export default function DiasporaView({
           aria-label={t('diaspora.heading')}
           onClick={handleSvgClick}
         >
-          {/* 同心环辅助圆（弱色参考线，提升对比让节点压住时仍能看清环路） */}
-          {RING_GUIDE_RADII.map((r, i) => (
+          {/* ─── 三环参考线（弱色） ───────────────────────────── */}
+          {(
+            ['inner', 'middle', 'outer'] as Array<keyof typeof layout.radii>
+          ).map((ring) => (
             <circle
-              key={i}
-              cx={W / 2}
-              cy={H / 2}
-              r={r}
+              key={ring}
+              cx={layout.center.x}
+              cy={layout.center.y}
+              r={layout.radii[ring]}
               fill="none"
               className="stroke-foreground"
               strokeWidth={1}
               strokeDasharray="2 5"
-              opacity={0.25}
+              opacity={0.2}
             />
           ))}
 
-          {/* ─── M2: ghost 环 —— 无 location_id 的 edition ─── */}
-          {/* 不可点击 / 不进 hover 状态机；count=0 时不渲染（防止画空环）。
-              这是"档案里的盲区"的视觉化：能数出来但定位不到。 */}
+          {/* ─── M2 残留: ghost 环（非 outflow 无 location 的 edition） ─── */}
           {ghost.count > 0 && (
             <g data-testid="diaspora-ghost-ring" aria-hidden="true">
               {ghost.positions.map((p, i) => (
@@ -319,217 +342,348 @@ export default function DiasporaView({
             </g>
           )}
 
-          {/* ─── edges ──────────────────────────────────────────── */}
-          {layout &&
-            edges.map((edge, i) => {
-              const from = coordMap.get(edge.fromNodeId);
-              const to = coordMap.get(edge.toNodeId);
-              if (!from || !to) return null;
-              const opacity = Math.min(1, edge.count * 0.3);
-              const d = curvedPath(from.x, from.y, to.x, to.y, W / 2, H / 2);
-              return (
-                <path
-                  key={i}
-                  d={d}
-                  fill="none"
+          {/* ─── Edges: 只画 location ↔ artist ───────────────────── */}
+          {layout.locationPoints.map((p) => {
+            const sw = Math.max(
+              0.5,
+              Math.min(2, p.node.editionCount / 5)
+            );
+            return (
+              <line
+                key={`edge-${p.node.id}`}
+                x1={layout.center.x}
+                y1={layout.center.y}
+                x2={p.x}
+                y2={p.y}
+                className="stroke-foreground"
+                strokeWidth={sw}
+                opacity={0.3}
+              />
+            );
+          })}
+
+          {/* ─── Phase 2 selection edges: dashed line from center to selected node ─── */}
+          {selectedArtworkId &&
+            layout.locationPoints
+              .filter((p) => selectedNodeIds.has(`location:${p.node.id}`))
+              .map((p) => (
+                <line
+                  key={`sel-edge-loc-${p.node.id}`}
+                  data-testid={`constellation-selection-edge-${p.node.id}`}
+                  x1={layout.center.x}
+                  y1={layout.center.y}
+                  x2={p.x}
+                  y2={p.y}
                   className="stroke-foreground"
-                  strokeWidth={1}
-                  strokeOpacity={opacity}
+                  strokeWidth={1.2}
+                  strokeDasharray="3 3"
+                  opacity={0.85}
                 />
-              );
-            })}
+              ))}
+          {selectedArtworkId &&
+            layout.namedPoints
+              .filter((p) => selectedNodeIds.has(`named:${p.node.id}`))
+              .map((p) => (
+                <line
+                  key={`sel-edge-named-${p.node.id}`}
+                  data-testid={`constellation-selection-edge-named-${p.node.id}`}
+                  x1={layout.center.x}
+                  y1={layout.center.y}
+                  x2={p.x}
+                  y2={p.y}
+                  className="stroke-foreground"
+                  strokeWidth={1.2}
+                  strokeDasharray="3 3"
+                  opacity={0.85}
+                />
+              ))}
 
-          {/* ─── outer nodes ────────────────────────────────────── */}
-          {layout &&
-            layout.ring.map(({ x, y, node }) => {
-              const r = nodeRadius(node.editionCount);
-              const opacity = TYPE_OPACITY[node.type];
-              const isHovered = hoveredNodeId === node.id && !pinnedNodeId;
-              const isPinned = pinnedNodeId === node.id;
-              const isActive = activeNodeId === node.id;
-              const iso2 = countryToISO2(node.country);
+          {/* ─── Outer ring: anonymous dots (不可点击) ───────────── */}
+          {layout.anonymousPoints.map((p) => (
+            <circle
+              key={`anon-${p.index}`}
+              data-testid={`constellation-anon-${p.index}`}
+              cx={p.x}
+              cy={p.y}
+              r={1.5}
+              className="fill-foreground"
+              opacity={0.3}
+            />
+          ))}
 
-              // 节点 label 偏移：让文字不覆盖节点本体
-              // 相对中心方向决定 label 放哪侧
-              const dx = x - W / 2;
-              const dy = y - H / 2;
-              const angle = Math.atan2(dy, dx);
-              const labelDist = r + 5;
-              const lx = x + Math.cos(angle) * labelDist;
-              const ly = y + Math.sin(angle) * labelDist;
-              const anchor =
-                Math.abs(dx) < 20
-                  ? 'middle'
-                  : dx > 0
-                    ? 'start'
-                    : 'end';
+          {/* ─── Inner ring: location nodes ────────────────────── */}
+          {layout.locationPoints.map(({ x, y, node }) => {
+            const r = nodeRadius(node.editionCount);
+            const opacity = TYPE_OPACITY[node.type] ?? 0.7;
+            const nodeKey = `location:${node.id}`;
+            const isHovered =
+              hoveredNodeId === nodeKey && !pinnedNodeId;
+            const isPinned = pinnedNodeId === nodeKey;
+            const isActive = activeNodeId === nodeKey;
+            const isSelected = selectedNodeIds.has(nodeKey);
+            const iso2 = countryToISO2(node.country);
 
-              return (
-                <g
-                  key={node.id}
-                  data-node={node.id}
-                  className="cursor-pointer focus:outline-none"
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`${node.name} — ${t('diaspora.tooltip.editions', { count: node.editionCount })}`}
-                  aria-pressed={isPinned}
-                  onMouseEnter={() => handleNodeMouseEnter(node.id)}
-                  onMouseLeave={handleNodeMouseLeave}
-                  onClick={(e) => { e.stopPropagation(); handleNodeClick(node.id); }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      handleNodeClick(node.id);
-                    }
-                  }}
-                >
-                  {/* SVG 原生 tooltip：hover 显示完整 name（label 被截断时尤其重要） */}
-                  <title>{node.name}</title>
-                  {/* pin 外圈（仅 pin 状态显示，动态脉冲） */}
-                  {isPinned && (
-                    <circle
-                      cx={x}
-                      cy={y}
-                      r={r + 6}
-                      fill="none"
-                      className="stroke-foreground diaspora-pin-pulse"
-                      strokeWidth={1.5}
-                    />
-                  )}
-                  {/* hover ring（仅 hover 预览时，细线） */}
-                  {isHovered && !isPinned && (
-                    <circle
-                      cx={x}
-                      cy={y}
-                      r={r + 4}
-                      fill="none"
-                      className="stroke-foreground"
-                      strokeWidth={0.5}
-                      opacity={0.4}
-                    />
-                  )}
-                  <circle
-                    cx={x}
-                    cy={y}
-                    r={r}
-                    className="fill-foreground"
-                    opacity={isPinned ? 1 : opacity}
-                  />
-                  {/* 节点名 */}
-                  <text
-                    x={lx}
-                    y={ly - 3}
-                    textAnchor={anchor}
-                    className="fill-foreground"
-                    fontSize="9"
-                    fontFamily="ui-monospace, monospace"
-                    opacity={isActive ? 1 : 0.75}
-                  >
-                    {node.name.length > 18
-                      ? node.name.slice(0, 16) + '…'
-                      : node.name}
-                  </text>
-                  {/* ISO-2 国家码 */}
-                  <text
-                    x={lx}
-                    y={ly + 8}
-                    textAnchor={anchor}
-                    className="fill-muted-foreground"
-                    fontSize="8"
-                    fontFamily="ui-monospace, monospace"
-                  >
-                    {iso2}
-                  </text>
-                </g>
-              );
-            })}
-
-          {/* ─── center node ────────────────────────────────────── */}
-          {layout && (() => {
-            const centerNodeObj = layout.center.node;
-            const isCenterHovered = hoveredNodeId === centerNodeObj.id && !pinnedNodeId;
-            const isCenterPinned = pinnedNodeId === centerNodeObj.id;
+            const dx = x - W / 2;
+            const dy = y - H / 2;
+            const angle = Math.atan2(dy, dx);
+            const labelDist = r + 5;
+            const lx = x + Math.cos(angle) * labelDist;
+            const ly = y + Math.sin(angle) * labelDist;
+            const anchor =
+              Math.abs(dx) < 20
+                ? 'middle'
+                : dx > 0
+                  ? 'start'
+                  : 'end';
 
             return (
               <g
-                data-node={centerNodeObj.id}
+                key={node.id}
+                data-node={node.id}
+                data-testid={`constellation-location-${node.id}`}
                 className="cursor-pointer focus:outline-none"
                 role="button"
                 tabIndex={0}
-                aria-label={`${centerNodeObj.name} — ${t('diaspora.tooltip.editions', { count: centerNodeObj.editionCount })}`}
-                aria-pressed={isCenterPinned}
-                onMouseEnter={() => handleNodeMouseEnter(centerNodeObj.id)}
+                aria-label={`${node.name} — ${t('diaspora.tooltip.editions', { count: node.editionCount })}`}
+                aria-pressed={isPinned}
+                onMouseEnter={() => handleNodeMouseEnter(nodeKey)}
                 onMouseLeave={handleNodeMouseLeave}
-                onClick={(e) => { e.stopPropagation(); handleNodeClick(centerNodeObj.id); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleNodeClick(nodeKey);
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    handleNodeClick(centerNodeObj.id);
+                    handleNodeClick(nodeKey);
                   }
                 }}
               >
-                {/* SVG 原生 tooltip：center node label 截断时也能看完整名 */}
-                <title>{centerNodeObj.name}</title>
-                {/* pin outer ring for center —— 动态脉冲 */}
-                {isCenterPinned && (
+                <title>{node.name}</title>
+                {/* selection ring: dashed outer ring (Phase 2) */}
+                {isSelected && (
                   <circle
-                    cx={layout.center.x}
-                    cy={layout.center.y}
-                    r={30}
+                    data-testid={`constellation-selection-ring-${node.id}`}
+                    cx={x}
+                    cy={y}
+                    r={r + 5}
+                    fill="none"
+                    className="stroke-foreground"
+                    strokeWidth={1.5}
+                    strokeDasharray="2 2"
+                  />
+                )}
+                {isPinned && (
+                  <circle
+                    cx={x}
+                    cy={y}
+                    r={r + 8}
                     fill="none"
                     className="stroke-foreground diaspora-pin-pulse"
                     strokeWidth={1.5}
                   />
                 )}
-                {/* pulse ring */}
+                {isHovered && !isPinned && (
+                  <circle
+                    cx={x}
+                    cy={y}
+                    r={r + 4}
+                    fill="none"
+                    className="stroke-foreground"
+                    strokeWidth={0.5}
+                    opacity={0.4}
+                  />
+                )}
                 <circle
-                  cx={layout.center.x}
-                  cy={layout.center.y}
-                  r={26}
-                  fill="none"
-                  className="stroke-foreground"
-                  strokeWidth={isCenterHovered ? 1 : 0.5}
-                  opacity={isCenterHovered ? 0.4 : 0.2}
-                />
-                <circle
-                  cx={layout.center.x}
-                  cy={layout.center.y}
-                  r={18}
+                  cx={x}
+                  cy={y}
+                  r={r}
                   className="fill-foreground"
-                  opacity={1}
+                  opacity={isPinned ? 1 : opacity}
                 />
-                {/* center label */}
                 <text
-                  x={layout.center.x}
-                  y={layout.center.y + 32}
-                  textAnchor="middle"
+                  x={lx}
+                  y={ly - 3}
+                  textAnchor={anchor}
                   className="fill-foreground"
                   fontSize="9"
                   fontFamily="ui-monospace, monospace"
+                  opacity={isActive ? 1 : 0.75}
                 >
-                  {centerNodeObj.name.length > 20
-                    ? centerNodeObj.name.slice(0, 18) + '…'
-                    : centerNodeObj.name}
+                  {node.name.length > 18
+                    ? node.name.slice(0, 16) + '…'
+                    : node.name}
                 </text>
                 <text
-                  x={layout.center.x}
-                  y={layout.center.y + 42}
-                  textAnchor="middle"
+                  x={lx}
+                  y={ly + 8}
+                  textAnchor={anchor}
                   className="fill-muted-foreground"
                   fontSize="8"
                   fontFamily="ui-monospace, monospace"
                 >
-                  {countryToISO2(centerNodeObj.country)}
+                  {iso2}
                 </text>
               </g>
             );
-          })()}
+          })}
+
+          {/* ─── Middle ring: named private buyers ──────────────── */}
+          {layout.namedPoints.map(({ x, y, node }) => {
+            const r = namedNodeRadius(node.editionCount);
+            const nodeKey = `named:${node.id}`;
+            const isHovered =
+              hoveredNodeId === nodeKey && !pinnedNodeId;
+            const isPinned = pinnedNodeId === nodeKey;
+            const isSelected = selectedNodeIds.has(nodeKey);
+
+            const dx = x - W / 2;
+            const dy = y - H / 2;
+            const angle = Math.atan2(dy, dx);
+            const labelDist = r + 6;
+            const lx = x + Math.cos(angle) * labelDist;
+            const ly = y + Math.sin(angle) * labelDist;
+            const anchor =
+              Math.abs(dx) < 20
+                ? 'middle'
+                : dx > 0
+                  ? 'start'
+                  : 'end';
+
+            return (
+              <g
+                key={`named-${node.id}`}
+                data-node={`named-${node.id}`}
+                data-testid={`constellation-named-${node.id}`}
+                className="cursor-pointer focus:outline-none"
+                role="button"
+                tabIndex={0}
+                aria-label={t('diaspora.constellation.aria.namedPrivate', {
+                  name: node.name,
+                  count: node.editionCount,
+                })}
+                aria-pressed={isPinned}
+                onMouseEnter={() => handleNodeMouseEnter(nodeKey)}
+                onMouseLeave={handleNodeMouseLeave}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleNodeClick(nodeKey);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleNodeClick(nodeKey);
+                  }
+                }}
+              >
+                <title>{node.name}</title>
+                {isSelected && (
+                  <circle
+                    data-testid={`constellation-selection-ring-named-${node.id}`}
+                    cx={x}
+                    cy={y}
+                    r={r + 4}
+                    fill="none"
+                    className="stroke-foreground"
+                    strokeWidth={1.5}
+                    strokeDasharray="2 2"
+                  />
+                )}
+                {isPinned && (
+                  <circle
+                    cx={x}
+                    cy={y}
+                    r={r + 6}
+                    fill="none"
+                    className="stroke-foreground diaspora-pin-pulse"
+                    strokeWidth={1.5}
+                  />
+                )}
+                {isHovered && !isPinned && (
+                  <circle
+                    cx={x}
+                    cy={y}
+                    r={r + 3}
+                    fill="none"
+                    className="stroke-foreground"
+                    strokeWidth={0.5}
+                    opacity={0.4}
+                  />
+                )}
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={r}
+                  className="fill-foreground"
+                  opacity={isPinned ? 0.9 : 0.5}
+                />
+                <text
+                  x={lx}
+                  y={ly}
+                  textAnchor={anchor}
+                  className="fill-muted-foreground"
+                  fontSize="7"
+                  fontFamily="ui-monospace, monospace"
+                  opacity={0.7}
+                >
+                  {node.name.length > 14
+                    ? node.name.slice(0, 12) + '…'
+                    : node.name}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* ─── Center: artist node ────────────────────────────── */}
+          <g
+            data-node="aaajiao"
+            data-testid="constellation-artist"
+            aria-label={t('diaspora.constellation.aria.artist')}
+          >
+            <title>{t('diaspora.constellation.centerLabel')}</title>
+            <circle
+              cx={layout.center.x}
+              cy={layout.center.y}
+              r={14}
+              fill="none"
+              className="stroke-foreground"
+              strokeWidth={0.5}
+              opacity={0.4}
+            />
+            <circle
+              cx={layout.center.x}
+              cy={layout.center.y}
+              r={12}
+              className="fill-foreground"
+              opacity={1}
+            />
+            <text
+              x={layout.center.x}
+              y={layout.center.y + 26}
+              textAnchor="middle"
+              className="fill-foreground"
+              fontSize="9"
+              fontFamily="ui-monospace, monospace"
+            >
+              {t('diaspora.constellation.centerLabel')}
+            </text>
+            <text
+              x={layout.center.x}
+              y={layout.center.y + 36}
+              textAnchor="middle"
+              className="fill-muted-foreground"
+              fontSize="8"
+              fontFamily="ui-monospace, monospace"
+            >
+              {constellation.artist.totalOutflowCount}
+            </text>
+          </g>
         </svg>
       </div>
 
-      {/* ─── Tooltip / Info bar（hover 预览或 pin 卡片）──────────────── */}
+      {/* ─── Tooltip / Info bar ──────────────────────────────────────── */}
       <div className="min-h-[3.5rem] border-t border-border pt-3 text-xs font-mono space-y-0.5">
-        {pinnedNode ? (
+        {pinnedNodeId && activeMeta ? (
           /* ── Pin 卡片 ───────────────────────────────────────────── */
           <div className="relative space-y-2 pr-6">
             <button
@@ -543,23 +697,28 @@ export default function DiasporaView({
             >
               <X className="w-3 h-3" />
             </button>
-            {/* 标题行 */}
             <div className="flex items-baseline justify-between gap-2">
               <div>
-                <span className="font-bold">{pinnedNode.name}</span>
+                <span className="font-bold">{activeMeta.node.name}</span>
                 <span className="text-muted-foreground ml-2">
-                  {pinnedNode.type}
-                  {pinnedNode.city ? ` · ${pinnedNode.city}` : ''}
-                  {pinnedNode.country ? ` · ${pinnedNode.country}` : ''}
+                  {activeMeta.kind === 'location' ? activeMeta.node.type : 'private'}
+                  {activeMeta.kind === 'location' && activeMeta.node.city
+                    ? ` · ${activeMeta.node.city}`
+                    : ''}
+                  {activeMeta.kind === 'location' && activeMeta.node.country
+                    ? ` · ${activeMeta.node.country}`
+                    : ''}
                 </span>
               </div>
             </div>
 
-            {/* Edition 列表 —— 横排 chips */}
             {pinnedEditions.length > 0 && (
               <div className="space-y-1.5">
                 <div className="text-muted-foreground">
-                  {t('diaspora.pin.editionsAt', { count: pinnedEditions.length })}:
+                  {t('diaspora.pin.editionsAt', {
+                    count: pinnedEditions.length,
+                  })}
+                  :
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {pinnedEditions.map(({ edition, displayId }) => (
@@ -569,8 +728,6 @@ export default function DiasporaView({
                       title={edition.status}
                       className="font-mono border border-border px-1.5 py-0.5 hover:bg-muted/50 hover:border-foreground transition-colors cursor-pointer"
                       onClick={(e) => {
-                        // 防御性 stopPropagation：pin 卡片在 SVG 外，理论上不会冒泡到 SVG unpin，
-                        // 但未来重构若把卡片移入 <foreignObject> 就会触发。预防为主。
                         e.stopPropagation();
                         navigate(`/editions/${edition.id}`);
                       }}
@@ -582,49 +739,84 @@ export default function DiasporaView({
               </div>
             )}
 
-            <div className="flex justify-end">
-              <button
-                type="button"
-                aria-label={t('diaspora.pin.viewAllAria')}
-                className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/editions?locationId=${pinnedNodeId}`);
-                }}
-              >
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            {activeMeta.kind === 'location' && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  aria-label={t('diaspora.pin.viewAllAria')}
+                  className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(
+                      `/editions?locationId=${activeMeta.node.id}`
+                    );
+                  }}
+                >
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
           </div>
-        ) : previewNode ? (
+        ) : activeMeta ? (
           /* ── Hover 预览 ─────────────────────────────────────────── */
           <div className="relative pr-6">
             <Pin
               className="absolute top-0 right-0 w-3 h-3 text-muted-foreground opacity-60"
               aria-hidden="true"
             />
-            <div className="font-bold">{previewNode.name}</div>
-            <div className="text-muted-foreground">
-              {t('diaspora.tooltip.editions', {
-                count: previewNode.editionCount,
-              })}
-              {previewNode.city ? ` · ${previewNode.city}` : ''}
-              {previewNode.country ? ` · ${previewNode.country}` : ''}
-            </div>
-            <div className="text-muted-foreground">
-              {previewNode.type}
-            </div>
+            <div className="font-bold">{activeMeta.node.name}</div>
+            {activeMeta.kind === 'location' ? (
+              <>
+                <div className="text-muted-foreground">
+                  {t('diaspora.tooltip.editions', {
+                    count: activeMeta.node.editionCount,
+                  })}
+                  {activeMeta.node.city ? ` · ${activeMeta.node.city}` : ''}
+                  {activeMeta.node.country
+                    ? ` · ${activeMeta.node.country}`
+                    : ''}
+                </div>
+                <div className="text-muted-foreground">
+                  {activeMeta.node.type}
+                </div>
+              </>
+            ) : (
+              <div className="text-muted-foreground">
+                {t('diaspora.constellation.tooltip.namedPrivate', {
+                  name: activeMeta.node.name,
+                  count: activeMeta.node.editionCount,
+                })}
+              </div>
+            )}
           </div>
         ) : (
-          /* ── 默认提示 ───────────────────────────────────────────── */
+          /* ── 默认提示：Constellation 总览 ─────────────────────── */
           <div className="text-muted-foreground">
+            {t('diaspora.constellation.summary.overview', {
+              locations: constellation.locations.length,
+              namedPrivate: constellation.namedPrivateBuyers.length,
+              anonymous: constellation.anonymous.count,
+            })}
+          </div>
+        )}
+
+        {/* 历史 flow 数量保留作为副标注（不抢主信息） */}
+        {!pinnedNodeId && !activeMeta && history.length > 0 && (
+          <div className="text-muted-foreground opacity-60">
             {t('diaspora.summary.overview', {
-              nodes: nodes.length,
-              edges: edges.length,
+              nodes:
+                constellation.locations.length +
+                constellation.namedPrivateBuyers.length,
+              edges: countLocationChanges(history),
             })}
           </div>
         )}
       </div>
     </div>
   );
+}
+
+/** 计算 history 里 location_change 事件数（保留旧 stat 的 edges 概念） */
+function countLocationChanges(history: VizHistory[]): number {
+  return history.filter((h) => h.action === 'location_change').length;
 }

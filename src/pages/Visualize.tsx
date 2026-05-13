@@ -1,9 +1,10 @@
-import { lazy, Suspense, useMemo } from 'react';
+import { lazy, Suspense, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { Loader2, RefreshCw, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useVisualizationData } from '@/hooks/queries/useVisualizationData';
+import { useVisualizationSelection } from '@/hooks/useVisualizationSelection';
 import StrataView from '@/components/visualize/StrataView';
 
 const MarketsView = lazy(() => import('@/components/visualize/MarketsView'));
@@ -26,6 +27,29 @@ export default function Visualize() {
   const { data, isLoading, isError, error, refetch, isFetching } =
     useVisualizationData();
 
+  // M3a: cross-view trace selection（URL `?sel=artwork:UUID`，4 视图共享）
+  const { selection, setSelection } = useVisualizationSelection();
+  const selectedArtworkId =
+    selection?.kind === 'artwork' ? selection.id : null;
+  const onArtworkSelect = useCallback(
+    (artworkId: string | null) => {
+      setSelection(artworkId ? { kind: 'artwork', id: artworkId } : null);
+    },
+    [setSelection]
+  );
+
+  // 选中作品的 title（用于 selection chip）
+  const selectedArtworkTitle = useMemo(() => {
+    if (!selectedArtworkId || !data) return null;
+    const aw = data.artworks.find((a) => a.id === selectedArtworkId);
+    if (!aw) return selectedArtworkId.slice(0, 8); // 兜底显示 id 前缀
+    return (
+      aw.title_en ||
+      aw.title_cn ||
+      aw.id.slice(0, 8)
+    );
+  }, [selectedArtworkId, data]);
+
   const setView = (v: ViewKey) => {
     const next = new URLSearchParams(searchParams);
     next.set('view', v);
@@ -47,7 +71,31 @@ export default function Visualize() {
   return (
     <div className="px-4 lg:px-8 py-6 space-y-6">
       <header className="space-y-2">
-        <h1 className="text-2xl font-bold tracking-tight">{t('title')}</h1>
+        <div className="flex flex-wrap items-baseline gap-3">
+          <h1 className="text-2xl font-bold tracking-tight">{t('title')}</h1>
+          {/* M3a: selection chip —— 显示当前跨视图选中的作品，× 清除 */}
+          {selectedArtworkId && selectedArtworkTitle && (
+            <span
+              data-testid="visualize-selection-chip"
+              className="inline-flex items-center gap-2 px-2 py-1 border border-foreground text-xs font-mono"
+            >
+              <span className="text-muted-foreground uppercase tracking-wider">
+                {t('selection.label')}
+              </span>
+              <span className="max-w-[12rem] truncate">
+                {selectedArtworkTitle}
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelection(null)}
+                aria-label={t('selection.clear')}
+                className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+        </div>
         <p className="text-sm text-muted-foreground">{t('subtitle')}</p>
       </header>
 
@@ -110,6 +158,8 @@ export default function Visualize() {
               artworks={data.artworks}
               editions={data.editions}
               history={data.history}
+              selectedArtworkId={selectedArtworkId}
+              onArtworkSelect={onArtworkSelect}
             />
           )}
           <Suspense
@@ -120,7 +170,12 @@ export default function Visualize() {
             }
           >
             {activeView === 'markets' && (
-              <MarketsView artworks={data.artworks} editions={data.editions} />
+              <MarketsView
+                artworks={data.artworks}
+                editions={data.editions}
+                selectedArtworkId={selectedArtworkId}
+                onArtworkSelect={onArtworkSelect}
+              />
             )}
             {activeView === 'terminal' && (
               <TerminalView
@@ -128,6 +183,8 @@ export default function Visualize() {
                 editions={data.editions}
                 locations={data.locations}
                 fetchedAt={data.fetchedAt}
+                selectedArtworkId={selectedArtworkId}
+                onArtworkSelect={onArtworkSelect}
               />
             )}
             {activeView === 'diaspora' && (
@@ -135,6 +192,8 @@ export default function Visualize() {
                 editions={data.editions}
                 locations={data.locations}
                 history={data.history}
+                selectedArtworkId={selectedArtworkId}
+                onArtworkSelect={onArtworkSelect}
               />
             )}
           </Suspense>

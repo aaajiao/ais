@@ -8,6 +8,10 @@ import {
   countryToISO2,
   nodeRadius,
   getGhostNodes,
+  buildConstellation,
+  layoutConstellation,
+  namedNodeRadius,
+  TYPE_ARC_RANGES,
 } from './diasporaUtils';
 import type { LocationNode } from './diasporaUtils';
 import type {
@@ -20,7 +24,8 @@ import type {
 
 function makeEdition(
   id: string,
-  location_id: string | null = null
+  location_id: string | null = null,
+  overrides: Partial<VizEdition> = {}
 ): VizEdition {
   return {
     id,
@@ -35,6 +40,7 @@ function makeEdition(
     sale_date: null,
     buyer_name: null,
     created_at: '2024-01-01T00:00:00Z',
+    ...overrides,
   };
 }
 
@@ -498,5 +504,306 @@ describe('getGhostNodes', () => {
     });
     expect(positions[0].x).toBeCloseTo(100, 4);
     expect(positions[0].y).toBeCloseTo(50, 4); // 12 点钟 = 上方
+  });
+});
+
+// ─── M6: buildConstellation ────────────────────────────────────────────────
+
+describe('buildConstellation', () => {
+  it('空 editions → 空 Constellation（artist outflow=0, locations=[], namedPrivate=[], anonymous=0）', () => {
+    const c = buildConstellation([], []);
+    expect(c.artist.kind).toBe('artist');
+    expect(c.artist.id).toBe('aaajiao');
+    expect(c.artist.totalOutflowCount).toBe(0);
+    expect(c.locations).toEqual([]);
+    expect(c.namedPrivateBuyers).toEqual([]);
+    expect(c.anonymous.count).toBe(0);
+    expect(c.anonymous.editionIds).toEqual([]);
+    expect(c.anonymous.artworkIds).toEqual([]);
+  });
+
+  it('单 non-studio location + sold edition → 1 个 LocationConstellationNode', () => {
+    const editions = [
+      makeEdition('e1', 'loc-gallery', { status: 'sold' }),
+    ];
+    const locations = [makeLocation('loc-gallery', 'Berlin Gallery', 'gallery')];
+    const c = buildConstellation(editions, locations);
+    expect(c.locations).toHaveLength(1);
+    expect(c.locations[0].id).toBe('loc-gallery');
+    expect(c.locations[0].editionCount).toBe(1);
+    expect(c.locations[0].editionIds).toEqual(['e1']);
+    expect(c.locations[0].type).toBe('gallery');
+    expect(c.artist.totalOutflowCount).toBe(1);
+    expect(c.namedPrivateBuyers).toEqual([]);
+    expect(c.anonymous.count).toBe(0);
+  });
+
+  it('多 location + 多 sold edition → 按 editionCount desc 排列 + 类型分弧度', () => {
+    const editions = [
+      makeEdition('e1', 'loc-g1', { status: 'sold' }),
+      makeEdition('e2', 'loc-g1', { status: 'sold' }),
+      makeEdition('e3', 'loc-g1', { status: 'sold' }),
+      makeEdition('e4', 'loc-m1', { status: 'sold' }),
+      makeEdition('e5', 'loc-p1', { status: 'sold' }),
+      makeEdition('e6', 'loc-p1', { status: 'sold' }),
+    ];
+    const locations = [
+      makeLocation('loc-g1', 'Gallery A', 'gallery'),
+      makeLocation('loc-m1', 'Museum B', 'museum'),
+      makeLocation('loc-p1', 'Akeroyd Collection', 'private_collection'),
+    ];
+    const c = buildConstellation(editions, locations);
+    // 按 editionCount desc 排
+    expect(c.locations.map((l) => l.id)).toEqual(['loc-g1', 'loc-p1', 'loc-m1']);
+    expect(c.locations[0].editionCount).toBe(3);
+    // type 字段透传
+    expect(c.locations.find((l) => l.id === 'loc-m1')?.type).toBe('museum');
+    expect(c.locations.find((l) => l.id === 'loc-p1')?.type).toBe(
+      'private_collection'
+    );
+  });
+
+  it('buyer_name 非空 + 无 location → NamedPrivateNode', () => {
+    const editions = [
+      makeEdition('e1', null, { status: 'sold', buyer_name: 'Liliana Gao' }),
+    ];
+    const c = buildConstellation(editions, []);
+    expect(c.namedPrivateBuyers).toHaveLength(1);
+    expect(c.namedPrivateBuyers[0].id).toBe('Liliana Gao');
+    expect(c.namedPrivateBuyers[0].name).toBe('Liliana Gao');
+    expect(c.namedPrivateBuyers[0].editionCount).toBe(1);
+    expect(c.locations).toEqual([]);
+    expect(c.anonymous.count).toBe(0);
+  });
+
+  it('buyer_name 重复 → 同一个 NamedPrivateNode + editionCount 累加（字面值不归一化）', () => {
+    const editions = [
+      makeEdition('e1', null, { status: 'sold', buyer_name: 'Liliana Gao' }),
+      makeEdition('e2', null, { status: 'gifted', buyer_name: 'Liliana Gao' }),
+      // 字面值不同 —— 不归一化合并
+      makeEdition('e3', null, {
+        status: 'sold',
+        buyer_name: 'Liliana Gao / 林奇',
+      }),
+    ];
+    const c = buildConstellation(editions, []);
+    expect(c.namedPrivateBuyers).toHaveLength(2);
+    const liliana = c.namedPrivateBuyers.find((n) => n.id === 'Liliana Gao')!;
+    expect(liliana.editionCount).toBe(2);
+    expect(liliana.editionIds.sort()).toEqual(['e1', 'e2']);
+    const lilianaLinQi = c.namedPrivateBuyers.find(
+      (n) => n.id === 'Liliana Gao / 林奇'
+    )!;
+    expect(lilianaLinQi.editionCount).toBe(1);
+  });
+
+  it('复杂关系：location=museum + buyer_name 非空 → 归 location（步骤 1 优先）', () => {
+    const editions = [
+      makeEdition('e1', 'loc-m1', {
+        status: 'sold',
+        buyer_name: 'Uli Sigg',
+      }),
+    ];
+    const locations = [makeLocation('loc-m1', 'M+ Museum', 'museum')];
+    const c = buildConstellation(editions, locations);
+    expect(c.locations).toHaveLength(1);
+    expect(c.locations[0].id).toBe('loc-m1');
+    expect(c.namedPrivateBuyers).toEqual([]);
+  });
+
+  it('studio 边界 case：location=studio + buyer_name 非空 → 归 namedPrivate（步骤 2）', () => {
+    // Leo Xu + aaajiao Shanghai Studio 真实场景：作品事实上卖给 Leo，
+    // 但物理上仍在 artist studio 寄存 —— 归 named private 而不是 studio location。
+    const editions = [
+      makeEdition('e1', 'loc-studio', {
+        status: 'sold',
+        buyer_name: 'Leo Xu',
+      }),
+    ];
+    const locations = [
+      makeLocation('loc-studio', 'aaajiao Shanghai Studio', 'studio'),
+    ];
+    const c = buildConstellation(editions, locations);
+    expect(c.locations).toEqual([]);
+    expect(c.namedPrivateBuyers).toHaveLength(1);
+    expect(c.namedPrivateBuyers[0].id).toBe('Leo Xu');
+  });
+
+  it('匿名：status=sold + 无 buyer_name + 无 location_id → AnonymousAggregate', () => {
+    const editions = [
+      makeEdition('e1', null, { status: 'sold' }),
+      makeEdition('e2', null, { status: 'gifted' }),
+    ];
+    const c = buildConstellation(editions, []);
+    expect(c.anonymous.count).toBe(2);
+    expect(c.anonymous.editionIds.sort()).toEqual(['e1', 'e2']);
+    expect(c.locations).toEqual([]);
+    expect(c.namedPrivateBuyers).toEqual([]);
+  });
+
+  it('status 过滤：in_studio / at_gallery / at_museum / in_transit 不进 Constellation', () => {
+    const editions = [
+      makeEdition('e1', 'loc-g1', { status: 'in_studio' }),
+      makeEdition('e2', 'loc-g1', { status: 'at_gallery' }),
+      makeEdition('e3', 'loc-g1', { status: 'at_museum' }),
+      makeEdition('e4', 'loc-g1', { status: 'in_transit' }),
+      makeEdition('e5', 'loc-g1', { status: 'in_production' }),
+    ];
+    const locations = [makeLocation('loc-g1', 'Gallery A', 'gallery')];
+    const c = buildConstellation(editions, locations);
+    expect(c.artist.totalOutflowCount).toBe(0);
+    expect(c.locations).toEqual([]);
+  });
+
+  it('lost / damaged editions 不进 Constellation（degenerate 不算 outflow）', () => {
+    const editions = [
+      makeEdition('e1', 'loc-g1', { status: 'lost' }),
+      makeEdition('e2', 'loc-g1', { status: 'damaged' }),
+    ];
+    const locations = [makeLocation('loc-g1', 'Gallery A', 'gallery')];
+    const c = buildConstellation(editions, locations);
+    expect(c.artist.totalOutflowCount).toBe(0);
+    expect(c.locations).toEqual([]);
+  });
+
+  it('artworkIds 去重：同一买家买同一作品多个版本 → artworkIds 只 count 一次', () => {
+    const editions = [
+      makeEdition('e1', null, {
+        artwork_id: 'art-1',
+        status: 'sold',
+        buyer_name: 'Buyer A',
+      }),
+      makeEdition('e2', null, {
+        artwork_id: 'art-1',
+        status: 'sold',
+        buyer_name: 'Buyer A',
+      }),
+      makeEdition('e3', null, {
+        artwork_id: 'art-2',
+        status: 'sold',
+        buyer_name: 'Buyer A',
+      }),
+    ];
+    const c = buildConstellation(editions, []);
+    const buyer = c.namedPrivateBuyers[0];
+    expect(buyer.editionCount).toBe(3);
+    expect(buyer.editionIds).toHaveLength(3); // editionIds 不去重
+    expect(buyer.artworkIds.sort()).toEqual(['art-1', 'art-2']); // artwork 去重
+  });
+
+  it('editionIds 不去重：每个 edition 都是独立流出实例', () => {
+    const editions = [
+      makeEdition('e1', 'loc-g1', { status: 'sold' }),
+      makeEdition('e2', 'loc-g1', { status: 'sold' }),
+      makeEdition('e3', 'loc-g1', { status: 'gifted' }),
+    ];
+    const locations = [makeLocation('loc-g1', 'Gallery A', 'gallery')];
+    const c = buildConstellation(editions, locations);
+    expect(c.locations[0].editionIds.sort()).toEqual(['e1', 'e2', 'e3']);
+    expect(c.locations[0].editionCount).toBe(3);
+  });
+
+  it('totalOutflowCount = sold + gifted 总数（跨桶）', () => {
+    const editions = [
+      makeEdition('e1', 'loc-g1', { status: 'sold' }),
+      makeEdition('e2', null, { status: 'sold', buyer_name: 'Buyer' }),
+      makeEdition('e3', null, { status: 'gifted' }), // anonymous
+      makeEdition('e4', 'loc-g1', { status: 'in_studio' }), // 不进
+    ];
+    const locations = [makeLocation('loc-g1', 'Gallery A', 'gallery')];
+    const c = buildConstellation(editions, locations);
+    expect(c.artist.totalOutflowCount).toBe(3);
+  });
+});
+
+// ─── M6: layoutConstellation ───────────────────────────────────────────────
+
+describe('layoutConstellation', () => {
+  it('center 落在 viewport 正中', () => {
+    const c = buildConstellation([], []);
+    const layout = layoutConstellation(c, { width: 800, height: 560 });
+    expect(layout.center.x).toBe(400);
+    expect(layout.center.y).toBe(280);
+  });
+
+  it('三环半径按 minDim × ratio 计算（默认 0.25 / 0.37 / 0.47）', () => {
+    const c = buildConstellation([], []);
+    const layout = layoutConstellation(c, { width: 800, height: 560 });
+    const minDim = 560;
+    expect(layout.radii.inner).toBeCloseTo(minDim * 0.25, 2);
+    expect(layout.radii.middle).toBeCloseTo(minDim * 0.37, 2);
+    expect(layout.radii.outer).toBeCloseTo(minDim * 0.47, 2);
+  });
+
+  it('location 节点落在对应 type 弧度区间内', () => {
+    const editions = [
+      makeEdition('e1', 'loc-g1', { status: 'sold' }),
+      makeEdition('e2', 'loc-m1', { status: 'sold' }),
+    ];
+    const locations = [
+      makeLocation('loc-g1', 'Gallery A', 'gallery'),
+      makeLocation('loc-m1', 'Museum B', 'museum'),
+    ];
+    const c = buildConstellation(editions, locations);
+    const layout = layoutConstellation(c, { width: 800, height: 560 });
+    const galleryPoint = layout.locationPoints.find(
+      (p) => p.node.id === 'loc-g1'
+    )!;
+    const museumPoint = layout.locationPoints.find(
+      (p) => p.node.id === 'loc-m1'
+    )!;
+    const galleryArc = TYPE_ARC_RANGES.gallery;
+    const museumArc = TYPE_ARC_RANGES.museum;
+    expect(galleryPoint.angle).toBeGreaterThanOrEqual(galleryArc.start);
+    expect(galleryPoint.angle).toBeLessThanOrEqual(galleryArc.end);
+    expect(museumPoint.angle).toBeGreaterThanOrEqual(museumArc.start);
+    expect(museumPoint.angle).toBeLessThanOrEqual(museumArc.end);
+  });
+
+  it('namedPoints 在 middle ring 上均匀分布', () => {
+    const editions = Array.from({ length: 4 }, (_, i) =>
+      makeEdition(`e${i}`, null, {
+        status: 'sold',
+        buyer_name: `Buyer ${i}`,
+      })
+    );
+    const c = buildConstellation(editions, []);
+    const layout = layoutConstellation(c, { width: 800, height: 600 });
+    expect(layout.namedPoints).toHaveLength(4);
+    // 每个 named point 到中心距离 = middle radius
+    for (const p of layout.namedPoints) {
+      const d = Math.sqrt((p.x - 400) ** 2 + (p.y - 300) ** 2);
+      expect(d).toBeCloseTo(layout.radii.middle, 2);
+    }
+  });
+
+  it('anonymousPoints 在 outer ring 上均匀分布，count = anonymous.count', () => {
+    const editions = Array.from({ length: 5 }, (_, i) =>
+      makeEdition(`e${i}`, null, { status: 'sold' })
+    );
+    const c = buildConstellation(editions, []);
+    const layout = layoutConstellation(c, { width: 800, height: 600 });
+    expect(layout.anonymousPoints).toHaveLength(5);
+    for (const p of layout.anonymousPoints) {
+      const d = Math.sqrt((p.x - 400) ** 2 + (p.y - 300) ** 2);
+      expect(d).toBeCloseTo(layout.radii.outer, 2);
+    }
+  });
+});
+
+// ─── M6: namedNodeRadius ───────────────────────────────────────────────────
+
+describe('namedNodeRadius', () => {
+  it('最小值 4', () => {
+    expect(namedNodeRadius(0)).toBe(4);
+  });
+
+  it('最大值 10', () => {
+    expect(namedNodeRadius(9999)).toBe(10);
+  });
+
+  it('随 editionCount 增大而增大', () => {
+    expect(namedNodeRadius(1)).toBeLessThan(namedNodeRadius(5));
+    expect(namedNodeRadius(5)).toBeLessThanOrEqual(namedNodeRadius(10));
   });
 });

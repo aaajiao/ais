@@ -64,10 +64,20 @@ const editions: VizEdition[] = [
   makeSale('e3', 'AAJ-2024-003', 'CNY', 30000, '2024-04-01'),
 ];
 
-function renderMarkets() {
+function renderMarkets(
+  overrides: Partial<{
+    artworks: VizArtwork[];
+    editions: VizEdition[];
+    selectedArtworkId: string | null;
+  }> = {}
+) {
   return renderWithClient(
     <MemoryRouter>
-      <MarketsView artworks={[artwork]} editions={editions} />
+      <MarketsView
+        artworks={overrides.artworks ?? [artwork]}
+        editions={overrides.editions ?? editions}
+        selectedArtworkId={overrides.selectedArtworkId ?? null}
+      />
     </MemoryRouter>
   );
 }
@@ -429,5 +439,23 @@ describe('MarketsView', () => {
     }
     expect(activeCount).toBeGreaterThan(0);
     expect(dimCount).toBeGreaterThan(0);
+  });
+
+  // ─── Phase 2: M3a selection ring ─────────────────────────────────────────
+
+  it('selectedArtworkId 设置时该作品的所有散点渲染 selection ring', () => {
+    const { container } = renderMarkets({ selectedArtworkId: 'aw-1' });
+    // fixture 里 3 个 sold edition 都属于 aw-1
+    const rings = container.querySelectorAll(
+      '[data-testid^="markets-selection-ring-"]'
+    );
+    expect(rings.length).toBe(3);
+  });
+
+  it('selectedArtworkId 为 null 时不渲染任何 selection ring', () => {
+    const { container } = renderMarkets({ selectedArtworkId: null });
+    expect(
+      container.querySelector('[data-testid^="markets-selection-ring-"]')
+    ).toBeNull();
   });
 });

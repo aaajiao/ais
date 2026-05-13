@@ -23,6 +23,9 @@ vi.mock('react-router-dom', async () => {
 });
 
 // ─── Test fixtures ────────────────────────────────────────────────────────────
+//
+// M6 Constellation 重构后，Diaspora 只展示 outflow（status ∈ sold/gifted）。
+// 测试 fixture 改用 sold 状态让节点真实出现在三环上。
 
 const fakeArtwork: VizArtwork = {
   id: 'artwork-1',
@@ -50,7 +53,8 @@ const fakeArtwork2: VizArtwork = {
   created_at: '2023-01-01T00:00:00Z',
 };
 
-// Studio location (center node — most editions)
+// Studio location（M6 后不会作为 Constellation 节点出现 —— studio + buyer
+// 会归 named_private；studio + 无 buyer + 非 outflow 不进 Constellation）
 const studioLocation: VizLocation = {
   id: 'loc-studio',
   name: 'aaajiao Shanghai Studio',
@@ -59,7 +63,7 @@ const studioLocation: VizLocation = {
   country: 'China',
 };
 
-// Gallery location (outer node)
+// Gallery location（作为 Inner ring location node）
 const galleryLocation: VizLocation = {
   id: 'loc-gallery',
   name: 'Test Gallery Berlin',
@@ -68,7 +72,15 @@ const galleryLocation: VizLocation = {
   country: 'Germany',
 };
 
-// Location with a name longer than 18 chars to assert SVG <title> tooltip + truncation
+// Museum location（作为另一个 Inner ring node，验证多 type 分弧）
+const museumLocation: VizLocation = {
+  id: 'loc-museum',
+  name: 'Test Museum NY',
+  type: 'museum',
+  city: 'New York',
+  country: 'United States',
+};
+
 const longNameLocation: VizLocation = {
   id: 'loc-longname',
   name: 'A Very Long Gallery Name That Exceeds Eighteen Chars',
@@ -83,7 +95,7 @@ const longNameEdition: VizEdition = {
   inventory_number: 'AAJ-LONG-001',
   edition_type: 'numbered',
   edition_number: 3,
-  status: 'at_gallery',
+  status: 'sold',
   location_id: 'loc-longname',
   sale_price: null,
   sale_currency: null,
@@ -92,8 +104,8 @@ const longNameEdition: VizEdition = {
   created_at: '2024-02-01T00:00:00Z',
 };
 
-// Editions at studio
-const studioEditions: VizEdition[] = [
+// 在 studio 的 in_studio editions —— 不进 Constellation，但触发 ghost / tracked stat
+const studioInternalEditions: VizEdition[] = [
   {
     id: 'e1',
     artwork_id: 'artwork-1',
@@ -125,7 +137,7 @@ const studioEditions: VizEdition[] = [
   {
     id: 'e3',
     artwork_id: 'artwork-2',
-    inventory_number: null, // no inventory number
+    inventory_number: null,
     edition_type: 'numbered',
     edition_number: 1,
     status: 'in_production',
@@ -138,14 +150,14 @@ const studioEditions: VizEdition[] = [
   },
 ];
 
-// Edition at gallery
-const galleryEdition: VizEdition = {
+// Gallery sold edition —— 进 Constellation Inner ring (loc-gallery)
+const gallerySoldEdition: VizEdition = {
   id: 'e4',
   artwork_id: 'artwork-2',
   inventory_number: 'AAJ-2023-001',
   edition_type: 'numbered',
   edition_number: 2,
-  status: 'at_gallery',
+  status: 'sold',
   location_id: 'loc-gallery',
   sale_price: null,
   sale_currency: null,
@@ -154,7 +166,61 @@ const galleryEdition: VizEdition = {
   created_at: '2023-06-01T00:00:00Z',
 };
 
-const allEditions = [...studioEditions, galleryEdition];
+// Museum sold edition —— 进 Constellation Inner ring (loc-museum)，验证多 type
+const museumSoldEdition: VizEdition = {
+  id: 'e6',
+  artwork_id: 'artwork-1',
+  inventory_number: 'AAJ-2022-001',
+  edition_type: 'numbered',
+  edition_number: 3,
+  status: 'sold',
+  location_id: 'loc-museum',
+  sale_price: null,
+  sale_currency: null,
+  sale_date: null,
+  buyer_name: null,
+  created_at: '2022-06-01T00:00:00Z',
+};
+
+// Named private buyer —— 进 Middle ring
+const namedBuyerEdition: VizEdition = {
+  id: 'e7',
+  artwork_id: 'artwork-1',
+  inventory_number: 'AAJ-NAMED-001',
+  edition_type: 'numbered',
+  edition_number: 4,
+  status: 'sold',
+  location_id: null,
+  sale_price: null,
+  sale_currency: null,
+  sale_date: null,
+  buyer_name: 'Liliana Gao',
+  created_at: '2024-03-01T00:00:00Z',
+};
+
+// Anonymous sold —— 进 Outer ring
+const anonSoldEdition: VizEdition = {
+  id: 'e8',
+  artwork_id: 'artwork-2',
+  inventory_number: 'AAJ-ANON-001',
+  edition_type: 'numbered',
+  edition_number: 5,
+  status: 'sold',
+  location_id: null,
+  sale_price: null,
+  sale_currency: null,
+  sale_date: null,
+  buyer_name: null,
+  created_at: '2024-04-01T00:00:00Z',
+};
+
+const allEditions = [
+  ...studioInternalEditions,
+  gallerySoldEdition,
+  museumSoldEdition,
+  namedBuyerEdition,
+  anonSoldEdition,
+];
 
 const fakeHistory: VizHistory[] = [
   {
@@ -169,7 +235,7 @@ const fakeHistory: VizHistory[] = [
   },
 ];
 
-const allLocations = [studioLocation, galleryLocation];
+const allLocations = [studioLocation, galleryLocation, museumLocation];
 const allArtworks = [fakeArtwork, fakeArtwork2];
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
@@ -180,6 +246,7 @@ function renderDiaspora(
     editions: VizEdition[];
     locations: VizLocation[];
     history: VizHistory[];
+    selectedArtworkId: string | null;
   }> = {}
 ) {
   const props = {
@@ -203,33 +270,30 @@ describe('DiasporaView', () => {
     mockNavigate.mockClear();
   });
 
-  it('初始状态：无 pin、信息条显示 summary 总览', () => {
+  it('初始状态：无 pin、信息条显示 Constellation 总览', () => {
     renderDiaspora();
 
-    // Heading rendered
     expect(screen.getByRole('heading', { name: /Diaspora|流散/i })).toBeInTheDocument();
-
-    // No pin card visible initially
-    expect(screen.queryByRole('button', { name: /查看此位置全部版本|View all editions/i })).not.toBeInTheDocument();
-
-    // Default summary shown (2 locations, 1 flow)
-    expect(screen.getByText(/处位置.*条流转|locations.*flows/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /查看此位置全部版本|View all editions/i })
+    ).not.toBeInTheDocument();
+    // 默认 summary 显示 Constellation 三环数量
+    expect(
+      screen.getByText(/机构.*私人买家.*匿名|institutions.*private buyers.*anonymous/i)
+    ).toBeInTheDocument();
   });
 
-  it('hover 节点 → 下方信息条预览 location 信息', () => {
+  it('hover gallery 节点 → 下方信息条预览 location 信息', () => {
     renderDiaspora();
 
-    // Find a node group by aria-label containing gallery name
     const galleryGroup = screen.getByRole('button', {
       name: /Test Gallery Berlin/i,
     });
     fireEvent.mouseEnter(galleryGroup);
 
-    // Preview appears (scope to div/span — SVG <title> also contains the name now)
     expect(
       screen.getByText('Test Gallery Berlin', { selector: 'div,span' })
     ).toBeInTheDocument();
-    // Pin icon (lucide) signals click-to-pin affordance; no text hint anymore
     expect(galleryGroup).toBeInTheDocument();
   });
 
@@ -245,13 +309,12 @@ describe('DiasporaView', () => {
     ).toBeInTheDocument();
 
     fireEvent.mouseLeave(galleryGroup);
-    // Preview gone — assert the visible (non-SVG-title) instance disappears.
-    // SVG <title> remains on the node permanently; that's fine.
     expect(
       screen.queryByText('Test Gallery Berlin', { selector: 'div,span' })
     ).not.toBeInTheDocument();
-    // Summary overview restored
-    expect(screen.getByText(/处位置.*条流转|locations.*flows/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/机构.*私人买家.*匿名|institutions.*private buyers.*anonymous/i)
+    ).toBeInTheDocument();
   });
 
   it('click 节点 → pin 卡片出现 + 显示 editions 列表', () => {
@@ -262,13 +325,12 @@ describe('DiasporaView', () => {
     });
     fireEvent.click(galleryGroup);
 
-    // Pin card should show gallery name (scope away from SVG <title>)
     expect(
       screen.getByText('Test Gallery Berlin', { selector: 'div,span' })
     ).toBeInTheDocument();
-    // View all link
-    expect(screen.getByRole('button', { name: /查看此位置全部版本|View all editions/i })).toBeInTheDocument();
-    // Edition inventory chip
+    expect(
+      screen.getByRole('button', { name: /查看此位置全部版本|View all editions/i })
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'AAJ-2023-001' })).toBeInTheDocument();
   });
 
@@ -280,7 +342,6 @@ describe('DiasporaView', () => {
     });
     fireEvent.click(galleryGroup);
 
-    // Click on the edition row button
     const editionBtn = screen.getByRole('button', { name: /AAJ-2023-001/i });
     fireEvent.click(editionBtn);
 
@@ -315,19 +376,22 @@ describe('DiasporaView', () => {
       name: /Test Gallery Berlin/i,
     });
     fireEvent.click(galleryGroup);
-    // Pinned
-    expect(screen.getByRole('button', { name: /查看此位置全部版本|View all editions/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /查看此位置全部版本|View all editions/i })
+    ).toBeInTheDocument();
 
     fireEvent.click(galleryGroup);
-    // Unpinned
-    expect(screen.queryByRole('button', { name: /查看此位置全部版本|View all editions/i })).not.toBeInTheDocument();
-    expect(screen.getByText(/处位置.*条流转|locations.*flows/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /查看此位置全部版本|View all editions/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/机构.*私人买家.*匿名|institutions.*private buyers.*anonymous/i)
+    ).toBeInTheDocument();
   });
 
   it('click 另一节点 → 切换 pin 到新节点', () => {
     renderDiaspora();
 
-    // Pin gallery
     const galleryGroup = screen.getByRole('button', {
       name: /Test Gallery Berlin/i,
     });
@@ -336,54 +400,39 @@ describe('DiasporaView', () => {
       screen.getByText('Test Gallery Berlin', { selector: 'div,span' })
     ).toBeInTheDocument();
 
-    // Click center node (studio) to switch pin
-    const studioGroup = screen.getByRole('button', {
-      name: /aaajiao Shanghai Studio/i,
+    const museumGroup = screen.getByRole('button', {
+      name: /Test Museum NY/i,
     });
-    fireEvent.click(studioGroup);
+    fireEvent.click(museumGroup);
 
-    // Now studio is pinned, gallery pin is gone
     expect(
-      screen.getByText('aaajiao Shanghai Studio', { selector: 'div,span' })
+      screen.getByText('Test Museum NY', { selector: 'div,span' })
     ).toBeInTheDocument();
-    // Gallery node name should not be in pin card position
-    // Check "view all" still present (still pinned, just to different location)
-    expect(screen.getByRole('button', { name: /查看此位置全部版本|View all editions/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /查看此位置全部版本|View all editions/i })
+    ).toBeInTheDocument();
   });
 
   it('pin 状态下 hover 其他节点 → pin 卡片保持，不显示预览', () => {
     renderDiaspora();
 
-    // Pin gallery first
     const galleryGroup = screen.getByRole('button', {
       name: /Test Gallery Berlin/i,
     });
     fireEvent.click(galleryGroup);
-    expect(screen.getByRole('button', { name: /查看此位置全部版本|View all editions/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /查看此位置全部版本|View all editions/i })
+    ).toBeInTheDocument();
 
-    // Hover studio node
-    const studioGroup = screen.getByRole('button', {
-      name: /aaajiao Shanghai Studio/i,
+    const museumGroup = screen.getByRole('button', {
+      name: /Test Museum NY/i,
     });
-    fireEvent.mouseEnter(studioGroup);
+    fireEvent.mouseEnter(museumGroup);
 
-    // Pin card still visible (gallery pin not disturbed)
-    expect(screen.getByRole('button', { name: /查看此位置全部版本|View all editions/i })).toBeInTheDocument();
-  });
-
-  it('edition 无 inventory_number 时显示 id 前缀 + noInventory 标记', () => {
-    renderDiaspora();
-
-    // Pin the studio (which has e3 with no inventory_number)
-    const studioGroup = screen.getByRole('button', {
-      name: /aaajiao Shanghai Studio/i,
-    });
-    fireEvent.click(studioGroup);
-
-    // e3 has no inventory_number, id = 'e3', so displayId starts with 'e3'
-    // The display should show "e3" prefix (first 8 chars of uuid) + noInventory marker
-    // Since id is 'e3' (2 chars), it shows 'e3（无编号）' or 'e3(no inv)'
-    expect(screen.getByText(/e3/)).toBeInTheDocument();
+    // Pin 仍指向 gallery
+    expect(
+      screen.getByRole('button', { name: /查看此位置全部版本|View all editions/i })
+    ).toBeInTheDocument();
   });
 
   it('空数据时渲染 empty 状态而不崩溃', () => {
@@ -413,7 +462,9 @@ describe('DiasporaView', () => {
     });
     fireEvent.keyDown(galleryGroup, { key: 'Enter' });
 
-    expect(screen.getByRole('button', { name: /查看此位置全部版本|View all editions/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /查看此位置全部版本|View all editions/i })
+    ).toBeInTheDocument();
   });
 
   it('pin 卡片中每个 edition chip 只显示 inventory 号（status 仅作 title）', () => {
@@ -424,28 +475,24 @@ describe('DiasporaView', () => {
     });
     fireEvent.click(galleryGroup);
 
-    // chip 仅显示 inv；status 作为 title attr 不进 accessible name
     const chip = screen.getByRole('button', { name: 'AAJ-2023-001' });
     expect(chip).toBeInTheDocument();
-    expect(chip).toHaveAttribute('title', 'at_gallery');
+    expect(chip).toHaveAttribute('title', 'sold');
   });
 
   it('长名 location 节点渲染 SVG <title> 元素显示完整 name（label 被截断）', () => {
     const { container } = renderDiaspora({
-      locations: [studioLocation, longNameLocation],
-      editions: [...studioEditions, longNameEdition],
+      locations: [galleryLocation, longNameLocation],
+      editions: [gallerySoldEdition, longNameEdition],
     });
 
-    // The node <g> has data-node attribute matching the location id
     const node = container.querySelector('g[data-node="loc-longname"]');
     expect(node).not.toBeNull();
 
-    // SVG native <title> child carries the full name (used as native tooltip on hover)
     const titleEl = node!.querySelector('title');
     expect(titleEl).not.toBeNull();
     expect(titleEl!.textContent).toBe(longNameLocation.name);
 
-    // The visible label is truncated (16 chars + '…')
     const visibleText = node!.querySelector('text');
     expect(visibleText).not.toBeNull();
     expect(visibleText!.textContent).toBe(
@@ -453,41 +500,26 @@ describe('DiasporaView', () => {
     );
   });
 
-  it('center node 也带 SVG <title> 显示完整 name', () => {
-    const { container } = renderDiaspora();
-
-    // Studio is the center (3 editions vs gallery's 1)
-    const centerNode = container.querySelector('g[data-node="loc-studio"]');
-    expect(centerNode).not.toBeNull();
-
-    const titleEl = centerNode!.querySelector('title');
-    expect(titleEl).not.toBeNull();
-    expect(titleEl!.textContent).toBe(studioLocation.name);
-  });
-
   it('pin 卡片 edition 行点击不会冒泡触发 SVG unpin（stopPropagation 防御）', () => {
     renderDiaspora();
 
-    // Pin the gallery
     const galleryGroup = screen.getByRole('button', {
       name: /Test Gallery Berlin/i,
     });
     fireEvent.click(galleryGroup);
-    expect(screen.getByRole('button', { name: /查看此位置全部版本|View all editions/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /查看此位置全部版本|View all editions/i })
+    ).toBeInTheDocument();
 
-    // Click the edition row — should navigate but NOT unpin
     const editionBtn = screen.getByRole('button', { name: /AAJ-2023-001/i });
     fireEvent.click(editionBtn);
 
     expect(mockNavigate).toHaveBeenCalledWith('/editions/e4');
-    // Verify stopPropagation by checking we'd remain pinned if the navigate were not present.
-    // Direct verification: the click event handler should call stopPropagation —
-    // we cover this with a dedicated spy test below.
   });
 
   // ─── M2 ghost ring ────────────────────────────────────────────────────────
 
-  it('有 location_id 缺失的 edition → 渲染 ghost 环（圆数 = 缺失数）', () => {
+  it('有 location_id 缺失的非 outflow edition → 渲染 ghost 环', () => {
     const ghostEditions: VizEdition[] = [
       ...allEditions,
       {
@@ -546,27 +578,23 @@ describe('DiasporaView', () => {
     ];
     const { container } = renderDiaspora({ editions: ghostEditions });
     const ring = container.querySelector('[data-testid="diaspora-ghost-ring"]')!;
-    // aria-hidden 让 screen reader 忽略（鬼影不进可达性树）
     expect(ring.getAttribute('aria-hidden')).toBe('true');
-    // 没有 role="button" / aria-pressed / tabIndex
     expect(ring.querySelector('[role="button"]')).toBeNull();
     expect(ring.querySelector('[aria-pressed]')).toBeNull();
     expect(ring.querySelector('[tabindex]')).toBeNull();
-    // stroke-only
     const circle = ring.querySelector('circle')!;
     expect(circle.getAttribute('fill')).toBe('none');
     const cls = circle.getAttribute('class') ?? '';
     expect(cls).toContain('stroke-foreground');
   });
 
-  it('所有 edition 都有 location_id → 不渲染 ghost 环（不画空环）', () => {
-    // allEditions 都有 location_id
+  it('所有 non-outflow edition 都有 location_id → 不渲染 ghost 环', () => {
+    // allEditions 里 non-outflow editions（studioInternalEditions）都有 location_id
     const { container } = renderDiaspora();
     const ring = container.querySelector('[data-testid="diaspora-ghost-ring"]');
     expect(ring).toBeNull();
   });
 
-  // ─── M2.5 图例 ────────────────────────────────────────────────────────────
   it('图例包含 ghost 项（diaspora-legend-ghost testid）', () => {
     renderDiaspora();
     expect(screen.getByTestId('diaspora-legend-ghost')).toBeInTheDocument();
@@ -575,28 +603,169 @@ describe('DiasporaView', () => {
   it('pin 卡片按钮 onClick 调用 stopPropagation（spy 验证）', () => {
     renderDiaspora();
 
-    // Pin gallery
     const galleryGroup = screen.getByRole('button', {
       name: /Test Gallery Berlin/i,
     });
     fireEvent.click(galleryGroup);
 
-    // Spy stopPropagation by creating a custom event
     const editionBtn = screen.getByRole('button', { name: /AAJ-2023-001/i });
     const event = new MouseEvent('click', { bubbles: true, cancelable: true });
     const stopProp = vi.spyOn(event, 'stopPropagation');
     editionBtn.dispatchEvent(event);
-
     expect(stopProp).toHaveBeenCalled();
 
-    // Same for "view all" button
     const viewAllBtn = screen.getByRole('button', {
       name: /查看此位置全部版本|View all editions/i,
     });
     const event2 = new MouseEvent('click', { bubbles: true, cancelable: true });
     const stopProp2 = vi.spyOn(event2, 'stopPropagation');
     viewAllBtn.dispatchEvent(event2);
-
     expect(stopProp2).toHaveBeenCalled();
+  });
+
+  // ─── M6 Constellation 三环 ─────────────────────────────────────────────
+
+  it('Constellation 模式下渲染 artist center node（testid constellation-artist）', () => {
+    renderDiaspora();
+    expect(screen.getByTestId('constellation-artist')).toBeInTheDocument();
+  });
+
+  it('Inner ring 渲染 location nodes（每个 sold edition 关联的 location 出现）', () => {
+    const { container } = renderDiaspora();
+    // gallery + museum 都是 sold edition target
+    expect(
+      container.querySelector('[data-testid="constellation-location-loc-gallery"]')
+    ).not.toBeNull();
+    expect(
+      container.querySelector('[data-testid="constellation-location-loc-museum"]')
+    ).not.toBeNull();
+    // studio 不在 Constellation 里（in_studio editions 非 outflow）
+    expect(
+      container.querySelector('[data-testid="constellation-location-loc-studio"]')
+    ).toBeNull();
+  });
+
+  it('Middle ring 渲染 named_private nodes (testid 模式 constellation-named-{name})', () => {
+    const { container } = renderDiaspora();
+    expect(
+      container.querySelector('[data-testid="constellation-named-Liliana Gao"]')
+    ).not.toBeNull();
+  });
+
+  it('Outer ring 渲染 anonymous dots, 数量 = anonymous.count', () => {
+    const { container } = renderDiaspora();
+    // allEditions 里只有 1 个匿名 sold (e8)
+    const anons = container.querySelectorAll(
+      '[data-testid^="constellation-anon-"]'
+    );
+    expect(anons).toHaveLength(1);
+  });
+
+  it('只画 location → artist edges（数 edge 数量 = locations.length）', () => {
+    // 构造一个只有 1 个 location（gallery）+ 1 个 named buyer + 1 个 anon 的 fixture
+    // 验证：line 数 (non-dashed) = 1，跟 location 节点数 = 1 一致；named / anon 不画 edge
+    const oneLoc: VizEdition[] = [
+      gallerySoldEdition,
+      namedBuyerEdition,
+      anonSoldEdition,
+    ];
+    const { container } = renderDiaspora({
+      editions: oneLoc,
+      locations: [galleryLocation],
+    });
+    const svg = container.querySelector('svg')!;
+    const allLines = svg.querySelectorAll('line');
+    // 至少 1 条（gallery edge）
+    expect(allLines.length).toBeGreaterThanOrEqual(1);
+    // non-dashed line = location → artist edge（selection edge 走 dashed，参考圆是 circle 不是 line）
+    const solidLines = Array.from(allLines).filter(
+      (l) => !l.getAttribute('stroke-dasharray')
+    );
+    expect(solidLines.length).toBe(1);
+  });
+
+  it('named_private node 可点击 / 键盘聚焦（role=button + tabIndex=0 + aria-label）', () => {
+    renderDiaspora();
+    const named = screen.getByRole('button', {
+      name: /Liliana Gao/i,
+    });
+    expect(named).toHaveAttribute('tabindex', '0');
+    expect(named.getAttribute('aria-label')).toBeTruthy();
+  });
+
+  it('anonymous dots 不可点击（无 role/tabIndex）', () => {
+    const { container } = renderDiaspora();
+    const anon = container.querySelector('[data-testid="constellation-anon-0"]');
+    expect(anon).not.toBeNull();
+    expect(anon!.getAttribute('role')).toBeNull();
+    expect(anon!.getAttribute('tabindex')).toBeNull();
+  });
+
+  it('点击 named_private node → pin 卡片显示 buyer 信息 + edition chip', () => {
+    renderDiaspora();
+    const named = screen.getByRole('button', {
+      name: /Liliana Gao/i,
+    });
+    fireEvent.click(named);
+    expect(
+      screen.getByRole('button', { name: 'AAJ-NAMED-001' })
+    ).toBeInTheDocument();
+    // named_private pin 卡片没有 "view all" 按钮（无 locationId）
+    expect(
+      screen.queryByRole('button', {
+        name: /查看此位置全部版本|View all editions/i,
+      })
+    ).not.toBeInTheDocument();
+  });
+
+  // ─── Phase 2: M3a selection ring on Diaspora ────────────────────────────
+
+  it('selectedArtworkId 设置时该作品关联的 location 节点渲染 selection ring', () => {
+    // gallerySoldEdition 卖到 gallery，artwork = artwork-2
+    const { container } = renderDiaspora({ selectedArtworkId: 'artwork-2' });
+    expect(
+      container.querySelector(
+        '[data-testid="constellation-selection-ring-loc-gallery"]'
+      )
+    ).not.toBeNull();
+    // museum 是 artwork-1 的，不该有 ring
+    expect(
+      container.querySelector(
+        '[data-testid="constellation-selection-ring-loc-museum"]'
+      )
+    ).toBeNull();
+  });
+
+  it('selectedArtworkId 设置时该作品关联的 named_private 节点渲染 selection ring', () => {
+    // namedBuyerEdition: artwork_id=artwork-1, buyer=Liliana Gao
+    const { container } = renderDiaspora({ selectedArtworkId: 'artwork-1' });
+    expect(
+      container.querySelector(
+        '[data-testid="constellation-selection-ring-named-Liliana Gao"]'
+      )
+    ).not.toBeNull();
+  });
+
+  it('selectedArtworkId 设置时画 dashed edge 从 center 到选中的 location 节点', () => {
+    const { container } = renderDiaspora({ selectedArtworkId: 'artwork-2' });
+    expect(
+      container.querySelector(
+        '[data-testid="constellation-selection-edge-loc-gallery"]'
+      )
+    ).not.toBeNull();
+  });
+
+  it('selectedArtworkId 为 null 时不渲染 selection ring / edges', () => {
+    const { container } = renderDiaspora({ selectedArtworkId: null });
+    expect(
+      container.querySelector(
+        '[data-testid^="constellation-selection-ring-"]'
+      )
+    ).toBeNull();
+    expect(
+      container.querySelector(
+        '[data-testid^="constellation-selection-edge-"]'
+      )
+    ).toBeNull();
   });
 });

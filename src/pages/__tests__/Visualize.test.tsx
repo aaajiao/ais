@@ -207,4 +207,42 @@ describe('Visualize page', () => {
     // 必须不包含 md: 断点（与 style-guide 一致：lg 是核心断点）
     expect(cls).not.toMatch(/\bmd:px-/);
   });
+
+  // ─── Phase 2: M3a cross-view trace selection ────────────────────────────
+
+  it('默认无 selection chip', () => {
+    resetMock();
+    renderAt('/visualize');
+    expect(screen.queryByTestId('visualize-selection-chip')).toBeNull();
+  });
+
+  it('?sel=artwork:a1 → selection chip 显示作品 title', () => {
+    resetMock();
+    renderAt('/visualize?sel=artwork:a1');
+    const chip = screen.getByTestId('visualize-selection-chip');
+    expect(chip).toBeInTheDocument();
+    expect(chip.textContent).toMatch(/Guard, I…/);
+  });
+
+  it('selection chip × 按钮清 selection（URL 去 sel）', () => {
+    resetMock();
+    renderAt('/visualize?sel=artwork:a1');
+    const chip = screen.getByTestId('visualize-selection-chip');
+    const clearBtn = chip.querySelector('button');
+    expect(clearBtn).not.toBeNull();
+    fireEvent.click(clearBtn!);
+    expect(screen.queryByTestId('visualize-selection-chip')).toBeNull();
+  });
+
+  it('?sel=invalid 不显示 chip（解析失败 fallback null）', () => {
+    resetMock();
+    renderAt('/visualize?sel=garbage');
+    expect(screen.queryByTestId('visualize-selection-chip')).toBeNull();
+  });
+
+  it('selection chip 在所有 view 都显示（跨视图共享）', () => {
+    resetMock();
+    renderAt('/visualize?view=diaspora&sel=artwork:a1');
+    expect(screen.getByTestId('visualize-selection-chip')).toBeInTheDocument();
+  });
 });

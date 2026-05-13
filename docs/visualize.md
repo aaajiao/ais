@@ -118,9 +118,50 @@ i18n keys 走各 view 自己段：`strata.legend.*` / `markets.legend.*` / `dias
 
 - Strata：`?view=strata&t=2024`（year，整数）
 - Markets：`?view=markets&t=2024-03-15`（ISO date 字符串）
+- Cross-view selection：`?sel=artwork:UUID`（M3a，v1.6.x 起）
 - `cutoff === max` 时**自动删除** `t` 参数（默认态 URL 干净）
-- **切 view 时 `Visualize.setView()` 调 `next.delete('t')`**：Strata 的 year 跟 Markets 的 date 不能共享 `t` 语义；重置 = max 是最简单且无歧义的选择。Diaspora / Terminal 不读 `t`，切回 Strata/Markets 也从 max 开始。
-- **守护测试** `Visualize.test.tsx` 的 `?view=strata&t=2024` smoke。
+- selection 为空时**自动删除** `sel` 参数（默认态 URL 干净）
+- **切 view 时 `Visualize.setView()` 调 `next.delete('t')`**：Strata 的 year 跟 Markets 的 date 不能共享 `t` 语义；重置 = max 是最简单且无歧义的选择。Diaspora / Terminal 不读 `t`，切回 Strata/Markets 也从 max 开始。`sel` 跨 view 共享，**切 view 时不清** —— 选中作品的轨迹在所有视图都看得见才是 trace 的意义。
+- **守护测试** `Visualize.test.tsx` 的 `?view=strata&t=2024` smoke + `?sel=artwork:UUID` chip 渲染 / × 清 / 跨 view 共享。
+
+### Cross-view trace (v1.6.x 起, M3a)
+
+4 视图共享一个 `useVisualizationSelection` hook，让用户在任一视图选中一件作品后，所有 4 个视图同步加 selection ring。这是把"作品轨迹"画进档案：同一件作品在地层里是某个方块、在市场里是若干散点、在终端里是几行 row、在 constellation 里是几个去向节点 + dashed edges —— 你能在 4 个角度同时看到它的完整流动。
+
+**Scope (MVP)**：只支持 `kind: 'artwork'`。`kind: 'edition' | 'buyer' | 'location'` 留给未来 —— 先把"作品轨迹"跑通是合理 MVP 范围，不在第一版扩 union 避免 scope creep。
+
+**Hook 契约** (`src/hooks/useVisualizationSelection.ts`)：
+```ts
+interface VizSelection { kind: 'artwork'; id: string }
+function useVisualizationSelection(): {
+  selection: VizSelection | null;
+  setSelection: (sel: VizSelection | null) => void;
+  isSelected: (kind: 'artwork', id: string) => boolean;
+}
+```
+URL state：`?sel=artwork:UUID`（key=`sel`，value `${kind}:${id}`）。解析失败 / kind 未知 → selection = null（兜底不抛错）。`setSelection(null)` 删 URL param。
+
+**Parent 接入 (`Visualize.tsx`)**：parent 调 `useVisualizationSelection()`，把 `selectedArtworkId` + `onArtworkSelect` 作为 prop 传给 4 个 view。4 view 签名一致，prop 都是 `(selectedArtworkId: string | null, onArtworkSelect: (id: string | null) => void)`。当前 view 实现里 `onArtworkSelect` 只占位 —— Strata / Markets / Terminal 点击仍走 navigate（不自动 setSelection），因为跳走详情页后 selection 视觉就看不到了。selection 主要的入口是 **URL state 带进来**（外部链接 `?sel=artwork:UUID`、浏览器 back / forward 保留 query）+ 顶部 **selection chip × 按钮清**。
+
+**各 view 渲染**：
+- **Strata**：选中 artwork 的方块（含 unknown-year 列）在 `OwnershipBlock` 之上加 `<rect>` dashed ring：`stroke-foreground stroke-dasharray="2 2" pointer-events-none`。其他方块不变（不 dim 别的 lane —— 跟 lane pin 状态机正交）。`data-testid="strata-selection-ring-{artworkId}"` 给测试用。
+- **Markets**：选中 artwork 的所有散点 r × 1.5 放大 + dashed ring 包外圈。noPrice lane 也支持。`data-testid="markets-selection-ring-{editionId}"`。
+- **Terminal**：选中 artwork 的所有行加 `bg-foreground/10 shadow-[inset_2px_0_0_0_var(--foreground)]`（**用 box-shadow 不用 border**：border 会让该行宽度差 1px 破坏 `<pre>` 等宽字符流）。`data-testid="terminal-selected-row-{editionId}"`。
+- **Diaspora**：选中 artwork 的所有 editions 归类到哪些 node（location / named_private），这些 node 加 dashed ring + 从 artist center 画 dashed edge 到它们。**anonymous 节点不加 ring**（聚合圈无个体性）。`data-testid="constellation-selection-ring-{...}"` + `constellation-selection-edge-{...}`。
+
+**Selection chip (page header)**：parent 在标题旁渲染一个 conditional chip：`Selected: {title} ×`，其中 title 取 `artwork.title_en || artwork.title_cn || id 前缀`。点击 × 调 `setSelection(null)` 清 URL。i18n keys：`visualize.selection.label` / `visualize.selection.clear`，**跨 view 共享放在 `visualize.selection.*` 段下**（不放进任何 view 子段，因为是跨 view 状态）。
+
+**为什么 onArtworkSelect 占位不主动调**：spec 探讨过让 Strata block / Markets dot 在 click 时**先 setSelection 再 navigate**，但跳走后 selection 视觉立刻消失，用户感受不到。简化决定：保留 navigate 行为，selection 的入口靠 URL state + chip × 清。未来如果加"长按 / Cmd+Click 不跳转只选中"等手势可以激活 `onArtworkSelect` prop。
+
+**i18n 隔离**：CLAUDE.md "i18n key 跨 view 借用是 ticking bomb" 仍适用。Selection chip 文案在 `visualize.selection.*` 是顶层段（跨 view 共享场景）；4 个 view 的 selection ring 视觉**没有任何文案**（aria-label / testid 都不需要 i18n），所以不需要"被某 view 借走"的可能性。
+
+**守护测试**：
+- `useVisualizationSelection.test.tsx` (13 tests)：URL 解析 / setSelection 写 / 删 URL / isSelected / 非法值 fallback
+- `Visualize.test.tsx`（新增 5）：默认无 chip / ?sel=artwork:UUID chip 显示 / × 清 / 非法 sel fallback / 跨 view 共享
+- `StrataView.test.tsx`（新增 2）：selectedArtworkId 渲染 ring / null 不渲染
+- `MarketsView.test.tsx`（新增 2）：selectedArtworkId 渲染所有散点 ring / null 不渲染
+- `TerminalView.test.tsx`（新增 2）：selectedArtworkId 渲染 row highlight / null 不渲染
+- `DiasporaView.test.tsx`（新增 4）：selectedArtworkId 渲染 location ring / named_private ring / dashed edge / null 不渲染
 
 ---
 
@@ -182,7 +223,18 @@ i18n keys 走各 view 自己段：`strata.legend.*` / `markets.legend.*` / `dias
 
 ### Diaspora
 
-- **同心环非力导布局**：力导（d3-force 等）需要新依赖 + 迭代仿真 + 每次渲染坐标可能漂移。同心环纯算术 + 笛卡尔坐标，**中心永远是工作室**，稳定可预期。
+- **Constellation 形态升级（v1.6.x 起，M6）**：Diaspora 视图从"单层 location 节点 + 同心环"升级为"三环 + center"的 **Constellation 数据模型**。i18n key / 文件名 / UI heading 保留 `Diaspora`（与 Strata / Markets / Terminal 同列诗意名），但内部 model 改名 `ConstellationData`。三环承担不同语义层次：
+  - **Center (artist)**：实心圆 r=12，label "aaajiao" + 总流出 count（sold + gifted）
+  - **Inner ring (R1 ≈ 0.25 × minDim)**：`LocationConstellationNode`，按 `location.type` 分弧度区间（studio 顶部、museum 右上、private_collection 右下、gallery 左侧、other 底部，区间内按 editionCount desc 排）。半径走原 `nodeRadius(editionCount)`。fill opacity 走 `TYPE_OPACITY`。
+  - **Middle ring (R2 ≈ 0.37 × minDim)**：`NamedPrivateNode`，按 `buyer_name` **字面值聚合**（不归一化、不合并 "Liliana Gao" / "Liliana Gao / 林奇"，保持灵活性）。半径走 `namedNodeRadius` 在 [4, 10]。整圆均匀分布从 12 点钟方向开始，按 editionCount desc 排让重要的落在视觉显眼位置。opacity 0.5（次级权重）。
+  - **Outer ring (R3 ≈ 0.47 × minDim)**：`AnonymousAggregate`，N 个 r=1.5 实心 dot，**不可点击 / 不进 hover 状态机 / 无 navigate 目标 / 无 testid 之外的 role**。这是"档案的薄"被画出来——sold 但无任何识别信息的流出。
+- **Constellation 数据归类（严格优先级，写在 `buildConstellation` 里）**：只处理 `status ∈ ('sold', 'gifted')` 的 outflow editions。其他 status 不进 Constellation（in_studio / at_gallery 等由 Strata / Markets 各自承担）。按这个顺序：
+  1. `location_id` 指向 location 且 `location.type !== 'studio'` → 归 LocationConstellationNode
+  2. `buyer_name` 非空 → 归 NamedPrivateNode（key = buyer_name 字面值）
+  3. `location_id` 指向 studio + buyer_name 非空 → 归 NamedPrivateNode（**studio 边界 case**：作品事实上卖给买家，只是物理上还在 artist studio 寄存，例如 Leo Xu + aaajiao Shanghai Studio）
+  4. 都没有 → AnonymousAggregate
+- **只画 location ↔ artist edge**：institution 是首要节点，画 edge 解释"作品流向公共空间"。`namedPrivate` / `anonymous` **不画 edge** —— 用径向位置本身（中环 / 外环）表达 from-artist 关系，否则一团乱麻。selection edges（dashed）是 Phase 2 才加的额外层。
+- **同心环非力导布局**：力导（d3-force 等）需要新依赖 + 迭代仿真 + 每次渲染坐标可能漂移。Constellation 纯算术 + 笛卡尔坐标，**中心永远是 artist node**，稳定可预期。
 - **曲线 edge（二次贝塞尔）向外偏离圆心**：直线 edge 全过中心会变成一团乱码。控制点向外偏 30px 让弧线散开。
 - **"档案薄"显式声明**：顶部 stat bar 直接写 `27 / 137 editions have known location`，配 stateHint "数据会随系统使用而生长"。**不要把空白藏起来**——薄数据是当前 archive 的真实状态，本身是 statement。
 - **`from_location` / `to_location` 是 name（text）不是 UUID**：构建边时需要 name → id 反向映射。改 schema 时注意（见 `supabase/schema.sql` 的 trigger）。
@@ -203,16 +255,17 @@ i18n keys 走各 view 自己段：`strata.legend.*` / `markets.legend.*` / `dias
 | `strataUtils.test.ts` | 71 — year 解析 / swimlane 分组 + 排序 / `(untyped)` 处理 / 高度 log scale / stack 满了水平蔓延 / `buildLaneStats`（ownership 4 桶 + degenerate OR / edition 链聚合 / yearSpan 空与非空 / untyped 保留 / 兜底 held） |
 | `marketsUtils.test.ts` | 36 — 过滤 sold/有价 / 中位数 / 半径归一化 / 边界 / `filterSalesByDateCutoff`（M1）/ `getSalesWithoutPrice`（M2）/ `buildActivityHistogram`（M1.5 优化：年/月 kind 切换 / 连续空桶 / 同 bin 多命中累加 / maxCount / minISO maxISO） |
 | `terminalUtils.test.ts` | 29 — inventory 自然排序 / edition label 4 种 / location 拼接 / group 分桶 / markets line |
-| `TerminalView.test.tsx` | 9 — 行 role=button + tabIndex / 点击 navigate / 键盘 Enter+Space / 其他键不触发 / 分组 heading + aria-hidden 装饰 / 紧凑字号 class / row.id 防御 / separator 对 SR 隐藏 |
-| `diasporaUtils.test.ts` | 35 — 节点关联 / 中心选择 tie-breaker / 同心环布局 / 边聚合 / tracked stat / `getGhostNodes`（M2） |
-| `DiasporaView.test.tsx` | 22 — 初始状态 / hover 预览 / hover 离开 / click pin / edition 行跳转 / view all 跳转 / 二次 click 取消 pin / 切换 pin / pin 时 hover 不干扰 / 无编号 edition / 空数据 / aria-pressed / 键盘 Enter / title_cn fallback / 长名 SVG `<title>` / center node `<title>` / pin 卡片 stopPropagation / spy stopPropagation / ghost 环渲染（M2）/ ghost count=0 不画（M2）/ ghost aria-hidden（M2）/ legend 含 ghost 项（M2.5） |
-| `StrataView.test.tsx` | 37 — role=button 包裹 rect / aria-label 拼装 / click navigate / Enter / Space / 其它键不触发 / tabindex=0 / id 缺失 aria-disabled / viewBox 响应式 / hover tooltip / 空数据 / 多年份渲染 Timeline（M1）/ 单年份不渲染 Timeline（M1）/ 默认 t=max 不 dim（M1）/ scrub 到中段部分 dim（M1）/ ownership held = stroke-only（M2）/ external = pattern fill（M2）/ departed = solid（M2）/ degenerate X 叠加（M2）/ unknown-year 列渲染（M2）/ unknown-year 强制 stroke-only（M2）/ unknown-year 不被播头过滤（M2）/ pattern defs 命名空间（M2）/ stroke-only 带 pointerEvents=all（M2 fix）/ legend 5 项（M2.5）/ Y 轴 pin：click toggle / 同 label 再点 unpin / 切换 pin / 其他 lane dim / 信息面板内容 / hover 覆盖 pin / mouseLeave 回 pin / 键盘 Enter+Space toggle / a11y aria-pressed+tabindex |
-| `MarketsView.test.tsx` | 21 — 货币列降序 / 散点 a11y / 空状态 / summary 段隔离 / 多 sale_date 渲染 Timeline（M1）/ 单点不渲染 Timeline（M1）/ 默认 t=max 不 dim（M1）/ scrub 后 dim（M1）/ noPrice lane 渲染（M2）/ count=0 不画 lane（M2）/ stroke-only 圆 + label（M2）/ noPrice 圆可 navigate（M2）/ noPrice 圆带 pointerEvents=all（M2 fix）/ legend 2 项（M2.5） |
+| `TerminalView.test.tsx` | 11 — 行 role=button + tabIndex / 点击 navigate / 键盘 Enter+Space / 其他键不触发 / 分组 heading + aria-hidden 装饰 / 紧凑字号 class / row.id 防御 / separator 对 SR 隐藏 / Phase 2 selection row highlight（M3a）/ Phase 2 null 不渲染（M3a） |
+| `useVisualizationSelection.test.tsx` | 13 — parseSelectionParam null / 空 / artwork / 未知 kind / 无冒号 / 空 id / serializeSelection / hook 无 sel = null / hook 解析 sel / hook setSelection 写 URL / setSelection(null) 删 URL / isSelected / 非法 sel fallback（M3a） |
+| `diasporaUtils.test.ts` | 56 — 节点关联 / 中心选择 tie-breaker / 同心环布局 / 边聚合 / tracked stat / `getGhostNodes`（M2）/ `buildConstellation`（M6: 12 条覆盖空 / 单 location / 多 location 排序 / buyer 字面值聚合 / studio 边界 / status 过滤 / lost 不算 outflow / artworkIds 去重 / editionIds 不去重 / totalOutflowCount）/ `layoutConstellation`（M6: center 位置 / 三环半径 / type 弧度区间 / named 均匀分布 / anonymous 均匀分布）/ `namedNodeRadius`（M6） |
+| `DiasporaView.test.tsx` | 32 — 初始状态 / hover 预览 / hover 离开 / click pin / edition 行跳转 / view all 跳转 / 二次 click 取消 pin / 切换 pin / pin 时 hover 不干扰 / 空数据 / aria-pressed / 键盘 Enter / 长名 SVG `<title>` / pin 卡片 stopPropagation / spy stopPropagation / ghost 环渲染（M2）/ ghost count=0 不画（M2）/ ghost aria-hidden（M2）/ legend 含 ghost 项（M2.5）/ Constellation artist center 渲染（M6）/ Inner ring location nodes 渲染（M6）/ Middle ring named_private 渲染（M6）/ Outer ring anonymous dots（M6）/ 只画 location-artist edge（M6）/ named_private 节点 a11y（M6）/ anonymous dots 不可点击（M6）/ named_private pin 卡片 (M6) / Phase 2 selection ring on location（M3a）/ Phase 2 selection ring on named（M3a）/ Phase 2 dashed edge（M3a）/ Phase 2 null selection 不渲染 ring（M3a） |
+| `StrataView.test.tsx` | 39 — role=button 包裹 rect / aria-label 拼装 / click navigate / Enter / Space / 其它键不触发 / tabindex=0 / id 缺失 aria-disabled / viewBox 响应式 / hover tooltip / 空数据 / Timeline (M1) / 默认不 dim / scrub dim / ownership 4 桶（M2）/ unknown-year 列（M2）/ pattern defs / pointerEvents=all（M2）/ legend 5 项（M2.5）/ Y 轴 pin 全套（v1.6.x）/ Phase 2 selection ring 渲染（M3a）/ Phase 2 null 不渲染（M3a） |
+| `MarketsView.test.tsx` | 23 — 货币列降序 / 散点 a11y / 空状态 / summary 段隔离 / Timeline 全套（M1）/ noPrice lane（M2）/ legend 2 项（M2.5）/ Phase 2 selection ring 渲染（M3a）/ Phase 2 null 不渲染（M3a） |
 | `useTimelineScrubber.test.ts` | 8 — enabled 计算 / setIdx 边界 / togglePlay / rAF 推进 / unmount cancel / 单点禁用 / play 复位 / play complete |
 | `StrataTimelineRibbon.test.tsx` | 9 — SVG `<g>` 渲染 / marker 三角 + 当前 year label / drop line 长度对齐 swimlane / Play 按钮 toggle / 透明 input 可拖 / 单年份返 null / aria 属性 / play complete URL 落地 / testid 保留 |
 | `MarketsTimelineRibbon.test.tsx` | 18 — 渲染 / 单点返 null / histogram bar 数 = 非空 bin / cutoff 之后 bin opacity 0.15 / marker 连续时间轴位置 / 不渲染 drop line（M1.5 优化）/ 键盘 slider 触发 onDateChange（a11y）/ aria-valuetext / Play / 稀疏 tick label / 颜色全 currentColor / **pointer click 25% 选最近 date（v1.6）/ pointer 0% / 50% / 100% 选对应 date / pointer drag 持续触发 / pointer 未 down 不 hijack / overlay 宽度 = axisWidth / 点击 → marker 坐标系闭环 / input pointer-events: none / overlay pointer-events: all** |
 | `Legend.test.tsx` | 5 — 渲染所有 item / glyph testid / separatorBefore 插入 `│` / 不传 separator 时无 `│` / 空数组 |
-| `Visualize.test.tsx` | 10 — loading / error / 4 个 view 默认渲染 / 非法 ?view 回落 / refetch 按钮 / 容器断点 lg: / `?view=strata&t=2024` smoke（M1） |
+| `Visualize.test.tsx` | 15 — loading / error / 4 个 view 默认渲染 / 非法 ?view 回落 / refetch 按钮 / 容器断点 lg: / `?view=strata&t=2024` smoke（M1）/ 默认无 selection chip（M3a）/ ?sel=artwork:UUID chip 显示 title（M3a）/ chip × 清 selection（M3a）/ 非法 sel fallback（M3a）/ chip 跨 view 共享（M3a） |
 | `visualize-parity.test.ts` | 2 — zh ⟷ en key 完全一致 / 核心段都存在 |
 
 不写每个 View 组件的视觉细节测试——SVG 几何细节用代码 review，回归靠 utils 测试 + smoke test 兜底。DiasporaView 是例外：交互状态机复杂，组件级测试守护 pin/hover 流。
@@ -232,9 +285,11 @@ i18n keys 走各 view 自己段：`strata.legend.*` / `markets.legend.*` / `dias
 ## 文件清单
 
 ```
-src/pages/Visualize.tsx                            # 容器 + tab 切换
+src/pages/Visualize.tsx                            # 容器 + tab 切换 + selection chip (M3a)
 src/hooks/queries/useVisualizationData.ts          # 数据 hook
 src/hooks/queries/useVisualizationData.test.ts
+src/hooks/useVisualizationSelection.ts             # Cross-view selection hook (M3a)
+src/hooks/useVisualizationSelection.test.tsx
 src/components/visualize/
   ├── useTimelineScrubber.ts         # 时间播头共享逻辑 hook（M1.5）
   ├── useTimelineScrubber.test.ts
@@ -245,16 +300,16 @@ src/components/visualize/
   ├── Legend.tsx                     # 共享图例布局（M2.5）
   ├── Legend.test.tsx
   ├── legendGlyphs.tsx               # 7 个 view-specific mini glyph（M2.5）
-  ├── StrataView.tsx
+  ├── StrataView.tsx                 # 含 selection ring (M3a)
   ├── strataUtils.ts                 # 含 filterArtworksByYearCutoff (M1) + getArtworkOwnershipState / getUnknownYearArtworks (M2)
   ├── strataUtils.test.ts
-  ├── MarketsView.tsx
+  ├── MarketsView.tsx                # 含 selection ring + scale (M3a)
   ├── marketsUtils.ts                # 含 filterSalesByDateCutoff (M1) + getSalesWithoutPrice (M2) + buildActivityHistogram (M1.5 优化)
   ├── marketsUtils.test.ts
-  ├── TerminalView.tsx
+  ├── TerminalView.tsx               # 含 selection row highlight (M3a)
   ├── TerminalView.test.tsx
-  ├── DiasporaView.tsx
-  ├── diasporaUtils.ts               # 含 getGhostNodes (M2)
+  ├── DiasporaView.tsx               # Constellation 三环 (M6) + selection ring + dashed edges (M3a)
+  ├── diasporaUtils.ts               # 含 getGhostNodes (M2) + buildConstellation / layoutConstellation / namedNodeRadius (M6)
   └── diasporaUtils.test.ts
 src/locales/{zh,en}/visualize.json
 ```

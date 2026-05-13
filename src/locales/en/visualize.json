@@ -143,6 +143,28 @@
       "viewAllAria": "View all editions at this location",
       "noInventory": "(no inv)",
       "unpinAria": "Unpin"
+    },
+    "constellation": {
+      "centerLabel": "aaajiao",
+      "ringLabel": {
+        "inner": "Institutions",
+        "middle": "Private buyers",
+        "outer": "Anonymous"
+      },
+      "tooltip": {
+        "namedPrivate": "{{name}} · {{count}} works"
+      },
+      "summary": {
+        "overview": "{{locations}} institutions · {{namedPrivate}} private buyers · {{anonymous}} anonymous outflows"
+      },
+      "aria": {
+        "artist": "Center node: aaajiao (artist)",
+        "namedPrivate": "Private buyer {{name}}, {{count}} works"
+      }
     }
+  },
+  "selection": {
+    "label": "Selected",
+    "clear": "Clear selection"
   }
 }

@@ -18,6 +18,10 @@ export interface TerminalViewProps {
   editions: VizEdition[];
   locations: VizLocation[];
   fetchedAt: string;
+  /** Phase 2: M3a — 跨视图选中的 artwork id；该作品的行加 background highlight + 左侧 border */
+  selectedArtworkId?: string | null;
+  /** 选中作品的 callback（Terminal 仍走 navigate 模式） */
+  onArtworkSelect?: (artworkId: string | null) => void;
 }
 
 // ──────────────────────────────────────────────
@@ -48,10 +52,14 @@ export default function TerminalView({
   editions,
   locations,
   fetchedAt,
+  selectedArtworkId = null,
+  onArtworkSelect: _onArtworkSelect,
 }: TerminalViewProps) {
   const { t } = useTranslation('visualize');
   const navigate = useNavigate();
   const [groupBy, setGroupBy] = useState<GroupBy>('none');
+  // selection 由 URL state 驱动；prop 占位
+  void _onArtworkSelect;
 
   const rows = useMemo(
     () => buildRows(artworks, editions, locations),
@@ -213,6 +221,9 @@ export default function TerminalView({
                 // row.id 防御：DB schema NOT NULL，但用户提供数据若异常仍稳健回退到 array index
                 const safeKey = row.id || `${group.key}-${ri}`;
                 const isSold = row.status === 'sold' || row.status === 'gifted';
+                const isSelected =
+                  selectedArtworkId !== null &&
+                  row.artworkId === selectedArtworkId;
                 const rowText =
                   col(row.year, COL.year) +
                   '  ' +
@@ -257,6 +268,8 @@ export default function TerminalView({
                 return (
                   <span
                     key={safeKey}
+                    data-testid={isSelected ? `terminal-selected-row-${row.id}` : undefined}
+                    data-selected={isSelected || undefined}
                     {...(isActivatable
                       ? {
                           role: 'button',
@@ -275,6 +288,12 @@ export default function TerminalView({
                       'block',
                       isActivatable
                         ? 'cursor-pointer hover:bg-foreground/10 focus:bg-foreground/10 focus:outline-none focus-visible:outline-1 focus-visible:outline-foreground'
+                        : '',
+                      // Phase 2: selection highlight —— 左侧 1px border-foreground + 微 bg
+                      // 借 box-shadow 而非 border-l：避免破坏 <pre> 等宽字符流（border 会
+                      // 让该行宽度差 1px 跟旁边行错开）
+                      isSelected
+                        ? 'bg-foreground/10 shadow-[inset_2px_0_0_0_var(--foreground)]'
                         : '',
                       isSold ? 'text-foreground' : 'text-muted-foreground',
                     ]

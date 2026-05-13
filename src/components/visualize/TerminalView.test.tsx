@@ -94,6 +94,7 @@ function renderTerminal(
     editions: VizEdition[];
     locations: VizLocation[];
     fetchedAt: string;
+    selectedArtworkId: string | null;
   }> = {}
 ) {
   const props = {
@@ -217,5 +218,26 @@ describe('TerminalView a11y & responsive', () => {
     );
     // 至少 2 条 separator 线 + 分组装饰（none 时无组装饰，仅 2 separator）
     expect(hiddenSpans.length).toBeGreaterThanOrEqual(2);
+  });
+
+  // ─── Phase 2: M3a selection ─────────────────────────────────────────────
+
+  it('selectedArtworkId 设置时该 artwork 对应行渲染 selection highlight (data-selected + testid)', () => {
+    const { container } = renderTerminal({ selectedArtworkId: 'artwork-1' });
+    // edition-1 属于 artwork-1
+    expect(
+      container.querySelector('[data-testid="terminal-selected-row-edition-1"]')
+    ).not.toBeNull();
+    // edition-2 属于 artwork-2，不被高亮
+    expect(
+      container.querySelector('[data-testid="terminal-selected-row-edition-2"]')
+    ).toBeNull();
+  });
+
+  it('selectedArtworkId 为 null 时不渲染任何 selection highlight', () => {
+    const { container } = renderTerminal({ selectedArtworkId: null });
+    expect(
+      container.querySelector('[data-testid^="terminal-selected-row-"]')
+    ).toBeNull();
   });
 });

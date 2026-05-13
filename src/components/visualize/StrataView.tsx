@@ -31,6 +31,10 @@ interface Props {
   artworks: VizArtwork[];
   editions?: VizEdition[];
   history: VizHistory[];
+  /** Phase 2: M3a — 跨视图选中的 artwork id；选中作品的方块加 dashed ring */
+  selectedArtworkId?: string | null;
+  /** 选中作品的 callback —— 当前 Strata 仍走 navigate 模式不主动 setSelection */
+  onArtworkSelect?: (artworkId: string | null) => void;
 }
 
 // ─── M2 状态编码 ────────────────────────────────────────────────────────────
@@ -70,10 +74,18 @@ const BLOCK_OTHER_LANE_CLS = 'opacity-[0.3] dark:opacity-[0.4]';
 // 播头之后的"未来"方块：保留鬼影，0.15 让形状仍可见但不抢视觉重心
 const BLOCK_FUTURE_CLS = 'opacity-[0.15] dark:opacity-[0.2]';
 
-export default function StrataView({ artworks, editions = [], history }: Props) {
+export default function StrataView({
+  artworks,
+  editions = [],
+  history,
+  selectedArtworkId = null,
+  onArtworkSelect: _onArtworkSelect,
+}: Props) {
   const { t } = useTranslation('visualize');
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  // 当前 selection 由 URL state 驱动（不在 view 内 setSelection）；prop 占位为 future hook
+  void _onArtworkSelect;
 
   const [hoveredArtwork, setHoveredArtwork] = useState<VizArtwork | null>(null);
   const [hoveredYear, setHoveredYear] = useState<number | null>(null);
@@ -536,6 +548,9 @@ export default function StrataView({ artworks, editions = [], history }: Props) 
                         isDegenerate: false,
                       };
 
+                    const isSelected =
+                      selectedArtworkId !== null && a.id === selectedArtworkId;
+
                     return (
                       <g
                         key={a.id ?? `${sl.type}-${year}-${i}`}
@@ -546,6 +561,7 @@ export default function StrataView({ artworks, editions = [], history }: Props) 
                         data-block="true"
                         data-ownership={ownership.bucket}
                         data-degenerate={ownership.isDegenerate || undefined}
+                        data-selected={isSelected || undefined}
                         className={cn(
                           'focus:outline-none focus-visible:outline-2 focus-visible:outline-foreground',
                           !disabled && 'cursor-pointer'
@@ -575,6 +591,20 @@ export default function StrataView({ artworks, editions = [], history }: Props) 
                           stateCls={stateCls}
                           forceStrokeOnly={false}
                         />
+                        {/* Phase 2 selection ring: dashed rect 包住方块外缘 */}
+                        {isSelected && (
+                          <rect
+                            data-testid={`strata-selection-ring-${a.id}`}
+                            x={blockX - 1.5}
+                            y={blockY - 1.5}
+                            width={BLOCK + 3}
+                            height={BLOCK + 3}
+                            fill="none"
+                            className="stroke-foreground pointer-events-none"
+                            strokeWidth={1.2}
+                            strokeDasharray="2 2"
+                          />
+                        )}
                       </g>
                     );
                   });
@@ -631,6 +661,8 @@ export default function StrataView({ artworks, editions = [], history }: Props) 
                     year: '?',
                     title,
                   });
+                  const isSelected =
+                    selectedArtworkId !== null && a.id === selectedArtworkId;
                   return (
                     <g
                       key={a.id ?? `${sl.type}-unknown-${i}`}
@@ -642,6 +674,7 @@ export default function StrataView({ artworks, editions = [], history }: Props) 
                       data-ownership={ownership.bucket}
                       data-degenerate={ownership.isDegenerate || undefined}
                       data-unknown-year="true"
+                      data-selected={isSelected || undefined}
                       className={cn(
                         'focus:outline-none focus-visible:outline-2 focus-visible:outline-foreground',
                         !disabled && 'cursor-pointer'
@@ -665,6 +698,19 @@ export default function StrataView({ artworks, editions = [], history }: Props) 
                         stateCls={BLOCK_DEFAULT_CLS}
                         forceStrokeOnly={true}
                       />
+                      {isSelected && (
+                        <rect
+                          data-testid={`strata-selection-ring-${a.id}`}
+                          x={blockX - 1.5}
+                          y={blockY - 1.5}
+                          width={BLOCK + 3}
+                          height={BLOCK + 3}
+                          fill="none"
+                          className="stroke-foreground pointer-events-none"
+                          strokeWidth={1.2}
+                          strokeDasharray="2 2"
+                        />
+                      )}
                     </g>
                   );
                 });

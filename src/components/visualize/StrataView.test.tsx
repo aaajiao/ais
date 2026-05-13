@@ -89,6 +89,7 @@ function renderStrata(
     artworks: VizArtwork[];
     editions: VizEdition[];
     history: VizHistory[];
+    selectedArtworkId: string | null;
   }> = {}
 ) {
   const props = {
@@ -658,5 +659,25 @@ describe('StrataView', () => {
     expect(label).toHaveAttribute('tabindex', '0');
     // aria-label 走 strata.lane.pin.aria，含 type 名
     expect(label.getAttribute('aria-label')).toMatch(/Installation/);
+  });
+
+  // ─── Phase 2: M3a selection ring ─────────────────────────────────────────
+
+  it('selectedArtworkId 设置时对应方块渲染 selection ring', () => {
+    const { container } = renderStrata({ selectedArtworkId: 'aw-1' });
+    expect(
+      container.querySelector('[data-testid="strata-selection-ring-aw-1"]')
+    ).not.toBeNull();
+    // aw-2 不应有 ring
+    expect(
+      container.querySelector('[data-testid="strata-selection-ring-aw-2"]')
+    ).toBeNull();
+  });
+
+  it('selectedArtworkId 为 null 时不渲染任何 selection ring', () => {
+    const { container } = renderStrata({ selectedArtworkId: null });
+    expect(
+      container.querySelector('[data-testid^="strata-selection-ring-"]')
+    ).toBeNull();
   });
 });
