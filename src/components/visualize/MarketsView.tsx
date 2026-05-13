@@ -286,7 +286,12 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
             );
           })()
         ) : (
-          <div className="text-muted-foreground">{t('markets.tooltip.idleHint')}</div>
+          <div className="text-muted-foreground">
+            {t('markets.summary.overview', {
+              sales: groups.reduce((s, g) => s + g.sales.length, 0),
+              currencies: currencyCount,
+            })}
+          </div>
         )}
       </div>
     </div>

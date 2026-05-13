@@ -23,8 +23,10 @@
     "tooltip": {
       "yearLabel": "{{year}} 年",
       "count": "{{count}} 件作品",
-      "editions": "{{count}} 个版本",
-      "click": "点击查看作品详情"
+      "editions": "{{count}} 个版本"
+    },
+    "summary": {
+      "overview": "{{artworks}} 件作品 · {{types}} 种类型 · {{yearSpan}}"
     },
     "gapNote": "记录时间 ≠ 创作时间。85 / 87 条历史在 2026 年的几周内集中产生。"
   },
@@ -40,8 +42,10 @@
     },
     "tooltip": {
       "noBuyer": "未记录买家",
-      "noDate": "未记录日期",
-      "idleHint": "悬停或聚焦圆点查看交易详情"
+      "noDate": "未记录日期"
+    },
+    "summary": {
+      "overview": "{{sales}} 笔交易 · {{currencies}} 种货币"
     },
     "empty": "暂无已售版本",
     "currenciesAvailable": "{{count}} 种货币",
@@ -90,15 +94,16 @@
     },
     "tooltip": {
       "editions": "{{count}} 个版本在此",
-      "untracked": "未记录所在地",
-      "clickToPin": "点击固定此节点",
-      "idleHint": "悬停或点击节点查看详情"
+      "untracked": "未记录所在地"
+    },
+    "summary": {
+      "overview": "{{nodes}} 处位置 · {{edges}} 条流转"
     },
     "pin": {
       "editionsAt": "此处 {{count}} 个版本",
       "viewAll": "查看此位置全部版本 →",
       "noInventory": "（无编号）",
-      "unpinHint": "再次点击节点或点击空白处取消固定"
+      "unpinAria": "取消固定"
     }
   }
 }

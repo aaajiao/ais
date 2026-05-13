@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { Pin, X } from 'lucide-react';
 import type {
   VizEdition,
   VizLocation,
@@ -481,7 +482,18 @@ export default function DiasporaView({
       <div className="min-h-[3.5rem] border-t border-border pt-3 text-xs font-mono space-y-0.5">
         {pinnedNode ? (
           /* ── Pin 卡片 ───────────────────────────────────────────── */
-          <div className="space-y-2">
+          <div className="relative space-y-2 pr-6">
+            <button
+              type="button"
+              aria-label={t('diaspora.pin.unpinAria')}
+              className="absolute top-0 right-0 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                setPinnedNodeId(null);
+              }}
+            >
+              <X className="w-3 h-3" />
+            </button>
             {/* 标题行 */}
             <div className="flex items-baseline justify-between gap-2">
               <div>
@@ -532,15 +544,14 @@ export default function DiasporaView({
             >
               {t('diaspora.pin.viewAll')}
             </button>
-
-            {/* Unpin 提示 */}
-            <div className="text-muted-foreground italic opacity-60">
-              {t('diaspora.pin.unpinHint')}
-            </div>
           </div>
         ) : previewNode ? (
           /* ── Hover 预览 ─────────────────────────────────────────── */
-          <>
+          <div className="relative pr-6">
+            <Pin
+              className="absolute top-0 right-0 w-3 h-3 text-muted-foreground opacity-60"
+              aria-hidden="true"
+            />
             <div className="font-bold">{previewNode.name}</div>
             <div className="text-muted-foreground">
               {t('diaspora.tooltip.editions', {
@@ -550,13 +561,16 @@ export default function DiasporaView({
               {previewNode.country ? ` · ${previewNode.country}` : ''}
             </div>
             <div className="text-muted-foreground">
-              {previewNode.type} · {t('diaspora.tooltip.clickToPin')}
+              {previewNode.type}
             </div>
-          </>
+          </div>
         ) : (
           /* ── 默认提示 ───────────────────────────────────────────── */
           <div className="text-muted-foreground">
-            {t('diaspora.tooltip.idleHint')}
+            {t('diaspora.summary.overview', {
+              nodes: nodes.length,
+              edges: edges.length,
+            })}
           </div>
         )}
       </div>

@@ -18,6 +18,7 @@
 3. **数据驱动而非 schema 驱动**：Markets 不硬编码 3 个货币。`CurrencyType` schema 列了 7 种（USD/EUR/CNY/GBP/CHF/HKD/JPY），实际出现哪些就画哪些列，按交易数降序。Strata 同理 —— 不硬编码 type 名单，把所有 distinct `artworks.type` 各占一条 swimlane，按 count desc 排列；`null` 归入 `(untyped)` swimlane。
 4. **缺失数据不藏**：Terminal 把 null 显式渲染为 `─`。Diaspora 顶部直接显示 `X / Y editions have known location history`，把档案的"薄"做成 statement，而不是装饰。Strata 的 `(untyped)` swimlane 同理。
 5. **跟随主题**：所有 SVG 颜色用 `fill-foreground` / `fill-muted-foreground` / `fill-border`，明暗模式自动适配。所有 view 都用单色 + 透明度做区分（绝不用彩色）。**Strata 不再用透明度区分 type**——type 身份由 swimlane 行位置承担，方块全部用统一 `fill-foreground` 0.65。
+6. **信息条不引导、展示总览**（v1.5.x 起）：底部 info bar 的 idle 态 **不**写"点击查看详情"/"悬停看节点"这类引导文字——元素本身可点击就是可点击，`cursor: pointer` + hover 高亮已经表达。idle 态改成展示该 view 的**当前总览数据**（如 Strata 的 `N 件作品 · N 种类型 · 年份跨度`、Markets 的 `N 笔交易 · N 种货币`、Diaspora 的 `N 处位置 · N 条流转`），同时填满 idle 态空间。可点击之外的非显然操作（如 Diaspora 的 pin / unpin）用 **Lucide icon** 表达，不写出来——见 Diaspora 决策。这条原则不要回退，回退会让 viz 重新被 nudge 文字稀释。
 
 ---
 
@@ -80,7 +81,7 @@ const [artworksRes, editionsRes, locationsRes, historyRes] = await Promise.all([
 - **散点 hover opacity 0.65 → 1.0**（与 Strata 对齐）：单色 + 透明度做"非激活/激活"区分，整个 viz 模块统一这一对常量，不要给 Markets 单独调更暗的默认值（曾经是 0.55，制造了 view 间不一致）。touch device 走 Tailwind `hover:` 修饰符（`@media (hover: hover)`），点 tap 直接 navigate 不会被 hover 状态截胡。
 - **SVG 响应式 viewBox + `className="w-full"`**：不写死 `width` / `height` px。外层 `overflow-x-auto` 兜底窄屏下水平滚动。这样窄屏 (mobile) 自动缩放、宽屏 (desktop) 自动撑满，跟 Diaspora 一致。
 - **散点 a11y**：每个圆包一层 `<g role="button" tabIndex={0} aria-label="..." aria-pressed={hovered}>`，Enter / Space 触发 navigate，focus 也走 hover 视觉态。货币列标签内嵌 `<title>` 让 screen reader 念出 "Currency: USD"。模仿 DiasporaView 节点 a11y pattern。
-- **idleHint 用自己段下的 key**：tooltip 默认提示 `t('markets.tooltip.idleHint')`，**不**复用 `strata.tooltip.click` —— 跨 view i18n 借用是 ticking bomb（参见 CLAUDE.md 关于 i18n 隔离的 pitfall）。
+- **summary 用自己段下的 key**：info bar idle 态走 `t('markets.summary.overview', { sales, currencies })`，**不**复用其他 view 的 summary key——跨 view i18n 借用是 ticking bomb（参见 CLAUDE.md 关于 i18n 隔离的 pitfall）。`Strata` 和 `Diaspora` 各自维护 `*.summary.overview`，结构相似但物理隔离。守护测试 `MarketsView.test.tsx` 的"不借其他 view 的 key"断言。
 
 ### Terminal
 
@@ -101,6 +102,7 @@ const [artworksRes, editionsRes, locationsRes, historyRes] = await Promise.all([
 - **"档案薄"显式声明**：顶部 stat bar 直接写 `27 / 137 editions have known location`，配 stateHint "数据会随系统使用而生长"。**不要把空白藏起来**——薄数据是当前 archive 的真实状态，本身是 statement。
 - **`from_location` / `to_location` 是 name（text）不是 UUID**：构建边时需要 name → id 反向映射。改 schema 时注意（见 `supabase/schema.sql` 的 trigger）。
 - **双态交互：hover = 预览，click = pin**：`hoveredNodeId` 只在无 pin 时驱动预览信息条；`pinnedNodeId` 驱动完整 pin 卡片（位置信息 + edition 列表 + "view all"链接）。两次点同一节点或点 SVG 空白取消 pin。**pin 卡片中每一行 edition（inventory_number · 标题 · status）都是可点击的 `<button>`，navigate 到 `/editions/{id}`；底部 "view all" 按钮 navigate 到 `/editions?locationId={id}`**。这条不要退回到只显示 `<span>` inventory_number 的旧实现。
+- **pin / unpin 用 Lucide icon 而非文字**（v1.5.x 起）：hover 预览卡片右上角放 `Pin` icon（`w-3 h-3 opacity-60`），不写"点击固定此节点"——图钉符号本身就是 affordance。pin 激活后，pin 卡片右上角放 `X` 按钮触发 `setPinnedNodeId(null)`，不写"再次点击节点或点击空白处取消固定"——X 按钮是 popover 解除的标准模式。"点击空白处取消" 的 `handleSvgClick` 逻辑**保留代码不删**，只是不再写出来，用户会试。aria-label 走 `t('diaspora.pin.unpinAria')` 给屏幕阅读器。这跟全局原则 6（信息条不引导）配套，不要回退到文字提示。
 - **长名 label 用 SVG `<title>` 做原生 tooltip**：节点可见 label 超过 18 字符会截断为 16+`…`（避免覆盖相邻节点）。每个 `<g data-node>` 内的第一个子元素是 `<title>{node.name}</title>`，浏览器 hover 节点时显示完整名（中心节点同样处理）。这是无依赖、跨浏览器、零样式开销的方案，不要换成自定义 HTML tooltip。
 - **pin 卡片按钮防御性 `stopPropagation`**：edition 行按钮和 "view all" 按钮的 `onClick` 都调 `e.stopPropagation()`。当前 pin 卡片在 SVG 外不会冒泡到 `handleSvgClick`，但未来重构若把卡片移入 `<foreignObject>`（为了和 SVG 同坐标系联动），点击就会冒泡触发 unpin。预防为主，省得调试。
 

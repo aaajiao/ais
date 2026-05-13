@@ -202,11 +202,11 @@ describe('MarketsView', () => {
     expect(screen.getByText(/暂无已售版本|No sold editions/i)).toBeInTheDocument();
   });
 
-  it('idleHint 使用自己段下的 key（不借 strata.tooltip.click）', () => {
+  it('idle 态显示自己段下的 summary（交易数 + 货币种数，不借其他 view 的 key）', () => {
     renderMarkets();
-    // 当前无 hover → 显示 idleHint
+    // 3 sold editions, 2 currencies (USD + CNY)
     expect(
-      screen.getByText(/悬停或聚焦圆点|Hover or focus a dot/i)
+      screen.getByText(/3 笔交易.*2 种货币|3 transactions.*2 currencies/i)
     ).toBeInTheDocument();
   });
 });

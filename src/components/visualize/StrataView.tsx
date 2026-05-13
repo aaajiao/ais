@@ -390,9 +390,6 @@ export default function StrataView({ artworks, history }: Props) {
             <div className="text-muted-foreground">
               {hoveredArtwork.year ?? '—'} · {hoveredArtwork.type ?? '(untyped)'}
             </div>
-            <div className="text-muted-foreground">
-              {t('strata.tooltip.click')}
-            </div>
           </>
         ) : hoveredYear !== null ? (
           <>
@@ -405,7 +402,16 @@ export default function StrataView({ artworks, history }: Props) {
           </>
         ) : (
           <div className="text-muted-foreground">
-            {t('strata.tooltip.click')}
+            {t('strata.summary.overview', {
+              artworks: artworks.length,
+              types: swimlanes.length,
+              yearSpan:
+                yearCount > 0
+                  ? yearCount === 1
+                    ? yearRange[0]
+                    : `${yearRange[0]}–${yearRange[yearCount - 1]}`
+                  : '—',
+            })}
           </div>
         )}
       </div>

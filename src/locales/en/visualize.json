@@ -23,8 +23,10 @@
     "tooltip": {
       "yearLabel": "{{year}}",
       "count": "{{count}} artworks",
-      "editions": "{{count}} editions",
-      "click": "Click to view artwork detail"
+      "editions": "{{count}} editions"
+    },
+    "summary": {
+      "overview": "{{artworks}} artworks · {{types}} types · {{yearSpan}}"
     },
     "gapNote": "Record time ≠ creation time. 85 of 87 history rows were written in a few weeks of 2026."
   },
@@ -40,8 +42,10 @@
     },
     "tooltip": {
       "noBuyer": "no buyer recorded",
-      "noDate": "no date recorded",
-      "idleHint": "Hover or focus a dot to see transaction details"
+      "noDate": "no date recorded"
+    },
+    "summary": {
+      "overview": "{{sales}} transactions · {{currencies}} currencies"
     },
     "empty": "No sold editions yet",
     "currenciesAvailable": "{{count}} currencies",
@@ -90,15 +94,16 @@
     },
     "tooltip": {
       "editions": "{{count}} editions here",
-      "untracked": "no location recorded",
-      "clickToPin": "Click to pin this node",
-      "idleHint": "Hover or click a node to see details"
+      "untracked": "no location recorded"
+    },
+    "summary": {
+      "overview": "{{nodes}} locations · {{edges}} flows"
     },
     "pin": {
       "editionsAt": "{{count}} editions here",
       "viewAll": "View all editions at this location →",
       "noInventory": "(no inv)",
-      "unpinHint": "Click node again or click empty area to unpin"
+      "unpinAria": "Unpin"
     }
   }
 }

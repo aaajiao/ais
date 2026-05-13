@@ -203,7 +203,7 @@ describe('DiasporaView', () => {
     mockNavigate.mockClear();
   });
 
-  it('初始状态：无 pin、信息条显示默认提示', () => {
+  it('初始状态：无 pin、信息条显示 summary 总览', () => {
     renderDiaspora();
 
     // Heading rendered
@@ -212,8 +212,8 @@ describe('DiasporaView', () => {
     // No pin card visible initially
     expect(screen.queryByText(/查看此位置全部版本|View all editions/i)).not.toBeInTheDocument();
 
-    // Default hint shown
-    expect(screen.getByText(/悬停或点击节点|Hover or click/i)).toBeInTheDocument();
+    // Default summary shown (2 locations, 1 flow)
+    expect(screen.getByText(/处位置.*条流转|locations.*flows/i)).toBeInTheDocument();
   });
 
   it('hover 节点 → 下方信息条预览 location 信息', () => {
@@ -229,8 +229,8 @@ describe('DiasporaView', () => {
     expect(
       screen.getByText('Test Gallery Berlin', { selector: 'div,span' })
     ).toBeInTheDocument();
-    // Should show clickToPin hint
-    expect(screen.getByText(/点击固定|Click to pin/i)).toBeInTheDocument();
+    // Pin icon (lucide) signals click-to-pin affordance; no text hint anymore
+    expect(galleryGroup).toBeInTheDocument();
   });
 
   it('hover 离开 → 预览消失，恢复默认提示', () => {
@@ -250,8 +250,8 @@ describe('DiasporaView', () => {
     expect(
       screen.queryByText('Test Gallery Berlin', { selector: 'div,span' })
     ).not.toBeInTheDocument();
-    // Default hint restored
-    expect(screen.getByText(/悬停或点击节点|Hover or click/i)).toBeInTheDocument();
+    // Summary overview restored
+    expect(screen.getByText(/处位置.*条流转|locations.*flows/i)).toBeInTheDocument();
   });
 
   it('click 节点 → pin 卡片出现 + 显示 editions 列表', () => {
@@ -321,7 +321,7 @@ describe('DiasporaView', () => {
     fireEvent.click(galleryGroup);
     // Unpinned
     expect(screen.queryByText(/查看此位置全部版本|View all editions/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/悬停或点击节点|Hover or click/i)).toBeInTheDocument();
+    expect(screen.getByText(/处位置.*条流转|locations.*flows/i)).toBeInTheDocument();
   });
 
   it('click 另一节点 → 切换 pin 到新节点', () => {
@@ -369,8 +369,6 @@ describe('DiasporaView', () => {
 
     // Pin card still visible (gallery pin not disturbed)
     expect(screen.getByText(/查看此位置全部版本|View all editions/i)).toBeInTheDocument();
-    // "clickToPin" hint should NOT appear (pin is active)
-    expect(screen.queryByText(/点击固定|Click to pin/i)).not.toBeInTheDocument();
   });
 
   it('edition 无 inventory_number 时显示 id 前缀 + noInventory 标记', () => {
