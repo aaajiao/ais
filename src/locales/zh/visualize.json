@@ -120,7 +120,8 @@
     "heading": "Diaspora — 流散",
     "description": "中心是工作室，作品向外辐射至 21 处。节点大小按版本数量。",
     "stat": {
-      "trackedRatio": "{{tracked}} / {{total}} 版本有位置历史（{{percent}}%）"
+      "trackedRatio": "{{tracked}} / {{total}} 版本有位置历史（{{percent}}%）",
+      "untrackedHint": "还有 {{count}} 件待补全 → 点击节点跳到版本详情补 location"
     },
     "stateHint": "档案还薄。位置流转数据会随系统使用而生长。",
     "legend": {
@@ -129,11 +130,14 @@
       "museum": "美术馆",
       "private_collection": "私人收藏",
       "other": "其他",
-      "ghost": "无 location 鬼影"
+      "anonymous": "匿名流出",
+      "untracked": "无位置待补全"
     },
     "tooltip": {
       "editions": "{{count}} 个版本在此",
-      "untracked": "未记录所在地"
+      "untracked": "未记录所在地",
+      "anonymousWithDate": "匿名 · {{date}}",
+      "anonymousNoDate": "匿名 · 无日期"
     },
     "summary": {
       "overview": "{{nodes}} 处位置 · {{edges}} 条流转"
@@ -160,7 +164,8 @@
       },
       "aria": {
         "artist": "中心节点：aaajiao（艺术家）",
-        "namedPrivate": "私人买家 {{name}}，{{count}} 件作品"
+        "namedPrivate": "私人买家 {{name}}，{{count}} 件作品",
+        "ghost": "待补全版本：{{title}} · {{inv}} · {{status}}（点击补 location）"
       }
     }
   },

@@ -13,6 +13,8 @@ import {
   getNodeVisual,
   generateOrganicPath,
   namedNodeRadius,
+  buildGhostEditions,
+  layoutGhostRing,
   TIME_SPIRAL_GEOMETRY,
 } from './diasporaUtils';
 import type { LocationNode } from './diasporaUtils';
@@ -20,7 +22,11 @@ import type {
   VizEdition,
   VizLocation,
   VizHistory,
+  VizArtwork,
 } from '@/hooks/queries/useVisualizationData';
+
+/** v1.6.x 第二轮：phyllotaxis 黄金角（rad），与 diasporaUtils 同步 */
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -782,8 +788,11 @@ describe('layoutConstellation (time-spiral)', () => {
     expect(layout.geometry.rAnonymous).toBe(TIME_SPIRAL_GEOMETRY.ANONYMOUS_R);
   });
 
-  it('dated entity 按时间映射径向：earliest → r=R_INNER + 12 点钟；latest → r=R_OUTER_DATA + angle 按 index 接近一圈', () => {
+  it('dated entity 按时间映射径向：earliest → r=R_INNER + 12 点钟（phyllotaxis i=0 起点）；latest → r=R_OUTER_DATA + angle 按 i×GOLDEN_ANGLE 分配', () => {
     // 两个有时间的 location：early 2018-01-01 / late 2024-12-31
+    // v1.6.x 第二轮：angle 改为 phyllotaxis 黄金角分布。N=2 时碰撞检测看两节点
+    // 是否需要推开 —— 两点 r 一近一远（R_INNER=60 / R_OUTER_DATA=190），笛卡尔
+    // 距离够大不触发推开，angle 应保持精确的 phyllotaxis 值。
     const editions = [
       makeEdition('e1', 'loc-early', { status: 'sold', sale_date: '2018-01-01' }),
       makeEdition('e2', 'loc-late', { status: 'sold', sale_date: '2024-12-31' }),
@@ -798,20 +807,16 @@ describe('layoutConstellation (time-spiral)', () => {
     const early = layout.locationPoints.find((p) => p.node.id === 'loc-early')!;
     const late = layout.locationPoints.find((p) => p.node.id === 'loc-late')!;
 
-    // earliest → r ≈ R_INNER (60), angle = -π/2（12 点钟方向，i=0/N=2 → 0% of 2π）
+    // earliest → r ≈ R_INNER (60), angle = -π/2（i=0 phyllotaxis 起点）
     expect(early.r).toBeCloseTo(TIME_SPIRAL_GEOMETRY.R_INNER, 4);
     expect(early.angle).toBeCloseTo(-Math.PI / 2, 4);
-    // earliest → (cx, cy - R_INNER) = (400, 300 - 60) = (400, 240)
     expect(early.x).toBeCloseTo(400, 4);
     expect(early.y).toBeCloseTo(240, 4);
 
-    // latest → r ≈ R_OUTER_DATA (190), angle = -π/2 + (1/2) · 2π = π/2（6 点钟方向）
-    // v1.6.x bug 修复：angle 改由 sorted-index 均匀分配，不再绕完整 360° 落回 12 点钟
+    // latest → r ≈ R_OUTER_DATA (190), angle = -π/2 + 1·GOLDEN_ANGLE
+    // R_INNER=60 与 R_OUTER_DATA=190 距离已超过两节点视觉半径之和，碰撞推开不会触发
     expect(late.r).toBeCloseTo(TIME_SPIRAL_GEOMETRY.R_OUTER_DATA, 4);
-    expect(late.angle).toBeCloseTo(Math.PI / 2, 4);
-    // 6 点钟方向 → cos=0, sin=1 → (400, 300 + 190) = (400, 490)
-    expect(late.x).toBeCloseTo(400, 4);
-    expect(late.y).toBeCloseTo(300 + 190, 4);
+    expect(late.angle).toBeCloseTo(-Math.PI / 2 + GOLDEN_ANGLE, 4);
 
     expect(early.isUndated).toBe(false);
     expect(late.isUndated).toBe(false);
@@ -1052,11 +1057,12 @@ describe('layoutConstellation (time-spiral)', () => {
     expect(coordsUniq.size).toBe(5);
   });
 
-  it('latest dated entity 落在 angle ≈ -π/2 + (N-1)/N · 2π（不再绕完整一圈）', () => {
-    // 3 个 dated entity → latest angle = -π/2 + 2/3·2π
+  it('phyllotaxis angle 起点：第 0 个 dated 在 -π/2（12 点钟），第 i 个 = -π/2 + i × GOLDEN_ANGLE', () => {
+    // 3 个 dated entity 时间相距足够远 + r 也分散（R_INNER → R_OUTER_DATA）→
+    // 碰撞推开不触发，angle 应精确等于 phyllotaxis 公式值。
     const editions = [
       makeEdition('e1', 'loc-a', { status: 'sold', sale_date: '2018-01-01' }),
-      makeEdition('e2', 'loc-b', { status: 'sold', sale_date: '2020-01-01' }),
+      makeEdition('e2', 'loc-b', { status: 'sold', sale_date: '2021-01-01' }),
       makeEdition('e3', 'loc-c', { status: 'sold', sale_date: '2024-01-01' }),
     ];
     const c = buildConstellation(editions, [
@@ -1065,9 +1071,99 @@ describe('layoutConstellation (time-spiral)', () => {
       makeLocation('loc-c', 'C', 'gallery'),
     ]);
     const layout = layoutConstellation(c, { width: 800, height: 600 });
-    const latest = layout.locationPoints.find((p) => p.node.id === 'loc-c')!;
-    const expectedAngle = -Math.PI / 2 + (2 / 3) * 2 * Math.PI;
-    expect(latest.angle).toBeCloseTo(expectedAngle, 4);
+    const a = layout.locationPoints.find((p) => p.node.id === 'loc-a')!;
+    const b = layout.locationPoints.find((p) => p.node.id === 'loc-b')!;
+    const cP = layout.locationPoints.find((p) => p.node.id === 'loc-c')!;
+    expect(a.angle).toBeCloseTo(-Math.PI / 2, 4);
+    expect(b.angle).toBeCloseTo(-Math.PI / 2 + GOLDEN_ANGLE, 4);
+    expect(cP.angle).toBeCloseTo(-Math.PI / 2 + 2 * GOLDEN_ANGLE, 4);
+  });
+
+  // ─── v1.6.x 第二轮：碰撞推开 ───────────────────────────────────────────────
+
+  it('时间密集 5+ entity 全部 chord ≥ r_a + r_b − 1（碰撞推开保留 1px epsilon）', () => {
+    // 7 个 entity 在 2 个月内成交 —— phyllotaxis 已让 angle 散，但 r 仍接近
+    // (R_INNER 区域)。碰撞推开应把任何 chord < r_a + r_b + pad 的对推到 ≥
+    // r_a + r_b - 1。所有 entity 都是同视觉档 (named_private r≈7) 避免边界
+    // case。每对包括 anonymous(3.5) / named(7) / location(museum 14)。
+    const editions = [
+      // 4 个 named buyer
+      makeEdition('e1', null, {
+        status: 'sold',
+        sale_date: '2024-01-01',
+        buyer_name: 'A',
+      }),
+      makeEdition('e2', null, {
+        status: 'sold',
+        sale_date: '2024-01-08',
+        buyer_name: 'B',
+      }),
+      makeEdition('e3', null, {
+        status: 'sold',
+        sale_date: '2024-01-15',
+        buyer_name: 'C',
+      }),
+      makeEdition('e4', null, {
+        status: 'sold',
+        sale_date: '2024-01-22',
+        buyer_name: 'D',
+      }),
+      // 1 个 anonymous
+      makeEdition('e5', null, { status: 'sold', sale_date: '2024-01-29' }),
+      // 2 个 location（museum + gallery）
+      makeEdition('e6', 'loc-m', {
+        status: 'sold',
+        sale_date: '2024-02-05',
+      }),
+      makeEdition('e7', 'loc-g', {
+        status: 'sold',
+        sale_date: '2024-02-12',
+      }),
+    ];
+    const locations = [
+      makeLocation('loc-m', 'M', 'museum'),
+      makeLocation('loc-g', 'G', 'gallery'),
+    ];
+    const c = buildConstellation(editions, locations);
+    const layout = layoutConstellation(c, { width: 800, height: 600 });
+
+    // 收集所有 dated point + 视觉半径
+    const all: Array<{ x: number; y: number; r: number; id: string }> = [];
+    for (const p of layout.locationPoints) {
+      all.push({
+        x: p.x,
+        y: p.y,
+        r: getNodeVisual('location', p.node.type, p.node.editionCount).r,
+        id: `loc:${p.node.id}`,
+      });
+    }
+    for (const p of layout.namedPoints) {
+      all.push({
+        x: p.x,
+        y: p.y,
+        r: getNodeVisual('named_private', null, p.node.editionCount).r,
+        id: `named:${p.node.id}`,
+      });
+    }
+    for (const p of layout.anonymousPoints) {
+      all.push({
+        x: p.x,
+        y: p.y,
+        r: getNodeVisual('anonymous', null, 1).r,
+        id: `anon:${p.editionId}`,
+      });
+    }
+    // 任意两点 chord ≥ r_a + r_b − 1
+    for (let i = 0; i < all.length; i++) {
+      for (let j = i + 1; j < all.length; j++) {
+        const dx = all[j].x - all[i].x;
+        const dy = all[j].y - all[i].y;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        const minAllowed = Math.max(0, all[i].r + all[j].r - 1);
+        // 失败信息含两节点 id 方便定位
+        expect(d, `${all[i].id} ↔ ${all[j].id} chord=${d.toFixed(2)} min=${minAllowed.toFixed(2)}`).toBeGreaterThanOrEqual(minAllowed);
+      }
+    }
   });
 });
 
@@ -1103,12 +1199,12 @@ describe('getNodeVisual', () => {
     expect(getNodeVisual('named_private', null, 1).innerRingR).toBeNull();
   });
 
-  it('anonymous 固定 r=1.5，style=dust', () => {
+  it('anonymous 固定 r=3.5，style=dust（v1.6.x 第二轮：1.5→3.5，"看得见但无名"档）', () => {
     const a = getNodeVisual('anonymous', null, 1);
-    expect(a.r).toBe(1.5);
+    expect(a.r).toBe(3.5);
     expect(a.style).toBe('dust');
     const a2 = getNodeVisual('anonymous', null, 100);
-    expect(a2.r).toBe(1.5); // anonymous 不随 editionCount 变化
+    expect(a2.r).toBe(3.5); // anonymous 不随 editionCount 变化
   });
 
   it('未知 type fallback 不报错', () => {
@@ -1118,12 +1214,12 @@ describe('getNodeVisual', () => {
     expect(v.style).toBe('solid');
   });
 
-  it('opacity spec：museum=1.0 / private_collection=0.85 / gallery=0.7 / named=0.55 / anonymous=0.3', () => {
+  it('opacity spec：museum=1.0 / private_collection=0.85 / gallery=0.7 / named=0.55 / anonymous=0.55（v1.6.x 第二轮升）', () => {
     expect(getNodeVisual('location', 'museum', 1).opacity).toBe(1.0);
     expect(getNodeVisual('location', 'private_collection', 1).opacity).toBe(0.85);
     expect(getNodeVisual('location', 'gallery', 1).opacity).toBe(0.7);
     expect(getNodeVisual('named_private', null, 1).opacity).toBe(0.55);
-    expect(getNodeVisual('anonymous', null, 1).opacity).toBe(0.3);
+    expect(getNodeVisual('anonymous', null, 1).opacity).toBe(0.55);
   });
 });
 
@@ -1142,15 +1238,15 @@ describe('generateOrganicPath', () => {
     expect(a).not.toBe(b);
   });
 
-  it('path format: 以 M 开头、Z 结尾、12 段 Q', () => {
+  it('path format: 以 M 开头、Z 结尾、8 段 Q（v1.6.x 第二轮：12→8）', () => {
     const path = generateOrganicPath(100, 100, 20, 'x');
     expect(path.startsWith('M ')).toBe(true);
     expect(path.endsWith(' Z')).toBe(true);
     const qCount = (path.match(/\sQ\s/g) ?? []).length;
-    expect(qCount).toBe(12);
+    expect(qCount).toBe(8);
   });
 
-  it('bounding box 大致 baseR ± 15%（路径所有点到中心距离 ≤ baseR × 1.15 + 浮点容差）', () => {
+  it('bounding box 大致 baseR ± 25%（路径所有点到中心距离 ≤ baseR × 1.25 + 浮点容差；v1.6.x 第二轮 ±15→±25）', () => {
     const cx = 200;
     const cy = 150;
     const baseR = 18;
@@ -1163,13 +1259,204 @@ describe('generateOrganicPath', () => {
       .map(Number);
     // 配对成 (x, y) 坐标
     expect(nums.length % 2).toBe(0);
-    const allowedMaxDist = baseR * 1.15 + 1; // +1 浮点容差
+    const allowedMaxDist = baseR * 1.25 + 1; // +1 浮点容差
     for (let i = 0; i < nums.length; i += 2) {
       const dx = nums[i] - cx;
       const dy = nums[i + 1] - cy;
       const d = Math.sqrt(dx * dx + dy * dy);
       expect(d).toBeLessThanOrEqual(allowedMaxDist);
     }
+  });
+});
+
+// ─── v1.6.x 第二轮: buildGhostEditions / layoutGhostRing ──────────────────
+
+describe('buildGhostEditions', () => {
+  function makeArtwork(id: string, title_en = '', title_cn = ''): VizArtwork {
+    return {
+      id,
+      title_en,
+      title_cn,
+      year: '2024',
+      type: 'Installation',
+      thumbnail_url: null,
+      edition_total: 1,
+      ap_total: 0,
+      is_unique: false,
+      created_at: '2024-01-01T00:00:00Z',
+    };
+  }
+
+  it('过滤：只保留 location_id == null && status ∉ (sold, gifted)', () => {
+    const editions = [
+      makeEdition('e1', null, { status: 'in_studio' }),
+      makeEdition('e2', 'loc-1', { status: 'in_studio' }), // 有 location，排除
+      makeEdition('e3', null, { status: 'sold' }), // outflow，排除
+      makeEdition('e4', null, { status: 'gifted' }), // outflow，排除
+      makeEdition('e5', null, { status: 'in_production' }),
+    ];
+    const artworks = [makeArtwork('artwork-1', 'My Title', '')];
+    const ghosts = buildGhostEditions(editions, artworks);
+    expect(ghosts).toHaveLength(2);
+    expect(ghosts.map((g) => g.editionId).sort()).toEqual(['e1', 'e5']);
+  });
+
+  it('artwork 不存在时 title = null（缺失态不藏，edition 仍出现）', () => {
+    const editions = [
+      makeEdition('e1', null, { status: 'in_studio', artwork_id: 'art-missing' }),
+    ];
+    const ghosts = buildGhostEditions(editions, []);
+    expect(ghosts).toHaveLength(1);
+    expect(ghosts[0].title).toBeNull();
+    expect(ghosts[0].editionId).toBe('e1');
+  });
+
+  it('artwork.title_en 优先，缺时回退 title_cn，空字符串 → null', () => {
+    const editions = [
+      makeEdition('e1', null, { status: 'in_studio', artwork_id: 'a-en' }),
+      makeEdition('e2', null, { status: 'in_studio', artwork_id: 'a-cn' }),
+      makeEdition('e3', null, { status: 'in_studio', artwork_id: 'a-empty' }),
+    ];
+    const artworks = [
+      makeArtwork('a-en', 'English Title', '中文标题'),
+      makeArtwork('a-cn', '', '只有中文'),
+      makeArtwork('a-empty', '', ''),
+    ];
+    const ghosts = buildGhostEditions(editions, artworks);
+    const byId = new Map(ghosts.map((g) => [g.editionId, g]));
+    expect(byId.get('e1')?.title).toBe('English Title');
+    expect(byId.get('e2')?.title).toBe('只有中文');
+    expect(byId.get('e3')?.title).toBeNull();
+  });
+
+  it('排序：status 优先级（in_production → in_studio → in_transit → at_gallery → at_museum → 其他），组内 created_at desc', () => {
+    const editions = [
+      makeEdition('e-gal', null, {
+        status: 'at_gallery',
+        created_at: '2024-01-01T00:00:00Z',
+      }),
+      makeEdition('e-stu-old', null, {
+        status: 'in_studio',
+        created_at: '2024-01-01T00:00:00Z',
+      }),
+      makeEdition('e-stu-new', null, {
+        status: 'in_studio',
+        created_at: '2025-06-01T00:00:00Z',
+      }),
+      makeEdition('e-prod', null, {
+        status: 'in_production',
+        created_at: '2024-05-01T00:00:00Z',
+      }),
+      makeEdition('e-mus', null, {
+        status: 'at_museum',
+        created_at: '2026-01-01T00:00:00Z',
+      }),
+    ];
+    const ghosts = buildGhostEditions(editions, []);
+    expect(ghosts.map((g) => g.editionId)).toEqual([
+      'e-prod', // in_production (优先级 0)
+      'e-stu-new', // in_studio 组内 desc → new 先
+      'e-stu-old', // in_studio 组内 desc → old 后
+      'e-gal', // at_gallery (优先级 3)
+      'e-mus', // at_museum (优先级 4)
+    ]);
+  });
+
+  it('inventoryNumber + status 字面值透传，不归一化', () => {
+    const editions = [
+      makeEdition('e1', null, {
+        status: 'in_studio',
+        inventory_number: 'AAJ-2024-001',
+      }),
+      makeEdition('e2', null, {
+        status: 'in_production',
+        inventory_number: null,
+      }),
+    ];
+    const ghosts = buildGhostEditions(editions, []);
+    const byId = new Map(ghosts.map((g) => [g.editionId, g]));
+    expect(byId.get('e1')?.inventoryNumber).toBe('AAJ-2024-001');
+    expect(byId.get('e1')?.status).toBe('in_studio');
+    expect(byId.get('e2')?.inventoryNumber).toBeNull();
+    expect(byId.get('e2')?.status).toBe('in_production');
+  });
+
+  it('空 editions → 空数组', () => {
+    expect(buildGhostEditions([], [])).toEqual([]);
+  });
+
+  it('全是 outflow 或全有 location → 空数组（buildGhostEditions 不出 noise）', () => {
+    const editions = [
+      makeEdition('e1', 'loc-1', { status: 'in_studio' }),
+      makeEdition('e2', null, { status: 'sold' }),
+      makeEdition('e3', null, { status: 'gifted' }),
+    ];
+    expect(buildGhostEditions(editions, [])).toEqual([]);
+  });
+});
+
+describe('layoutGhostRing', () => {
+  function makeGhost(editionId: string, status = 'in_studio') {
+    return {
+      editionId,
+      artworkId: 'art-1',
+      title: null,
+      inventoryNumber: null,
+      status,
+    };
+  }
+
+  it('N=0 → 空数组（view 据此不渲染）', () => {
+    expect(layoutGhostRing([], { width: 800, height: 600 })).toEqual([]);
+  });
+
+  it('默认 radius=245，center 取 (width/2, height/2)', () => {
+    const ghosts = [makeGhost('e1')];
+    const pts = layoutGhostRing(ghosts, { width: 800, height: 600 });
+    expect(pts).toHaveLength(1);
+    // 第一点 angle = -π/2，落 (400, 300 - 245) = (400, 55)
+    expect(pts[0].angle).toBeCloseTo(-Math.PI / 2, 4);
+    expect(pts[0].x).toBeCloseTo(400, 4);
+    expect(pts[0].y).toBeCloseTo(55, 4);
+  });
+
+  it('N>0 第一点 angle = -π/2（12 点钟起点）', () => {
+    const ghosts = [makeGhost('e1'), makeGhost('e2'), makeGhost('e3')];
+    const pts = layoutGhostRing(ghosts, { width: 800, height: 600 });
+    expect(pts[0].angle).toBeCloseTo(-Math.PI / 2, 4);
+  });
+
+  it('N 个点均匀分布 360°（相邻 angle 差 = 2π/N）', () => {
+    const N = 5;
+    const ghosts = Array.from({ length: N }, (_, i) => makeGhost(`e${i}`));
+    const pts = layoutGhostRing(ghosts, { width: 800, height: 600 });
+    expect(pts).toHaveLength(N);
+    const expectedStep = (2 * Math.PI) / N;
+    for (let i = 1; i < N; i++) {
+      expect(pts[i].angle - pts[i - 1].angle).toBeCloseTo(expectedStep, 4);
+    }
+  });
+
+  it('每个点到 center 距离 = radius（默认 245）', () => {
+    const ghosts = [makeGhost('e1'), makeGhost('e2'), makeGhost('e3'), makeGhost('e4')];
+    const pts = layoutGhostRing(ghosts, { width: 800, height: 600 });
+    for (const p of pts) {
+      const d = Math.sqrt((p.x - 400) ** 2 + (p.y - 300) ** 2);
+      expect(d).toBeCloseTo(245, 4);
+    }
+  });
+
+  it('自定义 radius option 生效', () => {
+    const ghosts = [makeGhost('e1')];
+    const pts = layoutGhostRing(ghosts, { width: 800, height: 600, radius: 300 });
+    expect(pts[0].y).toBeCloseTo(0, 4); // 12 点钟方向 cy - 300 = 300 - 300 = 0
+  });
+
+  it('每个 GhostRingPoint 带 ghost meta（用于 view 渲染 + click 跳转）', () => {
+    const ghosts = [makeGhost('e1', 'in_production')];
+    const pts = layoutGhostRing(ghosts, { width: 800, height: 600 });
+    expect(pts[0].ghost.editionId).toBe('e1');
+    expect(pts[0].ghost.status).toBe('in_production');
   });
 });
 

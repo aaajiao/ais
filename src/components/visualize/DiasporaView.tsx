@@ -16,7 +16,8 @@ import {
   buildNodes,
   computeTrackedStat,
   countryToISO2,
-  getGhostNodes,
+  buildGhostEditions,
+  layoutGhostRing,
   type LocationNode,
   type LocationConstellationNode,
   type NamedPrivateNode,
@@ -86,27 +87,16 @@ export default function DiasporaView({
     [editions, locations]
   );
 
-  // M2 残留：保留 ghost 环（无 location_id 且非 outflow 的 edition 仍可能存在）。
-  // 改成只对"非 outflow + 无 location"的 editions 显示，避免和 Outer ring (anonymous outflow)
-  // 视觉冲突。outflow + 无 location 的已经在 anonymous ring 表达了。
-  const nonOutflowNoLoc = useMemo(
-    () =>
-      editions.filter(
-        (e) =>
-          !e.location_id &&
-          e.status !== 'sold' &&
-          e.status !== 'gifted'
-      ),
-    [editions]
+  // v1.6.x 第二轮：Ghost editions 改成"待补全档案 inbox" —— per-edition 可点击
+  // 跳到 /editions/:id 让用户补 location。空心几何小圆 r=4 落 R=245 外圈，区别
+  // 于灰实心 anonymous dust（已离开但无买家信息）。
+  const ghostEditions = useMemo(
+    () => buildGhostEditions(editions, artworks),
+    [editions, artworks]
   );
-  const ghost = useMemo(
-    () =>
-      getGhostNodes(nonOutflowNoLoc, locations, {
-        cx: W / 2,
-        cy: H / 2,
-        radius: Math.min(W, H) * 0.52,
-      }),
-    [nonOutflowNoLoc, locations]
+  const ghostPoints = useMemo(
+    () => layoutGhostRing(ghostEditions, { width: W, height: H }),
+    [ghostEditions]
   );
 
   // 旧 buildNodes（仅供 empty-state 判断 fallback；Constellation 数据空时仍可能
@@ -257,6 +247,14 @@ export default function DiasporaView({
         <div className="text-xs text-muted-foreground">
           {t('diaspora.constellation.timelineLegend')}
         </div>
+        {ghostPoints.length > 0 && (
+          <div
+            className="text-xs"
+            data-testid="diaspora-stat-untracked-hint"
+          >
+            {t('diaspora.stat.untrackedHint', { count: ghostPoints.length })}
+          </div>
+        )}
       </div>
 
       {/* ─── Legend ──────────────────────────────────────────────────── */}
@@ -286,16 +284,31 @@ export default function DiasporaView({
         <span aria-hidden="true" className="opacity-30 px-1">
           │
         </span>
+        {/* v1.6.x 第二轮：三档视觉词汇 —— anonymous（灰实心 dust）+ ghost
+            editions inbox（空心待补全）。"无 location 鬼影" 旧 chip 删除，
+            语义被新的 untracked inbox 取代。 */}
         <span
-          key="ghost"
+          data-testid="diaspora-legend-anonymous"
           className="flex items-center gap-1.5"
-          data-testid="diaspora-legend-ghost"
         >
           <span
-            className="inline-block w-3 h-3 rounded-full border-[1.5px] border-foreground opacity-60"
+            className="inline-block w-3 h-3 rounded-full bg-foreground"
+            style={{ opacity: 0.55 }}
           />
           <span className="text-muted-foreground">
-            {t('diaspora.legend.ghost')}
+            {t('diaspora.legend.anonymous')}
+          </span>
+        </span>
+        <span aria-hidden="true" className="opacity-30 px-1">
+          │
+        </span>
+        <span
+          data-testid="diaspora-legend-untracked"
+          className="flex items-center gap-1.5"
+        >
+          <span className="inline-block w-3 h-3 rounded-full border border-foreground opacity-60" />
+          <span className="text-muted-foreground">
+            {t('diaspora.legend.untracked')}
           </span>
         </span>
       </div>
@@ -331,23 +344,47 @@ export default function DiasporaView({
             />
           ))}
 
-          {/* ─── M2 残留: ghost 环（非 outflow 无 location 的 edition） ─── */}
-          {ghost.count > 0 && (
-            <g data-testid="diaspora-ghost-ring" aria-hidden="true">
-              {ghost.positions.map((p, i) => (
-                <circle
-                  key={i}
-                  cx={p.x}
-                  cy={p.y}
-                  r={3}
-                  fill="none"
-                  className="stroke-foreground"
-                  strokeWidth={1}
-                  opacity={0.3}
-                />
-              ))}
+          {/* ─── Ghost editions inbox（v1.6.x 第二轮）─────────────────
+              non-outflow + 无 location 的 edition，画在 R=245 外圈：空心
+              几何小圆 r=4 opacity=0.55，**可点击** → /editions/:id 让用户
+              去补 location。与 anonymous dust（灰实心，已离开但无买家）形成
+              对照。设计哲学：信息密度递减的三档视觉规范。 */}
+          {ghostPoints.map(({ ghost, x, y }) => (
+            <g
+              key={`ghost-${ghost.editionId}`}
+              data-testid={`constellation-ghost-${ghost.editionId}`}
+              role="button"
+              tabIndex={0}
+              className="cursor-pointer focus:outline-none"
+              aria-label={t('diaspora.constellation.aria.ghost', {
+                title: ghost.title ?? '—',
+                inv: ghost.inventoryNumber ?? '—',
+                status: ghost.status,
+              })}
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/editions/${ghost.editionId}`);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  navigate(`/editions/${ghost.editionId}`);
+                }
+              }}
+            >
+              <title>{`${ghost.title ?? '—'} · ${ghost.inventoryNumber ?? '—'} · ${ghost.status}`}</title>
+              <circle
+                cx={x}
+                cy={y}
+                r={4}
+                fill="none"
+                className="stroke-foreground"
+                strokeWidth={1}
+                opacity={0.55}
+                pointerEvents="all"
+              />
             </g>
-          )}
+          ))}
 
           {/* ─── Edges: 只画 location ↔ artist ───────────────────── */}
           {layout.locationPoints.map((p) => {
@@ -409,26 +446,35 @@ export default function DiasporaView({
           {/*
             v1.6.x：anonymous 不再聚合成外圈 ring，每条 anonymous outflow edition
             一个独立 dot，跟 location / namedPrivate 共享同一份时间映射。缺
-            sale_date 的 anonymous 推 R_GHOST 外圈。视觉仍是 r=1.5 dust，不进
-            hover / pin / 不画 organic blob（太小看不出来）。
-            如果 selectedArtworkId 匹配某 anonymous point.artworkId，那 dot 升
-            为 r=2 + opacity=1 但**不画 selection ring**（聚合无 entity 身份，
-            ring 跨 dot 视觉混乱）。
+            sale_date 的 anonymous 推 R_GHOST 外圈。
+            v1.6.x 第二轮：r 升级 1.5→3.5 + opacity 0.3→0.55，灰实心几何小圆——
+            "信息密度递减"三档视觉的中档（具象 blob > 灰实心 dust > 空心 ghost）。
+            不进 hover / pin / 不画 organic blob（仍太小做 blob 噪声大）。**带
+            <title>** 让 hover 看 sale_date（无名也保留时间）。selection 命中时
+            opacity=1（不画 ring：聚合 dust 无 entity 身份）。
           */}
           {layout.anonymousPoints.map((p) => {
             const visual = getNodeVisual('anonymous', null, 1);
             const isSelected =
               !!selectedArtworkId && p.artworkId === selectedArtworkId;
             return (
-              <circle
-                key={`anon-${p.editionId}`}
-                data-testid={`constellation-anon-${p.editionId}`}
-                cx={p.x}
-                cy={p.y}
-                r={isSelected ? 2 : visual.r}
-                className="fill-foreground"
-                opacity={isSelected ? 1 : visual.opacity}
-              />
+              <g key={`anon-${p.editionId}`}>
+                <title>
+                  {p.sale_date
+                    ? t('diaspora.tooltip.anonymousWithDate', {
+                        date: p.sale_date,
+                      })
+                    : t('diaspora.tooltip.anonymousNoDate')}
+                </title>
+                <circle
+                  data-testid={`constellation-anon-${p.editionId}`}
+                  cx={p.x}
+                  cy={p.y}
+                  r={visual.r}
+                  className="fill-foreground"
+                  opacity={isSelected ? 1 : visual.opacity}
+                />
+              </g>
             );
           })}
 

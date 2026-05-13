@@ -120,7 +120,8 @@
     "heading": "Diaspora",
     "description": "The studio sits at the centre; works radiate outward to 21 locations. Node size scales with edition count.",
     "stat": {
-      "trackedRatio": "{{tracked}} / {{total}} editions have known location ({{percent}}%)"
+      "trackedRatio": "{{tracked}} / {{total}} editions have known location ({{percent}}%)",
+      "untrackedHint": "{{count}} editions awaiting location — click any to open"
     },
     "stateHint": "The archive is thin. Location-flow data will grow as the system gets used.",
     "legend": {
@@ -129,11 +130,14 @@
       "museum": "Museum",
       "private_collection": "Private collection",
       "other": "Other",
-      "ghost": "no location (ghost)"
+      "anonymous": "Anonymous outflow",
+      "untracked": "No location (to complete)"
     },
     "tooltip": {
       "editions": "{{count}} editions here",
-      "untracked": "no location recorded"
+      "untracked": "no location recorded",
+      "anonymousWithDate": "anonymous · {{date}}",
+      "anonymousNoDate": "anonymous · no date"
     },
     "summary": {
       "overview": "{{nodes}} locations · {{edges}} flows"
@@ -160,7 +164,8 @@
       },
       "aria": {
         "artist": "Center node: aaajiao (artist)",
-        "namedPrivate": "Private buyer {{name}}, {{count}} works"
+        "namedPrivate": "Private buyer {{name}}, {{count}} works",
+        "ghost": "Edition awaiting location: {{title}} · {{inv}} · {{status}} (click to complete)"
       }
     }
   },

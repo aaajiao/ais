@@ -517,9 +517,9 @@ describe('DiasporaView', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/editions/e4');
   });
 
-  // ─── M2 ghost ring ────────────────────────────────────────────────────────
+  // ─── v1.6.x 第二轮 ghost editions inbox（per-edition 可点击） ──────────
 
-  it('有 location_id 缺失的非 outflow edition → 渲染 ghost 环', () => {
+  it('non-outflow + 无 location → 渲染 per-edition ghost circle（每个独立 testid + role=button）', () => {
     const ghostEditions: VizEdition[] = [
       ...allEditions,
       {
@@ -552,13 +552,16 @@ describe('DiasporaView', () => {
       },
     ];
     const { container } = renderDiaspora({ editions: ghostEditions });
-    const ring = container.querySelector('[data-testid="diaspora-ghost-ring"]');
-    expect(ring).not.toBeNull();
-    const circles = ring!.querySelectorAll('circle');
-    expect(circles.length).toBe(2);
+    const g1 = container.querySelector('[data-testid="constellation-ghost-ghost-1"]');
+    const g2 = container.querySelector('[data-testid="constellation-ghost-ghost-2"]');
+    expect(g1).not.toBeNull();
+    expect(g2).not.toBeNull();
+    // 每个 ghost g 都是 role=button + tabIndex=0（可点击 + 可聚焦）
+    expect(g1!.getAttribute('role')).toBe('button');
+    expect(g1!.getAttribute('tabindex')).toBe('0');
   });
 
-  it('ghost 圆 stroke-only + 不可点击（aria-hidden + 无 role / 无 tabIndex）', () => {
+  it('ghost editions inbox 圆是空心（fill=none + stroke-foreground r=4 opacity=0.55）', () => {
     const ghostEditions: VizEdition[] = [
       ...allEditions,
       {
@@ -577,27 +580,116 @@ describe('DiasporaView', () => {
       },
     ];
     const { container } = renderDiaspora({ editions: ghostEditions });
-    const ring = container.querySelector('[data-testid="diaspora-ghost-ring"]')!;
-    expect(ring.getAttribute('aria-hidden')).toBe('true');
-    expect(ring.querySelector('[role="button"]')).toBeNull();
-    expect(ring.querySelector('[aria-pressed]')).toBeNull();
-    expect(ring.querySelector('[tabindex]')).toBeNull();
-    const circle = ring.querySelector('circle')!;
+    const g = container.querySelector('[data-testid="constellation-ghost-ghost-1"]')!;
+    const circle = g.querySelector('circle')!;
     expect(circle.getAttribute('fill')).toBe('none');
+    expect(circle.getAttribute('r')).toBe('4');
     const cls = circle.getAttribute('class') ?? '';
     expect(cls).toContain('stroke-foreground');
   });
 
-  it('所有 non-outflow edition 都有 location_id → 不渲染 ghost 环', () => {
-    // allEditions 里 non-outflow editions（studioInternalEditions）都有 location_id
-    const { container } = renderDiaspora();
-    const ring = container.querySelector('[data-testid="diaspora-ghost-ring"]');
-    expect(ring).toBeNull();
+  it('click ghost edition → navigate 到 /editions/{id}', () => {
+    const ghostEditions: VizEdition[] = [
+      ...allEditions,
+      {
+        id: 'ghost-click-me',
+        artwork_id: 'artwork-1',
+        inventory_number: 'AAJ-GHX',
+        edition_type: 'numbered',
+        edition_number: 99,
+        status: 'in_studio',
+        location_id: null,
+        sale_price: null,
+        sale_currency: null,
+        sale_date: null,
+        buyer_name: null,
+        created_at: '2024-01-01T00:00:00Z',
+      },
+    ];
+    const { container } = renderDiaspora({ editions: ghostEditions });
+    const g = container.querySelector(
+      '[data-testid="constellation-ghost-ghost-click-me"]'
+    )!;
+    fireEvent.click(g);
+    expect(mockNavigate).toHaveBeenCalledWith('/editions/ghost-click-me');
   });
 
-  it('图例包含 ghost 项（diaspora-legend-ghost testid）', () => {
+  it('Enter / Space 键盘也触发 navigate', () => {
+    const ghostEditions: VizEdition[] = [
+      ...allEditions,
+      {
+        id: 'ghost-kbd',
+        artwork_id: 'artwork-1',
+        inventory_number: 'AAJ-K',
+        edition_type: 'numbered',
+        edition_number: 99,
+        status: 'in_studio',
+        location_id: null,
+        sale_price: null,
+        sale_currency: null,
+        sale_date: null,
+        buyer_name: null,
+        created_at: '2024-01-01T00:00:00Z',
+      },
+    ];
+    const { container } = renderDiaspora({ editions: ghostEditions });
+    const g = container.querySelector(
+      '[data-testid="constellation-ghost-ghost-kbd"]'
+    )!;
+    fireEvent.keyDown(g, { key: 'Enter' });
+    expect(mockNavigate).toHaveBeenCalledWith('/editions/ghost-kbd');
+    mockNavigate.mockClear();
+    fireEvent.keyDown(g, { key: ' ' });
+    expect(mockNavigate).toHaveBeenCalledWith('/editions/ghost-kbd');
+  });
+
+  it('所有 non-outflow edition 都有 location_id → 不渲染任何 ghost', () => {
+    const { container } = renderDiaspora();
+    expect(
+      container.querySelector('[data-testid^="constellation-ghost-"]')
+    ).toBeNull();
+  });
+
+  it('图例包含 anonymous + untracked 项（v1.6.x 第二轮三档视觉词汇）', () => {
     renderDiaspora();
-    expect(screen.getByTestId('diaspora-legend-ghost')).toBeInTheDocument();
+    expect(screen.getByTestId('diaspora-legend-anonymous')).toBeInTheDocument();
+    expect(screen.getByTestId('diaspora-legend-untracked')).toBeInTheDocument();
+    // 旧 ghost legend chip 已被取代，不应出现
+    expect(screen.queryByTestId('diaspora-legend-ghost')).toBeNull();
+  });
+
+  it('stat 区显示 untrackedHint 当有 ghost editions 时（v1.6.x 第二轮）', () => {
+    const ghostEditions: VizEdition[] = [
+      ...allEditions,
+      {
+        id: 'ghost-stat',
+        artwork_id: 'artwork-1',
+        inventory_number: 'AAJ-GH-STAT',
+        edition_type: 'numbered',
+        edition_number: 99,
+        status: 'in_studio',
+        location_id: null,
+        sale_price: null,
+        sale_currency: null,
+        sale_date: null,
+        buyer_name: null,
+        created_at: '2024-01-01T00:00:00Z',
+      },
+    ];
+    const { container } = renderDiaspora({ editions: ghostEditions });
+    const hint = container.querySelector(
+      '[data-testid="diaspora-stat-untracked-hint"]'
+    );
+    expect(hint).not.toBeNull();
+    // 文案体现 count=1 + 提示去补 location（中英 i18n 任一匹配）
+    expect(hint!.textContent).toMatch(/1.*(?:补全|location|complete)/i);
+  });
+
+  it('无 ghost editions → 不渲染 untrackedHint', () => {
+    const { container } = renderDiaspora();
+    expect(
+      container.querySelector('[data-testid="diaspora-stat-untracked-hint"]')
+    ).toBeNull();
   });
 
   it('pin 卡片按钮 onClick 调用 stopPropagation（spy 验证）', () => {
@@ -962,11 +1054,22 @@ describe('DiasporaView', () => {
     expect(innerRing!.getAttribute('class')).toContain('stroke-background');
   });
 
-  it('anonymous dots 仍是 <circle r=1.5>（不应用 organic blob）', () => {
+  it('anonymous dots 仍是 <circle r=3.5>（v1.6.x 第二轮升级，不应用 organic blob）', () => {
     const { container } = renderDiaspora();
     const anon = container.querySelector('[data-testid="constellation-anon-e8"]')!;
     expect(anon.tagName.toLowerCase()).toBe('circle');
-    expect(anon.getAttribute('r')).toBe('1.5');
+    expect(anon.getAttribute('r')).toBe('3.5');
+  });
+
+  it('anonymous dot 带 <title> 暴露 sale_date 给 hover（v1.6.x 第二轮）', () => {
+    const { container } = renderDiaspora();
+    const anon = container.querySelector('[data-testid="constellation-anon-e8"]')!;
+    // 父 g 含 title 子元素（anonSoldEdition.sale_date = null → "no date"）
+    const parent = anon.parentElement!;
+    const title = parent.querySelector('title');
+    expect(title).not.toBeNull();
+    expect(title!.textContent).toMatch(/anonymous|匿名/i);
+    expect(title!.textContent).toMatch(/no date|无日期/i);
   });
 
   it('museum / gallery 节点不渲染 inner stroke ring', () => {
@@ -980,12 +1083,12 @@ describe('DiasporaView', () => {
   });
 
   it('label 走 radial anchor：右半圆 textAnchor=start，左半圆 textAnchor=end', () => {
-    // v1.6.x: angle 由 sorted-time index 均匀分 360°，不再 t·2π。
-    // 4 个 dated entity（按时间升序）对应 angle 序列：
-    //   i=0 → -π/2 (顶部, dx=0 → right)
-    //   i=1 → -π/2 + 0.25·2π = 0 (3 点钟, dx>0 → right)
-    //   i=2 → -π/2 + 0.5·2π = π/2 (6 点钟, dx=0 → right)
-    //   i=3 → -π/2 + 0.75·2π = π (9 点钟, dx<0 → left) ←—— 要这个
+    // v1.6.x 第二轮：phyllotaxis 黄金角分布（≈137.5°/段）。
+    // 4 个 dated entity（按时间升序）的 angle 序列：
+    //   i=0 → -π/2          (cos≈0,    dx=0 → right)
+    //   i=1 → -π/2 + 2.40   (cos≈0.67, dx>0 → right)
+    //   i=2 → -π/2 + 4.80   (cos≈-1.0, dx<0 → left)  ←—— 期望 'end'
+    //   i=3 → -π/2 + 7.20   (cos≈0.80, dx>0 → right) ←—— 期望 'start'
     const locs: VizLocation[] = [
       { id: 'loc-a', name: 'A', type: 'gallery', city: null, country: 'China' },
       { id: 'loc-b', name: 'B', type: 'gallery', city: null, country: 'China' },
@@ -1007,16 +1110,16 @@ describe('DiasporaView', () => {
       created_at: '2020-01-01T00:00:00Z',
     }));
     const { container } = renderDiaspora({ editions: eds, locations: locs });
-    // loc-d 是 sorted index 3 → angle = π → 9 点钟方向（左半 dx<0）
-    const groupD = container.querySelector('g[data-node="loc-d"]')!;
-    const texts = groupD.querySelectorAll('text');
-    expect(texts.length).toBeGreaterThanOrEqual(1);
-    expect(texts[0].getAttribute('text-anchor')).toBe('end');
+    // loc-c 是 sorted index 2 → cos≈-1 → 左半 dx<0
+    const groupC = container.querySelector('g[data-node="loc-c"]')!;
+    const textsC = groupC.querySelectorAll('text');
+    expect(textsC.length).toBeGreaterThanOrEqual(1);
+    expect(textsC[0].getAttribute('text-anchor')).toBe('end');
 
-    // loc-b 是 sorted index 1 → angle = 0 → 3 点钟方向（右半 dx>0）
-    const groupB = container.querySelector('g[data-node="loc-b"]')!;
-    const textsB = groupB.querySelectorAll('text');
-    expect(textsB[0].getAttribute('text-anchor')).toBe('start');
+    // loc-d 是 sorted index 3 → cos>0 → 右半 dx>0
+    const groupD = container.querySelector('g[data-node="loc-d"]')!;
+    const textsD = groupD.querySelectorAll('text');
+    expect(textsD[0].getAttribute('text-anchor')).toBe('start');
   });
 
   it('dated entity 数量 = entities with firstSaleDate != null（其余推到 R_GHOST 不影响 count）', () => {

@@ -1,4 +1,5 @@
 import type {
+  VizArtwork,
   VizEdition,
   VizLocation,
   VizHistory,
@@ -375,27 +376,62 @@ function isoToMs(iso: string): number {
   return new Date(iso).getTime();
 }
 
+/** 黄金角（rad）：phyllotaxis 分布关键常数，~2.3999 rad（137.5°） */
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+
+/** 碰撞推开：每次迭代把后落点的 entity 推开的角度增量（rad） */
+const COLLISION_REPEL_STEP = 0.06;
+
+/** 碰撞推开：最多迭代次数（足够大避免漂移，但有限避免病态死循环） */
+const COLLISION_REPEL_MAX_ITERS = 8;
+
+/** 碰撞检测时两节点视觉半径之外的 padding（px），留出视觉呼吸距离 */
+const COLLISION_PAD = 4;
+
+/** 取 entity 节点视觉半径（与 view 渲染保持一致；anonymous 走升级后的 3.5） */
+function visualRadiusOf(
+  ref:
+    | { kind: 'location'; node: LocationConstellationNode }
+    | { kind: 'named'; node: NamedPrivateNode }
+    | { kind: 'anonymous'; item: AnonymousItem }
+): number {
+  if (ref.kind === 'location') {
+    return getNodeVisual('location', ref.node.type, ref.node.editionCount).r;
+  }
+  if (ref.kind === 'named') {
+    return getNodeVisual('named_private', null, ref.node.editionCount).r;
+  }
+  return getNodeVisual('anonymous', null, 1).r;
+}
+
 /**
  * Time-spiral 布局。
  *
- * 算法（v1.6.x 重写：anonymous 也进 spiral；解决时间密集区重叠 bug）：
+ * 算法（v1.6.x 第二轮重写：phyllotaxis + 碰撞推开，解决时间相邻 entity 在
+ * sorted-index 上也相邻造成的 r/angle 双重接近重叠）：
  *
- * 1. 收集 dated points: locations + namedPrivate + anonymous.items
- *    where sale_date != null。collected as 单一 `dated[]` 数组。
- *    收集 undated points: 同 3 类，sale_date == null 的部分。
+ * 1. 三类 ref 合并：locations / namedPrivate / anonymous.items
+ *    按 sale_date 是否非空分 `dated[]` / `undated[]`。
  *
- * 2. dated 非空时：earliestMs = min(ms), latestMs = max(ms), spanMs = latest - earliest
+ * 2. dated 按 ms 升序排。**r 由真实时间** 决定 —— A 方向语义不变：
+ *    earliest → R_INNER，latest → R_OUTER_DATA。
  *
- * 3. 关键修复（避免时间密集区重叠）：
- *    - r 仍 by **真实时间**：t = (ms - earliestMs) / spanMs，r = R_INNER + t·(R_OUTER_DATA - R_INNER)
- *      （A 方向语义不变：earliest 老 → 近 center，latest 新 → 外圈）
- *    - angle 改 by **sorted-by-time index** 均匀 360°：先按 ms 升序排，第 i 个 point
- *      angle = -π/2 + (i / N) · 2π
- *    - 时间密集区（同年成交多 entity）r 接近、angle 分散 → 不再重叠
+ * 3. **angle 由 phyllotaxis 黄金角分配**（核心修复）：
+ *    第 i 个 dated point `angle = -π/2 + i × GOLDEN_ANGLE`（mod 2π 由
+ *    cos/sin 自然处理）。GOLDEN_ANGLE ≈ 2.3999 rad ≈ 137.5°，与 2π 不可
+ *    通约 → 任意 N 下相邻 index 在角度上散得最开（向日葵种子密堆原理）。
+ *    时间相邻的两 entity 不再在 angle 上也相邻。
  *
- * 4. dated 只 1 个或全 same date → span=0，r 取中点、angle=-π/2（12 点钟）
+ * 4. **碰撞推开**：phyllotaxis 已显著减少重叠，但 R_INNER 附近圆周短、
+ *    r 又接近 → 仍可能 chord 不足。最多 8 轮迭代：对每对 (i, j)（j>i，
+ *    时间更晚）若 chord 距离 < r_i + r_j + COLLISION_PAD，把 j 的 angle
+ *    递增 COLLISION_REPEL_STEP rad（j 始终推走，i 锚定时间）。
+ *    deterministic：固定迭代顺序 + 固定步长 → 相同输入相同输出。
  *
- * 5. undated 全 r = R_GHOST，按 -π/2 起均匀分布 360°
+ * 5. dated 只 1 个或全 same date → span=0，r 取径向中点、angle=-π/2
+ *    （12 点钟，保留 v1.6.x 第一轮契约）。
+ *
+ * 6. undated 全 r = R_GHOST，沿 -π/2 起均匀分布 360°（同 v1.6.x 第一轮）。
  *
  * anonymous 不再单独占外圈（ANONYMOUS_R 仍导出但 layout 不用）。
  */
@@ -443,36 +479,15 @@ export function layoutConstellation(
     }
   }
 
-  // dated 按时间升序排（earliest 在前）—— 同时决定 r（时间）与 angle（index）
+  // dated 按时间升序排（earliest 在前）—— 决定 r 与 phyllotaxis index
   dated.sort((a, b) => a.ms - b.ms);
 
-  const locationPoints: ConstellationLocationPoint[] = [];
-  const namedPoints: ConstellationNamedPoint[] = [];
-  const anonymousPoints: ConstellationAnonymousPoint[] = [];
+  // ─── 2/3/5. 计算每个 dated entity 的 (r, angle) ─────────────────────────
+  // 用平行数组保存几何中间结果，碰撞推开阶段就地改 angle。
+  const datedR: number[] = new Array(dated.length);
+  const datedAngle: number[] = new Array(dated.length);
+  const datedRadius: number[] = new Array(dated.length); // 视觉半径，碰撞用
 
-  /** 把一个 DatedRef 落到 (r, angle) 上，分流到对应的 points 数组 */
-  function placeDated(ref: DatedRef, r: number, angle: number, isUndated: boolean) {
-    const x = cx + r * Math.cos(angle);
-    const y = cy + r * Math.sin(angle);
-    if (ref.kind === 'location') {
-      locationPoints.push({ node: ref.node, x, y, angle, r, isUndated });
-    } else if (ref.kind === 'named') {
-      namedPoints.push({ node: ref.node, x, y, angle, r, isUndated });
-    } else {
-      anonymousPoints.push({
-        editionId: ref.item.editionId,
-        artworkId: ref.item.artworkId,
-        x,
-        y,
-        angle,
-        r,
-        isUndated,
-        sale_date: ref.item.sale_date,
-      });
-    }
-  }
-
-  // ─── 2/3/4. dated 时间→r + sorted-index→angle 映射 ─────────────────────
   if (dated.length > 0) {
     const earliestMs = dated[0].ms;
     const latestMs = dated[dated.length - 1].ms;
@@ -481,25 +496,80 @@ export function layoutConstellation(
 
     if (spanMs === 0) {
       // edge case：dated 只 1 个 / 全 same date —— 落径向中点 + 12 点钟方向
+      // （契约保留：保留 v1.6.x 第一轮的测试断言）
       const r = R_INNER + (R_OUTER_DATA - R_INNER) / 2;
       const angle = -Math.PI / 2;
-      for (const ref of dated) {
-        placeDated(ref, r, angle, false);
+      for (let i = 0; i < N; i++) {
+        datedR[i] = r;
+        datedAngle[i] = angle;
+        datedRadius[i] = visualRadiusOf(dated[i]);
       }
     } else {
-      // r 由真实时间 t 决定（保留 A 方向语义）；angle 由 sorted index 均匀分 360°
-      // → 时间密集区 r 接近但 angle 分散，避免节点重叠
+      // r 由真实时间 t 决定；angle 用 phyllotaxis 黄金角 step
       for (let i = 0; i < N; i++) {
         const ref = dated[i];
         const t = (ref.ms - earliestMs) / spanMs;
-        const r = R_INNER + t * (R_OUTER_DATA - R_INNER);
-        const angle = -Math.PI / 2 + (i / N) * 2 * Math.PI;
-        placeDated(ref, r, angle, false);
+        datedR[i] = R_INNER + t * (R_OUTER_DATA - R_INNER);
+        datedAngle[i] = -Math.PI / 2 + i * GOLDEN_ANGLE;
+        datedRadius[i] = visualRadiusOf(ref);
+      }
+
+      // ─── 4. 碰撞推开（迭代）─────────────────────────────────────────
+      // chord = 2·R·sin((|θ_i − θ_j|)/2) 在不同 R 时不严格，但实际节点对
+      // r 接近时 (R 几乎相同) 已足够；我们直接用笛卡尔距离判断更可靠。
+      for (let iter = 0; iter < COLLISION_REPEL_MAX_ITERS; iter++) {
+        let movedAny = false;
+        for (let i = 0; i < N; i++) {
+          const xi = datedR[i] * Math.cos(datedAngle[i]);
+          const yi = datedR[i] * Math.sin(datedAngle[i]);
+          for (let j = i + 1; j < N; j++) {
+            const xj = datedR[j] * Math.cos(datedAngle[j]);
+            const yj = datedR[j] * Math.sin(datedAngle[j]);
+            const dx = xj - xi;
+            const dy = yj - yi;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const needed = datedRadius[i] + datedRadius[j] + COLLISION_PAD;
+            if (dist < needed) {
+              // 推开 j（时间更晚，时间锚 i）
+              datedAngle[j] += COLLISION_REPEL_STEP;
+              movedAny = true;
+            }
+          }
+        }
+        if (!movedAny) break;
       }
     }
   }
 
-  // ─── 5. undated 全 r = R_GHOST，均匀分布 360° ───────────────────────────
+  // ─── 6. undated 全 r = R_GHOST，均匀分布 360° ───────────────────────────
+  const locationPoints: ConstellationLocationPoint[] = [];
+  const namedPoints: ConstellationNamedPoint[] = [];
+  const anonymousPoints: ConstellationAnonymousPoint[] = [];
+
+  for (let i = 0; i < dated.length; i++) {
+    const ref = dated[i];
+    const r = datedR[i];
+    const angle = datedAngle[i];
+    const x = cx + r * Math.cos(angle);
+    const y = cy + r * Math.sin(angle);
+    if (ref.kind === 'location') {
+      locationPoints.push({ node: ref.node, x, y, angle, r, isUndated: false });
+    } else if (ref.kind === 'named') {
+      namedPoints.push({ node: ref.node, x, y, angle, r, isUndated: false });
+    } else {
+      anonymousPoints.push({
+        editionId: ref.item.editionId,
+        artworkId: ref.item.artworkId,
+        x,
+        y,
+        angle,
+        r,
+        isUndated: false,
+        sale_date: ref.item.sale_date,
+      });
+    }
+  }
+
   const undatedN = undated.length;
   for (let i = 0; i < undatedN; i++) {
     const ref = undated[i];
@@ -589,7 +659,9 @@ export function getNodeVisual(
   editionCount: number
 ): NodeVisual {
   if (kind === 'anonymous') {
-    return { r: 1.5, style: 'dust', opacity: 0.3, innerRingR: null };
+    // v1.6.x 第二轮：r 1.5→3.5, opacity 0.3→0.55
+    // 视觉词汇升级 —— 灰实心几何小圆，"看得见但无名"。
+    return { r: 3.5, style: 'dust', opacity: 0.55, innerRingR: null };
   }
   const specKey = kind === 'location' && type ? `location:${type}` : kind;
   const spec = NODE_VISUAL_SPEC[specKey] ?? NODE_VISUAL_FALLBACK;
@@ -606,17 +678,21 @@ export function getNodeVisual(
 // ─── v1.6.x Organic blob shape ─────────────────────────────────────────────
 //
 // 每个 location / named_private 节点不再用规则 `<circle>`，而是按 entity id
-// (seed) 生成 12 段 quadratic-bezier 平滑闭合的有机轮廓。视觉用意：跟 Strata
+// (seed) 生成 quadratic-bezier 平滑闭合的有机轮廓。视觉用意：跟 Strata
 // 严格 geometric 方块、Markets 抽象 dot 形成对照 —— Diaspora 节点表达"具象的
 // 个体性"，每个机构/人是独一无二的轮廓。
 //
 // 不引入 lib / 动画 / morph：~30 行 deterministic hash 函数 + path 替换。
-// anonymous dust 仍是 `<circle r=1.5>`（太小 organic 看不出来，徒增 noise）。
+// anonymous dust 仍是 `<circle>`（太小 organic 看不出来，徒增 noise）。
+//
+// v1.6.x 第二轮：扰动 ±15→±25%, 段 12→8 —— 让 r=7-14 节点形状肉眼可见。
+// 旧 12 段 + ±15% 在小节点 (named_private r≈7-9) 上扰动只 1-2px，视觉上仍是
+// 规则圆。新的 8 段 + ±25% 在同尺寸下扰动达 1.75-3.5px，blob 形态清晰。
 
 /**
  * 生成 deterministic organic blob SVG path。
  *
- * 字符 hash → 每个控制点径向扰动 [-15%, +15%] → 12 段 quadratic bezier 闭合。
+ * 字符 hash → 每个控制点径向扰动 [-25%, +25%] → 8 段 quadratic bezier 闭合。
  * 同 seed + 同 (cx, cy, baseR) → 同字符串（render 间稳定，便于 React diff）。
  */
 export function generateOrganicPath(
@@ -625,19 +701,19 @@ export function generateOrganicPath(
   baseR: number,
   seed: string
 ): string {
-  const segments = 12;
+  const segments = 8;
 
-  /** 字符 hash → [-0.15, +0.15] 范围扰动比例 */
+  /** 字符 hash → [-0.25, +0.25] 范围扰动比例 */
   const hashOffset = (i: number): number => {
     const s = `${seed}:${i}`;
     let h = 0;
     for (let c = 0; c < s.length; c++) {
       h = ((h * 31) + s.charCodeAt(c)) | 0;
     }
-    return ((Math.abs(h) % 1000) / 1000 - 0.5) * 0.3; // -0.15..+0.15
+    return ((Math.abs(h) % 1000) / 1000 - 0.5) * 0.5; // -0.25..+0.25
   };
 
-  // 12 个径向扰动后的控制点
+  // segments 个径向扰动后的控制点（v1.6.x 第二轮：8 段，让小节点 blob 可见）
   const points: Array<{ x: number; y: number }> = [];
   for (let i = 0; i < segments; i++) {
     const angle = (i / segments) * 2 * Math.PI;
@@ -968,6 +1044,11 @@ export interface GhostNodes {
   positions: GhostNodePosition[];
 }
 
+/**
+ * @deprecated v1.6.x 第二轮起 ghost 改成 per-edition 可点击 inbox
+ * （见 `buildGhostEditions` / `layoutGhostRing`），不再走匿名 ring。
+ * 保留导出仅向后兼容；新代码不要用。
+ */
 export function getGhostNodes(
   editions: VizEdition[],
   // locations 暂未使用，但保留入参形状以匹配 buildNodes / computeTrackedStat，
@@ -998,4 +1079,138 @@ export function getGhostNodes(
     });
   }
   return { count, positions };
+}
+
+// ─── v1.6.x 第二轮: Ghost editions inbox ─────────────────────────────────
+//
+// 系统化"待补全档案"机制：edition 没 location 且没有出库（non-outflow）—— 这
+// 是 archive 里**等待补 location 元数据**的项。视觉上画在 R=245 外圈，**空心**
+// 几何小圆 r=4 opacity=0.55，**可点击**直接跳到 `/editions/:id` 让用户去补
+// location。三档信息密度的最外层，呼应 brutalist "缺失态画出来不藏" 的设计原则。
+//
+// 与匿名 dust（灰实心，看得见但无名）形成对照 ——
+//   - anonymous outflow = 已离开 + 无买家信息（hover 看 sale_date，**不可点击**）
+//   - ghost edition     = 未离开 + 无 location（**可点击**去补全）
+//
+// 旧 `getGhostNodes` 已 @deprecated；新代码走这套。
+
+/**
+ * 待补全档案的最小元数据，足够 view 渲染 + 跳转 + tooltip。
+ */
+export interface GhostEdition {
+  editionId: string;
+  artworkId: string;
+  /** artwork.title_en || title_cn || null */
+  title: string | null;
+  /** edition.inventory_number 或 null */
+  inventoryNumber: string | null;
+  /** edition.status 字面值（不归一化） */
+  status: string;
+}
+
+/** Ghost editions 排序时各 status 的优先级（小 = 先） —— 越紧迫的越靠前 */
+const GHOST_STATUS_PRIORITY: Record<string, number> = {
+  in_production: 0,
+  in_studio: 1,
+  in_transit: 2,
+  at_gallery: 3,
+  at_museum: 4,
+};
+
+/**
+ * 收集 "non-outflow + 无 location" 的 edition，组装成可渲染 / 可跳转的列表。
+ *
+ * - 过滤：`location_id == null && status !== 'sold' && status !== 'gifted'`
+ * - 排序：按 status 优先级（in_production → in_studio → in_transit →
+ *   at_gallery → at_museum → 其他），组内按 `created_at` desc（晚创建在前
+ *   —— 最新被忽视的更优先补全）
+ * - artwork 不存在时 title=null，但 GhostEdition 仍出现 —— 缺失态不藏
+ *
+ * 测试：见 diasporaUtils.test.ts `buildGhostEditions`。
+ */
+export function buildGhostEditions(
+  editions: VizEdition[],
+  artworks: VizArtwork[]
+): GhostEdition[] {
+  // artworkId → artwork 映射（title 查表用）
+  const artworkById = new Map<string, VizArtwork>();
+  for (const a of artworks) artworkById.set(a.id, a);
+
+  const ghosts: GhostEdition[] = [];
+  for (const e of editions) {
+    if (e.location_id) continue;
+    if (e.status === 'sold' || e.status === 'gifted') continue;
+    const aw = artworkById.get(e.artwork_id) ?? null;
+    const title = aw ? aw.title_en || aw.title_cn || null : null;
+    ghosts.push({
+      editionId: e.id,
+      artworkId: e.artwork_id,
+      title: title && title.length > 0 ? title : null,
+      inventoryNumber: e.inventory_number ?? null,
+      status: e.status,
+    });
+  }
+
+  // 按 status 优先级升序，相同 status 按 created_at desc（晚创建在前）
+  ghosts.sort((a, b) => {
+    const pa = GHOST_STATUS_PRIORITY[a.status] ?? 99;
+    const pb = GHOST_STATUS_PRIORITY[b.status] ?? 99;
+    if (pa !== pb) return pa - pb;
+    // 组内：晚 created_at 先（用原 editions 数组取 created_at）
+    const ea = editions.find((e) => e.id === a.editionId);
+    const eb = editions.find((e) => e.id === b.editionId);
+    const ta = ea?.created_at ?? '';
+    const tb = eb?.created_at ?? '';
+    if (ta === tb) return 0;
+    return ta < tb ? 1 : -1; // desc
+  });
+
+  return ghosts;
+}
+
+export interface GhostRingPoint {
+  ghost: GhostEdition;
+  x: number;
+  y: number;
+  angle: number;
+}
+
+export interface GhostRingLayoutOptions {
+  width: number;
+  height: number;
+  /** 默认 245 —— Diaspora SVG 内部约定（R_GHOST=220 之外再外圈） */
+  radius?: number;
+}
+
+/**
+ * Ghost editions 沿外圈均匀分布。
+ *
+ * - 中心 = (width/2, height/2)
+ * - 默认半径 245（在 R_GHOST=220 与 viewBox 边之间）
+ * - 起点 12 点钟（-π/2），均匀分布 360°
+ * - N=0 → 空数组（view 据此不渲染）
+ *
+ * 与 `getGhostNodes` 的关键差异：每点带 ghost meta（用于 click 跳转 / tooltip）。
+ */
+export function layoutGhostRing(
+  ghosts: GhostEdition[],
+  options: GhostRingLayoutOptions
+): GhostRingPoint[] {
+  const N = ghosts.length;
+  if (N === 0) return [];
+  const cx = options.width / 2;
+  const cy = options.height / 2;
+  const radius = options.radius ?? 245;
+
+  const points: GhostRingPoint[] = [];
+  for (let i = 0; i < N; i++) {
+    const angle = -Math.PI / 2 + (2 * Math.PI * i) / N;
+    points.push({
+      ghost: ghosts[i],
+      x: cx + radius * Math.cos(angle),
+      y: cy + radius * Math.sin(angle),
+      angle,
+    });
+  }
+  return points;
 }
