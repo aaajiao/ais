@@ -262,24 +262,41 @@ export default function DiasporaView({
       </div>
 
       {/* ─── Legend ──────────────────────────────────────────────────── */}
+      {/*
+        三档视觉词汇在 Legend 上必须 visible 区分：
+        - type chips（entity）→ inline SVG organic blob（跟主图 location 节点同源
+          generateOrganicPath，每 type 用自己字面值做 seed → 稳定不同形状）
+        - anonymous → 灰实心几何小圆（rounded-full + opacity 0.55）
+        - untracked → 空心几何小圆（border-only）
+        opacity 与主图 NODE_VISUAL_SPEC 对齐，让 chip 直接读图。
+      */}
       <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs">
         <span className="text-muted-foreground uppercase tracking-wider">
           type
         </span>
         {(
           [
-            ['studio', 1.0],
+            ['studio', 0.85],
             ['gallery', 0.7],
-            ['museum', 0.7],
-            ['private_collection', 0.7],
-            ['other', 0.4],
+            ['museum', 1.0],
+            ['private_collection', 0.85],
+            ['other', 0.6],
           ] as Array<[LocationNode['type'], number]>
         ).map(([type, opacity]) => (
           <span key={type} className="flex items-center gap-1.5">
-            <span
-              className="inline-block w-3 h-3 rounded-full bg-foreground"
-              style={{ opacity }}
-            />
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 12 12"
+              aria-hidden="true"
+              className="text-foreground"
+            >
+              <path
+                d={generateOrganicPath(6, 6, 5, type)}
+                fill="currentColor"
+                opacity={opacity}
+              />
+            </svg>
             <span className="text-muted-foreground">
               {t(`diaspora.legend.${type}`)}
             </span>

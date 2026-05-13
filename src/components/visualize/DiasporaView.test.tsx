@@ -853,7 +853,8 @@ describe('DiasporaView', () => {
       editions: oneLoc,
       locations: [galleryLocation],
     });
-    const svg = container.querySelector('svg')!;
+    // 主图 svg 用 role="img" 明确选中（Legend 里有多个 inline SVG chips）
+    const svg = container.querySelector('svg[role="img"]')!;
     const allLines = svg.querySelectorAll('line');
     // 至少 1 条（gallery edge）
     expect(allLines.length).toBeGreaterThanOrEqual(1);
