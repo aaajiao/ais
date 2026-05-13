@@ -277,9 +277,6 @@ export default function DiasporaView({
         opacity 与主图 NODE_VISUAL_SPEC 对齐，让 chip 直接读图。
       */}
       <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs">
-        <span className="text-muted-foreground uppercase tracking-wider">
-          type
-        </span>
         {(
           [
             ['studio', 0.85],
