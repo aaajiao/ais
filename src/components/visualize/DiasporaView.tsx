@@ -256,6 +256,21 @@ export default function DiasporaView({
             </span>
           </span>
         ))}
+        <span aria-hidden="true" className="opacity-30 px-1">
+          │
+        </span>
+        <span
+          key="ghost"
+          className="flex items-center gap-1.5"
+          data-testid="diaspora-legend-ghost"
+        >
+          <span
+            className="inline-block w-3 h-3 rounded-full border-[1.5px] border-foreground opacity-60"
+          />
+          <span className="text-muted-foreground">
+            {t('diaspora.legend.ghost')}
+          </span>
+        </span>
       </div>
 
       {/* ─── SVG 同心环关系图 ────────────────────────────────────────── */}

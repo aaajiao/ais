@@ -566,6 +566,12 @@ describe('DiasporaView', () => {
     expect(ring).toBeNull();
   });
 
+  // ─── M2.5 图例 ────────────────────────────────────────────────────────────
+  it('图例包含 ghost 项（diaspora-legend-ghost testid）', () => {
+    renderDiaspora();
+    expect(screen.getByTestId('diaspora-legend-ghost')).toBeInTheDocument();
+  });
+
   it('pin 卡片按钮 onClick 调用 stopPropagation（spy 验证）', () => {
     renderDiaspora();
 

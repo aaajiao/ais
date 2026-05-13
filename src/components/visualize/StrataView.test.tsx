@@ -466,4 +466,26 @@ describe('StrataView', () => {
     const col = svg.querySelector('[data-testid="strata-unknown-year-col"]');
     expect(col).toBeNull();
   });
+
+  // ─── M2 bug fix: pointer-events on stroke-only blocks ───────────────────
+  it('stroke-only 方块带 pointerEvents=all（让 click 可点中空心内部，不只 stroke）', () => {
+    const editions = [makeStrataEdition('e1', 'aw-1', 'in_studio')];
+    renderStrata({ editions });
+    const svg = screen.getByRole('img', { name: /Strata/i });
+    const block = svg.querySelector(
+      'g[role="button"][data-ownership="held"]'
+    )!;
+    const rect = block.querySelector('rect')!;
+    expect(rect.getAttribute('fill')).toBe('none');
+    expect(rect.getAttribute('pointer-events')).toBe('all');
+  });
+
+  // ─── M2.5 图例 ────────────────────────────────────────────────────────────
+  it('图例渲染 5 个 ownership glyph（held/external/departed/degenerate/unknownYear）', () => {
+    renderStrata();
+    expect(screen.getByTestId('visualize-legend')).toBeInTheDocument();
+    for (const key of ['held', 'external', 'departed', 'degenerate', 'unknownYear']) {
+      expect(screen.getByTestId(`legend-glyph-${key}`)).toBeInTheDocument();
+    }
+  });
 });

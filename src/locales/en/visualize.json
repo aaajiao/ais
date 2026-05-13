@@ -37,6 +37,13 @@
     "summary": {
       "overview": "{{artworks}} artworks · {{types}} types · {{yearSpan}}"
     },
+    "legend": {
+      "held": "in studio",
+      "external": "external (gallery / museum / in transit)",
+      "departed": "sold / gifted",
+      "degenerate": "lost / damaged",
+      "unknownYear": "no year"
+    },
     "gapNote": "Record time ≠ creation time. 85 of 87 history rows were written in a few weeks of 2026."
   },
   "markets": {
@@ -60,7 +67,11 @@
     "currenciesAvailable": "{{count}} currencies",
     "currencyLabel": "Currency: {{currency}}",
     "dotLabel": "{{inv}} · {{title}} · {{price}}",
-    "noPriceLane": "no price recorded"
+    "noPriceLane": "no price recorded",
+    "legend": {
+      "priced": "with price (filled)",
+      "noPrice": "no price (outline)"
+    }
   },
   "terminal": {
     "heading": "Terminal — Archive Output",
@@ -100,7 +111,8 @@
       "studio": "Studio",
       "gallery": "Gallery",
       "museum": "Museum",
-      "other": "Other"
+      "other": "Other",
+      "ghost": "no location (ghost)"
     },
     "tooltip": {
       "editions": "{{count}} editions here",

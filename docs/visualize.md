@@ -20,8 +20,9 @@
 5. **跟随主题**：所有 SVG 颜色用 `fill-foreground` / `fill-muted-foreground` / `fill-border`，明暗模式自动适配。所有 view 都用单色 + 透明度做区分（绝不用彩色）。**Strata 不再用透明度区分 type**——type 身份由 swimlane 行位置承担，方块全部用统一 `fill-foreground` 0.65。
 6. **信息条不引导、展示总览**（v1.5.x 起）：底部 info bar 的 idle 态 **不**写"点击查看详情"/"悬停看节点"这类引导文字——元素本身可点击就是可点击，`cursor: pointer` + hover 高亮已经表达。idle 态改成展示该 view 的**当前总览数据**（如 Strata 的 `N 件作品 · N 种类型 · 年份跨度`、Markets 的 `N 笔交易 · N 种货币`、Diaspora 的 `N 处位置 · N 条流转`），同时填满 idle 态空间。可点击之外的非显然操作（如 Diaspora 的 pin / unpin）用 **Lucide icon** 表达，不写出来——见 Diaspora 决策。这条原则不要回退，回退会让 viz 重新被 nudge 文字稀释。
 7. **时间作为播头（M1, v1.6.x 起）**：Strata 用 `artworks.year` 播艺术创作时间，Markets 用 `editions.sale_date` 播交易发生时间——让 archive 的 *becoming* 视觉化。**Diaspora 不播**：`edition_history.created_at` 是**录入时间**而非事件发生时间（85/87 条 history 集中在 2026 几周内是铁证），按它播会变成"2026 前一片死寂、几周内全炸"的伪叙事，扭曲艺术家真实流散史。播头默认 `t=max` 等于现在，初始载入跟改造前像素级一致——这是不破坏现有快照测试的必要条件。**超出 cutoff 的元素 `dim opacity 0.15` 不 hide**——保留"未来的鬼影"，让 archive 的边界本身可见（呼应原则 4「缺失数据不藏」的扩展：未来即"尚未发生的缺失"）。共享 `Timeline` 组件实现，见下方。
-8. **状态编码用 stroke / pattern / X，不用色彩（M2, v1.6.x 起）**：viz 单色铁律不变，但增加了 4 个视觉轴讲"作品跟艺术家关系"的故事：`fill="none" + stroke-foreground`（**held** — 在艺术家手里：in_studio / in_production）/ `fill={url(#pattern-dots)}`（**external** — 在外但艺术家仍持有：at_gallery / at_museum / in_transit）/ `solid fill-foreground`（**departed** — 已离开艺术家：sold / gifted）/ 独立 `<g>` X 叠加（**degenerate** — lost / damaged，在任一桶之上叠加，`pointer-events-none` 不阻挡点击）。聚合规则：per-artwork 按"最外溢优先级" held → external → departed，独立 X 由任一 degenerate edition 触发。判断走 `OWNERSHIP_STATUS_MAP: Record<EditionStatus, ...>`，TS 强制覆盖（新增 status enum 会编译失败，不会沉默漏分桶）。**绝对不要回退到色彩区分 status**——色彩破坏 brutalist 调性，且 9 个 status 用色无解。
+8. **状态编码用 stroke / pattern / X，不用色彩（M2, v1.6.x 起）**：viz 单色铁律不变，但增加了 4 个视觉轴讲"作品跟艺术家关系"的故事：`fill="none" + stroke-foreground`（**held** — 在艺术家手里：in_studio / in_production）/ `fill={url(#pattern-dots)}`（**external** — 在外但艺术家仍持有：at_gallery / at_museum / in_transit）/ `solid fill-foreground`（**departed** — 已离开艺术家：sold / gifted）/ 独立 `<g>` X 叠加（**degenerate** — lost / damaged，在任一桶之上叠加，`pointer-events-none` 不阻挡点击）。聚合规则：per-artwork 按"最外溢优先级" held → external → departed，独立 X 由任一 degenerate edition 触发。判断走 `OWNERSHIP_STATUS_MAP: Record<EditionStatus, ...>`，TS 强制覆盖（新增 status enum 会编译失败，不会沉默漏分桶）。**绝对不要回退到色彩区分 status**——色彩破坏 brutalist 调性，且 9 个 status 用色无解。**`fill="none"` 元素必须显式 `pointerEvents="all"`**——SVG 默认 `visiblePainted` 让空心 rect/circle 只在 stroke 响应 click，用户体验是"必须精准点到边框"。Strata held / unknown-year block 和 Markets noPrice 圆点都受影响；修复加 `pointerEvents="all"` 让 geometric bounding box 全响应，守护测试 `StrataView.test.tsx`/`MarketsView.test.tsx` 各一条 assertion。
 9. **缺失态画出来，不 silent drop（M2 强化原则 4）**：以前 viz 工具把"无法解析"的数据 silent filter（year 不可解析 / sold 无价 / 无 location_id 的 edition），现在改成画**专属的 stroke-only 区域**承载它们——Strata 最右"unknown year" 列、Markets 底部"no price" lane、Diaspora 最外圈 ghost 环。这些区域的形状都是 stroke-only outline（`fill="none"`），跟 ownership held 视觉同义但语义不同（held=数据完整但还在手里；缺失=数据维度不存在）。**缺失态优先级 > ownership 桶**——unknown-year 列里即使 ownership=departed 也强制 stroke-only，因为这件作品"没法被放在时间地图上"是更基础的事实。时间播头不过滤这些区域（缺失=时间维度不存在）。
+10. **图例跟视觉编码同步（M2.5, v1.6.x 起）**：viz 加了任何新视觉编码轴（pattern / stroke / X / ghost ring 等），必须同步往该 view 的 Legend 里加 glyph + i18n 文案。glyph 必须是真实元素的精确视觉复刻（同 fill / stroke / pattern），不用 emoji 或 Lucide icon——legend 跟数据说同一种语言。Strata 和 Markets 的 Legend 放在 SVG 下方、info bar 上方；Diaspora 的 Legend 保留 M2.5 之前的位置（stat bar 之后、SVG 之前）。i18n key 走各 view 自己段 `*.legend.*`，**绝不跨 view 借**——CLAUDE.md ticking bomb pitfall。如果未来某 view 又加新 ownership 桶或新缺失态，**忘了加 Legend 就等于 viz 上又出现一种"不知道是啥"的形状**，这种债比代码债更难还。
 
 ---
 
@@ -59,28 +60,52 @@ const [artworksRes, editionsRes, locationsRes, historyRes] = await Promise.all([
 
 ## 共享组件
 
-### Timeline（时间播头，M1 起）
+### Time scrubber 架构（M1 + M1.5）
 
-`src/components/visualize/Timeline.tsx` —— Strata / Markets 共享的播头组件，泛型 `<T>` 让两端各自传 year (`number`) 或 ISO date (`string`)。
+播头**逻辑共享、视觉各自**——以前 `Timeline.tsx` 是一个通用 widget 浮在 chart 上方（M1），M1.5 重做成"hook + view-specific ribbon" 让 scrubber 变成 chart 自己的一部分。
+
+**`src/components/visualize/useTimelineScrubber.ts`** —— 纯逻辑 hook，单一职责：
 
 ```ts
-interface TimelineProps<T> {
-  values: T[];            // 离散数据点（year 列 / sale_date 列），严禁连续插值
-  current: T;
-  onChange: (next: T) => void;
-  format: (t: T) => string;
-  playing?: boolean;
-  onPlayToggle?: () => void;
-  onPlayComplete?: () => void;
-  durationMs?: number;    // 默认 6000
+interface UseTimelineScrubberResult<T> {
+  isPlaying: boolean;
+  togglePlay: () => void;
+  currentIdx: number;
+  setIdx: (idx: number) => void;
+  enabled: boolean;  // false when values.length <= 1
 }
 ```
 
-- **`<input type="range">` step 走 index**（不是连续数值）：滑块只能停在真实数据点（year / sale_date），不存在"插值中间帧"。键盘 / 触屏 / screen reader 全免费——native a11y。**不要**改成自定义 div 拖拽。
-- **`requestAnimationFrame` play，不用 `setInterval`**：6 秒匀速从 min 到 max。tab 切走时浏览器自动暂停 rAF（防后台耗电）；`setInterval` 没这个语义。
-- **`values.length <= 1` 返回 null**：单点数据（仅一个 year / 一天）播头无意义，整个 scrubber 隐藏。守护测试 `Timeline.test.tsx` + 各 View 的"单一年份不渲染 Timeline"。
-- **play 中不写 URL**：避免 history 污染——拖拽时 React state 是 source of truth，stop / toggle / complete 才把最后一帧落 URL state。`setSearchParams(next, { replace: true })` 不增 history entry。
-- **i18n 走 `visualize.timeline.*` 共享段**：Timeline 是真共享组件，跟 CLAUDE.md "跨 view 借文案" pitfall 不冲突——pitfall 针对的是把 view A 的语义文案塞进 view B，而 Timeline 是平级共享 widget。新增 keys：`play` / `pause` / `reset` / `current` / `rangeLabel` / `ariaSlider` / `dimmedHint`。
+包含 rAF play (6s)、index 推进、cancel-on-unmount、`enabled = values.length > 1` 单点隐藏判断。**不接 URL/view state**——URL `?t=` 解析与写入留在各 view 的 useSearchParams 自管。
+
+**`StrataTimelineRibbon.tsx` / `MarketsTimelineRibbon.tsx`** —— 视觉层，**SVG 内嵌**（作为父 view SVG 的 `<g transform="translate(...)">` 子节点），跟主 chart 共享 viewBox + 坐标系：
+
+- **Strata ribbon**：年份标签本身就是 tick marks，垂直对齐到下方 swimlane 的 year 列。`▼` marker 落在对应年份，**marker 下方一条 dashed 垂直参考线**（`stroke-dasharray="2 3" opacity=0.3`）穿过整个 strata 区域——"现在的切片在哪"立刻可见。
+- **Markets ribbon**：顶部 date axis（稀疏 YYYY-MM tick，避免每 sale_date 一个标过密），`▼` marker 同上，drop line **只贯穿主散点 canvas**，**不进 noPrice lane**（无价没有时间维度，参考线在那里没意义）。
+
+**交互**：透明 `<input type="range">` 嵌在 SVG `<foreignObject>` 中覆盖 ribbon 区域 → native a11y / 键盘 / 触屏全免费；SVG marker / drop line 跟随 input value 渲染。Play 按钮也在独立 `<foreignObject>` 里，纯 Lucide `Play` / `Pause` icon 无边框。
+
+**SVG 高度调整**：两个 view 都加 `RIBBON_H + RIBBON_GAP = 40px` 的顶部空间，原有 history burst bar / currency header / 散点区 / noPrice lane 都顺延 `ribbonOffset` 像素。**单点数据时 ribbon 不渲染、offset=0**，原视觉零 regression。
+
+**i18n** 走 `visualize.timeline.*` 共享段（Timeline 是真共享 widget，CLAUDE.md "跨 view 借文案" pitfall 针对的是把 view A 文案塞进 view B，跟共享组件不冲突）。Keys：`play` / `pause` / `reset` / `current` / `rangeLabel` / `ariaSlider` / `dimmedHint`。
+
+**守护测试**：`useTimelineScrubber.test.ts`（8）+ `StrataTimelineRibbon.test.tsx`（9）+ `MarketsTimelineRibbon.test.tsx`（9）+ 各 View 的 "Timeline 渲染 / 单一年份不渲染 / 默认 t=max 不 dim / scrub 后 dim" 等。**`data-testid="visualize-timeline"` 和 `visualize-timeline-current` 保留在新 ribbon 上**——M1 → M1.5 重构期间所有 view-level 测试 0 regression 的关键。
+
+### Legend（图例，M2.5）
+
+`src/components/visualize/Legend.tsx` —— 共享布局组件 + `legendGlyphs.tsx`（per-view SVG mini-glyph）。
+
+每个 view 自己列出**它实际渲染的视觉态**——不堆通用 legend 罗列所有可能值。glyph 是该 view 真实元素的精确视觉复刻（同 stroke / pattern / fill），让图例跟数据说同一种语言、不是 emoji 不是 icon：
+
+- **Strata**：5 项 — held（stroke-only）/ external（dot pattern）/ departed（solid）/ degenerate（solid + X）/ unknownYear（stroke-only + `?`）。`separatorBefore="unknownYear"` 用 `│` 把 ownership 4 态跟"缺失态"分组。
+- **Markets**：2 项 — priced（solid circle）/ noPrice（stroke-only circle）
+- **Diaspora**：5 项 — studio / gallery / museum / other（按 location.type 染 opacity）+ `│` + ghost（stroke-only 圆，呼应 M2 ghost 环）
+
+位置：Strata + Markets 的 Legend 在 SVG 下方、info bar 上方，作为 `border-t` block；Diaspora 的 legend 保留 M2 之前的位置（stat bar 之后、SVG 之前），加 ghost 项即可。
+
+i18n keys 走各 view 自己段：`strata.legend.*` / `markets.legend.*` / `diaspora.legend.*`。Glyph 颜色用 `currentColor` / `fill-foreground` / `stroke-foreground`，dark mode 自动适配。
+
+**守护测试**：`Legend.test.tsx`（5）+ 各 View 的 "图例渲染 N 个 glyph" 断言。
 
 ### URL state 约定
 
@@ -163,10 +188,13 @@ interface TimelineProps<T> {
 | `terminalUtils.test.ts` | 29 — inventory 自然排序 / edition label 4 种 / location 拼接 / group 分桶 / markets line |
 | `TerminalView.test.tsx` | 9 — 行 role=button + tabIndex / 点击 navigate / 键盘 Enter+Space / 其他键不触发 / 分组 heading + aria-hidden 装饰 / 紧凑字号 class / row.id 防御 / separator 对 SR 隐藏 |
 | `diasporaUtils.test.ts` | 35 — 节点关联 / 中心选择 tie-breaker / 同心环布局 / 边聚合 / tracked stat / `getGhostNodes`（M2） |
-| `DiasporaView.test.tsx` | 21 — 初始状态 / hover 预览 / hover 离开 / click pin / edition 行跳转 / view all 跳转 / 二次 click 取消 pin / 切换 pin / pin 时 hover 不干扰 / 无编号 edition / 空数据 / aria-pressed / 键盘 Enter / title_cn fallback / 长名 SVG `<title>` / center node `<title>` / pin 卡片 stopPropagation / spy stopPropagation / ghost 环渲染（M2）/ ghost count=0 不画（M2）/ ghost aria-hidden（M2） |
-| `StrataView.test.tsx` | 24 — role=button 包裹 rect / aria-label 拼装 / click navigate / Enter / Space / 其它键不触发 / tabindex=0 / id 缺失 aria-disabled / viewBox 响应式 / hover tooltip / 空数据 / 多年份渲染 Timeline（M1）/ 单年份不渲染 Timeline（M1）/ 默认 t=max 不 dim（M1）/ scrub 到中段部分 dim（M1）/ ownership held = stroke-only（M2）/ external = pattern fill（M2）/ departed = solid（M2）/ degenerate X 叠加（M2）/ unknown-year 列渲染（M2）/ unknown-year 强制 stroke-only（M2）/ unknown-year 不被播头过滤（M2）/ pattern defs 命名空间（M2） |
-| `MarketsView.test.tsx` | 19 — 货币列降序 / 散点 a11y / 空状态 / summary 段隔离 / 多 sale_date 渲染 Timeline（M1）/ 单点不渲染 Timeline（M1）/ 默认 t=max 不 dim（M1）/ scrub 后 dim（M1）/ noPrice lane 渲染（M2）/ count=0 不画 lane（M2）/ stroke-only 圆 + label（M2）/ noPrice 圆可 navigate（M2） |
-| `Timeline.test.tsx` | 9 — render / 单点返 null / 拖拽 onChange / play 触发 onPlayToggle / aria slider attrs / format prop / index-step / 默认值 / className prop |
+| `DiasporaView.test.tsx` | 22 — 初始状态 / hover 预览 / hover 离开 / click pin / edition 行跳转 / view all 跳转 / 二次 click 取消 pin / 切换 pin / pin 时 hover 不干扰 / 无编号 edition / 空数据 / aria-pressed / 键盘 Enter / title_cn fallback / 长名 SVG `<title>` / center node `<title>` / pin 卡片 stopPropagation / spy stopPropagation / ghost 环渲染（M2）/ ghost count=0 不画（M2）/ ghost aria-hidden（M2）/ legend 含 ghost 项（M2.5） |
+| `StrataView.test.tsx` | 26 — role=button 包裹 rect / aria-label 拼装 / click navigate / Enter / Space / 其它键不触发 / tabindex=0 / id 缺失 aria-disabled / viewBox 响应式 / hover tooltip / 空数据 / 多年份渲染 Timeline（M1）/ 单年份不渲染 Timeline（M1）/ 默认 t=max 不 dim（M1）/ scrub 到中段部分 dim（M1）/ ownership held = stroke-only（M2）/ external = pattern fill（M2）/ departed = solid（M2）/ degenerate X 叠加（M2）/ unknown-year 列渲染（M2）/ unknown-year 强制 stroke-only（M2）/ unknown-year 不被播头过滤（M2）/ pattern defs 命名空间（M2）/ stroke-only 带 pointerEvents=all（M2 fix）/ legend 5 项（M2.5） |
+| `MarketsView.test.tsx` | 21 — 货币列降序 / 散点 a11y / 空状态 / summary 段隔离 / 多 sale_date 渲染 Timeline（M1）/ 单点不渲染 Timeline（M1）/ 默认 t=max 不 dim（M1）/ scrub 后 dim（M1）/ noPrice lane 渲染（M2）/ count=0 不画 lane（M2）/ stroke-only 圆 + label（M2）/ noPrice 圆可 navigate（M2）/ noPrice 圆带 pointerEvents=all（M2 fix）/ legend 2 项（M2.5） |
+| `useTimelineScrubber.test.ts` | 8 — enabled 计算 / setIdx 边界 / togglePlay / rAF 推进 / unmount cancel / 单点禁用 / play 复位 / play complete |
+| `StrataTimelineRibbon.test.tsx` | 9 — SVG `<g>` 渲染 / marker 三角 + 当前 year label / drop line 长度对齐 swimlane / Play 按钮 toggle / 透明 input 可拖 / 单年份返 null / aria 属性 / play complete URL 落地 / testid 保留 |
+| `MarketsTimelineRibbon.test.tsx` | 9 — 同 Strata 结构但 ISO date 轴 / 稀疏 YYYY-MM tick / drop line 只到主 canvas 不进 noPrice |
+| `Legend.test.tsx` | 5 — 渲染所有 item / glyph testid / separatorBefore 插入 `│` / 不传 separator 时无 `│` / 空数组 |
 | `Visualize.test.tsx` | 10 — loading / error / 4 个 view 默认渲染 / 非法 ?view 回落 / refetch 按钮 / 容器断点 lg: / `?view=strata&t=2024` smoke（M1） |
 | `visualize-parity.test.ts` | 2 — zh ⟷ en key 完全一致 / 核心段都存在 |
 
@@ -191,15 +219,25 @@ src/pages/Visualize.tsx                            # 容器 + tab 切换
 src/hooks/queries/useVisualizationData.ts          # 数据 hook
 src/hooks/queries/useVisualizationData.test.ts
 src/components/visualize/
-  ├── Timeline.tsx                   # 共享时间播头（M1）
-  ├── Timeline.test.tsx
+  ├── useTimelineScrubber.ts         # 时间播头共享逻辑 hook（M1.5）
+  ├── useTimelineScrubber.test.ts
+  ├── StrataTimelineRibbon.tsx       # Strata 嵌入式 ribbon（M1.5）
+  ├── StrataTimelineRibbon.test.tsx
+  ├── MarketsTimelineRibbon.tsx      # Markets 嵌入式 ribbon（M1.5）
+  ├── MarketsTimelineRibbon.test.tsx
+  ├── Legend.tsx                     # 共享图例布局（M2.5）
+  ├── Legend.test.tsx
+  ├── legendGlyphs.tsx               # 7 个 view-specific mini glyph（M2.5）
   ├── StrataView.tsx
-  ├── strataUtils.ts                 # 含 filterArtworksByYearCutoff (M1)
+  ├── strataUtils.ts                 # 含 filterArtworksByYearCutoff (M1) + getArtworkOwnershipState / getUnknownYearArtworks (M2)
   ├── strataUtils.test.ts
   ├── MarketsView.tsx
-  ├── marketsUtils.ts                # 含 filterSalesByDateCutoff (M1)
+  ├── marketsUtils.ts                # 含 filterSalesByDateCutoff (M1) + getSalesWithoutPrice (M2)
+  ├── marketsUtils.test.ts
   ├── TerminalView.tsx
   ├── TerminalView.test.tsx
-  └── DiasporaView.tsx
+  ├── DiasporaView.tsx
+  ├── diasporaUtils.ts               # 含 getGhostNodes (M2)
+  └── diasporaUtils.test.ts
 src/locales/{zh,en}/visualize.json
 ```

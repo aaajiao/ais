@@ -363,6 +363,45 @@ describe('MarketsView', () => {
     expect(screen.queryByTestId('markets-noprice-lane')).toBeNull();
   });
 
+  // ─── M2 bug fix: pointer-events on stroke-only circles ──────────────────
+  it('noPrice 圆点带 pointerEvents=all（让 click 可点中空心内部）', () => {
+    renderWithClient(
+      <MemoryRouter>
+        <MarketsView
+          artworks={[artwork]}
+          editions={[
+            {
+              id: 'np-pe',
+              artwork_id: artwork.id,
+              inventory_number: 'AAJ-PE',
+              edition_type: 'numbered',
+              edition_number: 1,
+              status: 'sold',
+              location_id: null,
+              sale_price: null,
+              sale_currency: null,
+              sale_date: null,
+              buyer_name: null,
+              created_at: '2024-01-01T00:00:00Z',
+            },
+          ]}
+        />
+      </MemoryRouter>
+    );
+    const dot = screen.getByTestId('markets-noprice-dot');
+    const circle = dot.querySelector('circle')!;
+    expect(circle.getAttribute('fill')).toBe('none');
+    expect(circle.getAttribute('pointer-events')).toBe('all');
+  });
+
+  // ─── M2.5 图例 ────────────────────────────────────────────────────────────
+  it('图例渲染 priced + noPrice glyph', () => {
+    renderMarkets();
+    expect(screen.getByTestId('visualize-legend')).toBeInTheDocument();
+    expect(screen.getByTestId('legend-glyph-priced')).toBeInTheDocument();
+    expect(screen.getByTestId('legend-glyph-noPrice')).toBeInTheDocument();
+  });
+
   it('拖动 scrubber 到中段 → 之后的散点 opacity=0.15，之前的保持 0.65', () => {
     renderMarkets();
     const slider = screen.getByRole('slider');

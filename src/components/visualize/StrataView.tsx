@@ -16,7 +16,15 @@ import {
   getUnknownYearArtworks,
   type ArtworkOwnershipState,
 } from './strataUtils';
-import Timeline from './Timeline';
+import StrataTimelineRibbon from './StrataTimelineRibbon';
+import { Legend } from './Legend';
+import {
+  HeldGlyph,
+  ExternalGlyph,
+  DepartedGlyph,
+  DegenerateGlyph,
+  UnknownYearGlyph,
+} from './legendGlyphs';
 
 interface Props {
   artworks: VizArtwork[];
@@ -44,6 +52,10 @@ const HISTORY_GAP = 24;   // history bar 与 swimlane 区域之间的间距
 const YEAR_LABEL_H = 20;  // 底部 year label 行高
 const TOP_PAD = 12;
 const BOTTOM_PAD = 8;
+// 顶层时间播头 ribbon —— 嵌入 SVG 内（取代 v1.5 之前的 widget Timeline）。
+// height 含 marker label 上方文字 + ▼ marker + baseline；不含 ribbon→history 间距，由 RIBBON_GAP 控。
+const RIBBON_H = 32;
+const RIBBON_GAP = 8;
 
 // ─── 方块状态 → Tailwind className ────────────────────────────────────────────
 // 用 Tailwind opacity 而非 SVG `fillOpacity` attribute，这样 dark 模式可以单独提暗。
@@ -186,8 +198,14 @@ export default function StrataView({ artworks, editions = [], history }: Props) 
   const unknownColX = LABEL_W + yearCount * colW;
 
   // ─── SVG 总高度 ───────────────────────────────────────────────────────────
+  // ribbon 仅在 yearRange.length > 1 时显示（与原 Timeline 单点隐藏行为一致）。
+  // ribbon 不显示时 ribbonOffset = 0，所有原有元素位置不变 —— 默认 t=max 视觉无 regression。
+  const showRibbon = yearRange.length > 1;
+  const ribbonOffset = showRibbon ? RIBBON_H + RIBBON_GAP : 0;
+
   const totalH =
     TOP_PAD +
+    ribbonOffset +
     HISTORY_H +
     HISTORY_GAP +
     totalLanesH +
@@ -195,7 +213,7 @@ export default function StrataView({ artworks, editions = [], history }: Props) 
     BOTTOM_PAD;
 
   // swimlane 区域顶部 y（相对 SVG）
-  const laneAreaTop = TOP_PAD + HISTORY_H + HISTORY_GAP;
+  const laneAreaTop = TOP_PAD + ribbonOffset + HISTORY_H + HISTORY_GAP;
 
   // ─── 按 (type, year) 建索引 ───────────────────────────────────────────────
   // Map<type_key, Map<year, VizArtwork[]>>
@@ -248,39 +266,9 @@ export default function StrataView({ artworks, editions = [], history }: Props) 
         </p>
       </header>
 
-      {/* ─── Time scrubber ──────────────────────────────────────────────── */}
-      {yearRange.length > 1 && effectiveCutoff !== null && (
-        <Timeline
-          values={yearRange}
-          current={effectiveCutoff}
-          onChange={(y) => {
-            if (playing) {
-              setPlayingCutoff(y);
-            } else {
-              setCutoffYear(y);
-            }
-          }}
-          format={(y) => String(y)}
-          playing={playing}
-          onPlayToggle={() => {
-            if (playing) {
-              if (playingCutoff !== null) setCutoffYear(playingCutoff);
-              setPlayingCutoff(null);
-              setPlaying(false);
-            } else {
-              setPlayingCutoff(cutoffYear);
-              setPlaying(true);
-            }
-          }}
-          onPlayComplete={() => {
-            if (playingCutoff !== null) setCutoffYear(playingCutoff);
-            setPlayingCutoff(null);
-            setPlaying(false);
-          }}
-        />
-      )}
-
       {/* ─── SVG ────────────────────────────────────────────────────────── */}
+      {/* Time scrubber 不再是独立 widget —— 嵌入 SVG 内部作为最顶层"年份地层"
+          （见 <StrataTimelineRibbon /> 在 SVG 子树里的位置）。 */}
       <div className="relative overflow-x-auto border border-border">
         <svg
           viewBox={`0 0 ${CANVAS_W} ${totalH}`}
@@ -302,12 +290,59 @@ export default function StrataView({ artworks, editions = [], history }: Props) 
             </pattern>
           </defs>
 
+          {/* ─── Time scrubber ribbon (M1.5) ─────────────────────────── */}
+          {/* ribbon 占据 SVG 顶部 RIBBON_H 高度 + RIBBON_GAP 间距，drop line
+              贯穿 history bar + 整片 swimlane 区 + year label，让"现在的切片"可见。
+              单年份数据时 ribbon 不渲染，ribbonOffset=0，原有元素位置不变。 */}
+          {showRibbon && effectiveCutoff !== null && (
+            <StrataTimelineRibbon
+              years={yearRange}
+              currentYear={effectiveCutoff}
+              onYearChange={(y) => {
+                if (playing) {
+                  setPlayingCutoff(y);
+                } else {
+                  setCutoffYear(y);
+                }
+              }}
+              xOffset={LABEL_W}
+              // axisWidth = yearCount × colW，让 ribbon tick 跟下方 year column 严格对齐
+              // （drop line 必须正中落在 cutoff year 的列上）。
+              axisWidth={yearCount * colW}
+              // Play 按钮：axis 之后留 4px gap；当有 unknown-year 列时贴在其右侧（避开列）；
+              // 其他情况下落在 RIGHT_PAD 内（CANVAS_W 已经包了 RIGHT_PAD）。
+              // 注意：相对 ribbon <g>（已经 translate 到 LABEL_W），所以不再减 LABEL_W。
+              playBtnX={yearCount * colW + (hasUnknownYearCol ? colW : 0) + 4}
+              yTop={TOP_PAD}
+              ribbonH={RIBBON_H}
+              dropLineH={
+                RIBBON_GAP + HISTORY_H + HISTORY_GAP + totalLanesH + YEAR_LABEL_H
+              }
+              playing={playing}
+              onPlayToggle={() => {
+                if (playing) {
+                  if (playingCutoff !== null) setCutoffYear(playingCutoff);
+                  setPlayingCutoff(null);
+                  setPlaying(false);
+                } else {
+                  setPlayingCutoff(cutoffYear);
+                  setPlaying(true);
+                }
+              }}
+              onPlayComplete={() => {
+                if (playingCutoff !== null) setCutoffYear(playingCutoff);
+                setPlayingCutoff(null);
+                setPlaying(false);
+              }}
+            />
+          )}
+
           {/* ─── History bar ─────────────────────────────────────────── */}
           {historyMonths.entries.length > 0 && (
             <>
               <text
                 x={LABEL_W}
-                y={TOP_PAD + 10}
+                y={TOP_PAD + ribbonOffset + 10}
                 className="fill-muted-foreground"
                 fontSize="9"
                 fontFamily="ui-monospace, monospace"
@@ -320,7 +355,7 @@ export default function StrataView({ artworks, editions = [], history }: Props) 
                 const h = historyMonths.max > 0
                   ? Math.max(2, (count / historyMonths.max) * (HISTORY_H - 12))
                   : 0;
-                const barY = TOP_PAD + HISTORY_H - h;
+                const barY = TOP_PAD + ribbonOffset + HISTORY_H - h;
                 return (
                   <g key={month}>
                     <rect
@@ -613,6 +648,18 @@ export default function StrataView({ artworks, editions = [], history }: Props) 
         {t('strata.gapNote')}
       </p>
 
+      {/* ─── 图例 (M2.5) ────────────────────────────────────────────── */}
+      <Legend
+        separatorBefore="unknownYear"
+        items={[
+          { key: 'held', glyph: <HeldGlyph />, label: t('strata.legend.held') },
+          { key: 'external', glyph: <ExternalGlyph />, label: t('strata.legend.external') },
+          { key: 'departed', glyph: <DepartedGlyph />, label: t('strata.legend.departed') },
+          { key: 'degenerate', glyph: <DegenerateGlyph />, label: t('strata.legend.degenerate') },
+          { key: 'unknownYear', glyph: <UnknownYearGlyph />, label: t('strata.legend.unknownYear') },
+        ]}
+      />
+
       {/* ─── 底部 tooltip 信息条 ─────────────────────────────────────── */}
       <div className="min-h-[3.5rem] border-t border-border pt-3 text-xs font-mono space-y-0.5">
         {hoveredArtwork ? (
@@ -673,6 +720,8 @@ function OwnershipBlock(props: {
   const strokeOnly = forceStrokeOnly || ownership.bucket === 'held';
 
   // 主形：fill / stroke 决定 ownership bucket 的视觉
+  // pointerEvents="all" —— SVG 默认 visiblePainted，fill=none 内部不响应点击；
+  // 强制全 geometry 响应，让用户可以点方块内部而非只点边
   const mainShape = strokeOnly ? (
     <rect
       x={x + 0.75}
@@ -680,6 +729,7 @@ function OwnershipBlock(props: {
       width={size - 1.5}
       height={size - 1.5}
       fill="none"
+      pointerEvents="all"
       className={cn(
         'stroke-foreground transition-opacity duration-100',
         stateCls

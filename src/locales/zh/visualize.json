@@ -37,6 +37,13 @@
     "summary": {
       "overview": "{{artworks}} 件作品 · {{types}} 种类型 · {{yearSpan}}"
     },
+    "legend": {
+      "held": "工作室",
+      "external": "在外（画廊 / 美术馆 / 在途）",
+      "departed": "已售 / 赠出",
+      "degenerate": "已失 / 损",
+      "unknownYear": "缺年份"
+    },
     "gapNote": "记录时间 ≠ 创作时间。85 / 87 条历史在 2026 年的几周内集中产生。"
   },
   "markets": {
@@ -60,7 +67,11 @@
     "currenciesAvailable": "{{count}} 种货币",
     "currencyLabel": "货币：{{currency}}",
     "dotLabel": "{{inv}} · {{title}} · {{price}}",
-    "noPriceLane": "未记录价格"
+    "noPriceLane": "未记录价格",
+    "legend": {
+      "priced": "已成交（实心）",
+      "noPrice": "未记录价格（空心）"
+    }
   },
   "terminal": {
     "heading": "Terminal — 档案输出",
@@ -100,7 +111,8 @@
       "studio": "工作室",
       "gallery": "画廊",
       "museum": "美术馆",
-      "other": "其他"
+      "other": "其他",
+      "ghost": "无 location 鬼影"
     },
     "tooltip": {
       "editions": "{{count}} 个版本在此",

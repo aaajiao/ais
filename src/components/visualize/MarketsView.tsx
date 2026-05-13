@@ -9,7 +9,9 @@ import {
   priceToY,
   getSalesWithoutPrice,
 } from './marketsUtils';
-import Timeline from './Timeline';
+import MarketsTimelineRibbon from './MarketsTimelineRibbon';
+import { Legend } from './Legend';
+import { PricedDotGlyph, NoPriceDotGlyph } from './legendGlyphs';
 
 export interface MarketsViewProps {
   artworks: VizArtwork[];
@@ -25,6 +27,10 @@ const COL_PAD_X = 24;      // 每列内部水平内边距（圆点不贴边）
 const HEADER_H = 32;       // 货币代码标签高度
 const STAT_H = 56;         // 底部 stat 行高度
 const TOP_PAD = 8;
+// 顶层时间播头 ribbon（M1.5）—— 嵌入 SVG 内（取代 v1.5 之前的 widget Timeline）。
+// 仅在 saleDates.length > 1 时显示；不显示时 ribbonOffset=0，原有布局像素级保持。
+const RIBBON_H = 32;
+const RIBBON_GAP = 8;
 // M2: 缺价横条 —— 跨整宽，置于 stat 行下方。只在有缺价 sold edition 时占用空间。
 const NOPRICE_LANE_H = 28;
 const NOPRICE_DOT_R = 4;
@@ -150,8 +156,13 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
       : 0;
   const totalW =
     currencyCount > 0 ? LEFT_PAD + colW * currencyCount + RIGHT_PAD : 800;
+  // ribbon 显示与否（saleDates.length > 1 时才有意义）
+  const showRibbon = saleDates.length > 1;
+  const ribbonOffset = showRibbon ? RIBBON_H + RIBBON_GAP : 0;
+  // 主面板顶端 y（HEADER 之上还有 ribbon）
+  const panelTopY = TOP_PAD + ribbonOffset + HEADER_H;
   // 主面板底部 y（stat 行结束）
-  const panelEndY = TOP_PAD + HEADER_H + PANEL_H + STAT_H;
+  const panelEndY = panelTopY + PANEL_H + STAT_H;
   const noPriceLaneY = panelEndY + NOPRICE_GAP_TOP;
   const totalH = panelEndY + (hasNoPriceLane ? NOPRICE_GAP_TOP + NOPRICE_LANE_H : 0);
 
@@ -171,38 +182,8 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
         </p>
       </header>
 
-      {/* ─── Time scrubber ──────────────────────────────────────────────── */}
-      {saleDates.length > 1 && effectiveCutoff !== null && (
-        <Timeline
-          values={saleDates}
-          current={effectiveCutoff}
-          onChange={(d) => {
-            if (playing) {
-              setPlayingCutoff(d);
-            } else {
-              setCutoffDate(d);
-            }
-          }}
-          format={(d) => d.slice(0, 7)}
-          playing={playing}
-          onPlayToggle={() => {
-            if (playing) {
-              if (playingCutoff !== null) setCutoffDate(playingCutoff);
-              setPlayingCutoff(null);
-              setPlaying(false);
-            } else {
-              setPlayingCutoff(cutoffDate);
-              setPlaying(true);
-            }
-          }}
-          onPlayComplete={() => {
-            if (playingCutoff !== null) setCutoffDate(playingCutoff);
-            setPlayingCutoff(null);
-            setPlaying(false);
-          }}
-        />
-      )}
-
+      {/* Time scrubber 不再是独立 widget —— 嵌入 SVG 内部作为顶部 date axis
+          （见下方 <MarketsTimelineRibbon /> 在 SVG 内的位置）。 */}
       <div className="relative overflow-x-auto border border-border">
         <svg
           viewBox={`0 0 ${totalW} ${totalH}`}
@@ -224,11 +205,53 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
               <circle cx="1" cy="1" r="0.7" fill="currentColor" />
             </pattern>
           </defs>
+          {/* ─── Time scrubber ribbon (M1.5) ─────────────────────────── */}
+          {/* 嵌入 SVG 内：顶部 date axis + ▼ marker，drop line 贯穿主散点 canvas
+              但不进 noPrice lane（无时间维度）。
+              ribbonOffset === 0 时不渲染，原有像素级布局保持。 */}
+          {showRibbon && effectiveCutoff !== null && (
+            <MarketsTimelineRibbon
+              dates={saleDates}
+              currentDate={effectiveCutoff}
+              onDateChange={(d) => {
+                if (playing) {
+                  setPlayingCutoff(d);
+                } else {
+                  setCutoffDate(d);
+                }
+              }}
+              xOffset={LEFT_PAD}
+              // axis 占满主面板宽度（货币列总和），右侧 RIGHT_PAD 留作 Play 按钮空间
+              axisWidth={Math.max(20, totalW - LEFT_PAD - RIGHT_PAD)}
+              playBtnX={totalW - LEFT_PAD - 16}
+              yTop={TOP_PAD}
+              ribbonH={RIBBON_H}
+              // drop line 贯穿 HEADER + 主散点 PANEL，止于 stat 行上方
+              dropLineH={RIBBON_GAP + HEADER_H + PANEL_H}
+              playing={playing}
+              onPlayToggle={() => {
+                if (playing) {
+                  if (playingCutoff !== null) setCutoffDate(playingCutoff);
+                  setPlayingCutoff(null);
+                  setPlaying(false);
+                } else {
+                  setPlayingCutoff(cutoffDate);
+                  setPlaying(true);
+                }
+              }}
+              onPlayComplete={() => {
+                if (playingCutoff !== null) setCutoffDate(playingCutoff);
+                setPlayingCutoff(null);
+                setPlaying(false);
+              }}
+            />
+          )}
+
           {groups.map(({ currency, sales }, colIdx) => {
             const stats = computeCurrencyStats(sales);
             const xColLeft = LEFT_PAD + colIdx * colW;
             const xCenter = xColLeft + colW / 2;
-            const panelTop = TOP_PAD + HEADER_H;
+            const panelTop = panelTopY;
             const panelBottom = panelTop + PANEL_H;
 
             // 每列独立 scale（见 marketsUtils.ts 注释说明原因）
@@ -237,11 +260,11 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
 
             return (
               <g key={currency}>
-                {/* 列分隔线 */}
+                {/* 列分隔线 —— 从 ribbon 下方（HEADER 顶）一直到 stat 底 */}
                 {colIdx > 0 && (
                   <line
                     x1={xColLeft}
-                    y1={TOP_PAD}
+                    y1={TOP_PAD + ribbonOffset}
                     x2={xColLeft}
                     y2={panelEndY - 4}
                     className="stroke-border"
@@ -252,7 +275,7 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
                 {/* 货币代码标签（<title> 让 screen reader 念出货币名） */}
                 <text
                   x={xCenter}
-                  y={TOP_PAD + HEADER_H - 8}
+                  y={panelTopY - 8}
                   textAnchor="middle"
                   className="fill-foreground"
                   fontSize="12"
@@ -436,6 +459,7 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
                         cy={dotCY}
                         r={NOPRICE_DOT_R}
                         fill="none"
+                        pointerEvents="all"
                         className="stroke-foreground hover:stroke-[2px]"
                         strokeWidth={1.5}
                         opacity={0.75}
@@ -448,6 +472,14 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
           )}
         </svg>
       </div>
+
+      {/* ─── 图例 (M2.5) ────────────────────────────────────────────── */}
+      <Legend
+        items={[
+          { key: 'priced', glyph: <PricedDotGlyph />, label: t('markets.legend.priced') },
+          { key: 'noPrice', glyph: <NoPriceDotGlyph />, label: t('markets.legend.noPrice') },
+        ]}
+      />
 
       {/* hover tooltip：固定在画布下方，避免遮挡 SVG */}
       <div className="min-h-[3.5rem] border-t border-border pt-3 text-xs font-mono space-y-0.5">
