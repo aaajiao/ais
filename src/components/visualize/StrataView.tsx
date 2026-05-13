@@ -14,6 +14,7 @@ import {
   stackPositionFor,
   getArtworkOwnershipState,
   getUnknownYearArtworks,
+  buildLaneStats,
   type ArtworkOwnershipState,
 } from './strataUtils';
 import StrataTimelineRibbon from './StrataTimelineRibbon';
@@ -77,7 +78,13 @@ export default function StrataView({ artworks, editions = [], history }: Props) 
   const [hoveredArtwork, setHoveredArtwork] = useState<VizArtwork | null>(null);
   const [hoveredYear, setHoveredYear] = useState<number | null>(null);
   const [hoveredLane, setHoveredLane] = useState<string | null>(null); // swimlane.type key
+  // pinnedLane：点击 type label 钉住的 lane。`effectiveLane = pinnedLane ?? hoveredLane`
+  // —— hover 仍然工作，被 pin 时 pin 占主。所有 visual lane 维度判断（block dim /
+  // label opacity / 底部 panel 优先级）都走 effectiveLane。
+  const [pinnedLane, setPinnedLane] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
+
+  const effectiveLane = pinnedLane ?? hoveredLane;
 
   // ─── 数据变换 ──────────────────────────────────────────────────────────────
   const { swimlanes, yearRange } = useMemo(
@@ -159,6 +166,13 @@ export default function StrataView({ artworks, editions = [], history }: Props) 
     }
     return m;
   }, [artworks, editions]);
+
+  // ─── M2: per-lane aggregate stats（Y 轴 pin 信息面板）─────────────────────
+  // 依赖 ownershipMap，所以在它之后；与 swimlanes / editions 同步失效。
+  const laneStatsMap = useMemo(
+    () => buildLaneStats(swimlanes, ownershipMap, editions),
+    [swimlanes, ownershipMap, editions]
+  );
 
   // ─── M2: 缺失 year 作品（年表外的特殊列）───────────────────────────────────
   const unknownYearArtworks = useMemo(
@@ -396,11 +410,19 @@ export default function StrataView({ artworks, editions = [], history }: Props) 
           {swimlanes.map((sl, laneIdx) => {
             const laneH = laneHeights[laneIdx];
             const laneY = laneAreaTop + laneTops[laneIdx];
-            const isFocusedLane = hoveredLane !== null && hoveredLane === sl.type;
-            const isOtherLane = hoveredLane !== null && hoveredLane !== sl.type;
+            // effectiveLane = pinnedLane ?? hoveredLane —— hover 与 pin 共享视觉
+            const isFocusedLane =
+              effectiveLane !== null && effectiveLane === sl.type;
+            const isOtherLane =
+              effectiveLane !== null && effectiveLane !== sl.type;
+            const isPinned = pinnedLane === sl.type;
 
             // Lane separator line (between lanes)
             const showSep = laneIdx > 0;
+
+            const togglePin = () => {
+              setPinnedLane((prev) => (prev === sl.type ? null : sl.type));
+            };
 
             return (
               <g key={sl.type}>
@@ -416,21 +438,53 @@ export default function StrataView({ artworks, editions = [], history }: Props) 
                   />
                 )}
 
-                {/* Type label —— 字体与 Diaspora 节点 label 对齐：9px mono + fill-foreground + opacity 0.75/1.0 */}
-                <text
-                  x={LABEL_W - 8}
-                  y={laneY + laneH / 2 + 4}
-                  textAnchor="end"
-                  className="fill-foreground"
-                  fontSize="9"
-                  fontFamily="ui-monospace, monospace"
-                  opacity={isFocusedLane ? 1 : 0.75}
-                  style={{ cursor: 'default' }}
+                {/* Type label —— 字体与 Diaspora 节点 label 对齐：9px mono +
+                    fill-foreground + opacity 0.75/1.0。点击 toggle pinnedLane，
+                    Enter/Space 同效；外层 <g role="button" aria-pressed> 让屏幕
+                    阅读器读到"按钮"状态。 */}
+                <g
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={isPinned}
+                  aria-label={t('strata.lane.pin.aria', {
+                    type: sl.displayLabel,
+                  })}
+                  data-testid={`lane-label-${sl.type}`}
+                  className="focus:outline-none focus-visible:outline-2 focus-visible:outline-foreground cursor-pointer"
+                  onClick={togglePin}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      togglePin();
+                    }
+                  }}
                   onMouseEnter={() => setHoveredLane(sl.type)}
                   onMouseLeave={() => setHoveredLane(null)}
                 >
-                  {sl.displayLabel} · {sl.count}
-                </text>
+                  {/* Pin marker：靠 SVG 内 absolute 位置（x=4）而非贴文字宽度，
+                      避免依赖 textWidth 测量。短粗竖条，仅在 pinned 时渲染。 */}
+                  {isPinned && (
+                    <rect
+                      data-testid={`lane-pin-marker-${sl.type}`}
+                      x={4}
+                      y={laneY + laneH / 2 - 4.5}
+                      width={1.5}
+                      height={9}
+                      className="fill-foreground"
+                    />
+                  )}
+                  <text
+                    x={LABEL_W - 8}
+                    y={laneY + laneH / 2 + 4}
+                    textAnchor="end"
+                    className="fill-foreground"
+                    fontSize="9"
+                    fontFamily="ui-monospace, monospace"
+                    opacity={isFocusedLane ? 1 : 0.75}
+                  >
+                    {sl.displayLabel} · {sl.count}
+                  </text>
+                </g>
 
                 {/* Blocks per year column */}
                 {yearRange.map((year, colIdx) => {
@@ -489,6 +543,7 @@ export default function StrataView({ artworks, editions = [], history }: Props) 
                         tabIndex={disabled ? -1 : 0}
                         aria-label={ariaLabel}
                         aria-disabled={disabled || undefined}
+                        data-block="true"
                         data-ownership={ownership.bucket}
                         data-degenerate={ownership.isDegenerate || undefined}
                         className={cn(
@@ -583,6 +638,7 @@ export default function StrataView({ artworks, editions = [], history }: Props) 
                       tabIndex={disabled ? -1 : 0}
                       aria-label={ariaLabel}
                       aria-disabled={disabled || undefined}
+                      data-block="true"
                       data-ownership={ownership.bucket}
                       data-degenerate={ownership.isDegenerate || undefined}
                       data-unknown-year="true"
@@ -663,6 +719,9 @@ export default function StrataView({ artworks, editions = [], history }: Props) 
       />
 
       {/* ─── 底部 tooltip 信息条 ─────────────────────────────────────── */}
+      {/* 优先级链：hoveredArtwork > hoveredYear > pinnedLane > overview。
+          pin 低于 hover —— hover 单 block 临时覆盖 pin 信息，离开 block 回到
+          pin 视图（不丢上下文）；空 idle 态显示 overview。 */}
       <div className="min-h-[3.5rem] border-t border-border pt-3 text-xs font-mono space-y-0.5">
         {hoveredArtwork ? (
           <>
@@ -684,6 +743,63 @@ export default function StrataView({ artworks, editions = [], history }: Props) 
               {t('strata.tooltip.count', { count: artworksInHoveredYear })}
             </div>
           </>
+        ) : pinnedLane !== null && laneStatsMap.get(pinnedLane) ? (
+          (() => {
+            const lane = laneStatsMap.get(pinnedLane)!;
+            // glyph 字符用 Unicode 而非 inline SVG —— info bar 是 HTML 不是 SVG，
+            // SVG 会破坏 mono 字体对齐。选取的字符宽度跟 mono 字体匹配：
+            //   held       ◻ (U+25FB White Medium Square)
+            //   external   ▦ (U+25A6 dotted-fill square)
+            //   departed   ◼ (U+25FC Black Medium Square)
+            //   degenerate ✕ (U+2715)
+            return (
+              <div data-testid="lane-pin-panel">
+                <div className="font-bold">{lane.displayLabel}</div>
+                <div className="text-muted-foreground">
+                  {t('strata.lane.summary.artworks', {
+                    count: lane.artworkCount,
+                  })}
+                  {' · '}
+                  {t('strata.lane.summary.editions', {
+                    count: lane.editionCount,
+                  })}
+                </div>
+                <div className="text-muted-foreground">
+                  <span data-testid="lane-pin-held">
+                    ◻ {t('strata.lane.summary.held', {
+                      count: lane.ownership.held,
+                    })}
+                  </span>
+                  {'  '}
+                  <span data-testid="lane-pin-external">
+                    ▦ {t('strata.lane.summary.external', {
+                      count: lane.ownership.external,
+                    })}
+                  </span>
+                  {'  '}
+                  <span data-testid="lane-pin-departed">
+                    ◼ {t('strata.lane.summary.departed', {
+                      count: lane.ownership.departed,
+                    })}
+                  </span>
+                  {'  '}
+                  <span data-testid="lane-pin-degenerate">
+                    ✕ {t('strata.lane.summary.degenerate', {
+                      count: lane.ownership.degenerate,
+                    })}
+                  </span>
+                </div>
+                <div className="text-muted-foreground">
+                  {lane.yearSpan
+                    ? t('strata.lane.summary.yearSpan', {
+                        from: lane.yearSpan.min,
+                        to: lane.yearSpan.max,
+                      })
+                    : t('strata.lane.summary.yearSpanEmpty')}
+                </div>
+              </div>
+            );
+          })()
         ) : (
           <div className="text-muted-foreground">
             {t('strata.summary.overview', {

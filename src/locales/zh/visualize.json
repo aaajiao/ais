@@ -44,6 +44,22 @@
       "degenerate": "已失 / 损",
       "unknownYear": "缺年份"
     },
+    "lane": {
+      "pin": {
+        "aria": "钉住 / 取消钉住分类 {{type}}",
+        "hint": ""
+      },
+      "summary": {
+        "artworks": "{{count}} 件作品",
+        "editions": "{{count}} 个版本",
+        "held": "{{count}} 工作室",
+        "external": "{{count}} 在外",
+        "departed": "{{count}} 已离开",
+        "degenerate": "{{count}} 已失/损",
+        "yearSpan": "跨度 {{from}}–{{to}}",
+        "yearSpanEmpty": "跨度 —"
+      }
+    },
     "gapNote": "记录时间 ≠ 创作时间。85 / 87 条历史在 2026 年的几周内集中产生。"
   },
   "markets": {

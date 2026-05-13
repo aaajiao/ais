@@ -139,7 +139,7 @@ describe('StrataView', () => {
     // 3 作品 → 3 个 block-button（每个 block 包一层 <g>）
     // 用 SVG 容器作为 scope，排除 Timeline 的 play button
     const svg = screen.getByRole('img', { name: /Strata/i });
-    const blockButtons = svg.querySelectorAll('g[role="button"]');
+    const blockButtons = svg.querySelectorAll('g[role="button"][data-block]');
     expect(blockButtons.length).toBe(3);
     // 每个 button 内部应含 <rect>
     for (const btn of Array.from(blockButtons)) {
@@ -215,7 +215,7 @@ describe('StrataView', () => {
 
     // scope 到 strata svg 内的 block-button，避免捕到 Timeline 的 play button
     const svg = screen.getByRole('img', { name: /Strata/i });
-    const blockButtons = svg.querySelectorAll('g[role="button"]');
+    const blockButtons = svg.querySelectorAll('g[role="button"][data-block]');
     expect(blockButtons.length).toBeGreaterThan(0);
     for (const btn of Array.from(blockButtons)) {
       expect(btn).toHaveAttribute('tabindex', '0');
@@ -231,7 +231,7 @@ describe('StrataView', () => {
     renderStrata({ artworks: [brokenArtwork] });
 
     const svg = screen.getByRole('img', { name: /Strata/i });
-    const blockButtons = Array.from(svg.querySelectorAll('g[role="button"]'));
+    const blockButtons = Array.from(svg.querySelectorAll('g[role="button"][data-block]'));
     expect(blockButtons.length).toBe(1);
     const btn = blockButtons[0] as HTMLElement;
     expect(btn).toHaveAttribute('aria-disabled', 'true');
@@ -296,7 +296,7 @@ describe('StrataView', () => {
   it('默认 t = max → 所有方块 opacity 不被 dim（>= 0.5）', () => {
     renderStrata();
     const svg = screen.getByRole('img', { name: /Strata/i });
-    const rects = Array.from(svg.querySelectorAll('g[role="button"] > rect'));
+    const rects = Array.from(svg.querySelectorAll('g[role="button"][data-block] > rect'));
     expect(rects.length).toBeGreaterThan(0);
     // 默认 BLOCK_DEFAULT_CLS = opacity-[0.65] 不是 future
     for (const r of rects) {
@@ -313,7 +313,7 @@ describe('StrataView', () => {
     fireEvent.change(slider, { target: { value: '0' } });
 
     const svg = screen.getByRole('img', { name: /Strata/i });
-    const buttons = Array.from(svg.querySelectorAll('g[role="button"]'));
+    const buttons = Array.from(svg.querySelectorAll('g[role="button"][data-block]'));
 
     let futureCount = 0;
     let activeCount = 0;
@@ -503,5 +503,160 @@ describe('StrataView', () => {
     const cls = xGroup!.getAttribute('class') ?? '';
     expect(cls).toContain('stroke-background');
     expect(cls).not.toContain('stroke-foreground');
+  });
+
+  // ─── M2 Y 轴 pin 交互 ─────────────────────────────────────────────────────
+
+  it('点击 type label → pinnedLane 进入 pin 状态，marker 渲染', () => {
+    renderStrata();
+    const label = screen.getByTestId('lane-label-Installation');
+    expect(label).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(label);
+    expect(label).toHaveAttribute('aria-pressed', 'true');
+    expect(
+      screen.getByTestId('lane-pin-marker-Installation')
+    ).toBeInTheDocument();
+  });
+
+  it('同 label 再点 → unpin，marker 消失', () => {
+    renderStrata();
+    const label = screen.getByTestId('lane-label-Installation');
+    fireEvent.click(label);
+    expect(screen.getByTestId('lane-pin-marker-Installation')).toBeInTheDocument();
+    fireEvent.click(label);
+    expect(label).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByTestId('lane-pin-marker-Installation')).toBeNull();
+  });
+
+  it('点不同 label → 切换 pin（marker 跟着移动）', () => {
+    renderStrata();
+    const labelA = screen.getByTestId('lane-label-Installation');
+    const labelB = screen.getByTestId('lane-label-Video');
+    fireEvent.click(labelA);
+    expect(screen.getByTestId('lane-pin-marker-Installation')).toBeInTheDocument();
+    fireEvent.click(labelB);
+    expect(screen.queryByTestId('lane-pin-marker-Installation')).toBeNull();
+    expect(screen.getByTestId('lane-pin-marker-Video')).toBeInTheDocument();
+    expect(labelA).toHaveAttribute('aria-pressed', 'false');
+    expect(labelB).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('pinned 状态下其他 lane block 走 BLOCK_OTHER_LANE_CLS opacity', () => {
+    renderStrata();
+    const label = screen.getByTestId('lane-label-Installation');
+    fireEvent.click(label);
+
+    const svg = screen.getByRole('img', { name: /Strata/i });
+    // Video lane 的 block 应该被 dim 到 opacity-[0.3]
+    const videoBlocks = Array.from(
+      svg.querySelectorAll('g[role="button"][data-block][aria-label*="Video"]')
+    );
+    expect(videoBlocks.length).toBeGreaterThan(0);
+    for (const btn of videoBlocks) {
+      const rect = btn.querySelector('rect')!;
+      const cls = rect.getAttribute('class') ?? '';
+      expect(cls).toMatch(/opacity-\[0\.3\]/);
+    }
+    // Installation lane 的 block 走 focused 态（opacity-100）
+    const instBlocks = Array.from(
+      svg.querySelectorAll(
+        'g[role="button"][data-block][aria-label*="Installation"]'
+      )
+    );
+    expect(instBlocks.length).toBeGreaterThan(0);
+    for (const btn of instBlocks) {
+      const rect = btn.querySelector('rect')!;
+      const cls = rect.getAttribute('class') ?? '';
+      // FOCUSED_LANE_CLS = 'opacity-100'，不应被 dim 到 0.3
+      expect(cls).not.toMatch(/opacity-\[0\.3\]/);
+    }
+  });
+
+  it('pin 模式下底部信息面板显示 lane stats（artworks / editions / 4 ownership / yearSpan）', () => {
+    // aw-1 (Installation/2024) in_studio, aw-2 (Installation/2024) at_gallery
+    const editions = [
+      makeStrataEdition('e1', 'aw-1', 'in_studio'),
+      makeStrataEdition('e2', 'aw-2', 'at_gallery'),
+    ];
+    renderStrata({ editions });
+    fireEvent.click(screen.getByTestId('lane-label-Installation'));
+
+    const panel = screen.getByTestId('lane-pin-panel');
+    expect(panel).toBeInTheDocument();
+    // 2 件 Installation
+    expect(panel.textContent).toMatch(/2/);
+    // 中文 / 英文都包"作品" 或 "artworks"
+    expect(panel.textContent ?? '').toMatch(/件作品|artworks/);
+    // editions 文案
+    expect(panel.textContent ?? '').toMatch(/版本|editions/);
+    // ownership 4 项均出现
+    expect(screen.getByTestId('lane-pin-held')).toBeInTheDocument();
+    expect(screen.getByTestId('lane-pin-external')).toBeInTheDocument();
+    expect(screen.getByTestId('lane-pin-departed')).toBeInTheDocument();
+    expect(screen.getByTestId('lane-pin-degenerate')).toBeInTheDocument();
+    // yearSpan：Installation 全在 2024，min=max=2024
+    expect(panel.textContent ?? '').toMatch(/2024/);
+    // 不是 "spans —" 空态
+    expect(panel.textContent ?? '').not.toMatch(/spans —|跨度 —/);
+  });
+
+  it('hover 单 block 优先于 pinnedLane 显示 artwork tooltip（pin 不消失）', () => {
+    renderStrata();
+    fireEvent.click(screen.getByTestId('lane-label-Installation'));
+    expect(screen.getByTestId('lane-pin-panel')).toBeInTheDocument();
+
+    const block = screen.getByRole('button', {
+      name: /Installation.*2024.*Guard/i,
+    });
+    fireEvent.mouseEnter(block);
+
+    // pin panel 被 artwork tooltip 覆盖
+    expect(screen.queryByTestId('lane-pin-panel')).toBeNull();
+    expect(screen.getByText('Guard, I…')).toBeInTheDocument();
+    // 但 pin marker 仍在 SVG 上（pinnedLane 未变）
+    expect(screen.getByTestId('lane-pin-marker-Installation')).toBeInTheDocument();
+  });
+
+  it('mouseLeave block → 信息面板回到 pin 视图（不退回 overview）', () => {
+    renderStrata();
+    fireEvent.click(screen.getByTestId('lane-label-Installation'));
+    const block = screen.getByRole('button', {
+      name: /Installation.*2024.*Guard/i,
+    });
+    fireEvent.mouseEnter(block);
+    expect(screen.queryByTestId('lane-pin-panel')).toBeNull();
+
+    fireEvent.mouseLeave(block);
+    // 回到 pin panel，不是 overview
+    expect(screen.getByTestId('lane-pin-panel')).toBeInTheDocument();
+  });
+
+  it('键盘 Enter 在 type label 上触发 toggle pin', () => {
+    renderStrata();
+    const label = screen.getByTestId('lane-label-Installation');
+    fireEvent.keyDown(label, { key: 'Enter' });
+    expect(label).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('lane-pin-marker-Installation')).toBeInTheDocument();
+    fireEvent.keyDown(label, { key: 'Enter' });
+    expect(label).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('键盘 Space 在 type label 上触发 toggle pin', () => {
+    renderStrata();
+    const label = screen.getByTestId('lane-label-Installation');
+    fireEvent.keyDown(label, { key: ' ' });
+    expect(label).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.keyDown(label, { key: ' ' });
+    expect(label).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('a11y：type label 有 role="button" + aria-pressed + tabIndex=0', () => {
+    renderStrata();
+    const label = screen.getByTestId('lane-label-Installation');
+    expect(label).toHaveAttribute('role', 'button');
+    expect(label).toHaveAttribute('aria-pressed', 'false');
+    expect(label).toHaveAttribute('tabindex', '0');
+    // aria-label 走 strata.lane.pin.aria，含 type 名
+    expect(label.getAttribute('aria-label')).toMatch(/Installation/);
   });
 });

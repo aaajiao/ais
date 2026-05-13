@@ -44,6 +44,22 @@
       "degenerate": "lost / damaged",
       "unknownYear": "no year"
     },
+    "lane": {
+      "pin": {
+        "aria": "Pin / unpin category {{type}}",
+        "hint": ""
+      },
+      "summary": {
+        "artworks": "{{count}} artworks",
+        "editions": "{{count}} editions",
+        "held": "{{count}} held",
+        "external": "{{count}} external",
+        "departed": "{{count}} departed",
+        "degenerate": "{{count}} degenerate",
+        "yearSpan": "spans {{from}}–{{to}}",
+        "yearSpanEmpty": "spans —"
+      }
+    },
     "gapNote": "Record time ≠ creation time. 85 of 87 history rows were written in a few weeks of 2026."
   },
   "markets": {

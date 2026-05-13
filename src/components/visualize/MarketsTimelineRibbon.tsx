@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Play, Pause } from 'lucide-react';
 import { useTimelineScrubber } from './useTimelineScrubber';
@@ -79,6 +80,8 @@ export default function MarketsTimelineRibbon(props: MarketsTimelineRibbonProps)
     onPlayComplete,
   });
 
+  const [dragging, setDragging] = useState(false);
+
   if (!enabled) return null;
 
   const histogram = buildActivityHistogram(dates);
@@ -94,6 +97,42 @@ export default function MarketsTimelineRibbon(props: MarketsTimelineRibbonProps)
   const dateToX = (iso: string): number => {
     const ms = isoToMs(iso);
     return ((ms - minMs) / timeSpan) * axisWidth;
+  };
+
+  /**
+   * pointer (clientX) → 最近的 sale date (ISO string)
+   *
+   * 转坐标用 overlay rect 的 `getBoundingClientRect()`：localX / rect.width
+   * 直接是"屏幕坐标比例" = "SVG 内部 localX / axisWidth"（同一 viewBox 缩放比例）。
+   * 然后把比例映射回**连续时间轴**上的目标 ms，扫描 dates[] 找最接近的。
+   *
+   * 关键：用连续时间映射、不用 idx 比例 —— 跟 ▼ marker / histogram bin /
+   * tick label 的连续时间坐标系一致。这是 v1.6 修复"点击不准"bug 的核心：
+   * 之前 `<input type="range">` 走 idx 离散映射，sale dates 不等距时 thumb
+   * 位置和 marker 位置永远偏移。
+   */
+  const pointerToDate = (e: React.PointerEvent<SVGRectElement>): string => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio =
+      rect.width > 0
+        ? Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+        : 0;
+    const targetMs = minMs + ratio * timeSpan;
+    let bestIdx = 0;
+    let bestDelta = Infinity;
+    for (let i = 0; i < dates.length; i++) {
+      const d = Math.abs(isoToMs(dates[i]) - targetMs);
+      if (d < bestDelta) {
+        bestDelta = d;
+        bestIdx = i;
+      }
+    }
+    return dates[bestIdx];
+  };
+
+  const handlePointer = (e: React.PointerEvent<SVGRectElement>) => {
+    const next = pointerToDate(e);
+    if (next !== currentDate) onDateChange(next);
   };
 
   const baselineY = HIST_AREA_H + BASELINE_GAP;
@@ -202,8 +241,18 @@ export default function MarketsTimelineRibbon(props: MarketsTimelineRibbonProps)
         {formatYearMonth(currentDate)}
       </text>
 
-      {/* ─── 透明 input 覆盖 ribbon 区，native a11y / 键盘 / 触屏 ──────── */}
-      <foreignObject x={0} y={0} width={axisWidth} height={ribbonH}>
+      {/* ─── 隐形 range input：仅服务键盘 a11y（Tab focus + ← →） ────────
+          pointer-events: none —— 不响应鼠标/触屏，避免跟下方 overlay rect
+          的 idx 离散映射冲突（v1.6 修复点击偏移 bug 的核心）。
+          仍保留在 DOM 是为了让 Tab 键聚焦 + 左右键步进 + screen reader
+          读出 aria-valuetext。 */}
+      <foreignObject
+        x={0}
+        y={0}
+        width={axisWidth}
+        height={ribbonH}
+        pointerEvents="none"
+      >
         <input
           type="range"
           min={0}
@@ -217,16 +266,56 @@ export default function MarketsTimelineRibbon(props: MarketsTimelineRibbonProps)
           aria-valuenow={currentIdx}
           aria-valuetext={formatYearMonth(currentDate)}
           style={{
+            position: 'absolute',
+            inset: 0,
             width: '100%',
             height: '100%',
             margin: 0,
             padding: 0,
             opacity: 0,
-            cursor: 'pointer',
+            pointerEvents: 'none',
             display: 'block',
           }}
         />
       </foreignObject>
+
+      {/* ─── pointer 点击/拖拽 overlay —— 连续时间映射 → 最近 sale date
+          只覆盖 axisWidth 范围，绝不延伸到 playBtnX 之后（不抢 Play 按钮的点击）。
+          setPointerCapture 让 drag 超出 rect 仍能持续触发 move，连贯体验。 */}
+      <rect
+        data-testid="markets-ribbon-click-overlay"
+        x={0}
+        y={0}
+        width={axisWidth}
+        height={ribbonH}
+        fill="transparent"
+        pointerEvents="all"
+        style={{ cursor: 'pointer' }}
+        onPointerDown={(e) => {
+          // setPointerCapture 在 jsdom 没实现 —— try/catch 防御
+          try {
+            e.currentTarget.setPointerCapture(e.pointerId);
+          } catch {
+            /* noop */
+          }
+          setDragging(true);
+          handlePointer(e);
+        }}
+        onPointerMove={(e) => {
+          if (dragging) handlePointer(e);
+        }}
+        onPointerUp={(e) => {
+          setDragging(false);
+          try {
+            if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+              e.currentTarget.releasePointerCapture(e.pointerId);
+            }
+          } catch {
+            /* noop */
+          }
+        }}
+        onPointerCancel={() => setDragging(false)}
+      />
 
       {/* ─── Play 按钮 ─────────────────────────────────────────────────── */}
       <foreignObject

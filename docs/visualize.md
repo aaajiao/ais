@@ -85,7 +85,12 @@ interface UseTimelineScrubberResult<T> {
 
 **这条原则不要回退**：Markets ribbon 不要"为对齐 Strata 风格"而加 drop line——viz 不同 view 用不同视觉词汇是回应数据语义不同。Strata 和 Markets 都用同一个 `useTimelineScrubber` hook（共享逻辑），但视觉各自。
 
-**交互**：透明 `<input type="range">` 嵌在 SVG `<foreignObject>` 中覆盖 ribbon 区域 → native a11y / 键盘 / 触屏全免费；SVG marker / drop line 跟随 input value 渲染。Play 按钮也在独立 `<foreignObject>` 里，纯 Lucide `Play` / `Pause` icon 无边框。
+**交互**：
+
+- **Strata ribbon**：透明 `<input type="range">` 嵌在 SVG `<foreignObject>` 中覆盖 ribbon 区域 → native a11y / 键盘 / 触屏全免费；SVG marker / drop line 跟随 input value 渲染。Strata X 轴本身是 `yearRange[]`（**离散等距**），idx 跟年份是同一映射，native range thumb 跟 marker 几何同步，没有偏移。
+- **Markets ribbon（v1.6 修复点击偏移）**：Markets 用**连续时间映射**（marker / histogram bin / tick label 都按 `(ms - minMs) / span * axisWidth` 算），但 sale dates 是**不等距**的（稀疏停留点）。如果走 native `<input type="range">` 的 idx 离散映射，点击屏幕 X → 浏览器按 idx 比例算 thumb → 触发 `dates[idx]` 反算 marker 连续时间位置 → 用户看到的"点击的地方"和"marker 落点"永远偏移。修复用自建 SVG `<rect data-testid="markets-ribbon-click-overlay">` 接管 pointer：`onPointerDown/Move/Up` 读 `getBoundingClientRect()` 算 `clientX → ratio → targetMs`，扫 `dates[]` 选最近的 ISO date 调 `onDateChange`。`setPointerCapture` 让 drag 拖出 rect 边界仍连贯。原 `<input type="range">` 保留在 DOM 里但 `pointer-events: none`，**只服务键盘 a11y**（Tab focus + ← → 步进 + screen reader 读 aria-valuetext）。overlay rect width = `axisWidth`，绝不延伸到 `playBtnX` 之后，不抢 Play 按钮的点击。Play 按钮也在独立 `<foreignObject>` 里，纯 Lucide `Play` / `Pause` icon 无边框。
+
+这条原则也要记住：Markets 跟 Strata 在 pointer 接入策略上**故意不同**，因为底层时间映射不同。任何"统一两个 ribbon 的输入实现"的重构必须先承认这一点。回退到 Markets 直接用 native range 会让点击偏移 bug 再次出现。
 
 **SVG 高度调整**：两个 view 都加 `RIBBON_H + RIBBON_GAP = 40px` 的顶部空间，原有 history burst bar / currency header / 散点区 / noPrice lane 都顺延 `ribbonOffset` 像素。**单点数据时 ribbon 不渲染、offset=0**，原视觉零 regression。
 
@@ -140,6 +145,15 @@ i18n keys 走各 view 自己段：`strata.legend.*` / `markets.legend.*` / `dias
 - **时间播头（M1）**：顶部 `Timeline` scrubber 按 `artworks.year` 播——artistic time 而非 `created_at`（后者跟 history 同病：录入时间集中在 2026）。超出 cutoff 的方块走 `BLOCK_FUTURE_CLS = 'opacity-[0.15]'`——dim 不 hide，保留"未来鬼影"。`values` 数组复用 `yearRange` 已算好的连续年份列（含空年份），跟 swimlane x 轴一致。
 - **Ownership 编码（M2）**：方块走 `OwnershipBlock` 组件按 `getArtworkOwnershipState(artwork, editions)` 四态渲染：`held` = `<rect fill="none" stroke-foreground strokeWidth=1.5>`；`external` = `<rect fill={url(#viz-strata-pattern-dots)}>`（pattern 在 SVG `<defs>` 内定义，id 命名空间隔离避免跨 view 撞名，`<circle>` 用 `currentColor` 由 Tailwind dark mode 自动适配）；`departed` = `<rect fill-foreground>`；degenerate 是独立 `<g data-mark="degenerate">` 叠加两条对角 `<line>`（80% 边长、`opacity=X_MARK_OPACITY`、`pointer-events-none`）。播头 dim 通过 `BLOCK_FUTURE_CLS` 叠加在以上之上——它改 opacity，不动 fill/stroke，两条轴正交。
 - **Unknown year 列（M2）**：year 无法解析的作品收进最右侧的 `UNKNOWN_YEAR_KEY = '__unknown_year__'` 列（`getUnknownYearArtworks(artworks)` 抽出），列头单字符 `?` opacity 较低。该列所有方块强制 `forceStrokeOnly={true}`——**缺失态优先级 > ownership 桶**（"无法被放进时间地图"是比"是否离开艺术家"更基础的事实）。时间播头不过滤此列。`data-unknown-year="true"` 给测试断言用。
+- **Y 轴 Pin 交互（v1.6.x 起）**：Y 轴 swimlane 的 type label 不仅可 hover，也可 **click pin**，让分类持续选中并在底部信息面板显示该 lane 的聚合统计。
+  - **State 模型**：`pinnedLane`（持续）与 `hoveredLane`（瞬态）独立存储，`effectiveLane = pinnedLane ?? hoveredLane` 驱动所有 lane 维度的视觉判断（block dim、label opacity）。这样 hover 与 pin **视觉连贯**：hover 临时高亮某 lane，click 把高亮固化；同 label 再点 unpin，不同 label 切换。
+  - **可点击 label**：type label 用 `<g role="button" tabIndex={0} aria-pressed={isPinned} aria-label={t('strata.lane.pin.aria')}>` 包裹 `<text>`，`cursor: pointer`，键盘 Enter / Space 触发 toggle。`data-testid="lane-label-{type}"` 给测试用。
+  - **Pin marker（视觉连贯的关键）**：pinned 状态下 label 行最左侧渲染一根短粗竖条 `<rect x={4} width=1.5 height=9 fill-foreground>` —— 靠 SVG 内 absolute 位置（x=4）而非贴文字测量，避免依赖 textWidth。**hover 只用 label opacity 0.75→1.0 区分，不画 marker**，保持 hover ≠ pin 视觉可分辨。`data-testid="lane-pin-marker-{type}"`。
+  - **底部信息面板优先级链**：`hoveredArtwork > hoveredYear > pinnedLane > overview`。pin 低于 hover —— hover 单 block 时 artwork tooltip 临时覆盖 pin 信息，鼠标离开 block 回到 pin 视图（不丢上下文），不是退回 overview。这条优先级**不要改**：hover 优先于 pin 是因为 hover 是用户当下的注意力焦点。
+  - **Lane 聚合（`buildLaneStats`）**：`strataUtils.ts` 的 `buildLaneStats(swimlanes, ownershipMap, editions)` 返回 `Map<type, LaneStats>`。`editionCount` 通过 `artwork_id` 链聚合（FK 链路一致）。`ownership` 是 4 个独立计数：bucket（held/external/departed）始终 +1，`isDegenerate=true` 时**额外** degenerate +1 —— degenerate 与 bucket 是 **OR 关系不是 XOR**，跟图例 5 种 glyph 一致（4 bucket × degenerate overlay）。yearSpan 全部缺 year 时返回 null（panel 显示 `spans —`）。
+  - **Panel ownership 行用文本 glyph 字符**：`◻ held N  ▦ external N  ◼ departed N  ✕ degenerate N`，**不**用 inline SVG —— info bar 是 HTML 不是 SVG，inline SVG 会破坏 mono 字体的字符流对齐。glyph 字符跟 mono 字体宽度匹配。
+  - **i18n key 独立、不跨 view 借用**：所有 lane 文案在 `strata.lane.*` 段下（`pin.aria`、`summary.{artworks,editions,held,external,departed,degenerate,yearSpan,yearSpanEmpty}`）。即使 "held / external / departed / degenerate" 跟 `strata.legend.*` 文字接近也**单独写**——CLAUDE.md 明确警告的 ticking bomb。`visualize-parity.test.ts` 守护 zh ⟷ en 同步。
+  - **Panel 不列 edition 明细**：Strata 是 overview 层，点开单个作品才看明细。Pin panel 只给"这一类长什么样"的聚合视图。
 
 ### Markets
 
@@ -186,17 +200,17 @@ i18n keys 走各 view 自己段：`strata.legend.*` / `markets.legend.*` / `dias
 | 文件 | 测试 |
 |---|---|
 | `useVisualizationData.test.ts` | 4 — 并行查 4 表 / RLS deleted_at / 聚合 / error 传播 |
-| `strataUtils.test.ts` | 26 — year 解析 / swimlane 分组 + 排序 / `(untyped)` 处理 / 高度 log scale / stack 满了水平蔓延 |
+| `strataUtils.test.ts` | 71 — year 解析 / swimlane 分组 + 排序 / `(untyped)` 处理 / 高度 log scale / stack 满了水平蔓延 / `buildLaneStats`（ownership 4 桶 + degenerate OR / edition 链聚合 / yearSpan 空与非空 / untyped 保留 / 兜底 held） |
 | `marketsUtils.test.ts` | 36 — 过滤 sold/有价 / 中位数 / 半径归一化 / 边界 / `filterSalesByDateCutoff`（M1）/ `getSalesWithoutPrice`（M2）/ `buildActivityHistogram`（M1.5 优化：年/月 kind 切换 / 连续空桶 / 同 bin 多命中累加 / maxCount / minISO maxISO） |
 | `terminalUtils.test.ts` | 29 — inventory 自然排序 / edition label 4 种 / location 拼接 / group 分桶 / markets line |
 | `TerminalView.test.tsx` | 9 — 行 role=button + tabIndex / 点击 navigate / 键盘 Enter+Space / 其他键不触发 / 分组 heading + aria-hidden 装饰 / 紧凑字号 class / row.id 防御 / separator 对 SR 隐藏 |
 | `diasporaUtils.test.ts` | 35 — 节点关联 / 中心选择 tie-breaker / 同心环布局 / 边聚合 / tracked stat / `getGhostNodes`（M2） |
 | `DiasporaView.test.tsx` | 22 — 初始状态 / hover 预览 / hover 离开 / click pin / edition 行跳转 / view all 跳转 / 二次 click 取消 pin / 切换 pin / pin 时 hover 不干扰 / 无编号 edition / 空数据 / aria-pressed / 键盘 Enter / title_cn fallback / 长名 SVG `<title>` / center node `<title>` / pin 卡片 stopPropagation / spy stopPropagation / ghost 环渲染（M2）/ ghost count=0 不画（M2）/ ghost aria-hidden（M2）/ legend 含 ghost 项（M2.5） |
-| `StrataView.test.tsx` | 26 — role=button 包裹 rect / aria-label 拼装 / click navigate / Enter / Space / 其它键不触发 / tabindex=0 / id 缺失 aria-disabled / viewBox 响应式 / hover tooltip / 空数据 / 多年份渲染 Timeline（M1）/ 单年份不渲染 Timeline（M1）/ 默认 t=max 不 dim（M1）/ scrub 到中段部分 dim（M1）/ ownership held = stroke-only（M2）/ external = pattern fill（M2）/ departed = solid（M2）/ degenerate X 叠加（M2）/ unknown-year 列渲染（M2）/ unknown-year 强制 stroke-only（M2）/ unknown-year 不被播头过滤（M2）/ pattern defs 命名空间（M2）/ stroke-only 带 pointerEvents=all（M2 fix）/ legend 5 项（M2.5） |
+| `StrataView.test.tsx` | 37 — role=button 包裹 rect / aria-label 拼装 / click navigate / Enter / Space / 其它键不触发 / tabindex=0 / id 缺失 aria-disabled / viewBox 响应式 / hover tooltip / 空数据 / 多年份渲染 Timeline（M1）/ 单年份不渲染 Timeline（M1）/ 默认 t=max 不 dim（M1）/ scrub 到中段部分 dim（M1）/ ownership held = stroke-only（M2）/ external = pattern fill（M2）/ departed = solid（M2）/ degenerate X 叠加（M2）/ unknown-year 列渲染（M2）/ unknown-year 强制 stroke-only（M2）/ unknown-year 不被播头过滤（M2）/ pattern defs 命名空间（M2）/ stroke-only 带 pointerEvents=all（M2 fix）/ legend 5 项（M2.5）/ Y 轴 pin：click toggle / 同 label 再点 unpin / 切换 pin / 其他 lane dim / 信息面板内容 / hover 覆盖 pin / mouseLeave 回 pin / 键盘 Enter+Space toggle / a11y aria-pressed+tabindex |
 | `MarketsView.test.tsx` | 21 — 货币列降序 / 散点 a11y / 空状态 / summary 段隔离 / 多 sale_date 渲染 Timeline（M1）/ 单点不渲染 Timeline（M1）/ 默认 t=max 不 dim（M1）/ scrub 后 dim（M1）/ noPrice lane 渲染（M2）/ count=0 不画 lane（M2）/ stroke-only 圆 + label（M2）/ noPrice 圆可 navigate（M2）/ noPrice 圆带 pointerEvents=all（M2 fix）/ legend 2 项（M2.5） |
 | `useTimelineScrubber.test.ts` | 8 — enabled 计算 / setIdx 边界 / togglePlay / rAF 推进 / unmount cancel / 单点禁用 / play 复位 / play complete |
 | `StrataTimelineRibbon.test.tsx` | 9 — SVG `<g>` 渲染 / marker 三角 + 当前 year label / drop line 长度对齐 swimlane / Play 按钮 toggle / 透明 input 可拖 / 单年份返 null / aria 属性 / play complete URL 落地 / testid 保留 |
-| `MarketsTimelineRibbon.test.tsx` | 11 — 渲染 / 单点返 null / histogram bar 数 = 非空 bin / cutoff 之后 bin opacity 0.15 / marker 连续时间轴位置 / 不渲染 drop line（M1.5 优化）/ slider onChange / a11y / Play / 稀疏 tick label / 颜色全 currentColor |
+| `MarketsTimelineRibbon.test.tsx` | 18 — 渲染 / 单点返 null / histogram bar 数 = 非空 bin / cutoff 之后 bin opacity 0.15 / marker 连续时间轴位置 / 不渲染 drop line（M1.5 优化）/ 键盘 slider 触发 onDateChange（a11y）/ aria-valuetext / Play / 稀疏 tick label / 颜色全 currentColor / **pointer click 25% 选最近 date（v1.6）/ pointer 0% / 50% / 100% 选对应 date / pointer drag 持续触发 / pointer 未 down 不 hijack / overlay 宽度 = axisWidth / 点击 → marker 坐标系闭环 / input pointer-events: none / overlay pointer-events: all** |
 | `Legend.test.tsx` | 5 — 渲染所有 item / glyph testid / separatorBefore 插入 `│` / 不传 separator 时无 `│` / 空数组 |
 | `Visualize.test.tsx` | 10 — loading / error / 4 个 view 默认渲染 / 非法 ?view 回落 / refetch 按钮 / 容器断点 lg: / `?view=strata&t=2024` smoke（M1） |
 | `visualize-parity.test.ts` | 2 — zh ⟷ en key 完全一致 / 核心段都存在 |

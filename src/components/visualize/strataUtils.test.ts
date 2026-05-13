@@ -8,7 +8,9 @@ import {
   filterArtworksByYearCutoff,
   getArtworkOwnershipState,
   getUnknownYearArtworks,
+  buildLaneStats,
   OWNERSHIP_STATUS_MAP,
+  type ArtworkOwnershipState,
 } from './strataUtils';
 import type {
   VizArtwork,
@@ -544,5 +546,149 @@ describe('getUnknownYearArtworks', () => {
 
   it('空输入 → 空数组', () => {
     expect(getUnknownYearArtworks([])).toEqual([]);
+  });
+});
+
+// ─── M2: buildLaneStats（Y 轴 pin 信息面板） ────────────────────────────────
+
+describe('buildLaneStats', () => {
+  it('空 swimlanes → 空 Map', () => {
+    expect(buildLaneStats([], new Map(), [])).toEqual(new Map());
+  });
+
+  it('单 lane 全 held（无 edition）→ ownership.held = 作品数，其余 0', () => {
+    const swimlanes = buildSwimlanes([
+      makeArtwork({ id: 'a1', type: 'Installation', year: '2020' }),
+      makeArtwork({ id: 'a2', type: 'Installation', year: '2021' }),
+    ]).swimlanes;
+    const ownershipMap = new Map<string, ArtworkOwnershipState>([
+      ['a1', { bucket: 'held', isDegenerate: false }],
+      ['a2', { bucket: 'held', isDegenerate: false }],
+    ]);
+    const stats = buildLaneStats(swimlanes, ownershipMap, []);
+    const lane = stats.get('Installation');
+    expect(lane).toBeDefined();
+    expect(lane!.artworkCount).toBe(2);
+    expect(lane!.editionCount).toBe(0);
+    expect(lane!.ownership).toEqual({
+      held: 2,
+      external: 0,
+      departed: 0,
+      degenerate: 0,
+    });
+  });
+
+  it('混合 ownership 桶 → bucket 各自 +1', () => {
+    const swimlanes = buildSwimlanes([
+      makeArtwork({ id: 'a1', type: 'V', year: '2020' }),
+      makeArtwork({ id: 'a2', type: 'V', year: '2021' }),
+      makeArtwork({ id: 'a3', type: 'V', year: '2022' }),
+    ]).swimlanes;
+    const ownershipMap = new Map<string, ArtworkOwnershipState>([
+      ['a1', { bucket: 'held', isDegenerate: false }],
+      ['a2', { bucket: 'external', isDegenerate: false }],
+      ['a3', { bucket: 'departed', isDegenerate: false }],
+    ]);
+    const stats = buildLaneStats(swimlanes, ownershipMap, []);
+    const lane = stats.get('V')!;
+    expect(lane.ownership).toEqual({
+      held: 1,
+      external: 1,
+      departed: 1,
+      degenerate: 0,
+    });
+  });
+
+  it('degenerate 与 bucket 是 OR 关系（不互斥）: departed + degenerate 各 +1', () => {
+    // 这条守护"4 bucket × degenerate overlay = 5 项独立计数"的关键不变式
+    const swimlanes = buildSwimlanes([
+      makeArtwork({ id: 'a1', type: 'V', year: '2020' }),
+      makeArtwork({ id: 'a2', type: 'V', year: '2021' }),
+    ]).swimlanes;
+    const ownershipMap = new Map<string, ArtworkOwnershipState>([
+      ['a1', { bucket: 'departed', isDegenerate: true }], // 同时 +departed +degenerate
+      ['a2', { bucket: 'held', isDegenerate: true }], // 同时 +held +degenerate
+    ]);
+    const stats = buildLaneStats(swimlanes, ownershipMap, []);
+    const lane = stats.get('V')!;
+    expect(lane.ownership).toEqual({
+      held: 1,
+      external: 0,
+      departed: 1,
+      degenerate: 2,
+    });
+  });
+
+  it('editionCount 通过 artwork_id 链聚合（忽略其他 lane 的 edition）', () => {
+    const swimlanes = buildSwimlanes([
+      makeArtwork({ id: 'a1', type: 'V', year: '2020' }),
+      makeArtwork({ id: 'a2', type: 'V', year: '2021' }),
+      makeArtwork({ id: 'a-other', type: 'I', year: '2020' }),
+    ]).swimlanes;
+    const editions: VizEdition[] = [
+      makeEdition('e1', 'a1', 'in_studio'),
+      makeEdition('e2', 'a1', 'sold'),
+      makeEdition('e3', 'a2', 'at_gallery'),
+      makeEdition('e4', 'a-other', 'sold'), // 不属于 V lane
+    ];
+    const stats = buildLaneStats(swimlanes, new Map(), editions);
+    expect(stats.get('V')!.editionCount).toBe(3);
+    expect(stats.get('I')!.editionCount).toBe(1);
+  });
+
+  it('yearSpan 取最小最大', () => {
+    const swimlanes = buildSwimlanes([
+      makeArtwork({ id: 'a1', type: 'V', year: '2014' }),
+      makeArtwork({ id: 'a2', type: 'V', year: '2025' }),
+      makeArtwork({ id: 'a3', type: 'V', year: '2019' }),
+    ]).swimlanes;
+    const stats = buildLaneStats(swimlanes, new Map(), []);
+    expect(stats.get('V')!.yearSpan).toEqual({ min: 2014, max: 2025 });
+  });
+
+  it('yearSpan = null 当全部 artwork 都缺 year', () => {
+    const swimlanes = buildSwimlanes([
+      makeArtwork({ id: 'a1', type: 'V', year: null }),
+      makeArtwork({ id: 'a2', type: 'V', year: 'unknown' }),
+    ]).swimlanes;
+    const stats = buildLaneStats(swimlanes, new Map(), []);
+    expect(stats.get('V')!.yearSpan).toBeNull();
+  });
+
+  it('yearSpan 部分缺 year → 仍按可解析的 year 计算', () => {
+    const swimlanes = buildSwimlanes([
+      makeArtwork({ id: 'a1', type: 'V', year: '2018' }),
+      makeArtwork({ id: 'a2', type: 'V', year: null }),
+      makeArtwork({ id: 'a3', type: 'V', year: '2022' }),
+    ]).swimlanes;
+    const stats = buildLaneStats(swimlanes, new Map(), []);
+    expect(stats.get('V')!.yearSpan).toEqual({ min: 2018, max: 2022 });
+  });
+
+  it('保留 type / displayLabel（含 untyped）', () => {
+    const swimlanes = buildSwimlanes([
+      makeArtwork({ id: 'a1', type: null, year: '2020' }),
+      makeArtwork({ id: 'a2', type: 'Video', year: '2020' }),
+    ]).swimlanes;
+    const stats = buildLaneStats(swimlanes, new Map(), []);
+    const untyped = stats.get('__untyped__');
+    expect(untyped).toBeDefined();
+    expect(untyped!.displayLabel).toBe('(untyped)');
+    expect(stats.get('Video')!.displayLabel).toBe('Video');
+  });
+
+  it('ownershipMap 缺 entry → 兜底为 held', () => {
+    // 防御：未来如果 ownership 计算路径漏算某件作品，不崩、归 held（跟
+    // OwnershipBlock 渲染兜底一致）
+    const swimlanes = buildSwimlanes([
+      makeArtwork({ id: 'a1', type: 'V', year: '2020' }),
+    ]).swimlanes;
+    const stats = buildLaneStats(swimlanes, new Map(), []);
+    expect(stats.get('V')!.ownership).toEqual({
+      held: 1,
+      external: 0,
+      departed: 0,
+      degenerate: 0,
+    });
   });
 });

@@ -203,6 +203,85 @@ export function filterArtworksByYearCutoff(
   });
 }
 
+// ─── LaneStats（M2 Y 轴 pin 交互） ──────────────────────────────────────────
+// 为单条 swimlane 聚合：作品数 / edition 数 / ownership 4 项 / year span。
+//
+// ownership 计数遵循 `OwnershipBlock` 的渲染语义 —— `bucket` 与 `degenerate` 是
+// 正交两轴：bucket 始终 +1（held/external/departed 之一），isDegenerate=true
+// 时**额外** degenerate +1。这跟图例 5 种 glyph 保持一致（4 桶 + degenerate
+// overlay），不是 XOR 关系。
+//
+// yearSpan：从 swimlane.artworks 取 anchor year，全部 unknown 时返回 null。
+
+export interface LaneStats {
+  type: string;
+  displayLabel: string;
+  artworkCount: number;
+  editionCount: number;
+  ownership: {
+    held: number;
+    external: number;
+    departed: number;
+    degenerate: number;
+  };
+  yearSpan: { min: number; max: number } | null;
+}
+
+export function buildLaneStats(
+  swimlanes: Swimlane[],
+  ownershipMap: Map<string, ArtworkOwnershipState>,
+  editions: VizEdition[]
+): Map<string, LaneStats> {
+  const result = new Map<string, LaneStats>();
+
+  for (const sl of swimlanes) {
+    const artworkIds = new Set<string>();
+    for (const a of sl.artworks) {
+      if (a.id) artworkIds.add(a.id);
+    }
+
+    let editionCount = 0;
+    for (const ed of editions) {
+      if (artworkIds.has(ed.artwork_id)) editionCount++;
+    }
+
+    const ownership = { held: 0, external: 0, departed: 0, degenerate: 0 };
+    let yearMin: number | null = null;
+    let yearMax: number | null = null;
+
+    for (const a of sl.artworks) {
+      const own = ownershipMap.get(a.id) ?? {
+        bucket: 'held' as const,
+        isDegenerate: false,
+      };
+      // bucket 始终 +1
+      ownership[own.bucket]++;
+      // degenerate 独立 overlay（不替代 bucket，按 OR 而非 XOR）
+      if (own.isDegenerate) ownership.degenerate++;
+
+      const y = parseYearAnchor(a.year);
+      if (y !== null) {
+        if (yearMin === null || y < yearMin) yearMin = y;
+        if (yearMax === null || y > yearMax) yearMax = y;
+      }
+    }
+
+    result.set(sl.type, {
+      type: sl.type,
+      displayLabel: sl.displayLabel,
+      artworkCount: sl.artworks.length,
+      editionCount,
+      ownership,
+      yearSpan:
+        yearMin !== null && yearMax !== null
+          ? { min: yearMin, max: yearMax }
+          : null,
+    });
+  }
+
+  return result;
+}
+
 // ─── stackPositionFor ───────────────────────────────────────────────────────
 // 给定 cell 内作品数和带高，返回每个作品的 (row, col)。
 // 先竖直堆（row 递增），行满了水平后移一格（col 递增，row 重置为 0）。
