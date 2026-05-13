@@ -393,6 +393,10 @@ describe('StrataView', () => {
     expect(xGroup).not.toBeNull();
     const lines = xGroup!.querySelectorAll('line');
     expect(lines.length).toBe(2);
+    // X 必须用 stroke-background（跟 fill-foreground 反差），否则同色叠加 X 不可见
+    const xCls = xGroup!.getAttribute('class') ?? '';
+    expect(xCls).toContain('stroke-background');
+    expect(xCls).not.toContain('stroke-foreground');
   });
 
   it('混合 edition：at_gallery + sold → 聚合为 departed', () => {
@@ -487,5 +491,17 @@ describe('StrataView', () => {
     for (const key of ['held', 'external', 'departed', 'degenerate', 'unknownYear']) {
       expect(screen.getByTestId(`legend-glyph-${key}`)).toBeInTheDocument();
     }
+  });
+
+  it('DegenerateGlyph 的 X 用 stroke-background（不是 stroke-foreground）', () => {
+    // 同色叠加 (fill-foreground + stroke-foreground) X 不可见。
+    // 这条守护让 glyph 跟 OwnershipBlock X 的修复保持一致。
+    renderStrata();
+    const wrap = screen.getByTestId('legend-glyph-degenerate');
+    const xGroup = wrap.querySelector('svg > g');
+    expect(xGroup).not.toBeNull();
+    const cls = xGroup!.getAttribute('class') ?? '';
+    expect(cls).toContain('stroke-background');
+    expect(cls).not.toContain('stroke-foreground');
   });
 });

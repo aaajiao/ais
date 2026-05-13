@@ -35,9 +35,11 @@ interface Props {
 // ─── M2 状态编码 ────────────────────────────────────────────────────────────
 // SVG defs 里的 dot pattern id —— 与 Markets 隔离避免重名（v1.6 共享 viewBox 同根 SVG 时此名都可见）
 const DOT_PATTERN_ID = 'viz-strata-pattern-dots';
-// X 标记线宽细于 stroke（1.5）
-const X_MARK_STROKE = 0.8;
-const X_MARK_OPACITY = 0.6;
+// X 标记：画在 solid fill-foreground 方块之上，必须用 stroke-background 形成
+// 反差（同色 stroke-foreground 会跟 fill 合并不可见）。宽度调到比 stroke 略粗
+// 提升小尺寸（BLOCK=8px）下的可读性。
+const X_MARK_STROKE = 1.2;
+const X_MARK_OPACITY = 0.9;
 
 // ─── 几何常量 ────────────────────────────────────────────────────────────────
 const BLOCK = 8;          // 方块边长
@@ -758,14 +760,17 @@ function OwnershipBlock(props: {
   );
 
   // X 标记：lost / damaged 在主形之上叠加。X 长度 = size 的 80%，居中。
+  // stroke-background 在 fill-foreground 方块上形成"切口"——必须反差色，
+  // stroke-foreground 等于把同色画在同色上，看不见。
   const xMark = ownership.isDegenerate ? (
     <g
       data-mark="degenerate"
       className={cn(
-        'stroke-foreground pointer-events-none transition-opacity duration-100',
+        'stroke-background pointer-events-none transition-opacity duration-100',
         stateCls
       )}
       strokeWidth={X_MARK_STROKE}
+      strokeLinecap="round"
       opacity={X_MARK_OPACITY}
     >
       <line

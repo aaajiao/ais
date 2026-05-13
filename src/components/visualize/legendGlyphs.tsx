@@ -51,10 +51,12 @@ export function DepartedGlyph() {
 }
 
 export function DegenerateGlyph() {
+  // X 用 stroke-background 而非 stroke-foreground —— 在 fill-foreground
+  // 方块上画"切口"。同色叠加 (stroke=fill=foreground) 等于看不见。
   return (
     <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
       <rect x={1} y={1} width={SIZE - 2} height={SIZE - 2} className="fill-foreground" />
-      <g className="stroke-foreground" strokeWidth={1.3} opacity={0.6}>
+      <g className="stroke-background" strokeWidth={1.5} strokeLinecap="round">
         <line x1={3} y1={3} x2={SIZE - 3} y2={SIZE - 3} />
         <line x1={SIZE - 3} y1={3} x2={3} y2={SIZE - 3} />
       </g>
