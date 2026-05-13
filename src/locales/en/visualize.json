@@ -5,6 +5,15 @@
   "error": "Failed to load archive",
   "errorRetry": "Retry",
   "empty": "No data to visualize",
+  "timeline": {
+    "play": "Play",
+    "pause": "Pause",
+    "reset": "Reset to present",
+    "current": "Now: {{value}}",
+    "rangeLabel": "Time scrubber from {{min}} to {{max}}",
+    "ariaSlider": "Scrub time",
+    "dimmedHint": "Items after this moment are dimmed"
+  },
   "view": {
     "strata": "Strata",
     "markets": "Markets",

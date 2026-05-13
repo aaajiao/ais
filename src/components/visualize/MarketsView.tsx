@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { VizArtwork, VizEdition } from '@/hooks/queries/useVisualizationData';
 import {
@@ -8,6 +8,7 @@ import {
   priceToRadius,
   priceToY,
 } from './marketsUtils';
+import Timeline from './Timeline';
 
 export interface MarketsViewProps {
   artworks: VizArtwork[];
@@ -29,6 +30,8 @@ const TOTAL_H = TOP_PAD + HEADER_H + PANEL_H + STAT_H;
 // hover opacity 与 Strata 对齐（locked design decision）：默认 0.65，hover 升 1.0
 const DOT_OPACITY_DEFAULT = 0.65;
 const DOT_OPACITY_HOVER = 1.0;
+// 播头之后的"未来"散点：保留鬼影，0.15 让形状仍可见但不抢视觉重心
+const DOT_OPACITY_FUTURE = 0.15;
 
 function formatPrice(price: number, currency: string): string {
   try {
@@ -45,7 +48,11 @@ function formatPrice(price: number, currency: string): string {
 export default function MarketsView({ artworks, editions }: MarketsViewProps) {
   const { t } = useTranslation('visualize');
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [hoveredEdition, setHoveredEdition] = useState<VizEdition | null>(null);
+  const [playing, setPlaying] = useState(false);
+  // play 中只在内存里推进 cutoff（避免 URL 抖动），stop 时落 URL 并清掉
+  const [playingCutoff, setPlayingCutoff] = useState<string | null>(null);
 
   // 作品 id → 作品
   const artworkMap = useMemo(() => {
@@ -78,6 +85,43 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
 
   const currencyCount = groups.length;
 
+  // ─── 时间播头 cutoff date ──────────────────────────────────────────────────
+  // values 是所有 sold edition 中出现过的 distinct sale_date（升序），
+  // 保证拖动 slider 只能停在真实数据点上（不引入"假"时间刻度）。
+  const saleDates = useMemo(() => {
+    const set = new Set<string>();
+    for (const { sales } of groups) {
+      for (const ed of sales) {
+        if (ed.sale_date) set.add(ed.sale_date);
+      }
+    }
+    return Array.from(set).sort();
+  }, [groups]);
+
+  const maxDate = saleDates.length > 0 ? saleDates[saleDates.length - 1] : null;
+  const cutoffDate = useMemo(() => {
+    if (maxDate === null) return null;
+    const raw = searchParams.get('t');
+    if (raw && saleDates.includes(raw)) return raw;
+    return maxDate;
+  }, [searchParams, saleDates, maxDate]);
+
+  const setCutoffDate = useCallback(
+    (d: string, opts: { writeUrl: boolean } = { writeUrl: true }) => {
+      if (!opts.writeUrl) return;
+      const next = new URLSearchParams(searchParams);
+      if (maxDate !== null && d === maxDate) {
+        next.delete('t');
+      } else {
+        next.set('t', d);
+      }
+      setSearchParams(next, { replace: true });
+    },
+    [searchParams, setSearchParams, maxDate]
+  );
+
+  const effectiveCutoff = playing ? playingCutoff ?? cutoffDate : cutoffDate;
+
   if (currencyCount === 0) {
     return (
       <div className="py-24 text-center text-muted-foreground text-sm">
@@ -108,6 +152,38 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
           {t('markets.description')}
         </p>
       </header>
+
+      {/* ─── Time scrubber ──────────────────────────────────────────────── */}
+      {saleDates.length > 1 && effectiveCutoff !== null && (
+        <Timeline
+          values={saleDates}
+          current={effectiveCutoff}
+          onChange={(d) => {
+            if (playing) {
+              setPlayingCutoff(d);
+            } else {
+              setCutoffDate(d);
+            }
+          }}
+          format={(d) => d.slice(0, 7)}
+          playing={playing}
+          onPlayToggle={() => {
+            if (playing) {
+              if (playingCutoff !== null) setCutoffDate(playingCutoff);
+              setPlayingCutoff(null);
+              setPlaying(false);
+            } else {
+              setPlayingCutoff(cutoffDate);
+              setPlaying(true);
+            }
+          }}
+          onPlayComplete={() => {
+            if (playingCutoff !== null) setCutoffDate(playingCutoff);
+            setPlayingCutoff(null);
+            setPlaying(false);
+          }}
+        />
+      )}
 
       <div className="relative overflow-x-auto border border-border">
         <svg
@@ -170,6 +246,11 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
                   const cx = xColLeft + COL_PAD_X + r + jitter;
 
                   const isHovered = hoveredEdition?.id === ed.id;
+                  // future dim：sale_date > effectiveCutoff（按 ISO date 字符串比较，
+                  // 因 YYYY-MM-DD 字典序 = 时间序），sale_date 缺失视为"未来"（保守不亮）
+                  const isFuture =
+                    effectiveCutoff !== null &&
+                    (!ed.sale_date || ed.sale_date > effectiveCutoff);
                   const artwork = artworkMap.get(ed.artwork_id);
                   const dotLabel = t('markets.dotLabel', {
                     inv: ed.inventory_number ?? '—',
@@ -211,7 +292,11 @@ export default function MarketsView({ artworks, editions }: MarketsViewProps) {
                         r={r}
                         className="fill-foreground transition-opacity hover:opacity-100"
                         opacity={
-                          isHovered ? DOT_OPACITY_HOVER : DOT_OPACITY_DEFAULT
+                          isFuture
+                            ? DOT_OPACITY_FUTURE
+                            : isHovered
+                            ? DOT_OPACITY_HOVER
+                            : DOT_OPACITY_DEFAULT
                         }
                       />
                     </g>

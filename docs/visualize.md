@@ -19,6 +19,7 @@
 4. **缺失数据不藏**：Terminal 把 null 显式渲染为 `─`。Diaspora 顶部直接显示 `X / Y editions have known location history`，把档案的"薄"做成 statement，而不是装饰。Strata 的 `(untyped)` swimlane 同理。
 5. **跟随主题**：所有 SVG 颜色用 `fill-foreground` / `fill-muted-foreground` / `fill-border`，明暗模式自动适配。所有 view 都用单色 + 透明度做区分（绝不用彩色）。**Strata 不再用透明度区分 type**——type 身份由 swimlane 行位置承担，方块全部用统一 `fill-foreground` 0.65。
 6. **信息条不引导、展示总览**（v1.5.x 起）：底部 info bar 的 idle 态 **不**写"点击查看详情"/"悬停看节点"这类引导文字——元素本身可点击就是可点击，`cursor: pointer` + hover 高亮已经表达。idle 态改成展示该 view 的**当前总览数据**（如 Strata 的 `N 件作品 · N 种类型 · 年份跨度`、Markets 的 `N 笔交易 · N 种货币`、Diaspora 的 `N 处位置 · N 条流转`），同时填满 idle 态空间。可点击之外的非显然操作（如 Diaspora 的 pin / unpin）用 **Lucide icon** 表达，不写出来——见 Diaspora 决策。这条原则不要回退，回退会让 viz 重新被 nudge 文字稀释。
+7. **时间作为播头（M1, v1.6.x 起）**：Strata 用 `artworks.year` 播艺术创作时间，Markets 用 `editions.sale_date` 播交易发生时间——让 archive 的 *becoming* 视觉化。**Diaspora 不播**：`edition_history.created_at` 是**录入时间**而非事件发生时间（85/87 条 history 集中在 2026 几周内是铁证），按它播会变成"2026 前一片死寂、几周内全炸"的伪叙事，扭曲艺术家真实流散史。播头默认 `t=max` 等于现在，初始载入跟改造前像素级一致——这是不破坏现有快照测试的必要条件。**超出 cutoff 的元素 `dim opacity 0.15` 不 hide**——保留"未来的鬼影"，让 archive 的边界本身可见（呼应原则 4「缺失数据不藏」的扩展：未来即"尚未发生的缺失"）。共享 `Timeline` 组件实现，见下方。
 
 ---
 
@@ -54,6 +55,41 @@ const [artworksRes, editionsRes, locationsRes, historyRes] = await Promise.all([
 
 ---
 
+## 共享组件
+
+### Timeline（时间播头，M1 起）
+
+`src/components/visualize/Timeline.tsx` —— Strata / Markets 共享的播头组件，泛型 `<T>` 让两端各自传 year (`number`) 或 ISO date (`string`)。
+
+```ts
+interface TimelineProps<T> {
+  values: T[];            // 离散数据点（year 列 / sale_date 列），严禁连续插值
+  current: T;
+  onChange: (next: T) => void;
+  format: (t: T) => string;
+  playing?: boolean;
+  onPlayToggle?: () => void;
+  onPlayComplete?: () => void;
+  durationMs?: number;    // 默认 6000
+}
+```
+
+- **`<input type="range">` step 走 index**（不是连续数值）：滑块只能停在真实数据点（year / sale_date），不存在"插值中间帧"。键盘 / 触屏 / screen reader 全免费——native a11y。**不要**改成自定义 div 拖拽。
+- **`requestAnimationFrame` play，不用 `setInterval`**：6 秒匀速从 min 到 max。tab 切走时浏览器自动暂停 rAF（防后台耗电）；`setInterval` 没这个语义。
+- **`values.length <= 1` 返回 null**：单点数据（仅一个 year / 一天）播头无意义，整个 scrubber 隐藏。守护测试 `Timeline.test.tsx` + 各 View 的"单一年份不渲染 Timeline"。
+- **play 中不写 URL**：避免 history 污染——拖拽时 React state 是 source of truth，stop / toggle / complete 才把最后一帧落 URL state。`setSearchParams(next, { replace: true })` 不增 history entry。
+- **i18n 走 `visualize.timeline.*` 共享段**：Timeline 是真共享组件，跟 CLAUDE.md "跨 view 借文案" pitfall 不冲突——pitfall 针对的是把 view A 的语义文案塞进 view B，而 Timeline 是平级共享 widget。新增 keys：`play` / `pause` / `reset` / `current` / `rangeLabel` / `ariaSlider` / `dimmedHint`。
+
+### URL state 约定
+
+- Strata：`?view=strata&t=2024`（year，整数）
+- Markets：`?view=markets&t=2024-03-15`（ISO date 字符串）
+- `cutoff === max` 时**自动删除** `t` 参数（默认态 URL 干净）
+- **切 view 时 `Visualize.setView()` 调 `next.delete('t')`**：Strata 的 year 跟 Markets 的 date 不能共享 `t` 语义；重置 = max 是最简单且无歧义的选择。Diaspora / Terminal 不读 `t`，切回 Strata/Markets 也从 max 开始。
+- **守护测试** `Visualize.test.tsx` 的 `?view=strata&t=2024` smoke。
+
+---
+
 ## Per-view 设计决策
 
 每个 view 都有一两个非显而易见的选择，记录在这里防止未来重构时被推翻。
@@ -72,6 +108,7 @@ const [artworksRes, editionsRes, locationsRes, historyRes] = await Promise.all([
 - **stack 满了水平蔓延**：同一 (type, year) 多个作品先竖直堆，行满了 col 右移一格 row 重置——确保多作品 cell 不溢出 swimlane 边界。
 - **顶部断层条**：history 月度密度作为单独的 SVG 层。85/87 条历史挤在 2026 年三个月——这是数据自己的故事，做成视觉断层就让"档案在 2026 年突然出现"立得住。
 - **跟 Markets 视觉对称**：Markets 是垂直列 × 散点；Strata 是水平带 × 方块。两者镜像。
+- **时间播头（M1）**：顶部 `Timeline` scrubber 按 `artworks.year` 播——artistic time 而非 `created_at`（后者跟 history 同病：录入时间集中在 2026）。超出 cutoff 的方块走 `BLOCK_FUTURE_CLS = 'opacity-[0.15]'`——dim 不 hide，保留"未来鬼影"。`values` 数组复用 `yearRange` 已算好的连续年份列（含空年份），跟 swimlane x 轴一致。
 
 ### Markets
 
@@ -82,6 +119,7 @@ const [artworksRes, editionsRes, locationsRes, historyRes] = await Promise.all([
 - **SVG 响应式 viewBox + `className="w-full"`**：不写死 `width` / `height` px。外层 `overflow-x-auto` 兜底窄屏下水平滚动。这样窄屏 (mobile) 自动缩放、宽屏 (desktop) 自动撑满，跟 Diaspora 一致。
 - **散点 a11y**：每个圆包一层 `<g role="button" tabIndex={0} aria-label="..." aria-pressed={hovered}>`，Enter / Space 触发 navigate，focus 也走 hover 视觉态。货币列标签内嵌 `<title>` 让 screen reader 念出 "Currency: USD"。模仿 DiasporaView 节点 a11y pattern。
 - **summary 用自己段下的 key**：info bar idle 态走 `t('markets.summary.overview', { sales, currencies })`，**不**复用其他 view 的 summary key——跨 view i18n 借用是 ticking bomb（参见 CLAUDE.md 关于 i18n 隔离的 pitfall）。`Strata` 和 `Diaspora` 各自维护 `*.summary.overview`，结构相似但物理隔离。守护测试 `MarketsView.test.tsx` 的"不借其他 view 的 key"断言。
+- **时间播头（M1）**：顶部 `Timeline` scrubber 按 `editions.sale_date` ISO 字符串播——transaction time 而非 `created_at`。`values` = `filterSalesByDateCutoff(editions, max)` 取所有 sold + 有 `sale_date` 的 distinct dates 升序；超出 cutoff 的散点走 const `DOT_OPACITY_FUTURE = 0.15`。`sale_date` 缺失的 sold edition **不显示**（保守，不构造伪日期）——这是有意的，跟原则 4「缺失数据不藏」一致：缺日期的成交在播头里就是不存在，回到 t=max 才看见，info bar 总览仍包含它。
 
 ### Terminal
 
@@ -114,13 +152,15 @@ const [artworksRes, editionsRes, locationsRes, historyRes] = await Promise.all([
 |---|---|
 | `useVisualizationData.test.ts` | 4 — 并行查 4 表 / RLS deleted_at / 聚合 / error 传播 |
 | `strataUtils.test.ts` | 26 — year 解析 / swimlane 分组 + 排序 / `(untyped)` 处理 / 高度 log scale / stack 满了水平蔓延 |
-| `marketsUtils.test.ts` | 17 — 过滤 sold/有价 / 中位数 / 半径归一化 / 边界 |
+| `marketsUtils.test.ts` | 24 — 过滤 sold/有价 / 中位数 / 半径归一化 / 边界 / `filterSalesByDateCutoff`（M1） |
 | `terminalUtils.test.ts` | 29 — inventory 自然排序 / edition label 4 种 / location 拼接 / group 分桶 / markets line |
 | `TerminalView.test.tsx` | 9 — 行 role=button + tabIndex / 点击 navigate / 键盘 Enter+Space / 其他键不触发 / 分组 heading + aria-hidden 装饰 / 紧凑字号 class / row.id 防御 / separator 对 SR 隐藏 |
 | `diasporaUtils.test.ts` | 30 — 节点关联 / 中心选择 tie-breaker / 同心环布局 / 边聚合 / tracked stat |
 | `DiasporaView.test.tsx` | 18 — 初始状态 / hover 预览 / hover 离开 / click pin / edition 行跳转 / view all 跳转 / 二次 click 取消 pin / 切换 pin / pin 时 hover 不干扰 / 无编号 edition / 空数据 / aria-pressed / 键盘 Enter / title_cn fallback / 长名 SVG `<title>` / center node `<title>` / pin 卡片 stopPropagation / spy stopPropagation |
-| `StrataView.test.tsx` | 11 — role=button 包裹 rect / aria-label 拼装 / click navigate / Enter / Space / 其它键不触发 / tabindex=0 / id 缺失 aria-disabled / viewBox 响应式 / hover tooltip / 空数据 |
-| `Visualize.test.tsx` | 9 — loading / error / 4 个 view 默认渲染 / 非法 ?view 回落 / refetch 按钮 / 容器断点 lg: |
+| `StrataView.test.tsx` | 15 — role=button 包裹 rect / aria-label 拼装 / click navigate / Enter / Space / 其它键不触发 / tabindex=0 / id 缺失 aria-disabled / viewBox 响应式 / hover tooltip / 空数据 / 多年份渲染 Timeline（M1）/ 单年份不渲染 Timeline（M1）/ 默认 t=max 不 dim（M1）/ scrub 到中段部分 dim（M1） |
+| `MarketsView.test.tsx` | 15 — 货币列降序 / 散点 a11y / 空状态 / summary 段隔离 / 多 sale_date 渲染 Timeline（M1）/ 单点不渲染 Timeline（M1）/ 默认 t=max 不 dim（M1）/ scrub 后 dim（M1） |
+| `Timeline.test.tsx` | 9 — render / 单点返 null / 拖拽 onChange / play 触发 onPlayToggle / aria slider attrs / format prop / index-step / 默认值 / className prop |
+| `Visualize.test.tsx` | 10 — loading / error / 4 个 view 默认渲染 / 非法 ?view 回落 / refetch 按钮 / 容器断点 lg: / `?view=strata&t=2024` smoke（M1） |
 | `visualize-parity.test.ts` | 2 — zh ⟷ en key 完全一致 / 核心段都存在 |
 
 不写每个 View 组件的视觉细节测试——SVG 几何细节用代码 review，回归靠 utils 测试 + smoke test 兜底。DiasporaView 是例外：交互状态机复杂，组件级测试守护 pin/hover 流。
@@ -144,10 +184,13 @@ src/pages/Visualize.tsx                            # 容器 + tab 切换
 src/hooks/queries/useVisualizationData.ts          # 数据 hook
 src/hooks/queries/useVisualizationData.test.ts
 src/components/visualize/
+  ├── Timeline.tsx                   # 共享时间播头（M1）
+  ├── Timeline.test.tsx
   ├── StrataView.tsx
-  ├── strataUtils.ts
+  ├── strataUtils.ts                 # 含 filterArtworksByYearCutoff (M1)
   ├── strataUtils.test.ts
   ├── MarketsView.tsx
+  ├── marketsUtils.ts                # 含 filterSalesByDateCutoff (M1)
   ├── TerminalView.tsx
   ├── TerminalView.test.tsx
   └── DiasporaView.tsx

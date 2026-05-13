@@ -104,6 +104,19 @@ export function swimlaneHeight(
   return min + ratio * (max - min);
 }
 
+// ─── filterArtworksByYearCutoff ─────────────────────────────────────────────
+// 给定 cutoff year（含），返回 anchor year <= cutoff 的作品。
+// year 无法解析的作品视为不在范围内（保守，不显示）。
+export function filterArtworksByYearCutoff(
+  artworks: VizArtwork[],
+  cutoffYear: number
+): VizArtwork[] {
+  return artworks.filter((a) => {
+    const y = parseYearAnchor(a.year);
+    return y !== null && y <= cutoffYear;
+  });
+}
+
 // ─── stackPositionFor ───────────────────────────────────────────────────────
 // 给定 cell 内作品数和带高，返回每个作品的 (row, col)。
 // 先竖直堆（row 递增），行满了水平后移一格（col 递增，row 重置为 0）。

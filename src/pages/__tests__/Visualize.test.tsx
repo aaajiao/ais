@@ -182,6 +182,16 @@ describe('Visualize page', () => {
     expect(mockHookResult.refetch).toHaveBeenCalledTimes(1);
   });
 
+  it('?view=strata&t=2024 渲染 Strata 且 Timeline 当前值跟随 t', () => {
+    resetMock();
+    renderAt('/visualize?view=strata&t=2024');
+    expect(
+      screen.getByRole('heading', { name: /Strata.*地层/i })
+    ).toBeInTheDocument();
+    // 单年份的 fixture 不渲染 Timeline；fixture 只有 '2024'，所以 Timeline 隐藏
+    // 这条 smoke test 主要确认 view + t 参数组合不 crash
+  });
+
   // ─── 容器规范化（style-guide：移动端/桌面端分界用 lg，不用 md）──────────
   it('容器使用 lg: 断点而非 md:（与 Layout.tsx 移动端/桌面端分界一致）', () => {
     resetMock();

@@ -110,11 +110,13 @@ describe('StrataView', () => {
   it('每个方块渲染为 role="button" 包裹 <rect>', () => {
     renderStrata();
 
-    // 3 作品 → 3 个 role="button"（每个 block 包一层 <g>）
-    const buttons = screen.getAllByRole('button');
-    expect(buttons.length).toBe(3);
+    // 3 作品 → 3 个 block-button（每个 block 包一层 <g>）
+    // 用 SVG 容器作为 scope，排除 Timeline 的 play button
+    const svg = screen.getByRole('img', { name: /Strata/i });
+    const blockButtons = svg.querySelectorAll('g[role="button"]');
+    expect(blockButtons.length).toBe(3);
     // 每个 button 内部应含 <rect>
-    for (const btn of buttons) {
+    for (const btn of Array.from(blockButtons)) {
       expect(btn.querySelector('rect')).not.toBeNull();
     }
   });
@@ -185,8 +187,11 @@ describe('StrataView', () => {
   it('方块 tabIndex=0，键盘可达', () => {
     renderStrata();
 
-    const buttons = screen.getAllByRole('button');
-    for (const btn of buttons) {
+    // scope 到 strata svg 内的 block-button，避免捕到 Timeline 的 play button
+    const svg = screen.getByRole('img', { name: /Strata/i });
+    const blockButtons = svg.querySelectorAll('g[role="button"]');
+    expect(blockButtons.length).toBeGreaterThan(0);
+    for (const btn of Array.from(blockButtons)) {
       expect(btn).toHaveAttribute('tabindex', '0');
     }
   });
@@ -199,9 +204,10 @@ describe('StrataView', () => {
     };
     renderStrata({ artworks: [brokenArtwork] });
 
-    const buttons = screen.getAllByRole('button');
-    expect(buttons.length).toBe(1);
-    const btn = buttons[0];
+    const svg = screen.getByRole('img', { name: /Strata/i });
+    const blockButtons = Array.from(svg.querySelectorAll('g[role="button"]'));
+    expect(blockButtons.length).toBe(1);
+    const btn = blockButtons[0] as HTMLElement;
     expect(btn).toHaveAttribute('aria-disabled', 'true');
     // tabIndex 应被设为 -1，避免 focus 到坏方块
     expect(btn).toHaveAttribute('tabindex', '-1');
@@ -212,18 +218,17 @@ describe('StrataView', () => {
   });
 
   it('SVG 用 viewBox 响应式渲染（不硬编码 width=800）', () => {
-    const { container } = renderStrata();
+    renderStrata();
 
-    const svg = container.querySelector('svg');
-    expect(svg).not.toBeNull();
+    // 用 aria-label scope 到主 svg（避免捕到 Timeline 内的 lucide icon svg）
+    const svg = screen.getByRole('img', { name: /Strata/i });
     // viewBox 必须存在
-    expect(svg!.getAttribute('viewBox')).toBeTruthy();
+    expect(svg.getAttribute('viewBox')).toBeTruthy();
     // 不应 hard-code 数字 width 属性；应使用 className w-full
-    // (SVG 没有 width 属性等价于 100% 默认；如果有，必须是百分比或不存在)
-    const widthAttr = svg!.getAttribute('width');
+    const widthAttr = svg.getAttribute('width');
     expect(widthAttr === null || widthAttr === '100%').toBe(true);
     // className 应包含 w-full
-    expect(svg!.getAttribute('class')).toMatch(/w-full/);
+    expect(svg.getAttribute('class')).toMatch(/w-full/);
   });
 
   it('hover 方块 → 底部 tooltip 显示作品信息', () => {
@@ -241,5 +246,65 @@ describe('StrataView', () => {
   it('空数据 → 渲染 empty 状态', () => {
     renderStrata({ artworks: [] });
     expect(screen.getByText(/暂无数据可视化|No data/i)).toBeInTheDocument();
+  });
+
+  // ─── Time scrubber (M1) ───────────────────────────────────────────────────
+
+  it('多年份数据 → 渲染 Timeline scrubber', () => {
+    renderStrata();
+    expect(screen.getByTestId('visualize-timeline')).toBeInTheDocument();
+    // 默认 cutoff = max year = 2024
+    expect(screen.getByTestId('visualize-timeline-current').textContent).toBe('2024');
+  });
+
+  it('单一年份数据 → 不渲染 Timeline', () => {
+    renderStrata({
+      artworks: [
+        installation2024,
+        installation2024Second,
+      ],
+    });
+    expect(screen.queryByTestId('visualize-timeline')).toBeNull();
+  });
+
+  it('默认 t = max → 所有方块 opacity 不被 dim（>= 0.5）', () => {
+    renderStrata();
+    const svg = screen.getByRole('img', { name: /Strata/i });
+    const rects = Array.from(svg.querySelectorAll('g[role="button"] > rect'));
+    expect(rects.length).toBeGreaterThan(0);
+    // 默认 BLOCK_DEFAULT_CLS = opacity-[0.65] 不是 future
+    for (const r of rects) {
+      const cls = r.getAttribute('class') ?? '';
+      // 不应出现 future-dim 的 opacity-[0.15]
+      expect(cls).not.toMatch(/opacity-\[0\.15\]/);
+    }
+  });
+
+  it('拖动 scrubber 到中段 → 之后的方块被 dim（opacity-[0.15]），之前的保持默认', () => {
+    renderStrata();
+    const slider = screen.getByRole('slider');
+    // yearRange = [2023, 2024]，切到 2023
+    fireEvent.change(slider, { target: { value: '0' } });
+
+    const svg = screen.getByRole('img', { name: /Strata/i });
+    const buttons = Array.from(svg.querySelectorAll('g[role="button"]'));
+
+    let futureCount = 0;
+    let activeCount = 0;
+    for (const btn of buttons) {
+      const label = btn.getAttribute('aria-label') ?? '';
+      const rect = btn.querySelector('rect')!;
+      const cls = rect.getAttribute('class') ?? '';
+      const isFutureClass = /opacity-\[0\.15\]/.test(cls);
+      if (label.includes('2024')) {
+        expect(isFutureClass).toBe(true);
+        futureCount++;
+      } else if (label.includes('2023')) {
+        expect(isFutureClass).toBe(false);
+        activeCount++;
+      }
+    }
+    expect(futureCount).toBeGreaterThan(0);
+    expect(activeCount).toBeGreaterThan(0);
   });
 });

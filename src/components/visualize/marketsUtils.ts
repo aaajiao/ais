@@ -60,6 +60,23 @@ export function priceToRadius(
   return MIN_R + t * (MAX_R - MIN_R);
 }
 
+// ─── filterSalesByDateCutoff ────────────────────────────────────────────────
+// 给定 cutoff ISO date 字符串（`YYYY-MM-DD`），返回 sale_date <= cutoff 的 sold edition。
+// sale_date 缺失 / 无法解析的 edition 视为不在范围内（保守，不显示）。
+// Markets 播头只过滤 sold + 有 sale_date 的数据，与 groupEditionsByCurrency 的过滤维度独立。
+export function filterSalesByDateCutoff(
+  editions: VizEdition[],
+  cutoffISODate: string
+): VizEdition[] {
+  const cutoffTs = new Date(cutoffISODate).getTime();
+  if (!Number.isFinite(cutoffTs)) return editions;
+  return editions.filter((ed) => {
+    if (!ed.sale_date) return false;
+    const ts = new Date(ed.sale_date).getTime();
+    return Number.isFinite(ts) && ts <= cutoffTs;
+  });
+}
+
 // y 轴是 sale_date 时间轴（顶部 = 最新，底部 = 最早）。
 // 没有 sale_date 的版本用 created_at fallback，还没有则居中。
 export function priceToY(

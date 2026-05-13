@@ -29,6 +29,9 @@ export default function Visualize() {
   const setView = (v: ViewKey) => {
     const next = new URLSearchParams(searchParams);
     next.set('view', v);
+    // 切 view 时重置 time scrubber（Strata 用 year，Markets 用 date，
+    // 复用同一个 `t` 参数语义不同；重置 = max 是最简单且无歧义的选择）
+    next.delete('t');
     setSearchParams(next, { replace: false });
   };
 

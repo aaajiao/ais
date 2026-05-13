@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import type {
@@ -12,6 +12,7 @@ import {
   swimlaneHeight,
   stackPositionFor,
 } from './strataUtils';
+import Timeline from './Timeline';
 
 interface Props {
   artworks: VizArtwork[];
@@ -39,14 +40,18 @@ const BOTTOM_PAD = 8;
 const BLOCK_DEFAULT_CLS = 'opacity-[0.65] dark:opacity-[0.8] hover:opacity-100';
 const BLOCK_FOCUSED_LANE_CLS = 'opacity-100';
 const BLOCK_OTHER_LANE_CLS = 'opacity-[0.3] dark:opacity-[0.4]';
+// 播头之后的"未来"方块：保留鬼影，0.15 让形状仍可见但不抢视觉重心
+const BLOCK_FUTURE_CLS = 'opacity-[0.15] dark:opacity-[0.2]';
 
 export default function StrataView({ artworks, history }: Props) {
   const { t } = useTranslation('visualize');
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [hoveredArtwork, setHoveredArtwork] = useState<VizArtwork | null>(null);
   const [hoveredYear, setHoveredYear] = useState<number | null>(null);
   const [hoveredLane, setHoveredLane] = useState<string | null>(null); // swimlane.type key
+  const [playing, setPlaying] = useState(false);
 
   // ─── 数据变换 ──────────────────────────────────────────────────────────────
   const { swimlanes, yearRange } = useMemo(
@@ -60,6 +65,41 @@ export default function StrataView({ artworks, history }: Props) {
 
   const maxCount = swimlanes.length > 0 ? swimlanes[0].count : 1;
   const yearCount = yearRange.length;
+
+  // ─── 时间播头 cutoff year ──────────────────────────────────────────────────
+  // 默认 = 数据 max year（"现在"），URL `?t=YYYY` 可覆盖。
+  // 解析失败 / 越界 → fall back 到 max，确保不破坏现有快照视觉。
+  const maxYear = yearCount > 0 ? yearRange[yearRange.length - 1] : null;
+  const cutoffYear = useMemo(() => {
+    if (maxYear === null) return null;
+    const raw = searchParams.get('t');
+    if (raw) {
+      const parsed = Number(raw);
+      if (Number.isInteger(parsed) && yearRange.includes(parsed)) {
+        return parsed;
+      }
+    }
+    return maxYear;
+  }, [searchParams, yearRange, maxYear]);
+
+  const setCutoffYear = useCallback(
+    (year: number, opts: { writeUrl: boolean } = { writeUrl: true }) => {
+      if (!opts.writeUrl) return;
+      const next = new URLSearchParams(searchParams);
+      if (maxYear !== null && year === maxYear) {
+        next.delete('t');
+      } else {
+        next.set('t', String(year));
+      }
+      setSearchParams(next, { replace: true });
+    },
+    [searchParams, setSearchParams, maxYear]
+  );
+
+  // play 中只在内存里推进 cutoff（avoid URL pollution per spec），暂存在 local state；
+  // stop play 时把最后一帧落进 URL，然后清掉 playingCutoff（在 play toggle / complete 回调里直接清，不用 effect）
+  const [playingCutoff, setPlayingCutoff] = useState<number | null>(null);
+  const effectiveCutoff = playing ? playingCutoff ?? cutoffYear : cutoffYear;
 
   // ─── swimlane 高度计算 ────────────────────────────────────────────────────
   const laneHeights = useMemo(
@@ -155,6 +195,38 @@ export default function StrataView({ artworks, history }: Props) {
           {t('strata.description')}
         </p>
       </header>
+
+      {/* ─── Time scrubber ──────────────────────────────────────────────── */}
+      {yearRange.length > 1 && effectiveCutoff !== null && (
+        <Timeline
+          values={yearRange}
+          current={effectiveCutoff}
+          onChange={(y) => {
+            if (playing) {
+              setPlayingCutoff(y);
+            } else {
+              setCutoffYear(y);
+            }
+          }}
+          format={(y) => String(y)}
+          playing={playing}
+          onPlayToggle={() => {
+            if (playing) {
+              if (playingCutoff !== null) setCutoffYear(playingCutoff);
+              setPlayingCutoff(null);
+              setPlaying(false);
+            } else {
+              setPlayingCutoff(cutoffYear);
+              setPlaying(true);
+            }
+          }}
+          onPlayComplete={() => {
+            if (playingCutoff !== null) setCutoffYear(playingCutoff);
+            setPlayingCutoff(null);
+            setPlaying(false);
+          }}
+        />
+      )}
 
       {/* ─── SVG ────────────────────────────────────────────────────────── */}
       <div className="relative overflow-x-auto border border-border">
@@ -280,10 +352,14 @@ export default function StrataView({ artworks, history }: Props) {
                     const blockY =
                       laneY + laneH - (pos.row + 1) * (BLOCK + BLOCK_GAP) + BLOCK_GAP;
 
-                    // 状态优先级：hovered (rect:hover) > focused lane > other lane > default
+                    // 状态优先级：future-dim > hovered (rect:hover) > focused lane > other lane > default
                     // hovered 通过 Tailwind `hover:opacity-100` 由 CSS 直接驱动（gated 在 hover-capable device），
                     // 这里只用 JS 状态处理 lane 维度
-                    const stateCls = isFocusedLane
+                    const isFuture =
+                      effectiveCutoff !== null && year > effectiveCutoff;
+                    const stateCls = isFuture
+                      ? BLOCK_FUTURE_CLS
+                      : isFocusedLane
                       ? BLOCK_FOCUSED_LANE_CLS
                       : isOtherLane
                       ? BLOCK_OTHER_LANE_CLS

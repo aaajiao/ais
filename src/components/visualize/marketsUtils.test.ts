@@ -4,6 +4,7 @@ import {
   computeCurrencyStats,
   priceToRadius,
   priceToY,
+  filterSalesByDateCutoff,
 } from './marketsUtils';
 import type { VizEdition } from '@/hooks/queries/useVisualizationData';
 
@@ -160,5 +161,52 @@ describe('priceToY', () => {
     const ed = makeEdition({ sale_date: null, created_at: '' });
     const y = priceToY(null, ed, dateRange, panelHeight);
     expect(y).toBe(panelHeight / 2);
+  });
+});
+
+describe('filterSalesByDateCutoff', () => {
+  const editions = [
+    makeEdition({ id: 'e1', sale_date: '2020-03-15' }),
+    makeEdition({ id: 'e2', sale_date: '2022-06-01' }),
+    makeEdition({ id: 'e3', sale_date: '2024-01-01' }),
+    makeEdition({ id: 'e4', sale_date: '2026-04-10' }),
+    makeEdition({ id: 'e5', sale_date: null }),
+  ];
+
+  it('cutoff = max → 返回所有有 sale_date 的 edition', () => {
+    const result = filterSalesByDateCutoff(editions, '2026-04-10');
+    const ids = result.map((e) => e.id).sort();
+    expect(ids).toEqual(['e1', 'e2', 'e3', 'e4']);
+  });
+
+  it('cutoff = 中间日期 → 只返回 sale_date <= cutoff 的 edition', () => {
+    const result = filterSalesByDateCutoff(editions, '2022-12-31');
+    const ids = result.map((e) => e.id).sort();
+    expect(ids).toEqual(['e1', 'e2']);
+  });
+
+  it('cutoff = min - 1 day → 空数组', () => {
+    const result = filterSalesByDateCutoff(editions, '2020-03-14');
+    expect(result).toEqual([]);
+  });
+
+  it('sale_date 为 null 的 edition 始终被过滤掉', () => {
+    const result = filterSalesByDateCutoff(editions, '2099-12-31');
+    const ids = result.map((e) => e.id);
+    expect(ids).not.toContain('e5');
+  });
+
+  it('非法 cutoff 字符串 → 返回原数组（防御）', () => {
+    const result = filterSalesByDateCutoff(editions, 'not-a-date');
+    expect(result).toEqual(editions);
+  });
+
+  it('空输入 → 空数组', () => {
+    expect(filterSalesByDateCutoff([], '2024-01-01')).toEqual([]);
+  });
+
+  it('cutoff 同日 → 包含该日期的 edition', () => {
+    const result = filterSalesByDateCutoff(editions, '2020-03-15');
+    expect(result.map((e) => e.id)).toEqual(['e1']);
   });
 });

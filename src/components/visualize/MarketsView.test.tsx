@@ -81,7 +81,9 @@ describe('MarketsView', () => {
 
   it('每个散点以 <g role="button"> 渲染（键盘可达）', () => {
     renderMarkets();
-    const dots = screen.getAllByRole('button');
+    // scope 到 markets svg，排除 Timeline 的 play button
+    const svg = screen.getByRole('img', { name: /Markets/i });
+    const dots = Array.from(svg.querySelectorAll('g[role="button"]'));
     // 3 sold editions → 3 dot buttons
     expect(dots.length).toBeGreaterThanOrEqual(3);
     for (const dot of dots) {
@@ -92,8 +94,9 @@ describe('MarketsView', () => {
 
   it('键盘 Enter 触发 navigate 到 /editions/{id}', () => {
     renderMarkets();
-    const dots = screen.getAllByRole('button');
-    const firstDot = dots[0]!;
+    const svg = screen.getByRole('img', { name: /Markets/i });
+    const dots = Array.from(svg.querySelectorAll('g[role="button"]'));
+    const firstDot = dots[0]! as HTMLElement;
     fireEvent.keyDown(firstDot, { key: 'Enter' });
     expect(mockNavigate).toHaveBeenCalledTimes(1);
     expect(mockNavigate).toHaveBeenCalledWith(
@@ -103,15 +106,17 @@ describe('MarketsView', () => {
 
   it('键盘 Space 同样触发 navigate', () => {
     renderMarkets();
-    const dots = screen.getAllByRole('button');
-    fireEvent.keyDown(dots[0]!, { key: ' ' });
+    const svg = screen.getByRole('img', { name: /Markets/i });
+    const dots = Array.from(svg.querySelectorAll('g[role="button"]'));
+    fireEvent.keyDown(dots[0]! as HTMLElement, { key: ' ' });
     expect(mockNavigate).toHaveBeenCalledTimes(1);
   });
 
   it('点击散点 navigate 到 /editions/{id}', () => {
     renderMarkets();
-    const dots = screen.getAllByRole('button');
-    fireEvent.click(dots[0]!);
+    const svg = screen.getByRole('img', { name: /Markets/i });
+    const dots = Array.from(svg.querySelectorAll('g[role="button"]'));
+    fireEvent.click(dots[0]! as HTMLElement);
     expect(mockNavigate).toHaveBeenCalledWith(
       expect.stringMatching(/^\/editions\/e[1-3]$/)
     );
@@ -135,8 +140,9 @@ describe('MarketsView', () => {
 
   it('hover 散点 aria-pressed 变 true，离开还原 false', () => {
     renderMarkets();
-    const dots = screen.getAllByRole('button');
-    const dot = dots[0]!;
+    const svg = screen.getByRole('img', { name: /Markets/i });
+    const dots = Array.from(svg.querySelectorAll('g[role="button"]'));
+    const dot = dots[0]! as HTMLElement;
     expect(dot).toHaveAttribute('aria-pressed', 'false');
     fireEvent.mouseEnter(dot);
     expect(dot).toHaveAttribute('aria-pressed', 'true');
@@ -145,8 +151,9 @@ describe('MarketsView', () => {
   });
 
   it('SVG 使用 viewBox 响应式（无固定 width/height 属性）', () => {
-    const { container } = renderMarkets();
-    const svg = container.querySelector('svg')!;
+    renderMarkets();
+    // 用 aria-label scope 到主 svg（避免捕到 Timeline 内的 lucide icon svg）
+    const svg = screen.getByRole('img', { name: /Markets/i });
     expect(svg).toBeTruthy();
     expect(svg).toHaveAttribute('viewBox');
     // 固定 px 宽高已移除
@@ -175,7 +182,8 @@ describe('MarketsView', () => {
         <MarketsView artworks={[artwork]} editions={editionsWithEmptyId} />
       </MemoryRouter>
     );
-    const dots = screen.getAllByRole('button');
+    const svg = screen.getByRole('img', { name: /Markets/i });
+    const dots = Array.from(svg.querySelectorAll('g[role="button"]')) as HTMLElement[];
     // 找到 aria-label 含 AAJ-EMPTY 的那个
     const emptyDot = dots.find((d) =>
       (d.getAttribute('aria-label') ?? '').includes('AAJ-EMPTY')
@@ -208,5 +216,64 @@ describe('MarketsView', () => {
     expect(
       screen.getByText(/3 笔交易.*2 种货币|3 transactions.*2 currencies/i)
     ).toBeInTheDocument();
+  });
+
+  // ─── Time scrubber (M1) ───────────────────────────────────────────────────
+
+  it('多 sale_date 数据 → 渲染 Timeline scrubber', () => {
+    renderMarkets();
+    expect(screen.getByTestId('visualize-timeline')).toBeInTheDocument();
+    // 默认 cutoff = max date = '2024-06-01' → format slice 0..7 = '2024-06'
+    expect(screen.getByTestId('visualize-timeline-current').textContent).toBe('2024-06');
+  });
+
+  it('单一 sale_date 数据 → 不渲染 Timeline', () => {
+    const singleDate: VizEdition[] = [
+      makeSale('e-only', 'AAJ-ONLY', 'USD', 5000, '2024-03-01'),
+    ];
+    renderWithClient(
+      <MemoryRouter>
+        <MarketsView artworks={[artwork]} editions={singleDate} />
+      </MemoryRouter>
+    );
+    expect(screen.queryByTestId('visualize-timeline')).toBeNull();
+  });
+
+  it('默认 t = max → 所有散点 opacity 0.65（不被 dim）', () => {
+    const { container } = renderMarkets();
+    const circles = container.querySelectorAll('g[role="button"] > circle');
+    expect(circles.length).toBeGreaterThanOrEqual(3);
+    for (const c of circles) {
+      expect(c.getAttribute('opacity')).toBe('0.65');
+    }
+  });
+
+  it('拖动 scrubber 到中段 → 之后的散点 opacity=0.15，之前的保持 0.65', () => {
+    renderMarkets();
+    const slider = screen.getByRole('slider');
+    // saleDates 升序：'2024-03-01', '2024-04-01', '2024-06-01' → idx 0=03-01
+    fireEvent.change(slider, { target: { value: '0' } });
+
+    const svg = screen.getByRole('img', { name: /Markets/i });
+    const buttons = Array.from(svg.querySelectorAll('g[role="button"]')) as HTMLElement[];
+
+    let dimCount = 0;
+    let activeCount = 0;
+    for (const btn of buttons) {
+      const label = btn.getAttribute('aria-label') ?? '';
+      const circle = btn.querySelector('circle')!;
+      const op = circle.getAttribute('opacity');
+      if (label.includes('AAJ-2024-001')) {
+        // sale_date='2024-03-01' = cutoff → 不 dim
+        expect(op).toBe('0.65');
+        activeCount++;
+      } else {
+        // 其余 sale_date > cutoff → dim
+        expect(op).toBe('0.15');
+        dimCount++;
+      }
+    }
+    expect(activeCount).toBeGreaterThan(0);
+    expect(dimCount).toBeGreaterThan(0);
   });
 });

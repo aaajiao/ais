@@ -5,6 +5,7 @@ import {
   buildSwimlanes,
   swimlaneHeight,
   stackPositionFor,
+  filterArtworksByYearCutoff,
 } from './strataUtils';
 import type { VizArtwork } from '@/hooks/queries/useVisualizationData';
 
@@ -255,5 +256,52 @@ describe('stackPositionFor', () => {
 
   it('零作品 → 空数组', () => {
     expect(stackPositionFor(0, 8, 2, 64)).toEqual([]);
+  });
+});
+
+// ─── filterArtworksByYearCutoff ─────────────────────────────────────────────
+
+describe('filterArtworksByYearCutoff', () => {
+  const artworks = [
+    makeArtwork({ id: 'a1', year: '2014' }),
+    makeArtwork({ id: 'a2', year: '2018' }),
+    makeArtwork({ id: 'a3', year: '2020-2021' }),
+    makeArtwork({ id: 'a4', year: '2026' }),
+    makeArtwork({ id: 'a5', year: 'unknown' }),
+    makeArtwork({ id: 'a6', year: null }),
+  ];
+
+  it('cutoff = max → 返回全部有 year 的作品（year 不可解析的被排除）', () => {
+    const result = filterArtworksByYearCutoff(artworks, 2026);
+    const ids = result.map((a) => a.id).sort();
+    expect(ids).toEqual(['a1', 'a2', 'a3', 'a4']);
+  });
+
+  it('cutoff = 中间年份 → 只返回 anchor year <= cutoff 的作品', () => {
+    const result = filterArtworksByYearCutoff(artworks, 2018);
+    const ids = result.map((a) => a.id).sort();
+    expect(ids).toEqual(['a1', 'a2']);
+  });
+
+  it('cutoff = min - 1 → 空数组', () => {
+    const result = filterArtworksByYearCutoff(artworks, 2013);
+    expect(result).toEqual([]);
+  });
+
+  it('range 类型 year（"2020-2021"）使用 anchor（起始年）做比较', () => {
+    const result = filterArtworksByYearCutoff(artworks, 2020);
+    const ids = result.map((a) => a.id).sort();
+    expect(ids).toContain('a3');
+  });
+
+  it('year 无法解析的作品始终被过滤掉', () => {
+    const result = filterArtworksByYearCutoff(artworks, 2100);
+    const ids = result.map((a) => a.id);
+    expect(ids).not.toContain('a5');
+    expect(ids).not.toContain('a6');
+  });
+
+  it('空输入 → 空数组', () => {
+    expect(filterArtworksByYearCutoff([], 2024)).toEqual([]);
   });
 });

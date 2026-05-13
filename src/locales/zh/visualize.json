@@ -5,6 +5,15 @@
   "error": "档案读取失败",
   "errorRetry": "重试",
   "empty": "暂无数据可视化",
+  "timeline": {
+    "play": "播放",
+    "pause": "暂停",
+    "reset": "回到当前",
+    "current": "当前：{{value}}",
+    "rangeLabel": "时间播头：从 {{min}} 到 {{max}}",
+    "ariaSlider": "拖动时间播头",
+    "dimmedHint": "之后的元素已淡化"
+  },
   "view": {
     "strata": "地层",
     "markets": "市场",
