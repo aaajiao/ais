@@ -296,16 +296,18 @@ URL state：`?sel=artwork:UUID`（key=`sel`，value `${kind}:${id}`）。解析�
 - **pin / unpin / view-all 用 Lucide icon 而非文字**（v1.5.x 起）：hover 预览卡片右上角放 `Pin` icon（`w-3 h-3 opacity-60`），不写"点击固定此节点"——图钉符号本身就是 affordance。pin 激活后，pin 卡片右上角放 `X` 按钮触发 `setPinnedNodeId(null)`，不写"再次点击节点或点击空白处取消固定"——X 按钮是 popover 解除的标准模式。"点击空白处取消" 的 `handleSvgClick` 逻辑**保留代码不删**，只是不再写出来，用户会试。pin 卡片底部 chips 块下方放右对齐的 `ArrowRight` icon button，navigate 到 `/editions?locationId={id}`——取代旧的 "查看此位置全部版本 →" 下划线文字，与右上 `X` 形成 unpin / view-all 的视觉对称。**用 `flex justify-end` 占独立一行而非 `absolute` 定位**——chips wrap 时 absolute 会重叠。aria-label 走 `t('diaspora.pin.unpinAria')` 和 `t('diaspora.pin.viewAllAria')` 给屏幕阅读器。这跟全局原则 6（信息条不引导）配套，不要回退到文字提示。
 - **长名 label 用 SVG `<title>` 做原生 tooltip**：节点可见 label 超过 18 字符会截断为 16+`…`（避免覆盖相邻节点）。每个 `<g data-node>` 内的第一个子元素是 `<title>{node.name}</title>`，浏览器 hover 节点时显示完整名（中心节点同样处理）。这是无依赖、跨浏览器、零样式开销的方案，不要换成自定义 HTML tooltip。
 - **pin 卡片按钮防御性 `stopPropagation`**：edition 行按钮和 "view all" 按钮的 `onClick` 都调 `e.stopPropagation()`。当前 pin 卡片在 SVG 外不会冒泡到 `handleSvgClick`，但未来重构若把卡片移入 `<foreignObject>`（为了和 SVG 同坐标系联动），点击就会冒泡触发 unpin。预防为主，省得调试。
-- **Zoom / Pan 交互（v1.6.x 第九轮起）**：38 个 entity + 17 个 anonymous + N 个 ghost 在 1200×680 viewBox 内挤、label 8-9pt 读不舒服，加 `useSvgZoomPan` hook 统一三种 input device：
-  - **wheel**（鼠标 + Mac trackpad）：直接 zoom（**不需要 Cmd/Ctrl modifier**——会跟浏览器自带快捷键冲突）。anchor = cursor 位置。Mac trackpad pinch 在 Chrome/Safari 自动 emit `wheel` event with `ctrlKey=true`，走同一 handler 但用更小 step (1.03 vs 1.1) 避免 pinch 跳变。
-  - **touch pinch**（移动端两指）：`touchstart` + `touchmove` 检测 2 指 → 起始距离 → move 时新距离 / 起始 = zoom factor，两指中点为 anchor。
-  - **drag pan**：mouse / 单指在**空白处** drag。节点上 mousedown 不触发 pan（保留 click/pin/navigate） —— `target.closest('g[data-node], [role="button"]')` 判定（entity 用 `data-node`，ghost / anonymous 用 `role="button"`）。
-  - **zoom range**：`[0.5, 4]`。0.5 = viewport 看 2× 原内容；4 = 看 1/4 原内容。累计越界则 zoom 操作 no-op（避免 overshoot 后视觉跳跃）。
-  - **Reset**：右上角浮动按钮（`zoom.toFixed(2)×` + 重置图标），`isZoomed === false` 时不显示。视觉跟"档案薄声明"风格一致（border + bg-background）。i18n: `diaspora.zoom.reset` / `diaspora.zoom.resetAria`。
-  - **viewBox 字符串**：每帧 toFixed(2) 减少 React diff churn。React DOM diff 是字符串比较，浮点抖动会让每次 mousemove 都 update DOM。
-  - **trade-off**：SVG 区内 wheel 不再滚页面（必须 `preventDefault`）。SVG `maxHeight: 70vh`，上下仍有可滚条空间，跟 Figma / Maps 的 paradigm 一致。
-  - **touch-none CSS**：`<svg className="touch-none">` 防 mobile 浏览器默认 touch 行为（pan/zoom）跟 hook 的 touch handlers 冲突。
-  - 守护：`useSvgZoomPan.test.tsx` (8 tests) 覆盖初始 state / handler shape / reset no-op / 边界（svgRef 未 attach 时 wheel 不抛）。完整 DOM-level 集成测试因 happy-dom 不 layout SVG 需要 spot-check 真浏览器。
+- **Zoom 控件 + drag pan（v1.6.x 第十轮）**：38 个 entity + 17 个 anonymous + N 个 ghost 在 1200×680 viewBox 内挤、label 8-9pt 读不舒服，但**九轮的 wheel + pinch + drag 实测体验差**（wheel 跟页面滚动冲突、pinch 灵敏度难调、wheel anchor 在 cursor 处导致 zoom 后定位混乱）。第十轮简化为：
+  - **Zoom 仅靠按钮**：右上角 vertical 控件 `[+] / {N}% / [-] / [↻]`。每次离散 step ×1.25 / ÷1.25，以 viewBox **中心**为 anchor（不再 cursor anchor）。Range `[0.5, 4]`。`canZoomIn` / `canZoomOut` 触底时按钮 disabled。Reset 按钮 `isZoomed === false` 时隐藏。
+  - **Drag pan 保留**：放大后用户必须能看不同区域。mouse / 单指 drag 空白处平移 viewBox。节点上 mousedown 不 trigger pan（保留 click/pin/navigate），用 `closest('g[data-node], [role="button"]')` 判定。
+  - **Wheel / pinch 删除**：第九轮的 `onWheel` + `onTouchStart/Move` pinch 全部移除。Mac trackpad pinch 现在走浏览器默认（缩放页面），不再被 hook 拦截。
+  - **多指 touch 忽略**：单指 drag pan，多指主动 reset pan state（让浏览器默认 pinch 缩页面）。
+  - **i18n**：`diaspora.zoom.inAria` / `diaspora.zoom.outAria` / `diaspora.zoom.resetAria`（无可见文字，只数字百分比 + icon）。
+  - **viewBox 字符串**：每帧 toFixed(2) 减少 React DOM diff churn。
+  - **trade-off**：zoom anchor 固定 viewBox 中心而非 cursor 位置 —— pan 接管 "看局部" 的需求，组合操作 `zoom → drag` 而非一步 `zoom-to-point`。这是为了交互可预期、无冲突。
+  - 守护：`useSvgZoomPan.test.tsx` (11 tests) 覆盖 zoomIn/Out 离散 step / can\* 边界 / 累计上下限 / reset / handlers shape / zoomOut→1 清空 pan。drag pan DOM-level 行为靠浏览器 spot-check（happy-dom 不 layout SVG）。
+- **历史轨迹（删 wheel/pinch 的演化）**：
+  - **第九轮（保留备查）**：wheel + Mac pinch (ctrlKey wheel) + touch pinch + drag pan 全套手势。问题：(1) wheel 跟页面滚动冲突需 preventDefault 让 SVG 区滚轮失效；(2) Mac pinch step 灵敏度（1.03 vs 1.1）难调，pinch 时跳变；(3) anchor 在 cursor 处导致 zoom 后用户难以定位关键节点。
+  - **第十轮（当前）**：按钮 zoom + drag pan，UX 行业 baseline（地图 / Figma 等同 paradigm）。
 
 ---
 
@@ -314,7 +316,7 @@ URL state：`?sel=artwork:UUID`（key=`sel`，value `${kind}:${id}`）。解析�
 | 文件 | 测试 |
 |---|---|
 | `useVisualizationData.test.ts` | 4 — 并行查 4 表 / RLS deleted_at / 聚合 / error 传播 |
-| `useSvgZoomPan.test.tsx` | 8 — 初始 state / handler shape / reset no-op / svgRef 未 attach 边界 |
+| `useSvgZoomPan.test.tsx` | 11 — 离散 step zoom in/out / can\* 边界 / 累计上下限 / reset / handlers shape / svgRef / zoomOut→1 清空 pan |
 | `strataUtils.test.ts` | 71 — year 解析 / swimlane 分组 + 排序 / `(untyped)` 处理 / 高度 log scale / stack 满了水平蔓延 / `buildLaneStats`（ownership 4 桶 + degenerate OR / edition 链聚合 / yearSpan 空与非空 / untyped 保留 / 兜底 held） |
 | `marketsUtils.test.ts` | 36 — 过滤 sold/有价 / 中位数 / 半径归一化 / 边界 / `filterSalesByDateCutoff`（M1）/ `getSalesWithoutPrice`（M2）/ `buildActivityHistogram`（M1.5 优化：年/月 kind 切换 / 连续空桶 / 同 bin 多命中累加 / maxCount / minISO maxISO） |
 | `terminalUtils.test.ts` | 29 — inventory 自然排序 / edition label 4 种 / location 拼接 / group 分桶 / markets line |

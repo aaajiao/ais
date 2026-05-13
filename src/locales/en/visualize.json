@@ -124,8 +124,9 @@
       "untrackedHint": "{{count}} editions awaiting location — click any to open"
     },
     "zoom": {
-      "reset": "Reset",
-      "resetAria": "Reset zoom and pan"
+      "inAria": "Zoom in",
+      "outAria": "Zoom out",
+      "resetAria": "Reset zoom"
     },
     "stateHint": "The archive is thin. Location-flow data will grow as the system gets used.",
     "legend": {

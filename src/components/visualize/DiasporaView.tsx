@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowRight, Pin, X, Maximize2 } from 'lucide-react';
+import { ArrowRight, Pin, X, Plus, Minus, RotateCcw } from 'lucide-react';
 import { useSvgZoomPan } from '@/hooks/useSvgZoomPan';
 import type {
   VizEdition,
@@ -79,17 +79,19 @@ export default function DiasporaView({
   const [pinnedNodeId, setPinnedNodeId] = useState<string | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
 
-  // ─── Zoom / Pan ────────────────────────────────────────────────────────────
-  // 触摸板 + 鼠标滚轮 + 移动端 pinch 统一交互；wheel 不需要 modifier 快捷键
-  // （避免和浏览器 Cmd/Ctrl++ 缩放冲突）。drag pan 在节点上不触发（保留 click/pin）。
-  //
-  // 解构出来分别引用 —— 否则 React 19 ESLint react-compiler 把 `zoomPan.xxx`
-  // 整体推断为 ref-like，触发 "Cannot access refs during render" 误报。
+  // ─── Zoom（v1.6.x 第十轮：删手势 / wheel，改右上 + - reset 按钮） ──────────
+  // 第九轮的 wheel + pinch + drag pan 体验不好（wheel 跟页面滚动冲突、pinch
+  // 灵敏度难调、drag pan 易误触发节点 click）。改成最简：按钮离散 step 缩放，
+  // 以 viewBox 中心为 anchor，无 pan。
   const {
     svgRef: zoomSvgRef,
     viewBoxStr: zoomViewBox,
     zoom: zoomLevel,
     isZoomed,
+    canZoomIn,
+    canZoomOut,
+    zoomIn,
+    zoomOut,
     reset: resetZoom,
     handlers: zoomHandlers,
   } = useSvgZoomPan({
@@ -365,23 +367,48 @@ export default function DiasporaView({
 
       {/* ─── SVG Constellation 图 ────────────────────────────────────── */}
       <div className="relative overflow-hidden border border-border">
-        {isZoomed && (
+        {/* Zoom 控件：右上角 + / − / reset 按钮，无手势 */}
+        <div className="absolute top-2 right-2 z-10 flex flex-col bg-background/90 border border-border font-mono text-xs">
           <button
             type="button"
-            onClick={resetZoom}
-            aria-label={t('diaspora.zoom.resetAria')}
-            className="absolute top-2 right-2 z-10 flex items-center gap-1 px-2 py-1 bg-background/90 border border-border text-xs font-mono cursor-pointer hover:bg-muted transition-colors"
+            onClick={zoomIn}
+            disabled={!canZoomIn}
+            aria-label={t('diaspora.zoom.inAria')}
+            className="px-2 py-1 cursor-pointer hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors border-b border-border"
           >
-            <Maximize2 className="w-3 h-3" />
-            <span>{zoomLevel.toFixed(2)}×</span>
-            <span className="text-muted-foreground">{t('diaspora.zoom.reset')}</span>
+            <Plus className="w-3.5 h-3.5" />
           </button>
-        )}
+          <span className="px-2 py-1 text-center border-b border-border tabular-nums">
+            {Math.round(zoomLevel * 100)}%
+          </span>
+          <button
+            type="button"
+            onClick={zoomOut}
+            disabled={!canZoomOut}
+            aria-label={t('diaspora.zoom.outAria')}
+            className="px-2 py-1 cursor-pointer hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            <Minus className="w-3.5 h-3.5" />
+          </button>
+          {isZoomed && (
+            <button
+              type="button"
+              onClick={resetZoom}
+              aria-label={t('diaspora.zoom.resetAria')}
+              className="px-2 py-1 cursor-pointer hover:bg-muted transition-colors border-t border-border"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
         <svg
           ref={zoomSvgRef}
           viewBox={zoomViewBox}
-          className="block w-full touch-none"
-          style={{ maxHeight: '70vh', cursor: 'grab' }}
+          className="block w-full"
+          style={{
+            maxHeight: '70vh',
+            cursor: isZoomed ? 'grab' : 'default',
+          }}
           role="img"
           aria-label={t('diaspora.heading')}
           onClick={handleSvgClick}
