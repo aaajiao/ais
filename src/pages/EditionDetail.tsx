@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -30,9 +30,30 @@ import { MessageSquare, Pencil } from 'lucide-react';
 type EditionHistory = Database['public']['Tables']['edition_history']['Row'];
 type EditionFile = Database['public']['Tables']['edition_files']['Row'];
 
+/**
+ * "返回"按钮 history-aware 处理：
+ * - location.key === 'default' = entry/deep-link/reload，无 prev history → 跳默认列表
+ * - 否则 navigate(-1) 回上一页（从 visualize 来回 visualize，从 list 来回 list）
+ * Cmd/Ctrl+Click 仍走 <a> 默认行为，浏览器新窗口打开 fallback URL
+ */
+function useBackToList(fallback: string) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  return (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    e.preventDefault();
+    if (location.key === 'default') {
+      navigate(fallback);
+    } else {
+      navigate(-1);
+    }
+  };
+}
+
 export default function EditionDetail() {
   const { t } = useTranslation('editionDetail');
   const { id } = useParams<{ id: string }>();
+  const handleBack = useBackToList('/editions');
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -189,9 +210,13 @@ export default function EditionDetail() {
   if (editionError || !edition) {
     return (
       <div className="p-6">
-        <Link to="/editions" className="text-primary hover:underline mb-6 inline-block">
+        <a
+          href="/editions"
+          onClick={handleBack}
+          className="text-primary hover:underline mb-6 inline-block cursor-pointer"
+        >
           {t('backToList')}
-        </Link>
+        </a>
         <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-destructive">
           {editionError instanceof Error ? editionError.message : t('notFound')}
         </div>
@@ -239,9 +264,13 @@ export default function EditionDetail() {
 
       {/* 返回链接 */}
       <div className="flex items-center justify-between mb-6">
-        <Link to="/editions" className="text-primary hover:underline">
+        <a
+          href="/editions"
+          onClick={handleBack}
+          className="text-primary hover:underline cursor-pointer"
+        >
           {t('backToList')}
-        </Link>
+        </a>
         <Button
           variant="destructive-outline"
           size="small"
