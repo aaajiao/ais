@@ -1250,12 +1250,15 @@ describe('generateOrganicPath', () => {
     expect(a).not.toBe(b);
   });
 
-  it('path format: 以 M 开头、Z 结尾、8 段 Q（v1.6.x 第二轮：12→8）', () => {
+  it('path format: 以 M 开头、Z 结尾、7 段 L（v1.6.x 第五轮：8 段 polygon = 1 M + 7 L + 1 Z）', () => {
     const path = generateOrganicPath(100, 100, 20, 'x');
     expect(path.startsWith('M ')).toBe(true);
     expect(path.endsWith(' Z')).toBe(true);
-    const qCount = (path.match(/\sQ\s/g) ?? []).length;
-    expect(qCount).toBe(8);
+    const lCount = (path.match(/\sL\s/g) ?? []).length;
+    expect(lCount).toBe(7);
+    // 第五轮：从 Q midpoint bezier 换成 L polygon，让 perturbation ±25% 真正
+    // 体现在视觉上（旧 bezier midpoint 把相邻 perturbed points 的扰动平均化抵消）
+    expect(path).not.toMatch(/\sQ\s/);
   });
 
   it('bounding box 大致 baseR ± 25%（路径所有点到中心距离 ≤ baseR × 1.25 + 浮点容差；v1.6.x 第二轮 ±15→±25）', () => {
@@ -1263,9 +1266,9 @@ describe('generateOrganicPath', () => {
     const cy = 150;
     const baseR = 18;
     const path = generateOrganicPath(cx, cy, baseR, 'akeroyd-collection');
-    // 解析所有 number（M cx cy / Q x y x y）
+    // 解析所有 number（M cx cy / L x y）
     const nums = path
-      .replace(/[MQZ,]/g, ' ')
+      .replace(/[MLZ,]/g, ' ')
       .split(/\s+/)
       .filter(Boolean)
       .map(Number);

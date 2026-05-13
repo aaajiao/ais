@@ -761,14 +761,15 @@ export function generateOrganicPath(
     });
   }
 
-  // Quadratic bezier 平滑：M start → Q ctrl=cur midpoint=midNext → ... → Z
+  // v1.6.x 第五轮：从 quadratic bezier midpoint 写法换成 8 段 L polygon。
+  // 旧写法 `Q ctrl=cur end=midpoint(cur,next)` 让 path **只经过 midpoints**，
+  // 相邻 perturbed points 的扰动 ±25% 在 midpoint 上被平均化抵消 → 视觉
+  // 上仍接近圆。新写法 path **直接经过每个 perturbed point**，扰动完整
+  // 体现 —— 8 个不等径向的顶点形成"碎石形"，跟 viewBox 椭圆化的"非规则
+  // 圆"哲学统一（节点不规则 + 整体不规则圆 = 两层 brutalist organic）。
   let path = `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
-  for (let i = 0; i < segments; i++) {
-    const cur = points[i];
-    const next = points[(i + 1) % segments];
-    const midX = (cur.x + next.x) / 2;
-    const midY = (cur.y + next.y) / 2;
-    path += ` Q ${cur.x.toFixed(2)} ${cur.y.toFixed(2)} ${midX.toFixed(2)} ${midY.toFixed(2)}`;
+  for (let i = 1; i < segments; i++) {
+    path += ` L ${points[i].x.toFixed(2)} ${points[i].y.toFixed(2)}`;
   }
   return path + ' Z';
 }
