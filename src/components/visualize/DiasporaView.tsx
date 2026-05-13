@@ -11,13 +11,11 @@ import type {
 import {
   buildConstellation,
   layoutConstellation,
-  namedNodeRadius,
+  getNodeVisual,
   buildNodes,
   computeTrackedStat,
   countryToISO2,
-  nodeRadius,
   getGhostNodes,
-  TYPE_OPACITY,
   type LocationNode,
   type LocationConstellationNode,
   type NamedPrivateNode,
@@ -254,6 +252,9 @@ export default function DiasporaView({
         <div className="text-xs text-muted-foreground italic">
           {t('diaspora.stateHint')}
         </div>
+        <div className="text-xs text-muted-foreground">
+          {t('diaspora.constellation.timelineLegend')}
+        </div>
       </div>
 
       {/* ─── Legend ──────────────────────────────────────────────────── */}
@@ -307,20 +308,24 @@ export default function DiasporaView({
           aria-label={t('diaspora.heading')}
           onClick={handleSvgClick}
         >
-          {/* ─── 三环参考线（弱色） ───────────────────────────── */}
+          {/* ─── Time-spiral 参考圆（仅画 inner / outer-data / ghost；anonymous 不画） */}
           {(
-            ['inner', 'middle', 'outer'] as Array<keyof typeof layout.radii>
-          ).map((ring) => (
+            [
+              ['rInner', layout.geometry.rInner],
+              ['rOuterData', layout.geometry.rOuterData],
+              ['rGhost', layout.geometry.rGhost],
+            ] as Array<[string, number]>
+          ).map(([key, r]) => (
             <circle
-              key={ring}
+              key={key}
               cx={layout.center.x}
               cy={layout.center.y}
-              r={layout.radii[ring]}
+              r={r}
               fill="none"
               className="stroke-foreground"
               strokeWidth={1}
               strokeDasharray="2 5"
-              opacity={0.2}
+              opacity={0.15}
             />
           ))}
 
@@ -398,23 +403,30 @@ export default function DiasporaView({
                 />
               ))}
 
-          {/* ─── Outer ring: anonymous dots (不可点击) ───────────── */}
-          {layout.anonymousPoints.map((p) => (
-            <circle
-              key={`anon-${p.index}`}
-              data-testid={`constellation-anon-${p.index}`}
-              cx={p.x}
-              cy={p.y}
-              r={1.5}
-              className="fill-foreground"
-              opacity={0.3}
-            />
-          ))}
+          {/* ─── Anonymous dust (最外圈，不可点击) ───────────────── */}
+          {layout.anonymousPoints.map((p) => {
+            const visual = getNodeVisual('anonymous', null, 1);
+            return (
+              <circle
+                key={`anon-${p.index}`}
+                data-testid={`constellation-anon-${p.index}`}
+                cx={p.x}
+                cy={p.y}
+                r={visual.r}
+                className="fill-foreground"
+                opacity={visual.opacity}
+              />
+            );
+          })}
 
-          {/* ─── Inner ring: location nodes ────────────────────── */}
+          {/* ─── Location nodes (time-spiral，size 由 getNodeVisual 决定) ─── */}
           {layout.locationPoints.map(({ x, y, node }) => {
-            const r = nodeRadius(node.editionCount);
-            const opacity = TYPE_OPACITY[node.type] ?? 0.7;
+            const visual = getNodeVisual(
+              'location',
+              node.type,
+              node.editionCount
+            );
+            const r = visual.r;
             const nodeKey = `location:${node.id}`;
             const isHovered =
               hoveredNodeId === nodeKey && !pinnedNodeId;
@@ -423,18 +435,13 @@ export default function DiasporaView({
             const isSelected = selectedNodeIds.has(nodeKey);
             const iso2 = countryToISO2(node.country);
 
+            // Label radial anchor：节点 angle ∈ [-π/2, π/2]（右半圆 + 顶部）
+            // → textAnchor='start'，label 放节点右侧 r + 4 px；否则放左侧。
             const dx = x - W / 2;
-            const dy = y - H / 2;
-            const angle = Math.atan2(dy, dx);
-            const labelDist = r + 5;
-            const lx = x + Math.cos(angle) * labelDist;
-            const ly = y + Math.sin(angle) * labelDist;
-            const anchor =
-              Math.abs(dx) < 20
-                ? 'middle'
-                : dx > 0
-                  ? 'start'
-                  : 'end';
+            const isRightHalf = dx >= 0;
+            const labelX = isRightHalf ? x + r + 4 : x - r - 4;
+            const labelY = y + 3; // baseline 微调
+            const anchor: 'start' | 'end' = isRightHalf ? 'start' : 'end';
 
             return (
               <g
@@ -499,11 +506,24 @@ export default function DiasporaView({
                   cy={y}
                   r={r}
                   className="fill-foreground"
-                  opacity={isPinned ? 1 : opacity}
+                  opacity={isPinned ? 1 : visual.opacity}
                 />
+                {/* private_collection：内部反差色环（"双圆嵌套"）*/}
+                {visual.innerRingR !== null && (
+                  <circle
+                    data-testid={`constellation-private-inner-${node.id}`}
+                    cx={x}
+                    cy={y}
+                    r={visual.innerRingR}
+                    fill="none"
+                    className="stroke-background"
+                    strokeWidth={1.2}
+                    opacity={visual.opacity}
+                  />
+                )}
                 <text
-                  x={lx}
-                  y={ly - 3}
+                  x={labelX}
+                  y={labelY - 5}
                   textAnchor={anchor}
                   className="fill-foreground"
                   fontSize="9"
@@ -515,8 +535,8 @@ export default function DiasporaView({
                     : node.name}
                 </text>
                 <text
-                  x={lx}
-                  y={ly + 8}
+                  x={labelX}
+                  y={labelY + 6}
                   textAnchor={anchor}
                   className="fill-muted-foreground"
                   fontSize="8"
@@ -528,9 +548,10 @@ export default function DiasporaView({
             );
           })}
 
-          {/* ─── Middle ring: named private buyers ──────────────── */}
+          {/* ─── Named private buyer nodes (time-spiral，与 location 混排) ─── */}
           {layout.namedPoints.map(({ x, y, node }) => {
-            const r = namedNodeRadius(node.editionCount);
+            const visual = getNodeVisual('named_private', null, node.editionCount);
+            const r = visual.r;
             const nodeKey = `named:${node.id}`;
             const isHovered =
               hoveredNodeId === nodeKey && !pinnedNodeId;
@@ -538,17 +559,10 @@ export default function DiasporaView({
             const isSelected = selectedNodeIds.has(nodeKey);
 
             const dx = x - W / 2;
-            const dy = y - H / 2;
-            const angle = Math.atan2(dy, dx);
-            const labelDist = r + 6;
-            const lx = x + Math.cos(angle) * labelDist;
-            const ly = y + Math.sin(angle) * labelDist;
-            const anchor =
-              Math.abs(dx) < 20
-                ? 'middle'
-                : dx > 0
-                  ? 'start'
-                  : 'end';
+            const isRightHalf = dx >= 0;
+            const labelX = isRightHalf ? x + r + 4 : x - r - 4;
+            const labelY = y + 3;
+            const anchor: 'start' | 'end' = isRightHalf ? 'start' : 'end';
 
             return (
               <g
@@ -615,14 +629,14 @@ export default function DiasporaView({
                   cy={y}
                   r={r}
                   className="fill-foreground"
-                  opacity={isPinned ? 0.9 : 0.5}
+                  opacity={isPinned ? 0.9 : visual.opacity}
                 />
                 <text
-                  x={lx}
-                  y={ly}
+                  x={labelX}
+                  y={labelY}
                   textAnchor={anchor}
-                  className="fill-muted-foreground"
-                  fontSize="7"
+                  className="fill-foreground"
+                  fontSize="9"
                   fontFamily="ui-monospace, monospace"
                   opacity={0.7}
                 >

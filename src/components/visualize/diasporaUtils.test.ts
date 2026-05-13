@@ -10,8 +10,9 @@ import {
   getGhostNodes,
   buildConstellation,
   layoutConstellation,
+  getNodeVisual,
   namedNodeRadius,
-  TYPE_ARC_RANGES,
+  TIME_SPIRAL_GEOMETRY,
 } from './diasporaUtils';
 import type { LocationNode } from './diasporaUtils';
 import type {
@@ -716,94 +717,276 @@ describe('buildConstellation', () => {
   });
 });
 
-// ─── M6: layoutConstellation ───────────────────────────────────────────────
+// ─── M6 buildConstellation: firstSaleDate 聚合（v1.6 新增）──────────────────
 
-describe('layoutConstellation', () => {
-  it('center 落在 viewport 正中', () => {
+describe('buildConstellation firstSaleDate', () => {
+  it('location.firstSaleDate = 该 entity 所有 outflow editions sale_date 非空最小值', () => {
+    const editions = [
+      makeEdition('e1', 'loc-g1', { status: 'sold', sale_date: '2020-05-12' }),
+      makeEdition('e2', 'loc-g1', { status: 'sold', sale_date: '2018-11-30' }),
+      makeEdition('e3', 'loc-g1', { status: 'gifted', sale_date: '2024-01-01' }),
+      // sale_date 缺失，不参与 min
+      makeEdition('e4', 'loc-g1', { status: 'sold', sale_date: null }),
+    ];
+    const locations = [makeLocation('loc-g1', 'Gallery A', 'gallery')];
+    const c = buildConstellation(editions, locations);
+    expect(c.locations[0].firstSaleDate).toBe('2018-11-30');
+  });
+
+  it('全部 outflow editions 缺 sale_date → firstSaleDate = null（undated entity）', () => {
+    const editions = [
+      makeEdition('e1', 'loc-g1', { status: 'sold' }),
+      makeEdition('e2', 'loc-g1', { status: 'gifted' }),
+    ];
+    const locations = [makeLocation('loc-g1', 'Gallery A', 'gallery')];
+    const c = buildConstellation(editions, locations);
+    expect(c.locations[0].firstSaleDate).toBeNull();
+  });
+
+  it('named buyer 同样有 firstSaleDate 聚合', () => {
+    const editions = [
+      makeEdition('e1', null, {
+        status: 'sold',
+        buyer_name: 'Liliana Gao',
+        sale_date: '2022-08-15',
+      }),
+      makeEdition('e2', null, {
+        status: 'sold',
+        buyer_name: 'Liliana Gao',
+        sale_date: '2019-04-01',
+      }),
+    ];
+    const c = buildConstellation(editions, []);
+    expect(c.namedPrivateBuyers[0].firstSaleDate).toBe('2019-04-01');
+  });
+});
+
+// ─── v1.6 layoutConstellation (time-spiral) ────────────────────────────────
+
+describe('layoutConstellation (time-spiral)', () => {
+  it('artist center 落在 viewport 正中 (800×560 → (400, 280))', () => {
     const c = buildConstellation([], []);
     const layout = layoutConstellation(c, { width: 800, height: 560 });
     expect(layout.center.x).toBe(400);
     expect(layout.center.y).toBe(280);
   });
 
-  it('三环半径按 minDim × ratio 计算（默认 0.25 / 0.37 / 0.47）', () => {
+  it('geometry 暴露 TIME_SPIRAL_GEOMETRY 常量', () => {
     const c = buildConstellation([], []);
     const layout = layoutConstellation(c, { width: 800, height: 560 });
-    const minDim = 560;
-    expect(layout.radii.inner).toBeCloseTo(minDim * 0.25, 2);
-    expect(layout.radii.middle).toBeCloseTo(minDim * 0.37, 2);
-    expect(layout.radii.outer).toBeCloseTo(minDim * 0.47, 2);
+    expect(layout.geometry.rInner).toBe(TIME_SPIRAL_GEOMETRY.R_INNER);
+    expect(layout.geometry.rOuterData).toBe(TIME_SPIRAL_GEOMETRY.R_OUTER_DATA);
+    expect(layout.geometry.rGhost).toBe(TIME_SPIRAL_GEOMETRY.R_GHOST);
+    expect(layout.geometry.rAnonymous).toBe(TIME_SPIRAL_GEOMETRY.ANONYMOUS_R);
   });
 
-  it('location 节点落在对应 type 弧度区间内', () => {
+  it('dated entity 按时间映射径向：earliest → R_INNER + 12 点钟 / latest → R_OUTER_DATA + 绕一圈', () => {
+    // 两个有时间的 location：early 2018-01-01 / late 2024-12-31
     const editions = [
-      makeEdition('e1', 'loc-g1', { status: 'sold' }),
-      makeEdition('e2', 'loc-m1', { status: 'sold' }),
+      makeEdition('e1', 'loc-early', { status: 'sold', sale_date: '2018-01-01' }),
+      makeEdition('e2', 'loc-late', { status: 'sold', sale_date: '2024-12-31' }),
     ];
     const locations = [
-      makeLocation('loc-g1', 'Gallery A', 'gallery'),
-      makeLocation('loc-m1', 'Museum B', 'museum'),
+      makeLocation('loc-early', 'Early Gallery', 'gallery'),
+      makeLocation('loc-late', 'Late Museum', 'museum'),
     ];
     const c = buildConstellation(editions, locations);
     const layout = layoutConstellation(c, { width: 800, height: 560 });
-    const galleryPoint = layout.locationPoints.find(
-      (p) => p.node.id === 'loc-g1'
-    )!;
-    const museumPoint = layout.locationPoints.find(
-      (p) => p.node.id === 'loc-m1'
-    )!;
-    const galleryArc = TYPE_ARC_RANGES.gallery;
-    const museumArc = TYPE_ARC_RANGES.museum;
-    expect(galleryPoint.angle).toBeGreaterThanOrEqual(galleryArc.start);
-    expect(galleryPoint.angle).toBeLessThanOrEqual(galleryArc.end);
-    expect(museumPoint.angle).toBeGreaterThanOrEqual(museumArc.start);
-    expect(museumPoint.angle).toBeLessThanOrEqual(museumArc.end);
+
+    const early = layout.locationPoints.find((p) => p.node.id === 'loc-early')!;
+    const late = layout.locationPoints.find((p) => p.node.id === 'loc-late')!;
+
+    // earliest → r ≈ R_INNER (70), angle = -π/2（12 点钟方向）
+    expect(early.r).toBeCloseTo(TIME_SPIRAL_GEOMETRY.R_INNER, 4);
+    expect(early.angle).toBeCloseTo(-Math.PI / 2, 4);
+    // earliest → (cx, cy - R_INNER) = (400, 280 - 70) = (400, 210)
+    expect(early.x).toBeCloseTo(400, 4);
+    expect(early.y).toBeCloseTo(210, 4);
+
+    // latest → r ≈ R_OUTER_DATA (240), angle = -π/2 + 2π = 3π/2（也落在 12 点钟）
+    expect(late.r).toBeCloseTo(TIME_SPIRAL_GEOMETRY.R_OUTER_DATA, 4);
+    // 绕一圈后 cos(3π/2) = 0, sin(3π/2) = -1
+    expect(late.x).toBeCloseTo(400, 4);
+    expect(late.y).toBeCloseTo(280 - 240, 4);
+
+    expect(early.isUndated).toBe(false);
+    expect(late.isUndated).toBe(false);
   });
 
-  it('namedPoints 在 middle ring 上均匀分布', () => {
-    const editions = Array.from({ length: 4 }, (_, i) =>
-      makeEdition(`e${i}`, null, {
-        status: 'sold',
-        buyer_name: `Buyer ${i}`,
-      })
-    );
-    const c = buildConstellation(editions, []);
-    const layout = layoutConstellation(c, { width: 800, height: 600 });
-    expect(layout.namedPoints).toHaveLength(4);
-    // 每个 named point 到中心距离 = middle radius
-    for (const p of layout.namedPoints) {
-      const d = Math.sqrt((p.x - 400) ** 2 + (p.y - 300) ** 2);
-      expect(d).toBeCloseTo(layout.radii.middle, 2);
+  it('dated 只有 1 个 entity → 放在径向中点 + 12 点钟方向', () => {
+    const editions = [
+      makeEdition('e1', 'loc-only', { status: 'sold', sale_date: '2020-06-15' }),
+    ];
+    const locations = [makeLocation('loc-only', 'Only Gallery', 'gallery')];
+    const c = buildConstellation(editions, locations);
+    const layout = layoutConstellation(c, { width: 800, height: 560 });
+    const p = layout.locationPoints[0];
+    const midR =
+      TIME_SPIRAL_GEOMETRY.R_INNER +
+      (TIME_SPIRAL_GEOMETRY.R_OUTER_DATA - TIME_SPIRAL_GEOMETRY.R_INNER) / 2;
+    expect(p.r).toBeCloseTo(midR, 4);
+    expect(p.angle).toBeCloseTo(-Math.PI / 2, 4);
+    expect(p.x).toBeCloseTo(400, 4);
+    expect(p.y).toBeCloseTo(280 - midR, 4);
+  });
+
+  it('所有 dated entity firstSaleDate 完全相同 → span=0 fallback 到径向中点', () => {
+    const editions = [
+      makeEdition('e1', 'loc-a', { status: 'sold', sale_date: '2021-03-01' }),
+      makeEdition('e2', 'loc-b', { status: 'sold', sale_date: '2021-03-01' }),
+    ];
+    const locations = [
+      makeLocation('loc-a', 'A', 'gallery'),
+      makeLocation('loc-b', 'B', 'museum'),
+    ];
+    const c = buildConstellation(editions, locations);
+    const layout = layoutConstellation(c, { width: 800, height: 560 });
+    const midR =
+      TIME_SPIRAL_GEOMETRY.R_INNER +
+      (TIME_SPIRAL_GEOMETRY.R_OUTER_DATA - TIME_SPIRAL_GEOMETRY.R_INNER) / 2;
+    for (const p of layout.locationPoints) {
+      expect(p.r).toBeCloseTo(midR, 4);
+      expect(p.angle).toBeCloseTo(-Math.PI / 2, 4);
     }
   });
 
-  it('anonymousPoints 在 outer ring 上均匀分布，count = anonymous.count', () => {
+  it('undated entity 全部 r = R_GHOST，从 12 点钟均匀分布 360°', () => {
+    // 3 个 location 全部缺 sale_date
+    const editions = [
+      makeEdition('e1', 'loc-1', { status: 'sold' }),
+      makeEdition('e2', 'loc-2', { status: 'sold' }),
+      makeEdition('e3', 'loc-3', { status: 'sold' }),
+    ];
+    const locations = [
+      makeLocation('loc-1', 'A', 'gallery'),
+      makeLocation('loc-2', 'B', 'museum'),
+      makeLocation('loc-3', 'C', 'private_collection'),
+    ];
+    const c = buildConstellation(editions, locations);
+    const layout = layoutConstellation(c, { width: 800, height: 560 });
+    expect(layout.locationPoints).toHaveLength(3);
+    for (const p of layout.locationPoints) {
+      expect(p.r).toBeCloseTo(TIME_SPIRAL_GEOMETRY.R_GHOST, 4);
+      expect(p.isUndated).toBe(true);
+      const d = Math.sqrt((p.x - 400) ** 2 + (p.y - 280) ** 2);
+      expect(d).toBeCloseTo(TIME_SPIRAL_GEOMETRY.R_GHOST, 2);
+    }
+    // 第一个 undated entity 落在 12 点钟方向
+    const first = layout.locationPoints[0];
+    expect(first.angle).toBeCloseTo(-Math.PI / 2, 4);
+  });
+
+  it('dated locations + namedPrivate 在 time-spiral 上混排（不按 type 分弧）', () => {
+    const editions = [
+      makeEdition('e1', 'loc-m1', {
+        status: 'sold',
+        sale_date: '2018-01-01',
+      }),
+      makeEdition('e2', null, {
+        status: 'sold',
+        sale_date: '2020-01-01',
+        buyer_name: 'Mr B',
+      }),
+      makeEdition('e3', 'loc-g1', {
+        status: 'sold',
+        sale_date: '2024-01-01',
+      }),
+    ];
+    const locations = [
+      makeLocation('loc-m1', 'Museum', 'museum'),
+      makeLocation('loc-g1', 'Gallery', 'gallery'),
+    ];
+    const c = buildConstellation(editions, locations);
+    const layout = layoutConstellation(c, { width: 800, height: 560 });
+    expect(layout.locationPoints).toHaveLength(2);
+    expect(layout.namedPoints).toHaveLength(1);
+    // earliest (loc-m1) r ≈ R_INNER；latest (loc-g1) r ≈ R_OUTER_DATA
+    const earliest = layout.locationPoints.find((p) => p.node.id === 'loc-m1')!;
+    const latest = layout.locationPoints.find((p) => p.node.id === 'loc-g1')!;
+    const named = layout.namedPoints[0];
+    expect(earliest.r).toBeCloseTo(TIME_SPIRAL_GEOMETRY.R_INNER, 4);
+    expect(latest.r).toBeCloseTo(TIME_SPIRAL_GEOMETRY.R_OUTER_DATA, 4);
+    // 2020-01-01 在 2018→2024 span 中点附近，r 介于 inner / outer-data 之间
+    expect(named.r).toBeGreaterThan(TIME_SPIRAL_GEOMETRY.R_INNER);
+    expect(named.r).toBeLessThan(TIME_SPIRAL_GEOMETRY.R_OUTER_DATA);
+  });
+
+  it('anonymous 全部 r = ANONYMOUS_R，均匀分布', () => {
     const editions = Array.from({ length: 5 }, (_, i) =>
       makeEdition(`e${i}`, null, { status: 'sold' })
     );
     const c = buildConstellation(editions, []);
-    const layout = layoutConstellation(c, { width: 800, height: 600 });
+    const layout = layoutConstellation(c, { width: 800, height: 560 });
     expect(layout.anonymousPoints).toHaveLength(5);
     for (const p of layout.anonymousPoints) {
-      const d = Math.sqrt((p.x - 400) ** 2 + (p.y - 300) ** 2);
-      expect(d).toBeCloseTo(layout.radii.outer, 2);
+      const d = Math.sqrt((p.x - 400) ** 2 + (p.y - 280) ** 2);
+      expect(d).toBeCloseTo(TIME_SPIRAL_GEOMETRY.ANONYMOUS_R, 2);
     }
   });
 });
 
-// ─── M6: namedNodeRadius ───────────────────────────────────────────────────
+// ─── v1.6 getNodeVisual ────────────────────────────────────────────────────
 
-describe('namedNodeRadius', () => {
-  it('最小值 4', () => {
+describe('getNodeVisual', () => {
+  it('museum > private_collection > gallery > named_private (相同 editionCount=1 base r 对比)', () => {
+    const m = getNodeVisual('location', 'museum', 1).r;
+    const p = getNodeVisual('location', 'private_collection', 1).r;
+    const g = getNodeVisual('location', 'gallery', 1).r;
+    const n = getNodeVisual('named_private', null, 1).r;
+    // museum 14 / private_collection 12 / gallery 12 / named_private 7
+    expect(m).toBeGreaterThan(p);
+    expect(p).toBeGreaterThanOrEqual(g);
+    expect(g).toBeGreaterThan(n);
+  });
+
+  it('同 type 内 editionCount 增大 → r 单调不降', () => {
+    expect(getNodeVisual('location', 'museum', 1).r).toBeLessThan(
+      getNodeVisual('location', 'museum', 10).r
+    );
+    expect(getNodeVisual('named_private', null, 1).r).toBeLessThan(
+      getNodeVisual('named_private', null, 20).r
+    );
+  });
+
+  it('private_collection 返回 innerRingR 非 null；其他 type innerRingR = null', () => {
+    expect(getNodeVisual('location', 'private_collection', 1).innerRingR).not.toBeNull();
+    expect(getNodeVisual('location', 'museum', 1).innerRingR).toBeNull();
+    expect(getNodeVisual('location', 'gallery', 1).innerRingR).toBeNull();
+    expect(getNodeVisual('location', 'studio', 1).innerRingR).toBeNull();
+    expect(getNodeVisual('location', 'other', 1).innerRingR).toBeNull();
+    expect(getNodeVisual('named_private', null, 1).innerRingR).toBeNull();
+  });
+
+  it('anonymous 固定 r=1.5，style=dust', () => {
+    const a = getNodeVisual('anonymous', null, 1);
+    expect(a.r).toBe(1.5);
+    expect(a.style).toBe('dust');
+    const a2 = getNodeVisual('anonymous', null, 100);
+    expect(a2.r).toBe(1.5); // anonymous 不随 editionCount 变化
+  });
+
+  it('未知 type fallback 不报错', () => {
+    // type=null（理论 location 应有 type，但万一）走 fallback
+    const v = getNodeVisual('location', null, 1);
+    expect(v.r).toBeGreaterThan(0);
+    expect(v.style).toBe('solid');
+  });
+
+  it('opacity spec：museum=1.0 / private_collection=0.85 / gallery=0.7 / named=0.55 / anonymous=0.3', () => {
+    expect(getNodeVisual('location', 'museum', 1).opacity).toBe(1.0);
+    expect(getNodeVisual('location', 'private_collection', 1).opacity).toBe(0.85);
+    expect(getNodeVisual('location', 'gallery', 1).opacity).toBe(0.7);
+    expect(getNodeVisual('named_private', null, 1).opacity).toBe(0.55);
+    expect(getNodeVisual('anonymous', null, 1).opacity).toBe(0.3);
+  });
+});
+
+// ─── 兼容性：legacy namedNodeRadius（@deprecated）保留导出守护测试 ─────────
+
+describe('namedNodeRadius (legacy)', () => {
+  it('保留导出 + 单调递增（@deprecated 不被新 view 使用）', () => {
     expect(namedNodeRadius(0)).toBe(4);
-  });
-
-  it('最大值 10', () => {
     expect(namedNodeRadius(9999)).toBe(10);
-  });
-
-  it('随 editionCount 增大而增大', () => {
     expect(namedNodeRadius(1)).toBeLessThan(namedNodeRadius(5));
-    expect(namedNodeRadius(5)).toBeLessThanOrEqual(namedNodeRadius(10));
   });
 });

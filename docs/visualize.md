@@ -223,19 +223,37 @@ URL state：`?sel=artwork:UUID`（key=`sel`，value `${kind}:${id}`）。解析�
 
 ### Diaspora
 
-- **Constellation 形态升级（v1.6.x 起，M6）**：Diaspora 视图从"单层 location 节点 + 同心环"升级为"三环 + center"的 **Constellation 数据模型**。i18n key / 文件名 / UI heading 保留 `Diaspora`（与 Strata / Markets / Terminal 同列诗意名），但内部 model 改名 `ConstellationData`。三环承担不同语义层次：
+- **Constellation 形态：time-spiral（v1.6 起，替换 v1.6 早期同心环 + type-arc 模型）**：Diaspora 视图早期版本按 `location.type` 把 inner-ring 切成 5 段弧度（museum / private_collection / gallery / studio / other），实测发现 14 个 location 中 12 个都是 museum（artist outflow 集中流向美术馆），结果 60° museum 弧度严重过载、其它 200° 弧度全空。新模型抛弃 type 分弧，改用 **time-spiral：径向距离 = 第一次交易时间，节点大小 = type + editionCount**：
   - **Center (artist)**：实心圆 r=12，label "aaajiao" + 总流出 count（sold + gifted）
-  - **Inner ring (R1 ≈ 0.25 × minDim)**：`LocationConstellationNode`，按 `location.type` 分弧度区间（studio 顶部、museum 右上、private_collection 右下、gallery 左侧、other 底部，区间内按 editionCount desc 排）。半径走原 `nodeRadius(editionCount)`。fill opacity 走 `TYPE_OPACITY`。
-  - **Middle ring (R2 ≈ 0.37 × minDim)**：`NamedPrivateNode`，按 `buyer_name` **字面值聚合**（不归一化、不合并 "Liliana Gao" / "Liliana Gao / 林奇"，保持灵活性）。半径走 `namedNodeRadius` 在 [4, 10]。整圆均匀分布从 12 点钟方向开始，按 editionCount desc 排让重要的落在视觉显眼位置。opacity 0.5（次级权重）。
-  - **Outer ring (R3 ≈ 0.47 × minDim)**：`AnonymousAggregate`，N 个 r=1.5 实心 dot，**不可点击 / 不进 hover 状态机 / 无 navigate 目标 / 无 testid 之外的 role**。这是"档案的薄"被画出来——sold 但无任何识别信息的流出。
+  - **径向（r）= 第一次交易时间**（A 方向：老→近 center，呼应 Strata 地层学）：
+    - dated entity（`firstSaleDate != null`）按时间线性插值：earliest → `R_INNER = 70`、latest → `R_OUTER_DATA = 240`
+    - 角度沿时间轴顺时针绕一圈：earliest → `-π/2`（12 点钟），latest → `-π/2 + 2π`（也是 12 点钟）—— 时间密度由角度密度直接表达
+    - undated entity（缺 `sale_date`，全部 outflow editions 都没有）推到 `R_GHOST = 280` 外圈均匀分布。**"缺失数据不藏"原则的几何化**（呼应 ghost 圆环 / Strata DegenerateGlyph）
+    - dated 只有 1 个或所有 dated entity 时间完全相同 → span=0 fallback 到径向中点 + 12 点钟方向（避免 NaN）
+  - **节点 size + visual style 由 `getNodeVisual(kind, type, editionCount)` 决定**（替代旧 `nodeRadius` / `namedNodeRadius` / `TYPE_OPACITY`，**单一函数管所有视觉编码**）：
+
+    | kind / type | base r | weight | opacity | innerRing |
+    |---|---|---|---|---|
+    | location / museum | 14 | 2.5 | 1.0 | — |
+    | location / private_collection | 12 | 2.5 | 0.85 | r × 0.45（双圆嵌套）|
+    | location / gallery | 12 | 2.5 | 0.7 | — |
+    | location / studio | 12 | 2.5 | 0.85 | — |
+    | location / other | 11 | 2.0 | 0.6 | — |
+    | named_private | 7 | 1.8 | 0.55 | — |
+    | anonymous | 1.5（固定）| — | 0.3 | — |
+
+    公式：`r = base + sqrt(max(0, editionCount - 1)) * weight`（anonymous 例外，r 固定 1.5）。museum 比 private_collection 大、private_collection 比 named_private 大 —— 节点 size 直接编码"机构 > 个人收藏 > 个人买家"的不对称地位。
+  - **private_collection 双圆嵌套**：fill-foreground 实心圆上叠一层 `stroke-background` 反差色环（r × 0.45），相当于在节点内部刻出空心圈。brutalist 风格的"私人但机构化"表达 —— 个人 collector 跟匿名买家是两种东西，跟机构 museum 也是两种东西。`strokeWidth=1.2` 是为了小尺寸节点（r=12-15）仍可读，跟 Strata DegenerateGlyph X mark stroke 同档。
+  - **anonymous outflow**：N 个 r=1.5 实心 dust dot，固定在最外圈 `ANONYMOUS_R = 310`，均匀分布。**不可点击 / 不进 hover 状态机 / 无 navigate 目标**。这是"档案的薄"被画出来——sold 但无任何识别信息的流出。
 - **Constellation 数据归类（严格优先级，写在 `buildConstellation` 里）**：只处理 `status ∈ ('sold', 'gifted')` 的 outflow editions。其他 status 不进 Constellation（in_studio / at_gallery 等由 Strata / Markets 各自承担）。按这个顺序：
   1. `location_id` 指向 location 且 `location.type !== 'studio'` → 归 LocationConstellationNode
-  2. `buyer_name` 非空 → 归 NamedPrivateNode（key = buyer_name 字面值）
+  2. `buyer_name` 非空 → 归 NamedPrivateNode（key = buyer_name 字面值，不归一化 —— "Liliana Gao" 与 "Liliana Gao / 林奇" 是两个节点）
   3. `location_id` 指向 studio + buyer_name 非空 → 归 NamedPrivateNode（**studio 边界 case**：作品事实上卖给买家，只是物理上还在 artist studio 寄存，例如 Leo Xu + aaajiao Shanghai Studio）
   4. 都没有 → AnonymousAggregate
-- **只画 location ↔ artist edge**：institution 是首要节点，画 edge 解释"作品流向公共空间"。`namedPrivate` / `anonymous` **不画 edge** —— 用径向位置本身（中环 / 外环）表达 from-artist 关系，否则一团乱麻。selection edges（dashed）是 Phase 2 才加的额外层。
-- **同心环非力导布局**：力导（d3-force 等）需要新依赖 + 迭代仿真 + 每次渲染坐标可能漂移。Constellation 纯算术 + 笛卡尔坐标，**中心永远是 artist node**，稳定可预期。
-- **曲线 edge（二次贝塞尔）向外偏离圆心**：直线 edge 全过中心会变成一团乱码。控制点向外偏 30px 让弧线散开。
+- **`firstSaleDate` 聚合规则**：每个 entity 的 `firstSaleDate` = 该 entity 所有 outflow editions 中 `sale_date` 非空值的 **min**（ISO YYYY-MM-DD 字典序与时间序等价）；全部缺 `sale_date` → `null`。`buildConstellation` 在归类同时累加 `saleDates[]`，最后取 min；位置层 `layoutConstellation` 根据这个值决定 entity 落在 dated 时间轴还是 undated 外圈。
+- **只画 location ↔ artist edge**：institution 是首要节点，画 edge 解释"作品流向公共空间"。`namedPrivate` / `anonymous` **不画 edge** —— 用径向位置本身（time-spiral 上的距离 + 外圈 dust）表达 from-artist 关系，否则一团乱麻。selection edges（dashed）是 Phase 2 (M3a) 才加的额外层，在新 time-spiral 布局上同样工作 —— `selectedNodeIds` 计算逻辑不依赖 layout 几何，只依赖 `artworkIds` 关联。
+- **time-spiral 非力导布局**：力导（d3-force 等）需要新依赖 + 迭代仿真 + 每次渲染坐标可能漂移。time-spiral 纯算术 + 笛卡尔坐标，**中心永远是 artist node**，稳定可预期。dated entity 的角度由 `firstSaleDate` 唯一决定 —— 同一份数据每次渲染坐标完全一致。
+- **Label radial anchor 决策**：`dx = x - W/2`；`dx >= 0`（右半圆 + 顶部）→ `textAnchor="start"`，label 放节点右侧 `r + 4` px；否则 → `textAnchor="end"`，label 放节点左侧。比旧版的 `Math.atan2 + Math.cos/sin` 做 polar offset 简单一档，几何含义也更直白（"label 永远长向外"）。
 - **"档案薄"显式声明**：顶部 stat bar 直接写 `27 / 137 editions have known location`，配 stateHint "数据会随系统使用而生长"。**不要把空白藏起来**——薄数据是当前 archive 的真实状态，本身是 statement。
 - **`from_location` / `to_location` 是 name（text）不是 UUID**：构建边时需要 name → id 反向映射。改 schema 时注意（见 `supabase/schema.sql` 的 trigger）。
 - **双态交互：hover = 预览，click = pin**：`hoveredNodeId` 只在无 pin 时驱动预览信息条；`pinnedNodeId` 驱动完整 pin 卡片（位置信息 + edition 列表 + "view all"链接）。两次点同一节点或点 SVG 空白取消 pin。**pin 卡片中每一行 edition（inventory_number · 标题 · status）都是可点击的 `<button>`，navigate 到 `/editions/{id}`；底部 "view all" 按钮 navigate 到 `/editions?locationId={id}`**。这条不要退回到只显示 `<span>` inventory_number 的旧实现。
@@ -257,8 +275,8 @@ URL state：`?sel=artwork:UUID`（key=`sel`，value `${kind}:${id}`）。解析�
 | `terminalUtils.test.ts` | 29 — inventory 自然排序 / edition label 4 种 / location 拼接 / group 分桶 / markets line |
 | `TerminalView.test.tsx` | 11 — 行 role=button + tabIndex / 点击 navigate / 键盘 Enter+Space / 其他键不触发 / 分组 heading + aria-hidden 装饰 / 紧凑字号 class / row.id 防御 / separator 对 SR 隐藏 / Phase 2 selection row highlight（M3a）/ Phase 2 null 不渲染（M3a） |
 | `useVisualizationSelection.test.tsx` | 13 — parseSelectionParam null / 空 / artwork / 未知 kind / 无冒号 / 空 id / serializeSelection / hook 无 sel = null / hook 解析 sel / hook setSelection 写 URL / setSelection(null) 删 URL / isSelected / 非法 sel fallback（M3a） |
-| `diasporaUtils.test.ts` | 56 — 节点关联 / 中心选择 tie-breaker / 同心环布局 / 边聚合 / tracked stat / `getGhostNodes`（M2）/ `buildConstellation`（M6: 12 条覆盖空 / 单 location / 多 location 排序 / buyer 字面值聚合 / studio 边界 / status 过滤 / lost 不算 outflow / artworkIds 去重 / editionIds 不去重 / totalOutflowCount）/ `layoutConstellation`（M6: center 位置 / 三环半径 / type 弧度区间 / named 均匀分布 / anonymous 均匀分布）/ `namedNodeRadius`（M6） |
-| `DiasporaView.test.tsx` | 32 — 初始状态 / hover 预览 / hover 离开 / click pin / edition 行跳转 / view all 跳转 / 二次 click 取消 pin / 切换 pin / pin 时 hover 不干扰 / 空数据 / aria-pressed / 键盘 Enter / 长名 SVG `<title>` / pin 卡片 stopPropagation / spy stopPropagation / ghost 环渲染（M2）/ ghost count=0 不画（M2）/ ghost aria-hidden（M2）/ legend 含 ghost 项（M2.5）/ Constellation artist center 渲染（M6）/ Inner ring location nodes 渲染（M6）/ Middle ring named_private 渲染（M6）/ Outer ring anonymous dots（M6）/ 只画 location-artist edge（M6）/ named_private 节点 a11y（M6）/ anonymous dots 不可点击（M6）/ named_private pin 卡片 (M6) / Phase 2 selection ring on location（M3a）/ Phase 2 selection ring on named（M3a）/ Phase 2 dashed edge（M3a）/ Phase 2 null selection 不渲染 ring（M3a） |
+| `diasporaUtils.test.ts` | 66 — 节点关联 / 中心选择 tie-breaker / 同心环布局 / 边聚合 / tracked stat / `getGhostNodes`（M2）/ `buildConstellation`（M6: 12 条覆盖空 / 单 location / 多 location 排序 / buyer 字面值聚合 / studio 边界 / status 过滤 / lost 不算 outflow / artworkIds 去重 / editionIds 不去重 / totalOutflowCount）/ **`buildConstellation.firstSaleDate` 聚合（v1.6 新增）** / **`layoutConstellation` time-spiral（v1.6 重写）：center 位置 / TIME_SPIRAL_GEOMETRY 常量 / dated entity earliest→R_INNER & latest→R_OUTER_DATA 绕一圈 / 单 dated entity span=0 fallback 到中点 / 全 dated entity 同日期 span=0 fallback / undated entity 全 r=R_GHOST 均匀分布 / dated locations+named 混排 / anonymous 全 r=ANONYMOUS_R** / **`getNodeVisual`（v1.6 新增）：museum > private_collection > gallery > named_private size 排序 / editionCount 单调递增 / private_collection innerRingR 非 null 其他 null / anonymous r=1.5 + style=dust / 未知 type fallback / opacity spec** / `namedNodeRadius`（legacy @deprecated） |
+| `DiasporaView.test.tsx` | 36 — 初始状态 / hover 预览 / hover 离开 / click pin / edition 行跳转 / view all 跳转 / 二次 click 取消 pin / 切换 pin / pin 时 hover 不干扰 / 空数据 / aria-pressed / 键盘 Enter / 长名 SVG `<title>` / pin 卡片 stopPropagation / spy stopPropagation / ghost 环渲染（M2）/ ghost count=0 不画（M2）/ ghost aria-hidden（M2）/ legend 含 ghost 项（M2.5）/ Constellation artist center 渲染（M6）/ location nodes 渲染（M6）/ named_private 渲染（M6）/ anonymous dots（M6）/ 只画 location-artist edge（M6）/ named_private 节点 a11y（M6）/ anonymous dots 不可点击（M6）/ named_private pin 卡片 (M6) / Phase 2 selection ring on location（M3a）/ Phase 2 selection ring on named（M3a）/ Phase 2 dashed edge（M3a）/ Phase 2 null selection 不渲染 ring（M3a） / **private_collection inner stroke ring 渲染（v1.6）/ museum/gallery 不画 inner ring（v1.6）/ label radial anchor 左右半圆切换（v1.6）/ dated+undated location 都渲染（v1.6）** |
 | `StrataView.test.tsx` | 39 — role=button 包裹 rect / aria-label 拼装 / click navigate / Enter / Space / 其它键不触发 / tabindex=0 / id 缺失 aria-disabled / viewBox 响应式 / hover tooltip / 空数据 / Timeline (M1) / 默认不 dim / scrub dim / ownership 4 桶（M2）/ unknown-year 列（M2）/ pattern defs / pointerEvents=all（M2）/ legend 5 项（M2.5）/ Y 轴 pin 全套（v1.6.x）/ Phase 2 selection ring 渲染（M3a）/ Phase 2 null 不渲染（M3a） |
 | `MarketsView.test.tsx` | 23 — 货币列降序 / 散点 a11y / 空状态 / summary 段隔离 / Timeline 全套（M1）/ noPrice lane（M2）/ legend 2 项（M2.5）/ Phase 2 selection ring 渲染（M3a）/ Phase 2 null 不渲染（M3a） |
 | `useTimelineScrubber.test.ts` | 8 — enabled 计算 / setIdx 边界 / togglePlay / rAF 推进 / unmount cancel / 单点禁用 / play 复位 / play complete |
@@ -308,8 +326,8 @@ src/components/visualize/
   ├── marketsUtils.test.ts
   ├── TerminalView.tsx               # 含 selection row highlight (M3a)
   ├── TerminalView.test.tsx
-  ├── DiasporaView.tsx               # Constellation 三环 (M6) + selection ring + dashed edges (M3a)
-  ├── diasporaUtils.ts               # 含 getGhostNodes (M2) + buildConstellation / layoutConstellation / namedNodeRadius (M6)
+  ├── DiasporaView.tsx               # Constellation time-spiral (v1.6) + selection ring + dashed edges (M3a)
+  ├── diasporaUtils.ts               # 含 getGhostNodes (M2) + buildConstellation / layoutConstellation (time-spiral, v1.6) / getNodeVisual (v1.6)
   └── diasporaUtils.test.ts
 src/locales/{zh,en}/visualize.json
 ```

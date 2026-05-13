@@ -151,6 +151,7 @@
         "middle": "私人买家",
         "outer": "匿名"
       },
+      "timelineLegend": "径向 = 第一次交易时间（近 = 早，远 = 晚），节点大小 = 收藏数量",
       "tooltip": {
         "namedPrivate": "{{name}} · {{count}} 件"
       },

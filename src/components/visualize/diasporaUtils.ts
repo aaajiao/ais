@@ -17,26 +17,28 @@ export interface LocationNode {
   editionIds: string[];
 }
 
-// ─── M6: Constellation data model ────────────────────────────────────────────
+// ─── M6 / v1.6 Constellation data model ──────────────────────────────────────
 //
-// Diaspora 视图升级为三环 + center 的 Constellation 形态。i18n key /
-// 文件名保留 "diaspora"（与 Strata / Markets / Terminal 同列诗意名），
-// 但内部数据 model 叫 ConstellationData，对应"机构 / 私人 / 匿名" 三层节点。
+// Diaspora 视图采用 "artist center + time-spiral" 形态。i18n key / 文件名 / UI
+// heading 保留 "diaspora"（与 Strata / Markets / Terminal 同列诗意名）。
 //
 // 数据归类只处理 outflow：edition.status ∈ ('sold', 'gifted')。其他 status
 // 不进 Constellation —— 在 artist 手里或 still external 的 editions 不算
 // "流出去"，由 Strata / Markets 各自承担它们的故事。
 //
-// 优先级（严格顺序）：
-//   1. location_id 指向 location 且 location.type !== 'studio' → LocationNode
+// 归类优先级（严格顺序）：
+//   1. location_id 指向 location 且 location.type !== 'studio' → LocationConstellationNode
 //   2. buyer_name 非空 → NamedPrivateNode（key = buyer_name 字面值，不归一化）
 //   3. location_id 指向 studio 类型 + buyer_name 兜底为空 → 不太可能命中，
-//      但若发生，仍归 NamedPrivateNode（buyer_name 用 location.name 兜底，
-//      避免 "卖给 studio" 的 phantom 节点出现在 Inner ring）
+//      但若发生，仍归 NamedPrivateNode（避免 "卖给 studio" 的 phantom 节点）
 //   4. 都没有 → AnonymousAggregate
 //
 // 注意：buyer_name 故意按字面值聚合 —— "Liliana Gao" 与 "Liliana Gao / 林奇"
 // 是两个节点，不强行 dedupe（避免对 Akeroyd / Sigg 类合作买家的归一化错误）。
+//
+// 视觉布局：抛弃原 type-arc 同心环模型，改用 time-spiral —— 径向距离表示
+// 第一次交易时间（老→近 center），节点 size 表示 type + editionCount。
+// 见 layoutTimeSpiralConstellation。
 
 export interface ArtistCenterNode {
   kind: 'artist';
@@ -56,6 +58,11 @@ export interface LocationConstellationNode {
   editionIds: string[];
   /** 经 editions join 后该 location 关联的 artwork id 集合（去重） */
   artworkIds: string[];
+  /**
+   * 该 entity 所有 outflow editions 里 sale_date 非空值的最小值 (ISO YYYY-MM-DD)。
+   * 全部缺 sale_date → null（"undated"，layout 时推到 R_GHOST 外圈）。
+   */
+  firstSaleDate: string | null;
 }
 
 export interface NamedPrivateNode {
@@ -67,6 +74,11 @@ export interface NamedPrivateNode {
   editionIds: string[];
   /** 该私人买家关联的 artwork id 集合（去重） */
   artworkIds: string[];
+  /**
+   * 该 buyer 所有 outflow editions 里 sale_date 非空值的最小值 (ISO YYYY-MM-DD)。
+   * 全部缺 sale_date → null（"undated"，layout 时推到 R_GHOST 外圈）。
+   */
+  firstSaleDate: string | null;
 }
 
 export interface AnonymousAggregate {
@@ -118,6 +130,7 @@ export function buildConstellation(
       meta: VizLocation;
       editionIds: string[];
       artworkIds: Set<string>;
+      saleDates: string[];
     }
   >();
   const namedBuckets = new Map<
@@ -126,6 +139,7 @@ export function buildConstellation(
       name: string;
       editionIds: string[];
       artworkIds: Set<string>;
+      saleDates: string[];
     }
   >();
   const anonEditionIds: string[] = [];
@@ -138,6 +152,7 @@ export function buildConstellation(
 
     const loc = ed.location_id ? locById.get(ed.location_id) ?? null : null;
     const buyerName = ed.buyer_name?.trim() ? ed.buyer_name.trim() : null;
+    const saleDate = ed.sale_date && ed.sale_date.trim() ? ed.sale_date : null;
 
     // 优先级 1: non-studio location
     if (loc && loc.type !== 'studio') {
@@ -147,11 +162,13 @@ export function buildConstellation(
           meta: loc,
           editionIds: [],
           artworkIds: new Set(),
+          saleDates: [],
         };
         locationBuckets.set(loc.id, bucket);
       }
       bucket.editionIds.push(ed.id);
       bucket.artworkIds.add(ed.artwork_id);
+      if (saleDate) bucket.saleDates.push(saleDate);
       continue;
     }
 
@@ -163,17 +180,29 @@ export function buildConstellation(
           name: buyerName,
           editionIds: [],
           artworkIds: new Set(),
+          saleDates: [],
         };
         namedBuckets.set(buyerName, bucket);
       }
       bucket.editionIds.push(ed.id);
       bucket.artworkIds.add(ed.artwork_id);
+      if (saleDate) bucket.saleDates.push(saleDate);
       continue;
     }
 
     // 优先级 4: anonymous
     anonEditionIds.push(ed.id);
     anonArtworkIds.add(ed.artwork_id);
+  }
+
+  /** 取 ISO date 字符串数组的最小值（字典序对 YYYY-MM-DD 等价数值排序）。空数组返 null。 */
+  function minSaleDate(dates: string[]): string | null {
+    if (dates.length === 0) return null;
+    let m = dates[0];
+    for (let i = 1; i < dates.length; i++) {
+      if (dates[i] < m) m = dates[i];
+    }
+    return m;
   }
 
   // 物化 + 排序
@@ -190,6 +219,7 @@ export function buildConstellation(
       editionCount: b.editionIds.length,
       editionIds: b.editionIds,
       artworkIds: Array.from(b.artworkIds),
+      firstSaleDate: minSaleDate(b.saleDates),
     }))
     .sort((a, b) => b.editionCount - a.editionCount);
 
@@ -201,6 +231,7 @@ export function buildConstellation(
       editionCount: b.editionIds.length,
       editionIds: b.editionIds,
       artworkIds: Array.from(b.artworkIds),
+      firstSaleDate: minSaleDate(b.saleDates),
     }))
     .sort((a, b) => b.editionCount - a.editionCount);
 
@@ -221,43 +252,45 @@ export function buildConstellation(
   };
 }
 
-// ─── M6: Constellation 视觉布局 ─────────────────────────────────────────────
+// ─── v1.6 Time-spiral Constellation 布局 ──────────────────────────────────
 //
-// 弧度区间按 location.type 分配（顺时针，−π/2 = 12 点钟方向，0 = 3 点钟方向）：
-//   studio              → 顶部弧 (-30°, 30°)  紧贴 artist center
-//   gallery             → 左侧弧 (120°, 200°) 商业代理
-//   museum              → 右上弧 (-90°, -30°) 公共收藏
-//   private_collection  → 右下弧 (-150°, -90°) 私人 collection
-//                         注：右下 = (270°, 330°) = (-90°, -30°) 与 museum 冲突，
-//                         我们用 (30°, 90°) 让 private collection 落在右下偏下，
-//                         museum 偏右上（见下方常量）
-//   other               → 底部弧 (210°, 270°) fallback
+// 抛弃 type-arc 同心环模型。新布局只用两个数据轴：
+//   - **径向距离** = 第一次交易时间（老 entity 在内圈紧贴 artist，新 entity 在外）
+//   - **节点 size** = type + editionCount（museum 大 / private_collection 中 /
+//     named_private 小 / anonymous 极小），通过 getNodeVisual 解决
 //
-// 实现里用 [startRad, endRad]，按 type 内 editionCount desc 排列后 evenly 分布
-// 在该区间。区间方向均按"角度递增"画。
+// 角度沿时间轴顺时针绕一圈（earliest = 12 点钟方向 = -90°，latest = -90° + 360°
+// = 同样 12 点钟方向）。span 是一年时角度近，span 是十年时角度差大，时间密度
+// 用角度密度直接表达。
+//
+// 缺 sale_date 的 entity 推到 R_GHOST 外圈均匀分布 —— "缺失数据不藏"原则的
+// 几何化（呼应 ghost 圆环 / Strata DegenerateGlyph）。
+//
+// anonymous outflow 仍在最外（ANONYMOUS_R），均匀分布，不参与时间映射（无
+// 个体性，每个 dot 只代表一次匿名流出，集合作为整体看）。
 
-/** 弧度区间（rad），按 SVG 习惯：-π/2 = 12 点钟，0 = 3 点钟，π/2 = 6 点钟 */
-export const TYPE_ARC_RANGES: Record<
-  LocationConstellationNode['type'],
-  { start: number; end: number }
-> = {
-  // 顶部弧：-π/6 ~ π/6（即 -30° ~ 30°）
-  studio: { start: -Math.PI / 6, end: Math.PI / 6 },
-  // 右上弧：-π/2 ~ -π/6（即 -90° ~ -30°），museum 偏右上
-  museum: { start: -Math.PI / 2, end: -Math.PI / 6 },
-  // 左侧弧：2π/3 ~ 10π/9（即 120° ~ 200°），gallery 商业代理
-  gallery: { start: (2 * Math.PI) / 3, end: (10 * Math.PI) / 9 },
-  // 右下弧：π/6 ~ π/2（即 30° ~ 90°），private collection 跟 museum 同侧但下方
-  private_collection: { start: Math.PI / 6, end: Math.PI / 2 },
-  // 底部弧：7π/6 ~ 3π/2（即 210° ~ 270°），fallback / other
-  other: { start: (7 * Math.PI) / 6, end: (3 * Math.PI) / 2 },
-};
+/** 几何常量（坐标在 800×560 viewBox 内），固定值便于测试断言精确 */
+export const TIME_SPIRAL_GEOMETRY = {
+  /** 离 artist center 最近的有数据 entity 半径 */
+  R_INNER: 70,
+  /** 有 sale_date 数据的 entity 最远径向距离 */
+  R_OUTER_DATA: 240,
+  /** 缺 sale_date 的 entity 推到这个外圈 */
+  R_GHOST: 280,
+  /** 匿名 dust 还在最外 */
+  ANONYMOUS_R: 310,
+} as const;
 
 export interface ConstellationLocationPoint {
   node: LocationConstellationNode;
   x: number;
   y: number;
+  /** 极坐标角度（rad），仅供调试 / 测试断言 */
   angle: number;
+  /** 该节点到 center 的径向距离（rad 圆半径），用于 stable testing */
+  r: number;
+  /** 是否缺 sale_date（true → 放在 R_GHOST 外圈） */
+  isUndated: boolean;
 }
 
 export interface ConstellationNamedPoint {
@@ -265,6 +298,8 @@ export interface ConstellationNamedPoint {
   x: number;
   y: number;
   angle: number;
+  r: number;
+  isUndated: boolean;
 }
 
 export interface ConstellationAnonymousPoint {
@@ -275,33 +310,44 @@ export interface ConstellationAnonymousPoint {
 
 export interface ConstellationLayout {
   center: { x: number; y: number };
-  /** Inner ring (R1) location 节点 */
   locationPoints: ConstellationLocationPoint[];
-  /** Middle ring (R2) named private buyer 节点 */
   namedPoints: ConstellationNamedPoint[];
-  /** Outer ring (R3) anonymous dot dust */
   anonymousPoints: ConstellationAnonymousPoint[];
-  /** 三环半径，便于 view 渲染参考线 */
-  radii: { inner: number; middle: number; outer: number };
+  /** Geometry 常量（暴露给 view 做参考/legend，可直接读 TIME_SPIRAL_GEOMETRY） */
+  geometry: {
+    rInner: number;
+    rOuterData: number;
+    rGhost: number;
+    rAnonymous: number;
+  };
 }
 
 export interface ConstellationLayoutOptions {
   width: number;
   height: number;
-  /** 半径系数（占 min(w,h) 的比例），默认 inner=0.25 / middle=0.37 / outer=0.47 */
-  innerRatio?: number;
-  middleRatio?: number;
-  outerRatio?: number;
+}
+
+/** ISO YYYY-MM-DD → ms（仅取 epoch），用于时间径向插值 */
+function isoToMs(iso: string): number {
+  return new Date(iso).getTime();
 }
 
 /**
- * 计算 Constellation 三环坐标。
+ * Time-spiral 布局。
  *
- * - location 按 type 落到对应弧度区间，区间内按 editionCount desc 排
- *   evenly 分布
- * - named private 在 middle ring 整圆均匀分布（不按 type 分弧），按 editionCount
- *   desc 排，重要的落在 12 点钟方向附近
- * - anonymous dots 在 outer ring 整圆均匀分布，从 12 点钟方向顺时针
+ * 算法（spec A 方向：老→近 center）：
+ * 1. dated entity = locations + namedPrivate where firstSaleDate != null
+ *    undated entity = locations + namedPrivate where firstSaleDate == null
+ * 2. dated 非空时:
+ *    earliest = min(firstSaleDate), latest = max(firstSaleDate)
+ *    span_ms = max(1, ms(latest) - ms(earliest))
+ *    每 entity: t = (ms(date) - ms(earliest)) / span_ms ∈ [0, 1]
+ *      r = R_INNER + t * (R_OUTER_DATA - R_INNER)
+ *      angle = -π/2 + t * 2π   （12 点开始顺时针绕一圈）
+ * 3. dated 只有 1 个 entity 或所有 dated entity firstSaleDate 相同：
+ *    span = 0，放中点 r = (R_INNER + R_OUTER_DATA)/2，angle = -π/2
+ * 4. undated entity 全部 r = R_GHOST，均匀分布 360°（从 -π/2 开始）
+ * 5. anonymous 全部 r = ANONYMOUS_R，均匀分布
  */
 export function layoutConstellation(
   data: ConstellationData,
@@ -310,84 +356,143 @@ export function layoutConstellation(
   const { width, height } = options;
   const cx = width / 2;
   const cy = height / 2;
-  const minDim = Math.min(width, height);
+  const { R_INNER, R_OUTER_DATA, R_GHOST, ANONYMOUS_R } = TIME_SPIRAL_GEOMETRY;
 
-  const innerR = minDim * (options.innerRatio ?? 0.25);
-  const middleR = minDim * (options.middleRatio ?? 0.37);
-  const outerR = minDim * (options.outerRatio ?? 0.47);
+  // 1. 收集 dated / undated entities（locations + namedPrivate）
+  type DatedRef =
+    | { kind: 'location'; node: LocationConstellationNode; ms: number }
+    | { kind: 'named'; node: NamedPrivateNode; ms: number };
+  type UndatedRef =
+    | { kind: 'location'; node: LocationConstellationNode }
+    | { kind: 'named'; node: NamedPrivateNode };
 
-  // ─── Inner ring: locations by type arc ─────────────────────────────────
-  // 按 type 分桶，桶内按 editionCount desc 排
-  const byType = new Map<
-    LocationConstellationNode['type'],
-    LocationConstellationNode[]
-  >();
+  const dated: DatedRef[] = [];
+  const undated: UndatedRef[] = [];
+
   for (const loc of data.locations) {
-    if (!byType.has(loc.type)) byType.set(loc.type, []);
-    byType.get(loc.type)!.push(loc);
+    if (loc.firstSaleDate) {
+      dated.push({ kind: 'location', node: loc, ms: isoToMs(loc.firstSaleDate) });
+    } else {
+      undated.push({ kind: 'location', node: loc });
+    }
   }
-  for (const arr of byType.values()) {
-    arr.sort((a, b) => b.editionCount - a.editionCount);
+  for (const np of data.namedPrivateBuyers) {
+    if (np.firstSaleDate) {
+      dated.push({ kind: 'named', node: np, ms: isoToMs(np.firstSaleDate) });
+    } else {
+      undated.push({ kind: 'named', node: np });
+    }
   }
+
+  // dated 按时间升序排（earliest 在前），保证插值时 ordering 稳定
+  dated.sort((a, b) => a.ms - b.ms);
 
   const locationPoints: ConstellationLocationPoint[] = [];
-  // 遍历 enum 顺序保证布局稳定（与 TYPE_ARC_RANGES 同 key 集合）
-  const typeOrder: LocationConstellationNode['type'][] = [
-    'studio',
-    'gallery',
-    'museum',
-    'private_collection',
-    'other',
-  ];
-  for (const type of typeOrder) {
-    const nodes = byType.get(type);
-    if (!nodes || nodes.length === 0) continue;
-    const range = TYPE_ARC_RANGES[type];
-    const span = range.end - range.start;
-    for (let i = 0; i < nodes.length; i++) {
-      // 单节点居中；多节点把端点也留点内边距，避免压到弧边
-      const t =
-        nodes.length === 1 ? 0.5 : i / (nodes.length - 1);
-      // 单节点 t=0.5 时直接落中点
-      const angle =
-        nodes.length === 1
-          ? range.start + span * 0.5
-          : range.start + span * t;
+  const namedPoints: ConstellationNamedPoint[] = [];
+
+  // 2/3. dated 时间映射
+  if (dated.length > 0) {
+    const earliestMs = dated[0].ms;
+    const latestMs = dated[dated.length - 1].ms;
+    const spanMs = latestMs - earliestMs; // 单 entity 或全 same date → 0
+
+    if (spanMs === 0) {
+      // edge case：dated 只有 1 个 entity 或所有 dated entity firstSaleDate 完全相同。
+      // 全部落在中点（r 中点，angle = -π/2 即 12 点钟）
+      const r = R_INNER + (R_OUTER_DATA - R_INNER) / 2;
+      const angle = -Math.PI / 2;
+      const x = cx + r * Math.cos(angle);
+      const y = cy + r * Math.sin(angle);
+      for (const ref of dated) {
+        if (ref.kind === 'location') {
+          locationPoints.push({
+            node: ref.node,
+            x,
+            y,
+            angle,
+            r,
+            isUndated: false,
+          });
+        } else {
+          namedPoints.push({
+            node: ref.node,
+            x,
+            y,
+            angle,
+            r,
+            isUndated: false,
+          });
+        }
+      }
+    } else {
+      for (const ref of dated) {
+        const t = (ref.ms - earliestMs) / spanMs;
+        const r = R_INNER + t * (R_OUTER_DATA - R_INNER);
+        const angle = -Math.PI / 2 + t * 2 * Math.PI;
+        const x = cx + r * Math.cos(angle);
+        const y = cy + r * Math.sin(angle);
+        if (ref.kind === 'location') {
+          locationPoints.push({
+            node: ref.node,
+            x,
+            y,
+            angle,
+            r,
+            isUndated: false,
+          });
+        } else {
+          namedPoints.push({
+            node: ref.node,
+            x,
+            y,
+            angle,
+            r,
+            isUndated: false,
+          });
+        }
+      }
+    }
+  }
+
+  // 4. undated entities 推到 R_GHOST 外圈，均匀分布 360°
+  const undatedN = undated.length;
+  for (let i = 0; i < undatedN; i++) {
+    const ref = undated[i];
+    // 从 -π/2 (12 点) 开始均匀
+    const angle = -Math.PI / 2 + (2 * Math.PI * i) / Math.max(1, undatedN);
+    const r = R_GHOST;
+    const x = cx + r * Math.cos(angle);
+    const y = cy + r * Math.sin(angle);
+    if (ref.kind === 'location') {
       locationPoints.push({
-        node: nodes[i],
-        x: cx + innerR * Math.cos(angle),
-        y: cy + innerR * Math.sin(angle),
+        node: ref.node,
+        x,
+        y,
         angle,
+        r,
+        isUndated: true,
+      });
+    } else {
+      namedPoints.push({
+        node: ref.node,
+        x,
+        y,
+        angle,
+        r,
+        isUndated: true,
       });
     }
   }
 
-  // ─── Middle ring: named private buyers (整圆均匀) ───────────────────────
-  const namedPoints: ConstellationNamedPoint[] = [];
-  const namedSorted = [...data.namedPrivateBuyers].sort(
-    (a, b) => b.editionCount - a.editionCount
-  );
-  const namedN = namedSorted.length;
-  for (let i = 0; i < namedN; i++) {
-    // 从 12 点钟方向开始（-π/2），顺时针
-    const angle = -Math.PI / 2 + (2 * Math.PI * i) / Math.max(1, namedN);
-    namedPoints.push({
-      node: namedSorted[i],
-      x: cx + middleR * Math.cos(angle),
-      y: cy + middleR * Math.sin(angle),
-      angle,
-    });
-  }
-
-  // ─── Outer ring: anonymous dots (整圆均匀, 不可点击) ────────────────────
+  // 5. anonymous: 均匀分布在最外圈
   const anonymousPoints: ConstellationAnonymousPoint[] = [];
   const anonN = data.anonymous.count;
   for (let i = 0; i < anonN; i++) {
     const angle = -Math.PI / 2 + (2 * Math.PI * i) / Math.max(1, anonN);
     anonymousPoints.push({
       index: i,
-      x: cx + outerR * Math.cos(angle),
-      y: cy + outerR * Math.sin(angle),
+      x: cx + ANONYMOUS_R * Math.cos(angle),
+      y: cy + ANONYMOUS_R * Math.sin(angle),
     });
   }
 
@@ -396,11 +501,84 @@ export function layoutConstellation(
     locationPoints,
     namedPoints,
     anonymousPoints,
-    radii: { inner: innerR, middle: middleR, outer: outerR },
+    geometry: {
+      rInner: R_INNER,
+      rOuterData: R_OUTER_DATA,
+      rGhost: R_GHOST,
+      rAnonymous: ANONYMOUS_R,
+    },
   };
 }
 
-/** 命名 private buyer node 半径：sqrt(editionCount) * 2.5 + 4，clamp [4, 10] */
+// ─── Node visual encoding（替代 nodeRadius / namedNodeRadius / TYPE_OPACITY）──
+//
+// 每个节点的视觉用 `getNodeVisual(kind, type, editionCount)` 统一决定：
+//   - r = base + sqrt(max(0, editionCount-1)) * weight
+//   - opacity 按 kind+type 固定
+//   - private_collection 加一层 inner stroke ring （"双圆嵌套"）表达
+//     "私人但机构化" 的不对称地位
+//   - anonymous 是 dust，固定 r=1.5
+
+export interface NodeVisual {
+  r: number;
+  /** 'solid' = fill-foreground 实心；'dust' = anonymous 极小点 */
+  style: 'solid' | 'dust';
+  opacity: number;
+  /** private_collection 双圆嵌套时的内部 stroke ring 半径（null 表示不画） */
+  innerRingR: number | null;
+}
+
+/** 内部 spec 表：base r / weight / opacity / 是否画 inner stroke ring */
+const NODE_VISUAL_SPEC: Record<
+  string,
+  { base: number; weight: number; opacity: number; innerRingFactor: number | null }
+> = {
+  'location:museum': { base: 14, weight: 2.5, opacity: 1.0, innerRingFactor: null },
+  'location:private_collection': {
+    base: 12,
+    weight: 2.5,
+    opacity: 0.85,
+    innerRingFactor: 0.45,
+  },
+  'location:gallery': { base: 12, weight: 2.5, opacity: 0.7, innerRingFactor: null },
+  'location:studio': { base: 12, weight: 2.5, opacity: 0.85, innerRingFactor: null },
+  'location:other': { base: 11, weight: 2.0, opacity: 0.6, innerRingFactor: null },
+  named_private: { base: 7, weight: 1.8, opacity: 0.55, innerRingFactor: null },
+};
+
+/** 任何未知 kind/type 的安全 fallback —— 与 location:other 同档但更暗 */
+const NODE_VISUAL_FALLBACK = {
+  base: 10,
+  weight: 1.5,
+  opacity: 0.5,
+  innerRingFactor: null as number | null,
+};
+
+export function getNodeVisual(
+  kind: 'location' | 'named_private' | 'anonymous',
+  type: LocationType | null,
+  editionCount: number
+): NodeVisual {
+  if (kind === 'anonymous') {
+    return { r: 1.5, style: 'dust', opacity: 0.3, innerRingR: null };
+  }
+  const specKey = kind === 'location' && type ? `location:${type}` : kind;
+  const spec = NODE_VISUAL_SPEC[specKey] ?? NODE_VISUAL_FALLBACK;
+  const r = spec.base + Math.sqrt(Math.max(0, editionCount - 1)) * spec.weight;
+  const innerRingR = spec.innerRingFactor === null ? null : r * spec.innerRingFactor;
+  return {
+    r,
+    style: 'solid',
+    opacity: spec.opacity,
+    innerRingR,
+  };
+}
+
+/**
+ * @deprecated v1.6 起 Constellation 节点视觉走 getNodeVisual；该函数仅服务
+ * 旧 LocationNode（radialLayout 路径），保留是为了不动 buildNodes/radialLayout
+ * 系列的 LocationNode 测试。新代码不要用。
+ */
 export function namedNodeRadius(editionCount: number): number {
   const r = Math.sqrt(editionCount) * 2.5 + 4;
   return Math.max(4, Math.min(10, r));

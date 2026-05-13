@@ -151,6 +151,7 @@
         "middle": "Private buyers",
         "outer": "Anonymous"
       },
+      "timelineLegend": "Radial distance = first transaction time (near = early, far = late); node size = collection count",
       "tooltip": {
         "namedPrivate": "{{name}} · {{count}} works"
       },
