@@ -87,6 +87,20 @@ export interface AnonymousAggregate {
   editionIds: string[];
   /** 匿名流出对应的 artwork id 集合（去重） */
   artworkIds: string[];
+  /**
+   * 每条匿名 outflow edition 一项（不聚合）。v1.6 起 anonymous editions 也按
+   * sale_date 进 time-spiral —— 每个 dot 独立落点，缺 sale_date 推 R_GHOST。
+   * editionIds[i] / items[i].editionId 一一对应（同序）。
+   */
+  items: AnonymousItem[];
+}
+
+/** 单条匿名 outflow edition 的最小元数据（用于 time-spiral 落点） */
+export interface AnonymousItem {
+  editionId: string;
+  artworkId: string;
+  /** ISO YYYY-MM-DD 或 null（缺 sale_date 推 R_GHOST 外圈） */
+  sale_date: string | null;
 }
 
 export interface ConstellationData {
@@ -144,6 +158,7 @@ export function buildConstellation(
   >();
   const anonEditionIds: string[] = [];
   const anonArtworkIds = new Set<string>();
+  const anonItems: AnonymousItem[] = [];
   let totalOutflowCount = 0;
 
   for (const ed of editions) {
@@ -193,6 +208,11 @@ export function buildConstellation(
     // 优先级 4: anonymous
     anonEditionIds.push(ed.id);
     anonArtworkIds.add(ed.artwork_id);
+    anonItems.push({
+      editionId: ed.id,
+      artworkId: ed.artwork_id,
+      sale_date: saleDate,
+    });
   }
 
   /** 取 ISO date 字符串数组的最小值（字典序对 YYYY-MM-DD 等价数值排序）。空数组返 null。 */
@@ -248,6 +268,7 @@ export function buildConstellation(
       count: anonEditionIds.length,
       editionIds: anonEditionIds,
       artworkIds: Array.from(anonArtworkIds),
+      items: anonItems,
     },
   };
 }
@@ -266,18 +287,29 @@ export function buildConstellation(
 // 缺 sale_date 的 entity 推到 R_GHOST 外圈均匀分布 —— "缺失数据不藏"原则的
 // 几何化（呼应 ghost 圆环 / Strata DegenerateGlyph）。
 //
-// anonymous outflow 仍在最外（ANONYMOUS_R），均匀分布，不参与时间映射（无
-// 个体性，每个 dot 只代表一次匿名流出，集合作为整体看）。
+// v1.6 anonymous 也按 sale_date 进 time-spiral —— 每条匿名 outflow edition 一个
+// 独立 dust dot（r=1.5），跟 location / namedPrivate entity 共享同一份
+// earliest/latest 时间范围。缺 sale_date 的 anonymous edition 推 R_GHOST 外圈。
+// 设计意图：「虽然没名字，但每件作品的购买时间和事实都该画出来」—— anonymous
+// 不再是整体一圈，而是 archive 里 N 件具体的"匿名但有时间"的流出。
+// 历史 ANONYMOUS_R = 310 常量保留导出（向后兼容），但 layout 不再使用。
 
-/** 几何常量（坐标在 800×560 viewBox 内），固定值便于测试断言精确 */
+/**
+ * 几何常量（坐标在 800×600 viewBox 内），固定值便于测试断言精确。
+ *
+ * v1.6.x 起 R 全部内缩：旧值（70 / 240 / 280 / 310）让 R_GHOST=280 + node r=14-20
+ * + label 直接出 viewBox（顶部/底部）。新值给 label 留 padding，时间螺旋整体居中
+ * 不抵边。`ANONYMOUS_R` 保留导出仅向后兼容 —— anonymous 不再单独 ring，每条
+ * anonymous edition 走时间螺旋（参见 layoutConstellation）。
+ */
 export const TIME_SPIRAL_GEOMETRY = {
   /** 离 artist center 最近的有数据 entity 半径 */
-  R_INNER: 70,
+  R_INNER: 60,
   /** 有 sale_date 数据的 entity 最远径向距离 */
-  R_OUTER_DATA: 240,
+  R_OUTER_DATA: 190,
   /** 缺 sale_date 的 entity 推到这个外圈 */
-  R_GHOST: 280,
-  /** 匿名 dust 还在最外 */
+  R_GHOST: 220,
+  /** @deprecated v1.6.x anonymous 走时间螺旋；常量保留向后兼容仅 */
   ANONYMOUS_R: 310,
 } as const;
 
@@ -303,9 +335,20 @@ export interface ConstellationNamedPoint {
 }
 
 export interface ConstellationAnonymousPoint {
-  index: number;
+  /** 跟 `AnonymousAggregate.items[i].editionId` 对应 */
+  editionId: string;
+  /** 跟 `AnonymousAggregate.items[i].artworkId` 对应（selection ring 用） */
+  artworkId: string;
   x: number;
   y: number;
+  /** 极坐标角度（rad），仅供调试 / 测试断言 */
+  angle: number;
+  /** 该点到 center 的径向距离 */
+  r: number;
+  /** 是否缺 sale_date（true → 推 R_GHOST 外圈） */
+  isUndated: boolean;
+  /** 原始 ISO date 或 null（用于 hover/debug） */
+  sale_date: string | null;
 }
 
 export interface ConstellationLayout {
@@ -335,19 +378,26 @@ function isoToMs(iso: string): number {
 /**
  * Time-spiral 布局。
  *
- * 算法（spec A 方向：老→近 center）：
- * 1. dated entity = locations + namedPrivate where firstSaleDate != null
- *    undated entity = locations + namedPrivate where firstSaleDate == null
- * 2. dated 非空时:
- *    earliest = min(firstSaleDate), latest = max(firstSaleDate)
- *    span_ms = max(1, ms(latest) - ms(earliest))
- *    每 entity: t = (ms(date) - ms(earliest)) / span_ms ∈ [0, 1]
- *      r = R_INNER + t * (R_OUTER_DATA - R_INNER)
- *      angle = -π/2 + t * 2π   （12 点开始顺时针绕一圈）
- * 3. dated 只有 1 个 entity 或所有 dated entity firstSaleDate 相同：
- *    span = 0，放中点 r = (R_INNER + R_OUTER_DATA)/2，angle = -π/2
- * 4. undated entity 全部 r = R_GHOST，均匀分布 360°（从 -π/2 开始）
- * 5. anonymous 全部 r = ANONYMOUS_R，均匀分布
+ * 算法（v1.6.x 重写：anonymous 也进 spiral；解决时间密集区重叠 bug）：
+ *
+ * 1. 收集 dated points: locations + namedPrivate + anonymous.items
+ *    where sale_date != null。collected as 单一 `dated[]` 数组。
+ *    收集 undated points: 同 3 类，sale_date == null 的部分。
+ *
+ * 2. dated 非空时：earliestMs = min(ms), latestMs = max(ms), spanMs = latest - earliest
+ *
+ * 3. 关键修复（避免时间密集区重叠）：
+ *    - r 仍 by **真实时间**：t = (ms - earliestMs) / spanMs，r = R_INNER + t·(R_OUTER_DATA - R_INNER)
+ *      （A 方向语义不变：earliest 老 → 近 center，latest 新 → 外圈）
+ *    - angle 改 by **sorted-by-time index** 均匀 360°：先按 ms 升序排，第 i 个 point
+ *      angle = -π/2 + (i / N) · 2π
+ *    - 时间密集区（同年成交多 entity）r 接近、angle 分散 → 不再重叠
+ *
+ * 4. dated 只 1 个或全 same date → span=0，r 取中点、angle=-π/2（12 点钟）
+ *
+ * 5. undated 全 r = R_GHOST，按 -π/2 起均匀分布 360°
+ *
+ * anonymous 不再单独占外圈（ANONYMOUS_R 仍导出但 layout 不用）。
  */
 export function layoutConstellation(
   data: ConstellationData,
@@ -358,13 +408,15 @@ export function layoutConstellation(
   const cy = height / 2;
   const { R_INNER, R_OUTER_DATA, R_GHOST, ANONYMOUS_R } = TIME_SPIRAL_GEOMETRY;
 
-  // 1. 收集 dated / undated entities（locations + namedPrivate）
+  // ─── 1. 三类 entity 合并收集（dated / undated 分桶）──────────────────────
   type DatedRef =
     | { kind: 'location'; node: LocationConstellationNode; ms: number }
-    | { kind: 'named'; node: NamedPrivateNode; ms: number };
+    | { kind: 'named'; node: NamedPrivateNode; ms: number }
+    | { kind: 'anonymous'; item: AnonymousItem; ms: number };
   type UndatedRef =
     | { kind: 'location'; node: LocationConstellationNode }
-    | { kind: 'named'; node: NamedPrivateNode };
+    | { kind: 'named'; node: NamedPrivateNode }
+    | { kind: 'anonymous'; item: AnonymousItem };
 
   const dated: DatedRef[] = [];
   const undated: UndatedRef[] = [];
@@ -383,117 +435,94 @@ export function layoutConstellation(
       undated.push({ kind: 'named', node: np });
     }
   }
+  for (const item of data.anonymous.items) {
+    if (item.sale_date) {
+      dated.push({ kind: 'anonymous', item, ms: isoToMs(item.sale_date) });
+    } else {
+      undated.push({ kind: 'anonymous', item });
+    }
+  }
 
-  // dated 按时间升序排（earliest 在前），保证插值时 ordering 稳定
+  // dated 按时间升序排（earliest 在前）—— 同时决定 r（时间）与 angle（index）
   dated.sort((a, b) => a.ms - b.ms);
 
   const locationPoints: ConstellationLocationPoint[] = [];
   const namedPoints: ConstellationNamedPoint[] = [];
+  const anonymousPoints: ConstellationAnonymousPoint[] = [];
 
-  // 2/3. dated 时间映射
+  /** 把一个 DatedRef 落到 (r, angle) 上，分流到对应的 points 数组 */
+  function placeDated(ref: DatedRef, r: number, angle: number, isUndated: boolean) {
+    const x = cx + r * Math.cos(angle);
+    const y = cy + r * Math.sin(angle);
+    if (ref.kind === 'location') {
+      locationPoints.push({ node: ref.node, x, y, angle, r, isUndated });
+    } else if (ref.kind === 'named') {
+      namedPoints.push({ node: ref.node, x, y, angle, r, isUndated });
+    } else {
+      anonymousPoints.push({
+        editionId: ref.item.editionId,
+        artworkId: ref.item.artworkId,
+        x,
+        y,
+        angle,
+        r,
+        isUndated,
+        sale_date: ref.item.sale_date,
+      });
+    }
+  }
+
+  // ─── 2/3/4. dated 时间→r + sorted-index→angle 映射 ─────────────────────
   if (dated.length > 0) {
     const earliestMs = dated[0].ms;
     const latestMs = dated[dated.length - 1].ms;
-    const spanMs = latestMs - earliestMs; // 单 entity 或全 same date → 0
+    const spanMs = latestMs - earliestMs;
+    const N = dated.length;
 
     if (spanMs === 0) {
-      // edge case：dated 只有 1 个 entity 或所有 dated entity firstSaleDate 完全相同。
-      // 全部落在中点（r 中点，angle = -π/2 即 12 点钟）
+      // edge case：dated 只 1 个 / 全 same date —— 落径向中点 + 12 点钟方向
       const r = R_INNER + (R_OUTER_DATA - R_INNER) / 2;
       const angle = -Math.PI / 2;
-      const x = cx + r * Math.cos(angle);
-      const y = cy + r * Math.sin(angle);
       for (const ref of dated) {
-        if (ref.kind === 'location') {
-          locationPoints.push({
-            node: ref.node,
-            x,
-            y,
-            angle,
-            r,
-            isUndated: false,
-          });
-        } else {
-          namedPoints.push({
-            node: ref.node,
-            x,
-            y,
-            angle,
-            r,
-            isUndated: false,
-          });
-        }
+        placeDated(ref, r, angle, false);
       }
     } else {
-      for (const ref of dated) {
+      // r 由真实时间 t 决定（保留 A 方向语义）；angle 由 sorted index 均匀分 360°
+      // → 时间密集区 r 接近但 angle 分散，避免节点重叠
+      for (let i = 0; i < N; i++) {
+        const ref = dated[i];
         const t = (ref.ms - earliestMs) / spanMs;
         const r = R_INNER + t * (R_OUTER_DATA - R_INNER);
-        const angle = -Math.PI / 2 + t * 2 * Math.PI;
-        const x = cx + r * Math.cos(angle);
-        const y = cy + r * Math.sin(angle);
-        if (ref.kind === 'location') {
-          locationPoints.push({
-            node: ref.node,
-            x,
-            y,
-            angle,
-            r,
-            isUndated: false,
-          });
-        } else {
-          namedPoints.push({
-            node: ref.node,
-            x,
-            y,
-            angle,
-            r,
-            isUndated: false,
-          });
-        }
+        const angle = -Math.PI / 2 + (i / N) * 2 * Math.PI;
+        placeDated(ref, r, angle, false);
       }
     }
   }
 
-  // 4. undated entities 推到 R_GHOST 外圈，均匀分布 360°
+  // ─── 5. undated 全 r = R_GHOST，均匀分布 360° ───────────────────────────
   const undatedN = undated.length;
   for (let i = 0; i < undatedN; i++) {
     const ref = undated[i];
-    // 从 -π/2 (12 点) 开始均匀
     const angle = -Math.PI / 2 + (2 * Math.PI * i) / Math.max(1, undatedN);
     const r = R_GHOST;
     const x = cx + r * Math.cos(angle);
     const y = cy + r * Math.sin(angle);
     if (ref.kind === 'location') {
-      locationPoints.push({
-        node: ref.node,
-        x,
-        y,
-        angle,
-        r,
-        isUndated: true,
-      });
+      locationPoints.push({ node: ref.node, x, y, angle, r, isUndated: true });
+    } else if (ref.kind === 'named') {
+      namedPoints.push({ node: ref.node, x, y, angle, r, isUndated: true });
     } else {
-      namedPoints.push({
-        node: ref.node,
+      anonymousPoints.push({
+        editionId: ref.item.editionId,
+        artworkId: ref.item.artworkId,
         x,
         y,
         angle,
         r,
         isUndated: true,
+        sale_date: null,
       });
     }
-  }
-
-  // 5. anonymous: 均匀分布在最外圈
-  const anonymousPoints: ConstellationAnonymousPoint[] = [];
-  const anonN = data.anonymous.count;
-  for (let i = 0; i < anonN; i++) {
-    const angle = -Math.PI / 2 + (2 * Math.PI * i) / Math.max(1, anonN);
-    anonymousPoints.push({
-      index: i,
-      x: cx + ANONYMOUS_R * Math.cos(angle),
-      y: cy + ANONYMOUS_R * Math.sin(angle),
-    });
   }
 
   return {
@@ -572,6 +601,63 @@ export function getNodeVisual(
     opacity: spec.opacity,
     innerRingR,
   };
+}
+
+// ─── v1.6.x Organic blob shape ─────────────────────────────────────────────
+//
+// 每个 location / named_private 节点不再用规则 `<circle>`，而是按 entity id
+// (seed) 生成 12 段 quadratic-bezier 平滑闭合的有机轮廓。视觉用意：跟 Strata
+// 严格 geometric 方块、Markets 抽象 dot 形成对照 —— Diaspora 节点表达"具象的
+// 个体性"，每个机构/人是独一无二的轮廓。
+//
+// 不引入 lib / 动画 / morph：~30 行 deterministic hash 函数 + path 替换。
+// anonymous dust 仍是 `<circle r=1.5>`（太小 organic 看不出来，徒增 noise）。
+
+/**
+ * 生成 deterministic organic blob SVG path。
+ *
+ * 字符 hash → 每个控制点径向扰动 [-15%, +15%] → 12 段 quadratic bezier 闭合。
+ * 同 seed + 同 (cx, cy, baseR) → 同字符串（render 间稳定，便于 React diff）。
+ */
+export function generateOrganicPath(
+  cx: number,
+  cy: number,
+  baseR: number,
+  seed: string
+): string {
+  const segments = 12;
+
+  /** 字符 hash → [-0.15, +0.15] 范围扰动比例 */
+  const hashOffset = (i: number): number => {
+    const s = `${seed}:${i}`;
+    let h = 0;
+    for (let c = 0; c < s.length; c++) {
+      h = ((h * 31) + s.charCodeAt(c)) | 0;
+    }
+    return ((Math.abs(h) % 1000) / 1000 - 0.5) * 0.3; // -0.15..+0.15
+  };
+
+  // 12 个径向扰动后的控制点
+  const points: Array<{ x: number; y: number }> = [];
+  for (let i = 0; i < segments; i++) {
+    const angle = (i / segments) * 2 * Math.PI;
+    const r = baseR * (1 + hashOffset(i));
+    points.push({
+      x: cx + r * Math.cos(angle),
+      y: cy + r * Math.sin(angle),
+    });
+  }
+
+  // Quadratic bezier 平滑：M start → Q ctrl=cur midpoint=midNext → ... → Z
+  let path = `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
+  for (let i = 0; i < segments; i++) {
+    const cur = points[i];
+    const next = points[(i + 1) % segments];
+    const midX = (cur.x + next.x) / 2;
+    const midY = (cur.y + next.y) / 2;
+    path += ` Q ${cur.x.toFixed(2)} ${cur.y.toFixed(2)} ${midX.toFixed(2)} ${midY.toFixed(2)}`;
+  }
+  return path + ' Z';
 }
 
 /**

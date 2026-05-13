@@ -112,6 +112,7 @@
       "studio": "工作室",
       "gallery": "画廊",
       "museum": "美术馆",
+      "private_collection": "私人收藏",
       "other": "其他"
     },
     "aliasLabel": "别名（可选）",

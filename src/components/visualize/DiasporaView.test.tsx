@@ -661,6 +661,94 @@ describe('DiasporaView', () => {
     expect(anons).toHaveLength(1);
   });
 
+  it('v1.6.x: anonymous dots 按 time-spiral 落点（不再固定 R=310 外圈）', () => {
+    // 构造 3 条 anonymous 带不同 sale_date + 1 条无 sale_date
+    // → 3 条 dated 落 time-spiral 半径区间 [R_INNER, R_OUTER_DATA]
+    // → 1 条 undated 落 R_GHOST
+    // viewport 用默认 W=800 H=600，center = (400, 300)
+    const editions: VizEdition[] = [
+      {
+        id: 'a1',
+        artwork_id: 'artwork-1',
+        inventory_number: 'A1',
+        edition_type: 'numbered',
+        edition_number: 1,
+        status: 'sold',
+        location_id: null,
+        sale_price: null,
+        sale_currency: null,
+        sale_date: '2018-01-01',
+        buyer_name: null,
+        created_at: '2018-01-01T00:00:00Z',
+      },
+      {
+        id: 'a2',
+        artwork_id: 'artwork-1',
+        inventory_number: 'A2',
+        edition_type: 'numbered',
+        edition_number: 2,
+        status: 'sold',
+        location_id: null,
+        sale_price: null,
+        sale_currency: null,
+        sale_date: '2021-06-15',
+        buyer_name: null,
+        created_at: '2021-06-15T00:00:00Z',
+      },
+      {
+        id: 'a3',
+        artwork_id: 'artwork-1',
+        inventory_number: 'A3',
+        edition_type: 'numbered',
+        edition_number: 3,
+        status: 'sold',
+        location_id: null,
+        sale_price: null,
+        sale_currency: null,
+        sale_date: '2024-01-01',
+        buyer_name: null,
+        created_at: '2024-01-01T00:00:00Z',
+      },
+      {
+        id: 'a4',
+        artwork_id: 'artwork-1',
+        inventory_number: 'A4',
+        edition_type: 'numbered',
+        edition_number: 4,
+        status: 'sold',
+        location_id: null,
+        sale_price: null,
+        sale_currency: null,
+        sale_date: null,
+        buyer_name: null,
+        created_at: '2024-02-01T00:00:00Z',
+      },
+    ];
+    const { container } = renderDiaspora({
+      editions,
+      locations: [],
+      artworks: [fakeArtwork],
+    });
+    const anons = container.querySelectorAll(
+      '[data-testid^="constellation-anon-"]'
+    );
+    expect(anons).toHaveLength(4);
+    // 收集所有 anonymous 中心到 viewport center 的距离
+    const dists = Array.from(anons).map((el) => {
+      const cx = parseFloat(el.getAttribute('cx') ?? '0');
+      const cy = parseFloat(el.getAttribute('cy') ?? '0');
+      const dx = cx - 400;
+      const dy = cy - 300;
+      return Math.sqrt(dx * dx + dy * dy);
+    });
+    // 不再全部固定一个半径（旧实现全 = ANONYMOUS_R 310）
+    const uniqDists = new Set(dists.map((d) => d.toFixed(2)));
+    expect(uniqDists.size).toBeGreaterThan(1);
+    // 缺 sale_date 的那个落 R_GHOST = 220
+    const hasGhost = dists.some((d) => Math.abs(d - 220) < 0.5);
+    expect(hasGhost).toBe(true);
+  });
+
   it('只画 location → artist edges（数 edge 数量 = locations.length）', () => {
     // 构造一个只有 1 个 location（gallery）+ 1 个 named buyer + 1 个 anon 的 fixture
     // 验证：line 数 (non-dashed) = 1，跟 location 节点数 = 1 一致；named / anon 不画 edge
@@ -694,8 +782,10 @@ describe('DiasporaView', () => {
   });
 
   it('anonymous dots 不可点击（无 role/tabIndex）', () => {
+    // v1.6.x: anonymous testid 从 index 改为 editionId（每条 anonymous edition
+    // 一个独立 dust dot 进 time-spiral，不再有"第 i 个"的概念）。
     const { container } = renderDiaspora();
-    const anon = container.querySelector('[data-testid="constellation-anon-0"]');
+    const anon = container.querySelector('[data-testid="constellation-anon-e8"]');
     expect(anon).not.toBeNull();
     expect(anon!.getAttribute('role')).toBeNull();
     expect(anon!.getAttribute('tabindex')).toBeNull();
@@ -807,6 +897,78 @@ describe('DiasporaView', () => {
     expect(cls).toContain('stroke-background');
   });
 
+  // ─── v1.6.x organic blob ────────────────────────────────────────────────
+
+  it('location 节点用 <path> organic blob 渲染（不再是 <circle>）', () => {
+    const { container } = renderDiaspora();
+    const galleryNode = container.querySelector(
+      '[data-testid="constellation-location-loc-gallery"]'
+    )!;
+    // organic path 存在
+    const path = galleryNode.querySelector('path');
+    expect(path).not.toBeNull();
+    const d = path!.getAttribute('d') ?? '';
+    expect(d.startsWith('M ')).toBe(true);
+    expect(d.endsWith(' Z')).toBe(true);
+  });
+
+  it('named_private 节点用 <path> organic blob 渲染', () => {
+    const { container } = renderDiaspora();
+    const named = container.querySelector(
+      '[data-testid="constellation-named-Liliana Gao"]'
+    )!;
+    const path = named.querySelector('path');
+    expect(path).not.toBeNull();
+    expect(path!.getAttribute('d')?.startsWith('M ')).toBe(true);
+  });
+
+  it('private_collection 节点同时含 <path> 外壳 + <circle stroke-background> 内部几何环（"有机壳 + 几何核"）', () => {
+    const pcLocation: VizLocation = {
+      id: 'loc-pc2',
+      name: 'PC',
+      type: 'private_collection',
+      city: null,
+      country: 'United Kingdom',
+    };
+    const pcEdition: VizEdition = {
+      id: 'e-pc2',
+      artwork_id: 'artwork-1',
+      inventory_number: 'AAJ-PC2-001',
+      edition_type: 'numbered',
+      edition_number: 1,
+      status: 'sold',
+      location_id: 'loc-pc2',
+      sale_price: null,
+      sale_currency: null,
+      sale_date: '2022-05-01',
+      buyer_name: null,
+      created_at: '2022-05-01T00:00:00Z',
+    };
+    const { container } = renderDiaspora({
+      editions: [pcEdition],
+      locations: [pcLocation],
+    });
+    const node = container.querySelector(
+      '[data-testid="constellation-location-loc-pc2"]'
+    )!;
+    // 外壳是 organic path
+    expect(node.querySelector('path')).not.toBeNull();
+    // 内部几何环 circle stroke-background
+    const innerRing = node.querySelector(
+      '[data-testid="constellation-private-inner-loc-pc2"]'
+    );
+    expect(innerRing).not.toBeNull();
+    expect(innerRing!.tagName.toLowerCase()).toBe('circle');
+    expect(innerRing!.getAttribute('class')).toContain('stroke-background');
+  });
+
+  it('anonymous dots 仍是 <circle r=1.5>（不应用 organic blob）', () => {
+    const { container } = renderDiaspora();
+    const anon = container.querySelector('[data-testid="constellation-anon-e8"]')!;
+    expect(anon.tagName.toLowerCase()).toBe('circle');
+    expect(anon.getAttribute('r')).toBe('1.5');
+  });
+
   it('museum / gallery 节点不渲染 inner stroke ring', () => {
     const { container } = renderDiaspora();
     expect(
@@ -818,23 +980,18 @@ describe('DiasporaView', () => {
   });
 
   it('label 走 radial anchor：右半圆 textAnchor=start，左半圆 textAnchor=end', () => {
-    // 构造两个 dated location，一个 earliest（落 12 点钟，dx≈0 → 右半算）一个 latest
-    // 仅用一个 dated entity 不够判断 anchor（落 12 点钟时 dx=0）；
-    // 构造两个不同日期的 location：earliest 落顶部，latest 也落顶部（绕一圈）
-    // —— 二者都在 dx>=0 一侧（顶部 dx=0 当 isRightHalf）。
-    // 为了拿到左右两侧 label，用 3 个 dated entity 形成不同 t 值：
-    //   t=0   → -π/2 (顶部, dx=0 → right)
-    //   t=0.25 → 0   (3 点钟方向, dx>0 → right)
-    //   t=0.5 → π/2  (6 点钟方向, dx=0 → right; dy>0)
-    //   t=0.75 → π   (9 点钟方向, dx<0 → left) ←—— 要这个
+    // v1.6.x: angle 由 sorted-time index 均匀分 360°，不再 t·2π。
+    // 4 个 dated entity（按时间升序）对应 angle 序列：
+    //   i=0 → -π/2 (顶部, dx=0 → right)
+    //   i=1 → -π/2 + 0.25·2π = 0 (3 点钟, dx>0 → right)
+    //   i=2 → -π/2 + 0.5·2π = π/2 (6 点钟, dx=0 → right)
+    //   i=3 → -π/2 + 0.75·2π = π (9 点钟, dx<0 → left) ←—— 要这个
     const locs: VizLocation[] = [
       { id: 'loc-a', name: 'A', type: 'gallery', city: null, country: 'China' },
       { id: 'loc-b', name: 'B', type: 'gallery', city: null, country: 'China' },
       { id: 'loc-c', name: 'C', type: 'gallery', city: null, country: 'China' },
       { id: 'loc-d', name: 'D', type: 'gallery', city: null, country: 'China' },
     ];
-    // t 值由 sale_date 在 [min, max] 区间的位置决定。span = 4ms（4 个连续 ms）
-    // 让 t = 0 / 1/3 / 2/3 / 1
     const eds: VizEdition[] = locs.map((l, i) => ({
       id: `ed-${i}`,
       artwork_id: 'artwork-1',
@@ -845,19 +1002,18 @@ describe('DiasporaView', () => {
       location_id: l.id,
       sale_price: null,
       sale_currency: null,
-      // 跨度 2018→2024，4 个等距点：2018/2020/2022/2024
       sale_date: `${2018 + i * 2}-01-01`,
       buyer_name: null,
       created_at: '2020-01-01T00:00:00Z',
     }));
     const { container } = renderDiaspora({ editions: eds, locations: locs });
-    // loc-c 对应 t=2/3 → angle = -π/2 + 2π * 2/3 = 5π/6（≈ 150°，左半 dx<0）
-    const groupC = container.querySelector('g[data-node="loc-c"]')!;
-    const texts = groupC.querySelectorAll('text');
+    // loc-d 是 sorted index 3 → angle = π → 9 点钟方向（左半 dx<0）
+    const groupD = container.querySelector('g[data-node="loc-d"]')!;
+    const texts = groupD.querySelectorAll('text');
     expect(texts.length).toBeGreaterThanOrEqual(1);
     expect(texts[0].getAttribute('text-anchor')).toBe('end');
 
-    // loc-b 对应 t=1/3 → angle = -π/2 + 2π/3 = π/6（≈ 30°, 右半 dx>0）
+    // loc-b 是 sorted index 1 → angle = 0 → 3 点钟方向（右半 dx>0）
     const groupB = container.querySelector('g[data-node="loc-b"]')!;
     const textsB = groupB.querySelectorAll('text');
     expect(textsB[0].getAttribute('text-anchor')).toBe('start');

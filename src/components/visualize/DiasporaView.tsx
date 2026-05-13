@@ -12,6 +12,7 @@ import {
   buildConstellation,
   layoutConstellation,
   getNodeVisual,
+  generateOrganicPath,
   buildNodes,
   computeTrackedStat,
   countryToISO2,
@@ -33,8 +34,9 @@ export interface DiasporaViewProps {
 }
 
 // SVG 内部坐标系（固定，用 viewBox 响应式缩放）
+// v1.6.x: H 从 560 → 600 给 top/bottom 节点 label 留余裕（R_GHOST 内缩同时进行）
 const W = 800;
-const H = 560;
+const H = 600;
 
 /** 从 VizArtwork 数组取得 artwork_id → artwork 的 Map */
 function buildArtworkMap(artworks: VizArtwork[]): Map<string, VizArtwork> {
@@ -403,18 +405,29 @@ export default function DiasporaView({
                 />
               ))}
 
-          {/* ─── Anonymous dust (最外圈，不可点击) ───────────────── */}
+          {/* ─── Anonymous dust (按 sale_date 进 time-spiral，不可点击) ─── */}
+          {/*
+            v1.6.x：anonymous 不再聚合成外圈 ring，每条 anonymous outflow edition
+            一个独立 dot，跟 location / namedPrivate 共享同一份时间映射。缺
+            sale_date 的 anonymous 推 R_GHOST 外圈。视觉仍是 r=1.5 dust，不进
+            hover / pin / 不画 organic blob（太小看不出来）。
+            如果 selectedArtworkId 匹配某 anonymous point.artworkId，那 dot 升
+            为 r=2 + opacity=1 但**不画 selection ring**（聚合无 entity 身份，
+            ring 跨 dot 视觉混乱）。
+          */}
           {layout.anonymousPoints.map((p) => {
             const visual = getNodeVisual('anonymous', null, 1);
+            const isSelected =
+              !!selectedArtworkId && p.artworkId === selectedArtworkId;
             return (
               <circle
-                key={`anon-${p.index}`}
-                data-testid={`constellation-anon-${p.index}`}
+                key={`anon-${p.editionId}`}
+                data-testid={`constellation-anon-${p.editionId}`}
                 cx={p.x}
                 cy={p.y}
-                r={visual.r}
+                r={isSelected ? 2 : visual.r}
                 className="fill-foreground"
-                opacity={visual.opacity}
+                opacity={isSelected ? 1 : visual.opacity}
               />
             );
           })}
@@ -501,14 +514,19 @@ export default function DiasporaView({
                     opacity={0.4}
                   />
                 )}
-                <circle
-                  cx={x}
-                  cy={y}
-                  r={r}
+                {/*
+                  v1.6.x: 把规则 circle 换成 deterministic organic blob path —
+                  跟 Strata 方块 / Markets dot 形成视觉对照。每个 entity 按 id
+                  (seed) 算 12 段 quadratic-bezier 闭合轮廓，render 间稳定。
+                  pointerEvents="all" 保 a11y / click 流。
+                */}
+                <path
+                  d={generateOrganicPath(x, y, r, node.id)}
                   className="fill-foreground"
                   opacity={isPinned ? 1 : visual.opacity}
+                  pointerEvents="all"
                 />
-                {/* private_collection：内部反差色环（"双圆嵌套"）*/}
+                {/* private_collection：内部反差色环（仍是几何 circle，"有机壳 + 几何核"对照）*/}
                 {visual.innerRingR !== null && (
                   <circle
                     data-testid={`constellation-private-inner-${node.id}`}
@@ -624,12 +642,12 @@ export default function DiasporaView({
                     opacity={0.4}
                   />
                 )}
-                <circle
-                  cx={x}
-                  cy={y}
-                  r={r}
+                {/* v1.6.x: organic blob，seed = buyer_name 字面值 */}
+                <path
+                  d={generateOrganicPath(x, y, r, node.id)}
                   className="fill-foreground"
                   opacity={isPinned ? 0.9 : visual.opacity}
+                  pointerEvents="all"
                 />
                 <text
                   x={labelX}

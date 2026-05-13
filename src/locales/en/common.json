@@ -112,6 +112,7 @@
       "studio": "Studio",
       "gallery": "Gallery",
       "museum": "Museum",
+      "private_collection": "Private collection",
       "other": "Other"
     },
     "aliasLabel": "Aliases (optional)",
