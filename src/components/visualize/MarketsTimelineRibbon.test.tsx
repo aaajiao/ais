@@ -369,6 +369,64 @@ describe('MarketsTimelineRibbon', () => {
     }
   });
 
+  it('caption x 被 clamp，marker 在 ribbon 两端时文字不伸出 [0, axisWidth] 压到兄弟元素', () => {
+    // v1.6.x 回归：caption textAnchor="middle" + x={markerCx}，当 markerCx≈0 或 axisWidth
+    // 时文字两侧伸出 ribbon 自身边界，压到 currency label 列 / Play 按钮区。
+    // 修复：caption.x clamp 到 [CAPTION_HALF_W, axisWidth - CAPTION_HALF_W] = [24, 476]。
+    // Marker 三角不动（仍严格 markerCx），仅 caption 移位。
+    const CAPTION_HALF_W = 24;
+    const axisWidth = 500;
+
+    // 左端：currentDate = dates[0] → markerCx = 0 → caption.x clamp 到 24
+    {
+      const { container } = renderRibbon({
+        currentDate: '2020-01-15',
+      });
+      const caption = container.querySelector(
+        '[data-testid="visualize-timeline-current"]'
+      );
+      const captionX = Number(caption!.getAttribute('x'));
+      expect(captionX).toBe(CAPTION_HALF_W);
+      // marker 不被 clamp，仍在 markerCx=0
+      const marker = container.querySelector(
+        '[data-testid="visualize-timeline-marker"]'
+      );
+      const markerX = Number(marker!.getAttribute('points')!.split(',')[0]);
+      expect(markerX).toBe(0);
+    }
+
+    // 右端：currentDate = dates[last] → markerCx = axisWidth → caption.x clamp 到 axisWidth - 24
+    {
+      const { container } = renderRibbon({
+        currentDate: '2024-12-01',
+      });
+      const caption = container.querySelector(
+        '[data-testid="visualize-timeline-current"]'
+      );
+      const captionX = Number(caption!.getAttribute('x'));
+      expect(captionX).toBe(axisWidth - CAPTION_HALF_W);
+      const marker = container.querySelector(
+        '[data-testid="visualize-timeline-marker"]'
+      );
+      const markerX = Number(marker!.getAttribute('points')!.split(',')[0]);
+      expect(markerX).toBe(axisWidth);
+    }
+
+    // 中段：currentDate 远离边界 → caption.x 跟 markerCx 一致（无 clamp 介入）
+    {
+      const { container } = renderRibbon();
+      const caption = container.querySelector(
+        '[data-testid="visualize-timeline-current"]'
+      );
+      const marker = container.querySelector(
+        '[data-testid="visualize-timeline-marker"]'
+      );
+      const captionX = Number(caption!.getAttribute('x'));
+      const markerX = Number(marker!.getAttribute('points')!.split(',')[0]);
+      expect(captionX).toBe(markerX);
+    }
+  });
+
   it('颜色全用 currentColor / fill-foreground', () => {
     const { container } = renderRibbon();
     const ribbonG = container.querySelector(

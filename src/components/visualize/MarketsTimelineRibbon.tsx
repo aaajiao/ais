@@ -52,6 +52,13 @@ const BASELINE_GAP = 0;
 const TARGET_TICK_LABELS = 6;
 /** 未来 bin / future-cutoff 的 opacity（跟 DOT_OPACITY_FUTURE 同步） */
 const FUTURE_OPACITY = 0.15;
+/**
+ * caption "YYYY-MM" 文字半宽 px（估算）—— 字号 10、mono bold、7 字符约 46px，
+ * 半宽 23 + 1px buffer。markerCx 接近 0 或 axisWidth 时用来 clamp caption.x，
+ * 避免文字超出 ribbon [0, axisWidth] 边界压到兄弟元素（currency label / Play
+ * 按钮）。Marker 三角 / overlay 不受影响，仍严格落在 markerCx。
+ */
+const CAPTION_HALF_W = 24;
 
 /** ISO date → 'YYYY-MM' for display label */
 function formatYearMonth(d: string): string {
@@ -153,6 +160,14 @@ export default function MarketsTimelineRibbon(props: MarketsTimelineRibbonProps)
   const labelY = baselineY + 10;
   const tickEndY = baselineY + 3;
 
+  // caption x：marker 落在 ribbon 两端时把 caption 往里挪，避免文字伸出
+  // [0, axisWidth] 边界压到兄弟 SVG 元素（currency label / Play 按钮）。
+  // marker 三角 / overlay 不动，仅 caption 文字移位 —— 边缘日期下读得到 > 跟 marker 像素级对齐。
+  const captionX = Math.max(
+    CAPTION_HALF_W,
+    Math.min(axisWidth - CAPTION_HALF_W, markerCx)
+  );
+
   /** bin 宽度：把全时间跨度按 bin 平均划分；连续时间轴下 bin 等宽 */
   const binW = axisWidth / bins.length;
 
@@ -252,7 +267,7 @@ export default function MarketsTimelineRibbon(props: MarketsTimelineRibbonProps)
           baseline y = TOP_LABEL_H - 3 = 9，字号 10，文字大致占 y ∈ [1, 9]，
           整段保持在 y < TOP_LABEL_H 范围内。 */}
       <text
-        x={markerCx}
+        x={captionX}
         y={TOP_LABEL_H - 3}
         textAnchor="middle"
         fontSize="10"
