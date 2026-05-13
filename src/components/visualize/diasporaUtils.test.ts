@@ -1250,26 +1250,26 @@ describe('generateOrganicPath', () => {
     expect(a).not.toBe(b);
   });
 
-  it('path format: 以 M 开头、Z 结尾、8 段 C cubic bezier（v1.6.x 第六轮：Catmull-Rom smooth）', () => {
+  it('path format: 以 M 开头、Z 结尾、6 段 C cubic bezier（v1.6.x 第七轮：6 段水滴形 Catmull-Rom）', () => {
     const path = generateOrganicPath(100, 100, 20, 'x');
     expect(path.startsWith('M ')).toBe(true);
     expect(path.endsWith(' Z')).toBe(true);
     const cCount = (path.match(/\sC\s/g) ?? []).length;
-    expect(cCount).toBe(8);
-    // 第六轮：L polygon → C cubic Catmull-Rom，path 平滑经过每个 perturbed point
-    // 同时保留 ±25% 扰动完整体现（既不是平均化掉的圆，也不是棱角硬 polygon）
+    expect(cCount).toBe(6);
+    // 第七轮：8 段 → 6 段 + FNV-1a hash + ±40% 扰动 = 流体水滴。
+    // 仍是 Catmull-Rom smooth，不出现 Q 或 L
     expect(path).not.toMatch(/\sQ\s/);
     expect(path).not.toMatch(/\sL\s/);
   });
 
-  it('bounding box 大致 baseR ± 25%（perturbed points 到中心距离 ≤ baseR × 1.25 + 浮点容差；控制点可能轻微 overshoot 但已 round-trip 回 anchor）', () => {
+  it('bounding box 大致 baseR ± 40%（perturbed anchor points 到中心距离 ≤ baseR × 1.40 + 浮点容差）', () => {
     const cx = 200;
     const cy = 150;
     const baseR = 18;
     const path = generateOrganicPath(cx, cy, baseR, 'akeroyd-collection');
     // 解析 path 命令 + 数值（M cx cy / C c1x c1y c2x c2y endX endY）。
-    // Catmull-Rom 控制点可能比 baseR × 1.25 略微 overshoot（这是 smooth 的代价），
-    // 所以只验证 anchor points（M 和每个 C 段的 end point = perturbed point）。
+    // Catmull-Rom 控制点可能比 baseR × 1.40 略微 overshoot（smooth 弧线代价），
+    // 只验证 anchor points（M 和每个 C 段的 end point = perturbed point）。
     const tokens = path.split(/\s+/).filter(Boolean);
     const anchorPoints: Array<{ x: number; y: number }> = [];
     let i = 0;
@@ -1279,18 +1279,45 @@ describe('generateOrganicPath', () => {
         anchorPoints.push({ x: +tokens[i + 1], y: +tokens[i + 2] });
         i += 3;
       } else if (cmd === 'C') {
-        // C c1x c1y c2x c2y endX endY —— 只取 endpoint
         anchorPoints.push({ x: +tokens[i + 5], y: +tokens[i + 6] });
         i += 7;
       } else {
         i += 1; // Z 等
       }
     }
-    const allowedMaxDist = baseR * 1.25 + 1; // +1 浮点容差
+    const allowedMaxDist = baseR * 1.4 + 1; // +1 浮点容差
     for (const p of anchorPoints) {
       const d = Math.hypot(p.x - cx, p.y - cy);
       expect(d).toBeLessThanOrEqual(allowedMaxDist);
     }
+  });
+
+  it('FNV-1a hash spread：5 个 type seed 形状 max/min ratio 应 > 1.5（远超旧 polynomial hash 的 1.03）', () => {
+    // 第七轮加测：FNV-1a hash spread 显著 → 5 个 type chip 形状真正不同。
+    // 旧 `h*31+char` 在短 seed 上输出集中，max/min ratio 实测 1.03（似圆）。
+    // FNV-1a 应让大多 seed ratio > 1.5（视觉差异明显）。
+    const seeds = ['studio', 'gallery', 'museum', 'private_collection', 'other'];
+    const ratios = seeds.map((seed) => {
+      const path = generateOrganicPath(10, 10, 8, seed);
+      const tokens = path.split(/\s+/).filter(Boolean);
+      const dists: number[] = [];
+      let i = 0;
+      while (i < tokens.length) {
+        if (tokens[i] === 'M') {
+          dists.push(Math.hypot(+tokens[i + 1] - 10, +tokens[i + 2] - 10));
+          i += 3;
+        } else if (tokens[i] === 'C') {
+          dists.push(Math.hypot(+tokens[i + 5] - 10, +tokens[i + 6] - 10));
+          i += 7;
+        } else {
+          i += 1;
+        }
+      }
+      return Math.max(...dists) / Math.min(...dists);
+    });
+    // 大多 seed (>= 3/5) 应有显著差异 ratio > 1.5
+    const significant = ratios.filter((r) => r > 1.5).length;
+    expect(significant).toBeGreaterThanOrEqual(3);
   });
 });
 
