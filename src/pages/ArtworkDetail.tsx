@@ -241,7 +241,7 @@ export default function ArtworkDetail() {
           onClick={handleBack}
           className="text-primary hover:underline mb-6 inline-block cursor-pointer"
         >
-          {t('backToList')}
+          {t('back')}
         </a>
         <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-destructive">
           {artworkError instanceof Error ? artworkError.message : t('notFound')}
@@ -289,7 +289,7 @@ export default function ArtworkDetail() {
           onClick={handleBack}
           className="text-primary hover:underline cursor-pointer"
         >
-          {t('backToList')}
+          {t('back')}
         </a>
         <Button
           variant="destructive-outline"
