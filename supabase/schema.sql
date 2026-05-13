@@ -291,6 +291,32 @@ CREATE TRIGGER editions_status_change
   EXECUTE FUNCTION record_edition_status_change();
 
 -- =====================================================
+-- DATA API EXPOSURE (PostgREST / GraphQL grants)
+-- =====================================================
+-- 自 2026-05-30 起，新建 Supabase 项目 public schema 默认不再自动暴露到 Data API；
+-- 2026-10-30 起所有现有项目同步该默认。grant 是 RLS 之外的另一层：
+--   grant 控制角色能否访问表本身，RLS 控制能看到哪些行。
+-- 缺 grant 时 PostgREST 直接返回 42501 错误。
+-- 参考: https://github.com/orgs/supabase/discussions/45329
+--
+-- 角色分工（与本项目 RLS 策略对齐）：
+--   * authenticated → 8 张表全 CRUD，行级通过 RLS 限制为本用户数据
+--   * service_role  → 后端 serverless 函数使用，绕过 RLS，全权限
+--   * anon          → 仅 gallery_links SELECT（公开链接查看器，RLS 进一步限制 status='active'）
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON users           TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON locations       TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON api_keys        TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON gallery_links   TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON artworks        TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON editions        TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON edition_files   TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON edition_history TO authenticated, service_role;
+
+-- anon 仅用于公开链接查看（status='active' 的 gallery_links 行）
+GRANT SELECT ON gallery_links TO anon;
+
+-- =====================================================
 -- ROW LEVEL SECURITY
 -- =====================================================
 -- 使用 (SELECT auth.uid()) 子查询包装，性能优化（缓存每语句一次）

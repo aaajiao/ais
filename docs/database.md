@@ -76,6 +76,7 @@ users (用户)
 任何 DB schema 改动都必须走完这条链，否则 schema ↔ AI 工具 ↔ prompt ↔ 外部 API 之间会出现漂移（v1.2.0–v1.3.x 一连串 GPT 失败的根因）：
 
 1. **DB**：写 SQL migration（位置 `supabase/migrations/`），手动到 Supabase Dashboard SQL Editor 应用，归档到 `migrations/archived/`，**同步更新 `supabase/schema.sql`（source of truth）**
+   - **新建表时必须显式 GRANT**（migration 007 起强制）：自 2026-10-30 起 Supabase 默认行为翻转，public schema 新建表不再自动暴露 Data API。任何 `CREATE TABLE public.X` 后必须附 `GRANT ... ON X TO authenticated, service_role`（按需 `anon`），否则 PostgREST/GraphQL/supabase-js 直接返回 `42501 permission denied`。schema.sql 的 `DATA API EXPOSURE` 段 + migration 007 是范式。详见下方 [v1.x Data API Exposure 默认翻转](#v1x-data-api-exposure-默认翻转)。
 2. **TypeScript 类型**：`bunx supabase gen types typescript --project-id <id> > src/lib/database.types.ts` 重新生成
 3. **AI 工具映射审计**：`grep -rn '<field-name>' api/tools/` 列出所有引用该字段的工具，对照 DB 真实列类型逐个核对：
    - **enum 列**（如 status / condition / sale_currency / edition_type）→ 工具必须用 `z.enum(LOCAL_CONST).nullable().optional()`，**不能** `z.string().optional()`。LOCAL_CONST 字节级匹配 DB enum 值
@@ -493,7 +494,7 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 - 后端 API 使用 service key 绕过 RLS，代码中手动添加 `user_id` 过滤
 - 软删除不在 RLS 中强制，Trash 页面需要读取已删除数据
 - `(SELECT auth.uid())` 子查询模式用于性能优化（每条语句只计算一次）
-- 迁移文件归档：`supabase/migrations/archived/001_add_user_id_and_rls.sql`、`002_add_api_keys.sql`、`003_fix_edition_history_double_write.sql`、`004_normalize_artwork_types.sql`、`005_supabase_security_hardening.sql`
+- 迁移文件归档：`supabase/migrations/archived/001_add_user_id_and_rls.sql`、`002_add_api_keys.sql`、`003_fix_edition_history_double_write.sql`、`004_normalize_artwork_types.sql`、`005_supabase_security_hardening.sql`、`006_buyer_data_tidy.sql`、`007_data_api_explicit_grants.sql`、`008_tighten_anon_grants.sql`
 
 ### v1.4 安全加固（migration 005）
 
@@ -506,6 +507,59 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 | `function_security_definer` 越权 | `REVOKE EXECUTE ON record_edition_status_change FROM anon, authenticated, PUBLIC` | 函数仅由 `editions_status_change` AFTER UPDATE trigger 触发；全仓库无 `supabase.rpc()` 调用，REVOKE 不影响 trigger 路径。 |
 | `public_bucket_allows_listing` | DROP `"Public read access for thumbnails"` on `storage.objects` | bucket `public=true` 仍提供 CDN 直链 GET（`getPublicUrl()` 工作），但匿名 LIST 被拒绝，防止枚举 bucket 全部 key。 |
 | `auth_leaked_password_protection` | **暂未处理（known issue）** | HaveIBeenPwned 集成是 Supabase Auth 高级功能，受订阅计划级别限制；当前计划下开关不可用。等计划升级或 Supabase 调整可用性后再启用。Linter 此条告警保留为预期行为。 |
+
+### v1.x Data API Exposure 默认翻转
+
+Supabase 在 2026-04-28 [公告](https://github.com/orgs/supabase/discussions/45329)：`public` schema 表不再自动暴露到 Data API。
+
+| 日期 | 影响 |
+|---|---|
+| 2026-05-30 | 所有**新建**项目默认 opt-out —— 新表必须显式 `GRANT` 才能从 PostgREST/GraphQL 访问 |
+| 2026-10-30 | 所有**现有**项目（含本项目）同步该默认 |
+
+**本项目状态**（migration 007 + 008 已落实）：
+
+| 项目 | 状态 |
+|---|---|
+| 现有 8 张表的 grants | 已显式写入 `supabase/schema.sql` + migration 007；2026-10-30 默认翻转后行为不变 |
+| 现有项目 opt-in | migration 007 的 `ALTER DEFAULT PRIVILEGES ... REVOKE` 段已提前进入新默认 —— 之后新建表如忘写 GRANT 立即 42501，与生产事故隔离 |
+| schema.sql 自给自足 | 在 2026-05-30 之后新创建的 Supabase 项目上整段执行可直接部署，不依赖任何 Supabase 历史默认 |
+| anon 收紧到文档预期 | migration 008 REVOKE 了 Supabase 历史默认 `GRANT ALL TO anon` 残留 —— anon 现在仅持 `gallery_links SELECT`，其余 7 张表 grant 层兜底（不再仅靠 RLS） |
+
+**为何需要 008**：migration 007 在已存在项目跑完后验证 query 发现 `anon` 仍持 `ALL PRIVILEGES`（CRUD + REFERENCES + TRIGGER + TRUNCATE）。原因：Supabase 历史默认是 `GRANT ALL ON tables TO anon, authenticated, service_role`，007 只 `GRANT` 没 `REVOKE`，加的是 CRUD 子集对 anon 多余权限无效。008 显式 `REVOKE ALL ON ... FROM anon` 收齐到 schema.sql / CLAUDE.md 描述的最小集。**fresh deploy 走 schema.sql 不会出现这个问题**（新项目 opt-out 默认无 grant，schema.sql 的 GRANT 块直接给出最小集）—— 仅现有生产项目需要 008 补救。
+
+**角色 grant 分工**（与 RLS 策略对齐）：
+
+| 角色 | 用途 | 权限 |
+|---|---|---|
+| `authenticated` | 前端登录后的用户 session JWT | 8 张表全 CRUD，RLS 限制行级 |
+| `service_role` | 后端 serverless 函数（`SUPABASE_SERVICE_KEY`） | 8 张表全 CRUD，绕过 RLS |
+| `anon` | 公开链接查看器（未登录访问 `/links/<id>`） | 仅 `gallery_links` SELECT；其余表无任何 grant |
+
+**未来新建表的强制范式**（与上方 [添加 / 修改数据库字段 checklist](#添加--修改数据库字段强制-checklist) 第 1 步对齐）：
+
+```sql
+CREATE TABLE public.your_table ( ... );
+
+-- 必加：Data API exposure
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.your_table TO authenticated, service_role;
+-- 按需：GRANT SELECT ON public.your_table TO anon;
+
+-- 然后才是 RLS
+ALTER TABLE public.your_table ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.your_table FORCE ROW LEVEL SECURITY;
+CREATE POLICY ... ;
+```
+
+**缺 GRANT 时的报错** —— PostgREST 不会静默失败，直接返回带修复建议的错误：
+
+```json
+{
+  "code": "42501",
+  "message": "permission denied for table your_table",
+  "hint": "Grant the required privileges to the current role with: GRANT SELECT ON public.your_table TO anon;"
+}
+```
 
 ---
 
@@ -521,3 +575,5 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 | 2025-02-06 | 添加 api_keys 表（外部 API Key 管理），支持外部 AI 代理只读查询库存数据 |
 | 2026-05-04 | 修复 `edition_history` 双写：触发器 `record_edition_status_change` 在 `auth.uid() IS NULL`（service key）时跳过，由后端代码自行写带富字段的历史。前端 anon key 路径不变。Migration 003 |
 | 2026-05-12 | Supabase Linter 安全加固：DROP 4 张表残留的 `USING (true)` 旧策略 / 给 2 个函数 `SET search_path` / REVOKE `record_edition_status_change` EXECUTE / DROP thumbnails bucket 公开 SELECT 策略（保留 GET-by-URL）。8 条告警清掉 7 条；`auth_leaked_password_protection` 因订阅级别限制保留为 known issue。Migration 005 |
+| 2026-05-13 | Data API exposure 显式化：响应 Supabase 2026-10-30 默认翻转。schema.sql 新增 `DATA API EXPOSURE` 段，8 张表全部显式 `GRANT` 给 authenticated / service_role，gallery_links 额外给 anon SELECT。Migration 007 同步给现有项目应用，并提前 opt-in 新默认（`ALTER DEFAULT PRIVILEGES ... REVOKE`）—— 之后任何新建表如忘写 GRANT 立即 42501。checklist 第 1 步加入显式 GRANT 强制要求。 |
+| 2026-05-13 | Migration 008 anon 收紧：007 验证后发现 anon 仍持 Supabase 历史默认 `GRANT ALL`（CRUD + REFERENCES + TRIGGER + TRUNCATE），原因是 007 只 GRANT 没 REVOKE。008 显式 `REVOKE ALL ... FROM anon` + 重新 `GRANT SELECT ON gallery_links TO anon`，把现实收齐到 schema.sql / CLAUDE.md 文档预期的最小集。前端 0 感知，grant 层补上 defense in depth。 |
