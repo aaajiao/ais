@@ -1292,10 +1292,10 @@ describe('getNodeVisual', () => {
     expect(getNodeVisual('named_private', null, 1).innerRingR).toBeNull();
   });
 
-  it('anonymous 固定 r=3.5，style=dust（v1.6.x 第二轮：1.5→3.5，"看得见但无名"档）', () => {
+  it('anonymous 固定 r=3.5，shape=dust（v1.6.x 第二轮：1.5→3.5，"看得见但无名"档）', () => {
     const a = getNodeVisual('anonymous', null, 1);
     expect(a.r).toBe(3.5);
-    expect(a.style).toBe('dust');
+    expect(a.shape).toBe('dust');
     const a2 = getNodeVisual('anonymous', null, 100);
     expect(a2.r).toBe(3.5); // anonymous 不随 editionCount 变化
   });
@@ -1304,15 +1304,27 @@ describe('getNodeVisual', () => {
     // type=null（理论 location 应有 type，但万一）走 fallback
     const v = getNodeVisual('location', null, 1);
     expect(v.r).toBeGreaterThan(0);
-    expect(v.style).toBe('solid');
+    expect(v.shape).toBe('blob-solid');
   });
 
-  it('opacity spec：museum=1.0 / private_collection=0.85 / gallery=0.7 / named=0.55 / anonymous=0.55（v1.6.x 第二轮升）', () => {
+  it('opacity spec：museum=1.0 / private_collection=0.85 / gallery=0.85 / other=0.7 / named=0.55 / anonymous=0.55（v1.8.x：other 0.6→0.7，gallery 0.7→0.85 配合 outline shape）', () => {
     expect(getNodeVisual('location', 'museum', 1).opacity).toBe(1.0);
     expect(getNodeVisual('location', 'private_collection', 1).opacity).toBe(0.85);
-    expect(getNodeVisual('location', 'gallery', 1).opacity).toBe(0.7);
+    expect(getNodeVisual('location', 'gallery', 1).opacity).toBe(0.85);
+    expect(getNodeVisual('location', 'other', 1).opacity).toBe(0.7);
     expect(getNodeVisual('named_private', null, 1).opacity).toBe(0.55);
     expect(getNodeVisual('anonymous', null, 1).opacity).toBe(0.55);
+  });
+
+  it('shape spec：museum=blob-solid / gallery=blob-outline / private_collection=blob-with-ring / other=square / named=blob-named / anonymous=dust（v1.8.x mono palette 视觉编码）', () => {
+    expect(getNodeVisual('location', 'museum', 1).shape).toBe('blob-solid');
+    expect(getNodeVisual('location', 'gallery', 1).shape).toBe('blob-outline');
+    expect(getNodeVisual('location', 'private_collection', 1).shape).toBe(
+      'blob-with-ring'
+    );
+    expect(getNodeVisual('location', 'other', 1).shape).toBe('square');
+    expect(getNodeVisual('named_private', null, 1).shape).toBe('blob-named');
+    expect(getNodeVisual('anonymous', null, 1).shape).toBe('dust');
   });
 });
 

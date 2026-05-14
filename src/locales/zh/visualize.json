@@ -137,10 +137,11 @@
       "gallery": "画廊",
       "museum": "美术馆",
       "private_collection": "私人收藏",
-      "other": "其他",
+      "other": "其他场所",
+      "namedBuyer": "私人买家",
       "anonymous": "匿名流向",
       "untracked": "无位置待补全",
-      "namedPrivateBadge": "私人"
+      "namedPrivateBadge": "私人买家"
     },
     "tooltip": {
       "editions": "{{count}} 个版本在此",

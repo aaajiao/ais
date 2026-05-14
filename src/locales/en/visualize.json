@@ -137,10 +137,11 @@
       "gallery": "Gallery",
       "museum": "Museum",
       "private_collection": "Private collection",
-      "other": "Other",
+      "other": "Other venue",
+      "namedBuyer": "Private buyer",
       "anonymous": "Anonymous outflow",
       "untracked": "No location (to complete)",
-      "namedPrivateBadge": "private"
+      "namedPrivateBadge": "private buyer"
     },
     "tooltip": {
       "editions": "{{count}} editions here",

@@ -19,10 +19,10 @@ import {
   countryToISO2,
   buildGhostEditions,
   layoutGhostRing,
-  type LocationNode,
   type LocationConstellationNode,
   type NamedPrivateNode,
 } from './diasporaUtils';
+import type { LocationType } from '@/lib/database.types';
 
 export interface DiasporaViewProps {
   artworks?: VizArtwork[];
@@ -319,47 +319,99 @@ export default function DiasporaView({
 
       {/* ─── Legend ──────────────────────────────────────────────────── */}
       {/*
-        三档视觉词汇在 Legend 上必须 visible 区分：
-        - type chips（entity）→ inline SVG organic blob（跟主图 location 节点同源
-          generateOrganicPath，每 type 用自己字面值做 seed → 稳定不同形状）
-        - anonymous → 灰实心几何小圆（rounded-full + opacity 0.55）
-        - untracked → 空心几何小圆（border-only）
-        opacity 与主图 NODE_VISUAL_SPEC 对齐，让 chip 直接读图。
+        v1.8.x: Legend 跟主图节点 1-1 对应（mono palette + shape/fill 区分）。
+          - 满足 5 类 satellite location 类型 + named_private（外加 anonymous /
+            untracked）
+          - 删除 studio chip（studio 版本聚合到 artist center，外圈不画）
+          - 新增 namedBuyer chip（之前 24 个 named_private 节点对 legend
+            读者完全 invisible —— 这是用户原始诉求里"实际每一块都不一样"
+            最直接的漏项）
+          - rename other → 其他场所（用户语义疏通：别跟"私人"那一档混淆）
+        每个 chip 的 SVG 用 visual.shape 分支渲染，跟主图节点同源（不再统一
+        画 organic path，否则 square 类型对不上）。
       */}
       <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs">
         {(
           [
-            ['studio', 0.85],
-            ['gallery', 0.7],
-            ['museum', 1.0],
-            ['private_collection', 0.85],
-            ['other', 0.6],
-          ] as Array<[LocationNode['type'], number]>
-        ).map(([type, opacity]) => (
-          <span key={type} className="flex items-center gap-1.5">
-            {/*
-              chip 放大到 20×20 + baseR=8 让 ±25% organic 扰动可见
-              (12×12 baseR=5 → 视觉扰动 1.25px 太小看不出；20×20 baseR=8
-              → 视觉扰动 2px，肉眼能识别 5 个 type 各自的 organic 指纹)。
-            */}
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 20 20"
-              aria-hidden="true"
-              className="text-foreground shrink-0"
+            ['museum', 'location', 'museum'],
+            ['gallery', 'location', 'gallery'],
+            ['private_collection', 'location', 'private_collection'],
+            ['other', 'location', 'other'],
+            ['namedBuyer', 'named_private', null],
+          ] as Array<
+            [
+              string,
+              'location' | 'named_private',
+              LocationType | null,
+            ]
+          >
+        ).map(([labelKey, kind, type]) => {
+          const visual = getNodeVisual(kind, type, 1);
+          // chip viewBox 20×20，统一用 cx=cy=10；blob 类用 baseR=8 让 organic
+          // 扰动肉眼可见（小于 8 看不出 hash 差异），square 用 14×14 ≈ 同视觉重量
+          const seed =
+            kind === 'location' && type ? type : 'namedBuyer-chip';
+          return (
+            <span
+              key={labelKey}
+              data-testid={`diaspora-legend-${labelKey}`}
+              className="flex items-center gap-1.5"
             >
-              <path
-                d={generateOrganicPath(10, 10, 8, type)}
-                fill="currentColor"
-                opacity={opacity}
-              />
-            </svg>
-            <span className="text-muted-foreground">
-              {t(`diaspora.legend.${type}`)}
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 20 20"
+                aria-hidden="true"
+                className="text-foreground shrink-0"
+              >
+                {visual.shape === 'square' ? (
+                  <rect
+                    data-shape={visual.shape}
+                    x={3}
+                    y={3}
+                    width={14}
+                    height={14}
+                    fill="currentColor"
+                    opacity={visual.opacity}
+                  />
+                ) : visual.shape === 'blob-outline' ? (
+                  <path
+                    data-shape={visual.shape}
+                    d={generateOrganicPath(10, 10, 8, seed)}
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                    opacity={visual.opacity}
+                  />
+                ) : (
+                  <>
+                    <path
+                      data-shape={visual.shape}
+                      d={generateOrganicPath(10, 10, 8, seed)}
+                      fill="currentColor"
+                      opacity={visual.opacity}
+                    />
+                    {/* private_collection：内部 negative ring，跟主图同 spec */}
+                    {visual.shape === 'blob-with-ring' && (
+                      <circle
+                        cx={10}
+                        cy={10}
+                        r={8 * 0.45}
+                        fill="none"
+                        className="stroke-background"
+                        strokeWidth={1.2}
+                        opacity={visual.opacity}
+                      />
+                    )}
+                  </>
+                )}
+              </svg>
+              <span className="text-muted-foreground">
+                {t(`diaspora.legend.${labelKey}`)}
+              </span>
             </span>
-          </span>
-        ))}
+          );
+        })}
         <span aria-hidden="true" className="opacity-30 px-1">
           │
         </span>
@@ -699,17 +751,48 @@ export default function DiasporaView({
                   />
                 )}
                 {/*
-                  v1.6.x: 把规则 circle 换成 deterministic organic blob path —
-                  跟 Strata 方块 / Markets dot 形成视觉对照。每个 entity 按 id
-                  (seed) 算 12 段 quadratic-bezier 闭合轮廓，render 间稳定。
-                  pointerEvents="all" 保 a11y / click 流。
+                  v1.6.x: organic blob path 取代规则 circle —— Strata 方块 /
+                  Markets dot / Diaspora blob 形成视觉对照。
+                  v1.8.x: 节点形态按 visual.shape 分支（mono palette 下用
+                  fill style + 几何 primitive 区分 5 个 location 类型；颜色
+                  全部 foreground）：
+                    - blob-solid     museum: 实心 organic（公共最实）
+                    - blob-outline   gallery: 描边 organic（中空有边界）
+                    - blob-with-ring private_collection: 实心 + 内 negative ring
+                    - square         other: 实心方块（geometric primitive）
+                  每个分支共享同一 hover/pin/selection ring + label，节点本体
+                  用 data-shape attribute 暴露给测试断言。
                 */}
-                <path
-                  d={generateOrganicPath(x, y, r, node.id)}
-                  className="fill-foreground"
-                  opacity={isPinned ? 1 : visual.opacity}
-                  pointerEvents="all"
-                />
+                {visual.shape === 'square' ? (
+                  <rect
+                    data-shape={visual.shape}
+                    x={x - r * 0.85}
+                    y={y - r * 0.85}
+                    width={r * 1.7}
+                    height={r * 1.7}
+                    className="fill-foreground"
+                    opacity={isPinned ? 1 : visual.opacity}
+                    pointerEvents="all"
+                  />
+                ) : visual.shape === 'blob-outline' ? (
+                  <path
+                    data-shape={visual.shape}
+                    d={generateOrganicPath(x, y, r, node.id)}
+                    fill="none"
+                    className="stroke-foreground"
+                    strokeWidth={1.5}
+                    opacity={isPinned ? 1 : visual.opacity}
+                    pointerEvents="all"
+                  />
+                ) : (
+                  <path
+                    data-shape={visual.shape}
+                    d={generateOrganicPath(x, y, r, node.id)}
+                    className="fill-foreground"
+                    opacity={isPinned ? 1 : visual.opacity}
+                    pointerEvents="all"
+                  />
+                )}
                 {/* private_collection：内部反差色环（仍是几何 circle，"有机壳 + 几何核"对照）*/}
                 {visual.innerRingR !== null && (
                   <circle

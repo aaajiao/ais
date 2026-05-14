@@ -721,36 +721,94 @@ export function layoutConstellation(
 //
 // 每个节点的视觉用 `getNodeVisual(kind, type, editionCount)` 统一决定：
 //   - r = base + sqrt(max(0, editionCount-1)) * weight
+//   - shape 决定 SVG 渲染分支（blob-solid / blob-outline / blob-with-ring /
+//     square / blob-named / dust）—— brutalist mono 调色板下，shape + fill
+//     style 是唯一区分 5 个 location 类型 + named_private 的视觉轴。颜色全部
+//     foreground 单色，所以视觉差异必须在 shape 和 fill style 上做足。
 //   - opacity 按 kind+type 固定
-//   - private_collection 加一层 inner stroke ring （"双圆嵌套"）表达
-//     "私人但机构化" 的不对称地位
-//   - anonymous 是 dust，固定 r=1.5
+//   - private_collection 仍画 inner stroke ring 表达"私人但机构化"，跟 named_private
+//     的"个人买家"区分
+//   - anonymous 是 dust，固定 r=3.5
+
+/** 节点 SVG 渲染形态 —— DiasporaView 据此分支不同 path/rect/circle */
+export type NodeShape =
+  /** 实心 organic blob（museum：公共机构最大最实） */
+  | 'blob-solid'
+  /** 描边 organic blob（gallery：流转平台 = "中空有边界"） */
+  | 'blob-outline'
+  /** 实心 organic blob + 中心 negative-space ring（private_collection：私人但机构化） */
+  | 'blob-with-ring'
+  /** 实心方块（other 场所：几何 primitive，跟 organic blob 区别 genus） */
+  | 'square'
+  /** 小尺寸实心 organic blob（named_private 个人买家：跟 institutional 同 genus 但 r 显著小） */
+  | 'blob-named'
+  /** 极小点（anonymous） */
+  | 'dust';
 
 export interface NodeVisual {
   r: number;
-  /** 'solid' = fill-foreground 实心；'dust' = anonymous 极小点 */
-  style: 'solid' | 'dust';
+  /** 见 NodeShape JSDoc */
+  shape: NodeShape;
   opacity: number;
   /** private_collection 双圆嵌套时的内部 stroke ring 半径（null 表示不画） */
   innerRingR: number | null;
 }
 
-/** 内部 spec 表：base r / weight / opacity / 是否画 inner stroke ring */
+/** 内部 spec 表：base r / weight / opacity / shape / 是否画 inner stroke ring */
 const NODE_VISUAL_SPEC: Record<
   string,
-  { base: number; weight: number; opacity: number; innerRingFactor: number | null }
+  {
+    base: number;
+    weight: number;
+    opacity: number;
+    shape: NodeShape;
+    innerRingFactor: number | null;
+  }
 > = {
-  'location:museum': { base: 14, weight: 2.5, opacity: 1.0, innerRingFactor: null },
+  'location:museum': {
+    base: 14,
+    weight: 2.5,
+    opacity: 1.0,
+    shape: 'blob-solid',
+    innerRingFactor: null,
+  },
   'location:private_collection': {
     base: 12,
     weight: 2.5,
     opacity: 0.85,
+    shape: 'blob-with-ring',
     innerRingFactor: 0.45,
   },
-  'location:gallery': { base: 12, weight: 2.5, opacity: 0.7, innerRingFactor: null },
-  'location:studio': { base: 12, weight: 2.5, opacity: 0.85, innerRingFactor: null },
-  'location:other': { base: 11, weight: 2.0, opacity: 0.6, innerRingFactor: null },
-  named_private: { base: 7, weight: 1.8, opacity: 0.55, innerRingFactor: null },
+  'location:gallery': {
+    base: 12,
+    weight: 2.5,
+    opacity: 0.85,
+    shape: 'blob-outline',
+    innerRingFactor: null,
+  },
+  // studio 不在 outflow constellation 出现（studio 版本聚合到 artist center）；
+  // spec 仍保留 → 兼容遗留代码路径 + getNodeVisual 单元测试。
+  'location:studio': {
+    base: 12,
+    weight: 2.5,
+    opacity: 0.85,
+    shape: 'blob-solid',
+    innerRingFactor: null,
+  },
+  'location:other': {
+    base: 10,
+    weight: 1.8,
+    opacity: 0.7,
+    shape: 'square',
+    innerRingFactor: null,
+  },
+  named_private: {
+    base: 7,
+    weight: 1.8,
+    opacity: 0.55,
+    shape: 'blob-named',
+    innerRingFactor: null,
+  },
 };
 
 /** 任何未知 kind/type 的安全 fallback —— 与 location:other 同档但更暗 */
@@ -758,6 +816,7 @@ const NODE_VISUAL_FALLBACK = {
   base: 10,
   weight: 1.5,
   opacity: 0.5,
+  shape: 'blob-solid' as NodeShape,
   innerRingFactor: null as number | null,
 };
 
@@ -769,7 +828,7 @@ export function getNodeVisual(
   if (kind === 'anonymous') {
     // v1.6.x 第二轮：r 1.5→3.5, opacity 0.3→0.55
     // 视觉词汇升级 —— 灰实心几何小圆，"看得见但无名"。
-    return { r: 3.5, style: 'dust', opacity: 0.55, innerRingR: null };
+    return { r: 3.5, shape: 'dust', opacity: 0.55, innerRingR: null };
   }
   const specKey = kind === 'location' && type ? `location:${type}` : kind;
   const spec = NODE_VISUAL_SPEC[specKey] ?? NODE_VISUAL_FALLBACK;
@@ -777,7 +836,7 @@ export function getNodeVisual(
   const innerRingR = spec.innerRingFactor === null ? null : r * spec.innerRingFactor;
   return {
     r,
-    style: 'solid',
+    shape: spec.shape,
     opacity: spec.opacity,
     innerRingR,
   };

@@ -659,31 +659,69 @@ describe('DiasporaView', () => {
     expect(screen.queryByTestId('diaspora-legend-ghost')).toBeNull();
   });
 
-  it('Legend 5 个 type chip 用 <svg><path> organic blob 渲染（149dbd1：与主图节点视觉同源）', () => {
-    // type chips 必须是 generateOrganicPath 出的 inline SVG path（baseR=8 在 20×20 viewBox）
-    // —— 跟主图 location 节点同 hash 函数 + 同形状。回归到旧 `rounded-full` <span>
-    // block（圆 chip）会破坏"图例跟视觉编码同步"原则（视觉指南 #10）。
+  it('Legend 5 个 satellite chip 跟主图节点 1-1 对应（v1.8.x：删 studio + 加 namedBuyer + other 改 square）', () => {
+    // v1.8.x: legend 跟主图 satellite 节点 1-1 对应 ——
+    //   museum / gallery / private_collection / other / namedBuyer 共 5 个 chip
+    //   （删除 studio：studio 版本聚合到 artist center，外圈不画；
+    //   新增 namedBuyer：之前 24 个 named_private 节点对 legend 完全 invisible）
+    // chip 渲染按 visual.shape 分支：blob 系列出 <path>，square 出 <rect>，
+    // 跟主图节点同源。回归到统一 path 渲染会让 square 类型对不上。
     const { container } = renderDiaspora();
-    // 取 Legend 容器（在主 SVG 之前的 flex-wrap div，含 diaspora-legend-* testid）
     const anonymousChip = container.querySelector(
       '[data-testid="diaspora-legend-anonymous"]'
     )!;
     const legendContainer = anonymousChip.parentElement!;
-    // type chips 各自是一个含 <svg> 的 span（非 testid 名义节点，按结构选）
+
+    // 5 个 satellite chip 必须 1-1 命中（不能多不能少）
+    for (const labelKey of [
+      'museum',
+      'gallery',
+      'private_collection',
+      'other',
+      'namedBuyer',
+    ]) {
+      expect(
+        container.querySelector(`[data-testid="diaspora-legend-${labelKey}"]`)
+      ).not.toBeNull();
+    }
+    // studio chip 不应出现 —— 外圈不画 studio
+    expect(
+      container.querySelector('[data-testid="diaspora-legend-studio"]')
+    ).toBeNull();
+
+    // 容器里的 satellite chip svg 数量 = 5
     const typeSvgs = legendContainer.querySelectorAll(
       'svg[aria-hidden="true"][viewBox="0 0 20 20"]'
     );
-    expect(typeSvgs).toHaveLength(5); // studio / gallery / museum / private_collection / other
-    for (const svg of Array.from(typeSvgs)) {
-      const path = svg.querySelector('path');
-      expect(path).not.toBeNull();
-      const d = path!.getAttribute('d') ?? '';
+    expect(typeSvgs).toHaveLength(5);
+
+    // blob 系列 chip 内含 <path>（museum / gallery / private_collection / namedBuyer），
+    // 4 个 path；其中 gallery 是 fill="none" outline。square chip 内含 <rect>，1 个。
+    const allPaths = legendContainer.querySelectorAll(
+      'svg[aria-hidden="true"][viewBox="0 0 20 20"] path'
+    );
+    expect(allPaths.length).toBe(4);
+    for (const path of Array.from(allPaths)) {
+      const d = path.getAttribute('d') ?? '';
       expect(d.startsWith('M ')).toBe(true);
       expect(d.endsWith(' Z')).toBe(true);
       // 同主图节点：Catmull-Rom cubic bezier（v1.6.x 第六/七轮），不出现 Q / L 段
       expect(d).not.toMatch(/\sQ\s/);
       expect(d).not.toMatch(/\sL\s/);
     }
+    // gallery chip 用 outline 渲染（fill='none'）
+    const galleryChip = container.querySelector(
+      '[data-testid="diaspora-legend-gallery"]'
+    )!;
+    const galleryPath = galleryChip.querySelector('path')!;
+    expect(galleryPath.getAttribute('fill')).toBe('none');
+
+    // other chip 用 <rect> 渲染（geometric primitive 区分 organic blob genus）
+    const otherChip = container.querySelector(
+      '[data-testid="diaspora-legend-other"]'
+    )!;
+    expect(otherChip.querySelector('rect')).not.toBeNull();
+    expect(otherChip.querySelector('path')).toBeNull();
   });
 
   it('Legend 不渲染裸 "type" 字符串（45c8d9d anti-regression：删除硬编码 "type" 标签）', () => {
