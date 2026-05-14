@@ -69,11 +69,23 @@ export interface ArtistCenterNode {
 }
 
 /** "在艺术家手里" 的 status 集合 —— 中心点持有版本判定。
- *  at_gallery / at_museum 不算（那是外借出去的状态，由 location 节点承载语义）。 */
+ *  at_gallery / at_museum 不算（那是外借出去的状态，由 location 节点承载语义，
+ *  见 EXTERNAL_LOAN_STATUSES）。 */
 const HELD_STATUSES: ReadonlySet<VizEdition['status']> = new Set([
   'in_studio',
   'in_production',
   'in_transit',
+]);
+
+/** "外借中"：艺术家仍拥有，但作品物理在外部场所（借展 / 展览中）。
+ *  Constellation 把这类 edition 路由到 location 节点（跟 sold-to 同节点聚合 ——
+ *  同一画廊既有买入也有借展，节点就显示总数）。totalOutflowCount **不计入**，
+ *  因为 "流出" 在艺术家中心 label 里语义是 "永久离开"。
+ *  v1.8.x 修复：之前 `isOutflow` 只放 sold/gifted，导致只 at_gallery / at_museum
+ *  的画廊 / 美术馆完全不在图上出现 —— 用户视角的"借展中场所"被吞掉。 */
+const EXTERNAL_LOAN_STATUSES: ReadonlySet<VizEdition['status']> = new Set([
+  'at_gallery',
+  'at_museum',
 ]);
 
 export interface LocationConstellationNode {
@@ -147,16 +159,24 @@ function isOutflow(status: VizEdition['status']): boolean {
 /**
  * 构造 Constellation 三环数据。
  *
- * 严格按优先级把每条 outflow edition 归到唯一一个节点：
+ * Edition status 分流（互斥，每条 edition 走唯一路径）：
+ *   - HELD_STATUSES (in_studio / in_production / in_transit) → artist center
+ *   - EXTERNAL_LOAN_STATUSES (at_gallery / at_museum) → location bucket（外借）
+ *   - OUTFLOW (sold / gifted) → 按下方 4 段优先级归一个 satellite 节点
+ *   - 其它（lost / damaged 等 degenerate）→ 不进 Constellation
+ *
+ * Outflow 4 段优先级：
  *   1. non-studio location（机构层）
  *   2. named buyer（私人买家层）
  *   3. studio + named buyer（仍归私人买家，避免 phantom"卖给 studio"）
  *   4. anonymous（匿名）
  *
- * - locations 按 editionCount desc 排
+ * - locations 按 editionCount desc 排（含 outflow + on-loan 同 location 桶里聚合）
  * - namedPrivateBuyers 按 editionCount desc 排（视觉上重要的在前）
  * - artworkIds 去重（同一买家买同一作品多个版本只 count 一个 artwork）
  * - editionIds 不去重（每个 edition 是独立流出实例）
+ * - totalOutflowCount **只算 sold + gifted**（artist center label "X 件流出"
+ *   的语义是永久离开，不含借展）
  */
 export function buildConstellation(
   editions: VizEdition[],
@@ -209,6 +229,33 @@ export function buildConstellation(
           studioBuckets.set(loc.id, bucket);
         }
       }
+      continue;
+    }
+
+    // External loan：路由到 location bucket，跟 outflow→location 同桶聚合。
+    // 走在 outflow 前面，因为这条不增加 totalOutflowCount，也不走 buyer/anonymous
+    // 兜底（外借没有 buyer_name 的概念）。要求有 location_id；缺则跳过 ——
+    // "at_museum 但没填美术馆"是数据脏，不强行兜成匿名。
+    if (EXTERNAL_LOAN_STATUSES.has(ed.status)) {
+      if (!ed.location_id) continue;
+      const loc = locById.get(ed.location_id);
+      if (!loc) continue;
+      let bucket = locationBuckets.get(loc.id);
+      if (!bucket) {
+        bucket = {
+          meta: loc,
+          editionIds: [],
+          artworkIds: new Set(),
+          saleDates: [],
+        };
+        locationBuckets.set(loc.id, bucket);
+      }
+      bucket.editionIds.push(ed.id);
+      bucket.artworkIds.add(ed.artwork_id);
+      // 借展的 sale_date 通常 null，但若有（罕见数据状态）就接受 ——
+      // time-spiral 不区分"借展首日"vs"成交日"，按已知最早日期落点即可。
+      const loanDate = ed.sale_date && ed.sale_date.trim() ? ed.sale_date : null;
+      if (loanDate) bucket.saleDates.push(loanDate);
       continue;
     }
 

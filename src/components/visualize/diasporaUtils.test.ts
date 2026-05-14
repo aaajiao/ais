@@ -649,11 +649,9 @@ describe('buildConstellation', () => {
     expect(c.namedPrivateBuyers).toEqual([]);
   });
 
-  it('status 过滤：in_studio / at_gallery / at_museum / in_transit 不进 Constellation', () => {
+  it('status 过滤：HELD（in_studio / in_transit / in_production）不进 Constellation satellite', () => {
     const editions = [
       makeEdition('e1', 'loc-g1', { status: 'in_studio' }),
-      makeEdition('e2', 'loc-g1', { status: 'at_gallery' }),
-      makeEdition('e3', 'loc-g1', { status: 'at_museum' }),
       makeEdition('e4', 'loc-g1', { status: 'in_transit' }),
       makeEdition('e5', 'loc-g1', { status: 'in_production' }),
     ];
@@ -661,6 +659,42 @@ describe('buildConstellation', () => {
     const c = buildConstellation(editions, locations);
     expect(c.artist.totalOutflowCount).toBe(0);
     expect(c.locations).toEqual([]);
+  });
+
+  it('at_gallery / at_museum 进 location bucket（外借中场所是 satellite，v1.8.x bug fix）', () => {
+    // 之前 isOutflow 只放 sold/gifted → 只有借展 edition 的画廊/美术馆完全
+    // 不在图上出现。这条断言守护修复后的行为：外借 edition 跟 outflow→location
+    // 同桶聚合；totalOutflowCount **不变**（外借语义上不算"流出"）。
+    const editions = [
+      makeEdition('e1', 'loc-g1', { status: 'at_gallery' }),
+      makeEdition('e2', 'loc-m1', { status: 'at_museum' }),
+      makeEdition('e3', 'loc-g1', { status: 'sold' }), // 同 location 既有借展又有 sold
+    ];
+    const locations = [
+      makeLocation('loc-g1', 'Gallery A', 'gallery'),
+      makeLocation('loc-m1', 'Museum B', 'museum'),
+    ];
+    const c = buildConstellation(editions, locations);
+    expect(c.artist.totalOutflowCount).toBe(1); // 只算 sold
+    expect(c.locations).toHaveLength(2);
+    const galleryNode = c.locations.find((l) => l.id === 'loc-g1')!;
+    expect(galleryNode.editionCount).toBe(2); // at_gallery + sold 同桶
+    expect(galleryNode.editionIds.sort()).toEqual(['e1', 'e3']);
+    const museumNode = c.locations.find((l) => l.id === 'loc-m1')!;
+    expect(museumNode.editionCount).toBe(1);
+    expect(museumNode.editionIds).toEqual(['e2']);
+  });
+
+  it('at_gallery / at_museum 缺 location_id → 跳过（不强行兜成匿名，数据脏不静默）', () => {
+    const editions = [
+      makeEdition('e1', null, { status: 'at_gallery' }),
+      makeEdition('e2', null, { status: 'at_museum' }),
+    ];
+    const c = buildConstellation(editions, []);
+    expect(c.locations).toEqual([]);
+    expect(c.namedPrivateBuyers).toEqual([]);
+    expect(c.anonymous.count).toBe(0);
+    expect(c.artist.totalOutflowCount).toBe(0);
   });
 
   it('lost / damaged editions 不进 Constellation（degenerate 不算 outflow）', () => {
