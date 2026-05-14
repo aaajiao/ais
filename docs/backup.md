@@ -48,8 +48,11 @@
 manifest.json         # 元数据 + 完整性自描述
 data.json             # 所有用户域表的 jsonb 快照
 images/
-  {edition_file_id}.{jpg|png|webp|gif|...}
+  {edition_file_id}.{jpg|png|webp|gif|...}    # edition_files.file_url 重写后的图片
+  {artwork_id}.{jpg|png|webp|gif|...}          # artworks.thumbnail_url 重写后的图片
 ```
+
+> `images/` 目录平铺，artwork_id 与 edition_file_id 同为 UUID（命名空间不冲突）。restore 通过查 row 的 `id` 字段去 ZIP 内取 buffer，两条路径共用 lookup 逻辑。
 
 ### `manifest.json` schema
 
@@ -69,7 +72,7 @@ images/
     "gallery_links": number,
     "api_keys": number
   },
-  "image_count": number,               // 成功打包进 ZIP 的图片数量（可能少于 edition_files.image 总数）
+  "image_count": number,               // ZIP 内 images/ 子目录的图片总数（含 edition_files 图片 + artworks 缩略图）
   "total_size_bytes": number           // ZIP 文件本身的 size，与 buffer.byteLength 一致
 }
 ```
@@ -80,31 +83,48 @@ images/
 
 ```ts
 {
-  "artworks":        Row[],   // 含 deleted_at IS NOT NULL 的软删行（恢复时保留软删状态）
+  "artworks":        ArtworkRow[], // thumbnail_url 已重写为 images/ 路径，_original_thumbnail_url 保留原 URL
   "editions":        Row[],
-  "edition_files":   FileRow[],   // file_url 已重写为相对 images/ 路径，_original_url 保留原 URL
+  "edition_files":   FileRow[],    // file_url 已重写为 images/ 路径，_original_url 保留原 URL
   "edition_history": Row[],
   "locations":       Row[],
   "gallery_links":   Row[],
-  "api_keys":        Row[]    // 注意：含 key_hash（哈希值）而非明文 key，泄漏 ZIP 不直接给到可用 key
+  "api_keys":        Row[]         // 注意：含 key_hash（哈希值）而非明文 key，泄漏 ZIP 不直接给到可用 key
 }
 ```
 
 **不包含** `users` 表 —— 账号身份保护。备份只是工作室数据，不是账号凭据。
 
-### `edition_files` 行重写
+### 行重写：两条路径
 
-打包前：
-```json
-{ "id": "f1", "file_url": "https://xxx.supabase.co/storage/v1/.../thumbnails/img.jpg", "file_type": "image" }
-```
+**`edition_files`**（file_type='image' 的行）：
 
-打包后（写进 `data.json`）：
 ```json
+// 打包前
+{ "id": "f1", "file_url": "https://xxx.supabase.co/.../thumbnails/img.jpg", "file_type": "image" }
+// 打包后
 { "id": "f1", "file_url": "images/f1.jpg", "_original_url": "https://xxx.../img.jpg", "file_type": "image" }
 ```
 
-恢复时 `_original_url` 一律剥离不进 DB；新 file_url 是图片重传后的新 public URL。
+**`artworks.thumbnail_url`**（前端列表 / 详情显示的作品主图）：
+
+```json
+// 打包前
+{ "id": "aw1", "thumbnail_url": "https://xxx.supabase.co/.../thumbnails/a/b.jpg" }
+// 打包后
+{ "id": "aw1", "thumbnail_url": "images/aw1.jpg", "_original_thumbnail_url": "https://xxx.../b.jpg" }
+```
+
+恢复时 `_original_url` / `_original_thumbnail_url` 一律剥离不进 DB；图片重传后的新 public URL 写回对应字段。
+
+### URL 形态归一：相对 vs 绝对
+
+`edition_files.file_url` 在 DB 里历史上**双形态共存**：
+
+- 老数据：相对 Storage 路径，如 `{edition_id}/{uuid}_filename.png`
+- 新数据：绝对 URL `https://{ref}.supabase.co/storage/v1/object/public/thumbnails/...`
+
+`buildBackupZip` 在下载图片前会调 `resolveToAbsoluteUrl()` 把字符串归一成可 fetch 的绝对 URL（相对路径默认拼到 `thumbnails` bucket public URL，绝对 URL 原样）。下载失败的行（含外链 404 / 网络超时）字段保持原值，restore 时若 ZIP 内也找不到 buffer 就走 fallback 原 URL + warning，**单条失败不阻断整体备份**。
 
 ---
 
@@ -210,14 +230,20 @@ restoreBackup                       → 500 + hint 用回滚包还原
    edition_history → edition_files → editions
                   → gallery_links → api_keys → locations → artworks
 
-2. 图片重传（仅 file_type='image' 且 file_url 以 'images/' 开头）：
-   - 从 ZIP getImage(file_id) 取 buffer
-   - upload 到 Supabase Storage `thumbnails` bucket，路径 `restored/{file_id}.{ext}`
-   - 改写 row.file_url 为新 public URL，删 _original_url
-   - 失败 row 仍 INSERT（fallback 到 _original_url 或原 images/ 字符串 + warning）
+2. 图片重传（两条平行路径）：
+   a) edition_files 行（file_type='image' 且 file_url 以 'images/' 开头）：
+      - 从 ZIP getImage(file_id) 取 buffer
+      - upload 到 Supabase Storage `thumbnails` bucket，路径 `restored/{file_id}.{ext}`
+      - 改写 row.file_url 为新 public URL，删 _original_url
+   b) artworks 行（thumbnail_url 以 'images/' 开头）：
+      - 从 ZIP getImage(artwork_id) 取 buffer
+      - 同 bucket 同路径模板 `restored/{artwork_id}.{ext}`
+      - 改写 row.thumbnail_url 为新 public URL，删 _original_thumbnail_url
+   失败 row 仍 INSERT（fallback 到 _original* 或原 images/ 字符串 + warning）
+   imagesRestored / imagesFailed 是两条路径合计。
 
 3. INSERT 备份内容（正 FK 顺序）：
-   artworks → locations → api_keys → editions
+   artworks (用重写后的 rows) → locations → api_keys → editions
           → edition_files (用重写后的 rows)
           → edition_history → gallery_links
 

@@ -5,13 +5,27 @@
  * ----
  * 1. 调 RPC `public.backup_snapshot(p_user_id)` 拿到跨表一致性 jsonb 快照
  *    （单事务内所有 SELECT 共享同一 snapshot，避免 supabase-js 多请求间的脏读）。
- * 2. 解析 jsonb 中 `edition_files` 的 file_url，按 `fetchImagesInBatches` 模式
- *    并发下载图片 buffer（batch size = 5，与 api/export/pdf.ts:414 对齐）。
- * 3. 重写 edition_files 行：
- *      - 把 `file_url` 替换成 ZIP 内相对路径 `images/{file_id}.{ext}`
- *      - 原 URL 保留到 `_original_url` 字段（Phase 2 导入时可参考，默认重新上传）
- * 4. 用 jszip 组装 ZIP：manifest.json + data.json + images/{file_id}.{ext}
+ * 2. 收集两类图片 URL 一起并发下载（batch size = 5，与 api/export/pdf.ts:414 对齐）：
+ *      - `edition_files.file_url`（仅 file_type='image'，且 file_url 可能是相对路径
+ *        或绝对 URL —— 见下方 "URL 形态" 说明）
+ *      - `artworks.thumbnail_url`（前端列表/详情显示的作品主图，全部用绝对 URL）
+ * 3. 重写两张表的行：
+ *      - edition_files: `file_url` → `images/{file_id}.{ext}`，原 URL 保留到 `_original_url`
+ *      - artworks: `thumbnail_url` → `images/{artwork_id}.{ext}`，原 URL 保留到
+ *        `_original_thumbnail_url`
+ *      ZIP 内文件命名都是 UUID，artwork_id 与 file_id 命名空间天然不冲突，
+ *      平铺到一个 `images/` 子目录。
+ * 4. 用 jszip 组装 ZIP：manifest.json + data.json + images/{id}.{ext}
  * 5. 返回 `{ buffer, manifest }`（jszip nodebuffer 模式，内存全打包）。
+ *
+ * URL 形态：相对路径 vs 绝对 URL
+ * ------------------------------
+ * `edition_files.file_url` 是历史遗留双形态：
+ *   - 老数据：相对路径 `{edition_id}/{uuid}_filename.png`（早期上传流写入）
+ *   - 新数据：绝对 URL `https://{ref}.supabase.co/storage/v1/object/public/thumbnails/...`
+ * `artworks.thumbnail_url` 目前观察都是绝对 URL，但为防御性兼容也走同一 resolver。
+ * `resolveToAbsoluteUrl()` 统一处理：绝对 URL 原样返；相对路径拼上
+ * `${SUPABASE_URL}/storage/v1/object/public/thumbnails/` 前缀。
  *
  * 注意
  * ----
@@ -52,14 +66,51 @@ interface EditionFileRow {
   _original_url?: string;
 }
 
+interface ArtworkRow {
+  id: string;
+  thumbnail_url?: string | null;
+  // 写入 ZIP 时附加：保留原始 thumbnail URL，restore 时若 ZIP 内图片缺失走 fallback
+  _original_thumbnail_url?: string;
+  // 其他字段保持透明，restore 时整行回写
+  [key: string]: unknown;
+}
+
 interface BackupSnapshot {
-  artworks: unknown[];
+  artworks: ArtworkRow[];
   editions: unknown[];
   edition_files: EditionFileRow[];
   edition_history: unknown[];
   locations: unknown[];
   gallery_links: unknown[];
   api_keys: unknown[];
+}
+
+// =====================================================
+// URL 形态归一：相对路径 → 绝对 Storage URL；绝对 URL 原样
+// =====================================================
+
+const THUMBNAILS_BUCKET = 'thumbnails';
+
+function getSupabaseUrl(): string {
+  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+  if (!url) {
+    throw new Error('Missing VITE_SUPABASE_URL / SUPABASE_URL in environment');
+  }
+  return url.replace(/\/+$/, '');
+}
+
+/**
+ * 把可能是相对路径的 file_url / thumbnail_url 归一成绝对 https URL。
+ *   - 已经是 http(s):// 开头：原样返回（已是 Storage public URL 或外链）
+ *   - 否则：当作 `${THUMBNAILS_BUCKET}/${path}` 拼出 public URL
+ *     —— 项目当前唯一的公开图片 bucket 就是 thumbnails，老相对路径都属于这里
+ */
+export function resolveToAbsoluteUrl(raw: string): string {
+  if (!raw) return raw;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  const base = getSupabaseUrl();
+  const cleaned = raw.replace(/^\/+/, '');
+  return `${base}/storage/v1/object/public/${THUMBNAILS_BUCKET}/${cleaned}`;
 }
 
 // =====================================================
@@ -187,20 +238,31 @@ export async function buildBackupZip(
 
   const data = snapshot as BackupSnapshot;
 
-  // 2) 收集所有图片 URL（edition_files 表中的 file_url；含非图片类型，
-  //    但 file_type='image' 才尝试 ZIP 化；其他文件类型保留外链，Phase 2 可重传）
+  // 2) 收集两类图片 URL：
+  //    a) edition_files (file_type='image' 且 file_url 非空)
+  //    b) artworks.thumbnail_url（前端列表/详情主图）
+  //    file_url 可能是相对 Storage 路径，先 resolveToAbsoluteUrl 归一成绝对 URL 再 fetch。
   const fileRows: EditionFileRow[] = Array.isArray(data.edition_files) ? data.edition_files : [];
+  const artworkRows: ArtworkRow[] = Array.isArray(data.artworks) ? data.artworks : [];
 
-  // 仅打包 image 类型的文件 buffer。其他（pdf / video / link / etc）保留 file_url 原样。
-  const imageRows = fileRows.filter(
+  const imageFileRows = fileRows.filter(
     (f) => f.file_type === 'image' && typeof f.file_url === 'string' && f.file_url.length > 0,
   );
+  const thumbArtworkRows = artworkRows.filter(
+    (a) => typeof a.thumbnail_url === 'string' && a.thumbnail_url.length > 0,
+  );
 
-  const uniqueUrls = [...new Set(imageRows.map((f) => f.file_url))];
+  // 收集所有需要下载的绝对 URL（去重）
+  const urlSet = new Set<string>();
+  for (const f of imageFileRows) urlSet.add(resolveToAbsoluteUrl(f.file_url));
+  for (const a of thumbArtworkRows) urlSet.add(resolveToAbsoluteUrl(a.thumbnail_url as string));
+  const uniqueUrls = [...urlSet];
+
   const imageCache = await fetchImagesInBatches(uniqueUrls);
 
-  // 3) 重写 edition_files：成功下载的图片改成相对路径，原 URL 存到 _original_url
-  //    失败的图片保持原 file_url（Phase 2 导入可重新拉取）
+  // 3) 重写两张表的图片字段：
+  //    - 成功下载 → file_url / thumbnail_url 改 `images/{id}.{ext}`，原 URL 存 _original*
+  //    - 失败 → 字段保持原值（restore 时若也找不到 ZIP buffer，落到 fallback 原 URL）
   const zip = new JSZip();
   const imagesFolder = zip.folder('images');
   if (!imagesFolder) {
@@ -208,12 +270,16 @@ export async function buildBackupZip(
   }
 
   let packedImageCount = 0;
+  let packedThumbCount = 0;
+
+  // 3a) edition_files
   const rewrittenFileRows: EditionFileRow[] = fileRows.map((row) => {
     if (row.file_type !== 'image') return row;
-    const img = imageCache.get(row.file_url);
-    if (!img) return row; // 下载失败 → 保留原 URL
+    const absUrl = resolveToAbsoluteUrl(row.file_url);
+    const img = imageCache.get(absUrl);
+    if (!img) return row; // 下载失败 → 保留原 file_url
 
-    const ext = extractExtension(row.file_url, img.contentType);
+    const ext = extractExtension(absUrl, img.contentType);
     const zipPath = `${row.id}.${ext}`;
     imagesFolder.file(zipPath, img.buffer);
     packedImageCount += 1;
@@ -222,6 +288,27 @@ export async function buildBackupZip(
       ...row,
       file_url: `images/${zipPath}`,
       _original_url: row.file_url,
+    };
+  });
+
+  // 3b) artworks.thumbnail_url
+  const rewrittenArtworkRows: ArtworkRow[] = artworkRows.map((row) => {
+    const thumb = row.thumbnail_url;
+    if (typeof thumb !== 'string' || thumb.length === 0) return row;
+    const absUrl = resolveToAbsoluteUrl(thumb);
+    const img = imageCache.get(absUrl);
+    if (!img) return row; // 下载失败 → 保留原 thumbnail_url
+
+    const ext = extractExtension(absUrl, img.contentType);
+    const zipPath = `${row.id}.${ext}`;
+    // artwork_id 与 file_id 都是 UUID，同一 images/ 子目录命名空间不冲突
+    imagesFolder.file(zipPath, img.buffer);
+    packedThumbCount += 1;
+
+    return {
+      ...row,
+      thumbnail_url: `images/${zipPath}`,
+      _original_thumbnail_url: thumb,
     };
   });
 
@@ -237,6 +324,7 @@ export async function buildBackupZip(
   };
 
   // 5) Manifest（total_size_bytes 暂填 0，generateAsync 完成后回填）
+  //    image_count 同时含 edition_files 图片 + artworks thumbnail（两条路径合计）
   const manifest: BackupManifest = {
     backup_format_version: BACKUP_FORMAT_VERSION,
     db_schema_version: DB_SCHEMA_VERSION,
@@ -244,13 +332,14 @@ export async function buildBackupZip(
     user_email: userEmail,
     created_at: new Date().toISOString(),
     stats,
-    image_count: packedImageCount,
+    image_count: packedImageCount + packedThumbCount,
     total_size_bytes: 0,
   };
 
-  // 6) data.json: 完整快照（edition_files 已重写）
+  // 6) data.json: 完整快照（edition_files + artworks 已重写）
   const dataPayload = {
     ...data,
+    artworks: rewrittenArtworkRows,
     edition_files: rewrittenFileRows,
   };
 

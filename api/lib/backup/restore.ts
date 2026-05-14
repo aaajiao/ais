@@ -207,17 +207,44 @@ async function deleteExistingData(
 // =====================================================
 
 /**
+ * 上传单张 ZIP 内图片 → thumbnails bucket → 返回新 public URL。
+ * 失败时返 null，调用方决定 fallback。
+ *
+ * 路径约定：`restored/${id}.${ext}` —— 扁平、唯一、与 `${artworkId}/...` 现有上传流区隔。
+ * id 既可以是 edition_file.id 也可以是 artwork.id（UUID 全局唯一）。
+ */
+async function uploadImageToBucket(
+  supabase: SupabaseClient,
+  id: string,
+  img: { buffer: Buffer; contentType: string },
+): Promise<string | null> {
+  const ext = extFromContentType(img.contentType);
+  const storagePath = `restored/${id}.${ext}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('thumbnails')
+    .upload(storagePath, img.buffer, {
+      contentType: img.contentType,
+      upsert: true,
+    });
+
+  if (uploadError) {
+    return null;
+  }
+
+  const { data: publicUrlData } = supabase.storage.from('thumbnails').getPublicUrl(storagePath);
+  return publicUrlData.publicUrl;
+}
+
+/**
  * 遍历 edition_files 行：
  *   - file_type === 'image' 且 file_url 以 `images/` 开头 → 从 ZIP 取 buffer → 上传 thumbnails
  *   - 上传成功 → row.file_url = 新 public URL，删 _original_url
  *   - 上传失败 → row.file_url fallback 到 _original_url（如果存在），warn
  *
- * 路径约定：`restored/${edition_file.id}.${ext}` —— 扁平、唯一、与 `${artworkId}/...`
- * 模式区隔（后者属于现有上传流）。
- *
  * 返回新的 rows 数组（不变更入参），以及成功/失败计数。
  */
-async function restoreImagesToStorage(
+async function restoreEditionFileImages(
   supabase: SupabaseClient,
   parsed: ParsedBackup,
   warnings: string[],
@@ -245,7 +272,6 @@ async function restoreImagesToStorage(
     }
 
     if (!fileId) {
-      // 无 id 无法定位 ZIP 内图片，跳过重传 —— 但 row 仍要 INSERT，给个降级 URL
       const originalUrl = typeof r._original_url === 'string' ? r._original_url : '';
       r.file_url = originalUrl || fileUrl;
       delete r._original_url;
@@ -257,7 +283,6 @@ async function restoreImagesToStorage(
 
     const img = await parsed.getImage(fileId);
     if (!img) {
-      // ZIP 内找不到对应图片（备份时下载失败 / 文件被裁剪）
       const originalUrl = typeof r._original_url === 'string' ? r._original_url : '';
       r.file_url = originalUrl || fileUrl;
       delete r._original_url;
@@ -267,36 +292,103 @@ async function restoreImagesToStorage(
       continue;
     }
 
-    const ext = extFromContentType(img.contentType);
-    const storagePath = `restored/${fileId}.${ext}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('thumbnails')
-      .upload(storagePath, img.buffer, {
-        contentType: img.contentType,
-        upsert: true,
-      });
-
-    if (uploadError) {
+    const newUrl = await uploadImageToBucket(supabase, fileId, img);
+    if (!newUrl) {
       const originalUrl = typeof r._original_url === 'string' ? r._original_url : '';
       r.file_url = originalUrl || fileUrl;
       delete r._original_url;
       imagesFailed += 1;
-      warnings.push(
-        `Upload failed for edition_file ${fileId}: ${uploadError.message}; fallback to ${r.file_url}`,
-      );
+      warnings.push(`Upload failed for edition_file ${fileId}; fallback to ${r.file_url}`);
       out.push(r);
       continue;
     }
 
-    const { data: publicUrlData } = supabase.storage.from('thumbnails').getPublicUrl(storagePath);
-    r.file_url = publicUrlData.publicUrl;
+    r.file_url = newUrl;
     delete r._original_url;
     imagesRestored += 1;
     out.push(r);
   }
 
   return { rewrittenFileRows: out, imagesRestored, imagesFailed };
+}
+
+/**
+ * 遍历 artworks 行 thumbnail_url：
+ *   - thumbnail_url 以 `images/` 开头 → 从 ZIP 取 buffer → 上传 thumbnails → 改写为绝对 URL
+ *   - 失败 → fallback 到 _original_thumbnail_url（如有），warn
+ *
+ * 与 edition_files 走同一个 ZIP 子目录 `images/`，按 row.id 查（artwork_id 也是 UUID）。
+ */
+async function restoreArtworkThumbnails(
+  supabase: SupabaseClient,
+  parsed: ParsedBackup,
+  warnings: string[],
+): Promise<{
+  rewrittenArtworkRows: Record<string, unknown>[];
+  thumbnailsRestored: number;
+  thumbnailsFailed: number;
+}> {
+  const rows = parsed.data.artworks;
+  let thumbnailsRestored = 0;
+  let thumbnailsFailed = 0;
+
+  const out: Record<string, unknown>[] = [];
+  for (const row of rows) {
+    const r = { ...row };
+    const thumb = typeof r.thumbnail_url === 'string' ? r.thumbnail_url : '';
+    const artworkId = typeof r.id === 'string' ? r.id : '';
+
+    // 无 thumbnail_url 或不是 ZIP 内相对路径 → 原样保留
+    if (!thumb || !thumb.startsWith('images/')) {
+      delete r._original_thumbnail_url; // 防止 DB 里残留 _original_thumbnail_url 字段
+      out.push(r);
+      continue;
+    }
+
+    if (!artworkId) {
+      const originalUrl =
+        typeof r._original_thumbnail_url === 'string' ? r._original_thumbnail_url : '';
+      r.thumbnail_url = originalUrl || thumb;
+      delete r._original_thumbnail_url;
+      thumbnailsFailed += 1;
+      warnings.push(`artwork row without id; cannot restore thumbnail (thumbnail_url=${thumb})`);
+      out.push(r);
+      continue;
+    }
+
+    const img = await parsed.getImage(artworkId);
+    if (!img) {
+      const originalUrl =
+        typeof r._original_thumbnail_url === 'string' ? r._original_thumbnail_url : '';
+      r.thumbnail_url = originalUrl || thumb;
+      delete r._original_thumbnail_url;
+      thumbnailsFailed += 1;
+      warnings.push(
+        `Thumbnail not found in ZIP for artwork ${artworkId}; fallback to ${r.thumbnail_url}`,
+      );
+      out.push(r);
+      continue;
+    }
+
+    const newUrl = await uploadImageToBucket(supabase, artworkId, img);
+    if (!newUrl) {
+      const originalUrl =
+        typeof r._original_thumbnail_url === 'string' ? r._original_thumbnail_url : '';
+      r.thumbnail_url = originalUrl || thumb;
+      delete r._original_thumbnail_url;
+      thumbnailsFailed += 1;
+      warnings.push(`Upload failed for artwork ${artworkId}; fallback to ${r.thumbnail_url}`);
+      out.push(r);
+      continue;
+    }
+
+    r.thumbnail_url = newUrl;
+    delete r._original_thumbnail_url;
+    thumbnailsRestored += 1;
+    out.push(r);
+  }
+
+  return { rewrittenArtworkRows: out, thumbnailsRestored, thumbnailsFailed };
 }
 
 // =====================================================
@@ -312,24 +404,34 @@ export async function restoreBackup(params: RestoreParams): Promise<RestoreResul
   const deletedRowCounts = await deleteExistingData(supabase, userId);
   onProgress?.('delete:done', deletedRowCounts);
 
-  // b) 上传图片到 thumbnails bucket + 改写 edition_files.file_url
+  // b) 上传两类图片到 thumbnails bucket + 改写对应字段
+  //    b1) edition_files.file_url
+  //    b2) artworks.thumbnail_url
+  //    两类合并到 imagesRestored / imagesFailed 总计（manifest.image_count 是统一口径）
   onProgress?.('images:start');
-  const { rewrittenFileRows, imagesRestored, imagesFailed } = await restoreImagesToStorage(
-    supabase,
-    parsed,
-    warnings,
-  );
+  const {
+    rewrittenFileRows,
+    imagesRestored: fileImagesRestored,
+    imagesFailed: fileImagesFailed,
+  } = await restoreEditionFileImages(supabase, parsed, warnings);
+  const {
+    rewrittenArtworkRows,
+    thumbnailsRestored,
+    thumbnailsFailed,
+  } = await restoreArtworkThumbnails(supabase, parsed, warnings);
+  const imagesRestored = fileImagesRestored + thumbnailsRestored;
+  const imagesFailed = fileImagesFailed + thumbnailsFailed;
   onProgress?.('images:done', { imagesRestored, imagesFailed });
 
   // c) INSERT 备份数据（正 FK 顺序）
-  //    edition_files 用 b 步骤改写后的 rows；其他表用 parsed.data 原始 rows
+  //    edition_files / artworks 用 b 步骤改写后的 rows；其他表用 parsed.data 原始 rows
   const data: BackupData = parsed.data;
   const insertedRowCounts: Record<string, number> = {};
 
-  // 1) artworks (root)
+  // 1) artworks (root, 用改写后的 rows)
   onProgress?.('insert:artworks');
-  await insertInBatches(supabase, 'artworks', data.artworks);
-  insertedRowCounts.artworks = data.artworks.length;
+  await insertInBatches(supabase, 'artworks', rewrittenArtworkRows);
+  insertedRowCounts.artworks = rewrittenArtworkRows.length;
 
   // 2) locations
   onProgress?.('insert:locations');

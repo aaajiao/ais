@@ -326,6 +326,80 @@ describe('restoreBackup — 图片重传到 thumbnails', () => {
     expect(inserted._original_url).toBeUndefined();
   });
 
+  it('artwork.thumbnail_url + images/ 前缀 → upload + 改写为 public URL + 删 _original_thumbnail_url', async () => {
+    const { client, rec } = makeFakeSupabase({});
+    const parsed = makeParsed(
+      {
+        artworks: [
+          {
+            id: 'aw-1',
+            thumbnail_url: 'images/aw-1.jpg',
+            _original_thumbnail_url: 'https://old.example/aw-1.jpg',
+          },
+        ],
+      },
+      { 'aw-1': { buffer: Buffer.from([0xff]), contentType: 'image/jpeg' } },
+    );
+    const result = await restoreBackup({ userId: 'user-1', supabase: client, parsed });
+
+    expect(result.imagesRestored).toBe(1);
+    expect(result.imagesFailed).toBe(0);
+    // 走的还是 thumbnails bucket + restored/{id}.{ext} 路径约定
+    expect(rec.capturedUploads).toContainEqual({
+      bucket: 'thumbnails',
+      path: 'restored/aw-1.jpg',
+      contentType: 'image/jpeg',
+    });
+
+    const insertedArt = rec.capturedInserts.artworks[0];
+    expect(insertedArt.thumbnail_url).toBe('https://fake.example/thumbnails/restored/aw-1.jpg');
+    expect(insertedArt._original_thumbnail_url).toBeUndefined();
+  });
+
+  it('artwork.thumbnail_url getImage 返回 null → fallback 到 _original_thumbnail_url + warning', async () => {
+    const { client, rec } = makeFakeSupabase({});
+    const parsed = makeParsed({
+      artworks: [
+        {
+          id: 'aw-missing',
+          thumbnail_url: 'images/aw-missing.jpg',
+          _original_thumbnail_url: 'https://original.example/aw.jpg',
+        },
+      ],
+    });
+    const result = await restoreBackup({ userId: 'user-1', supabase: client, parsed });
+
+    expect(result.imagesFailed).toBe(1);
+    expect(result.warnings[0]).toMatch(/Thumbnail not found in ZIP for artwork aw-missing/);
+
+    const insertedArt = rec.capturedInserts.artworks[0];
+    expect(insertedArt.thumbnail_url).toBe('https://original.example/aw.jpg');
+    expect(insertedArt._original_thumbnail_url).toBeUndefined();
+  });
+
+  it('artwork 无 thumbnail_url 或绝对 URL：不 upload，_original_thumbnail_url 仍剥离', async () => {
+    const { client, rec } = makeFakeSupabase({});
+    const parsed = makeParsed({
+      artworks: [
+        { id: 'aw-no-thumb' }, // 没 thumbnail_url
+        {
+          id: 'aw-abs',
+          thumbnail_url: 'https://existing.example/x.jpg', // 已经是绝对 URL，不走 ZIP
+          _original_thumbnail_url: 'should-be-stripped',
+        },
+      ],
+    });
+    await restoreBackup({ userId: 'user-1', supabase: client, parsed });
+
+    // 没有任何 upload 调用（fake supabase rec.capturedUploads 为空）
+    expect(rec.capturedUploads).toEqual([]);
+    const arts = rec.capturedInserts.artworks;
+    expect(arts[0].thumbnail_url).toBeUndefined();
+    expect(arts[1].thumbnail_url).toBe('https://existing.example/x.jpg');
+    expect(arts[0]._original_thumbnail_url).toBeUndefined();
+    expect(arts[1]._original_thumbnail_url).toBeUndefined();
+  });
+
   it('非 image 类型 → 不动 file_url，不 upload，_original_url 仍剥离', async () => {
     const { client, rec } = makeFakeSupabase({});
     const parsed = makeParsed({
