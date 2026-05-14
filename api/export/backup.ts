@@ -92,13 +92,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { buffer, manifest } = await buildBackupZip(userId, userEmail, supabase);
 
     // 2) 上传到 Vercel Blob，每用户单 slot
+    //    私有 store 必须传 access: 'private'，否则服务端返
+    //    "Cannot use public access on a private store"。
     const blobPath = getBackupBlobPath(userId);
-    // @vercel/blob v2.3.3 的 TS 类型定义只声明 access: 'public'（types 滞后于 runtime），
-    // 但 Vercel Blob 实际 runtime + API 支持 'private' 并且**对私有 store 必须传 'private'**，
-    // 否则服务端返 "Cannot use public access on a private store"。docs / context7 写的是
-    // 完整的 'public' | 'private'。等 SDK 类型修正后可去掉 ts-expect-error。
     await put(blobPath, buffer, {
-      // @ts-expect-error v2.3.3 types lag runtime; private store requires access: 'private'
       access: 'private',
       allowOverwrite: true,
       addRandomSuffix: false,
