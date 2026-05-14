@@ -109,15 +109,6 @@ export default function BackupSettings() {
     }
   };
 
-  const isDesktopOnly = (
-    <div className="lg:hidden mb-3 p-3 bg-muted/40 border border-border rounded-lg text-sm text-muted-foreground flex items-start gap-2">
-      <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-      <span>{t('settings.mobileNotice')}</span>
-    </div>
-  );
-
-  // Mobile：所有 action 一律 disable
-  const desktopDisabledOnMobile = 'max-lg:opacity-50 max-lg:pointer-events-none';
 
   return (
     <div className="bg-card border border-border rounded-xl p-6 mb-6">
@@ -128,8 +119,6 @@ export default function BackupSettings() {
       <p className="text-sm text-muted-foreground mb-4">
         {t('settings.description')}
       </p>
-
-      {isDesktopOnly}
 
       {/* 14 天提醒 banner */}
       {reminder && (
@@ -171,7 +160,7 @@ export default function BackupSettings() {
       </div>
 
       {/* Block B — Actions */}
-      <div className={`flex flex-wrap gap-2 mb-6 ${desktopDisabledOnMobile}`}>
+      <div className="flex flex-wrap gap-2 mb-6">
         {hasBackup ? (
           <>
             <Button
@@ -214,7 +203,7 @@ export default function BackupSettings() {
       </div>
 
       {/* Block C — 频率配置 */}
-      <div className={desktopDisabledOnMobile}>
+      <div>
         <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
           <label className="text-sm font-medium">
             {t('settings.frequency.label')}

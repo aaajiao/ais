@@ -1,6 +1,5 @@
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle } from 'lucide-react';
 import { useAuthContext } from '@/contexts/useAuthContext';
 import { useRestoreBackup } from '@/hooks/useBackup';
 import BackupUploadStep from './BackupUploadStep';
@@ -21,10 +20,9 @@ import type {
  * 2. Preview：展示 manifest + diff + 强制下载 rollback + CONFIRM 输入 → 调 restore
  * 3. Result：success / failure
  *
- * Mobile：整个组件包一层 mobile notice + disable（容器外 Import.tsx 已经判断 tab disable）。
+ * 注：v1.8.3 起手机端也允许走完整流程（备份操作不再限定 desktop only）。
  */
 export default function BackupImport() {
-  const { t } = useTranslation('backup');
   const { user } = useAuthContext();
   const restoreMutation = useRestoreBackup();
 
@@ -73,41 +71,31 @@ export default function BackupImport() {
 
   return (
     <div className="space-y-6">
-      {/* Mobile notice */}
-      <div className="lg:hidden p-4 border border-orange-500/40 bg-orange-500/10 rounded-xl flex items-start gap-2 text-sm">
-        <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-orange-600" />
-        <span className="text-orange-700 dark:text-orange-400">
-          {t('import.mobileNotice')}
-        </span>
-      </div>
-
       {/* Step indicator */}
       <BackupStepIndicator currentStep={step} />
 
-      <div className="max-lg:pointer-events-none max-lg:opacity-60">
-        {step === 'upload' && (
-          <BackupUploadStep
-            currentUserId={user?.id ?? null}
-            onParsed={handleParsed}
-          />
-        )}
+      {step === 'upload' && (
+        <BackupUploadStep
+          currentUserId={user?.id ?? null}
+          onParsed={handleParsed}
+        />
+      )}
 
-        {step === 'preview' && parsed && (
-          <BackupPreviewStep
-            parsed={parsed}
-            onRestore={handleRestore}
-            onBack={handleBackToUpload}
-            restoring={restoreMutation.isPending}
-          />
-        )}
+      {step === 'preview' && parsed && (
+        <BackupPreviewStep
+          parsed={parsed}
+          onRestore={handleRestore}
+          onBack={handleBackToUpload}
+          restoring={restoreMutation.isPending}
+        />
+      )}
 
-        {step === 'result' && outcome && (
-          <BackupResultStep
-            outcome={outcome}
-            onReset={handleReset}
-          />
-        )}
-      </div>
+      {step === 'result' && outcome && (
+        <BackupResultStep
+          outcome={outcome}
+          onReset={handleReset}
+        />
+      )}
     </div>
   );
 }

@@ -25,8 +25,7 @@
     "reminder": {
       "never": "提示：还没把任何备份拉到本地，立即下载一份留底。",
       "overdue": "提示：你已 {{days}} 天没把备份拉到本地了。立即下载一份留底。"
-    },
-    "mobileNotice": "请在桌面端管理备份。"
+    }
   },
   "import": {
     "tab": {
@@ -102,7 +101,6 @@
       "no_manifest": "ZIP 中找不到 manifest.json。",
       "manifest_parse_failed": "解析 manifest.json 失败。",
       "generic": "恢复过程出错：{{message}}"
-    },
-    "mobileNotice": "请在桌面端进行备份恢复。"
+    }
   }
 }

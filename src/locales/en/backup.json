@@ -25,8 +25,7 @@
     "reminder": {
       "never": "Heads up: you have never downloaded a backup to your machine. Pull one now.",
       "overdue": "Heads up: it has been {{days}} days since you last downloaded a backup. Pull one now."
-    },
-    "mobileNotice": "Please manage backups on desktop."
+    }
   },
   "import": {
     "tab": {
@@ -102,7 +101,6 @@
       "no_manifest": "manifest.json missing from the ZIP.",
       "manifest_parse_failed": "Failed to parse manifest.json.",
       "generic": "Restore error: {{message}}"
-    },
-    "mobileNotice": "Please run restore on desktop."
+    }
   }
 }
