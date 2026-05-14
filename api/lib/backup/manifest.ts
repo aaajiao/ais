@@ -54,3 +54,24 @@ export interface BackupManifest {
 
 /** 表名联合，用于在快照解析时给 jsonb 字段加类型。 */
 export type BackupTableName = keyof BackupStats;
+
+/**
+ * 备份 ZIP 中 `data.json` 顶层结构。
+ *
+ * 为何用 `Record<string, unknown>[]` 而非详细 Row 类型
+ * --------------------------------------------------
+ * Phase 2 导入端的 restore 路径按位置往 supabase 写入，schema 校验靠 DB
+ * （列定义 + CHECK + FK + NOT NULL）兜底；这里只关心 ZIP ↔ 数据形状的关系。
+ * 重新声明每张表的 Row 类型会拖一份与 `database.types.ts` 重复的维护负担，
+ * 而备份的字段集合（带不带 `_original_url` / 是否含软删行）跟 DB 类型不一致 ——
+ * 用宽松类型让 zip-builder / zip-parser / restore 都能自然引用。
+ */
+export interface BackupData {
+  artworks: Record<string, unknown>[];
+  editions: Record<string, unknown>[];
+  edition_files: Record<string, unknown>[];
+  edition_history: Record<string, unknown>[];
+  locations: Record<string, unknown>[];
+  gallery_links: Record<string, unknown>[];
+  api_keys: Record<string, unknown>[];
+}
