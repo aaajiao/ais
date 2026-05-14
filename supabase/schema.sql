@@ -42,6 +42,8 @@ CREATE TYPE history_action AS ENUM (
   'number_assigned'
 );
 CREATE TYPE gallery_link_status AS ENUM ('active', 'disabled');
+-- NOTE: backup_frequency 用 TEXT + CHECK 约束（见 users 表），不建 enum；
+-- 三态枚举不值得引入新类型，且未来扩展（daily / quarterly）改 CHECK 更轻。
 
 -- =====================================================
 -- TABLES
@@ -55,6 +57,15 @@ CREATE TABLE users (
   role user_role DEFAULT 'editor',
   status user_status DEFAULT 'active',
   last_login TIMESTAMPTZ,
+  -- Backup metadata (migration 009)
+  -- 写入路径：cron handler / 手动 /api/export/backup 端点 / /api/export/backup/download
+  -- 读取路径：前端 settings 页（频率开关 + 状态展示）
+  -- ZIP 文件本体存 Vercel Blob private store（不在 Supabase Storage），见 api/lib/backup/storage.ts
+  backup_frequency TEXT CHECK (backup_frequency IN ('weekly', 'monthly', 'off')) DEFAULT 'weekly',
+  last_backup_at TIMESTAMPTZ,
+  last_backup_downloaded_at TIMESTAMPTZ,
+  last_backup_size_bytes BIGINT,
+  last_backup_stats JSONB,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -291,6 +302,103 @@ CREATE TRIGGER editions_status_change
   EXECUTE FUNCTION record_edition_status_change();
 
 -- =====================================================
+-- BACKUP SNAPSHOT RPC (migration 009)
+-- =====================================================
+-- 跨表一致性快照：在单个 PG 事务内 SELECT 所有用户域表，返回 jsonb。
+-- supabase-js 不直接支持 BEGIN/COMMIT，SECURITY DEFINER 函数是正路。
+-- 包含：artworks（含 deleted_at IS NOT NULL）/ editions / edition_files /
+--      edition_history / locations / gallery_links / api_keys
+-- 不包含：users 表自身（账号身份保护 —— 备份只是工作室数据，不是账号）
+--
+-- 调用方：service_role（后端 cron / /api/export/backup 端点）
+-- 安全：SECURITY DEFINER + 函数内显式 auth.uid() / service_role 二选一校验
+--
+-- ZIP 文件本体存 Vercel Blob private store（不在 Supabase Storage —— 用户 Supabase Free 计划
+-- 50MB 上限装不下 ~340MB 完整快照；Vercel Pro Blob 5TB 单文件上限）
+
+CREATE OR REPLACE FUNCTION public.backup_snapshot(p_user_id UUID)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_caller UUID := auth.uid();
+  v_role TEXT := COALESCE(auth.role(), current_user);
+  v_result JSONB;
+BEGIN
+  IF v_role <> 'service_role' AND (v_caller IS NULL OR v_caller <> p_user_id) THEN
+    RAISE EXCEPTION 'backup_snapshot: not authorized for user %', p_user_id
+      USING ERRCODE = '42501';
+  END IF;
+
+  SELECT jsonb_build_object(
+    'artworks',
+      COALESCE((
+        SELECT jsonb_agg(to_jsonb(a) ORDER BY a.created_at)
+        FROM artworks a
+        WHERE a.user_id = p_user_id
+      ), '[]'::jsonb),
+
+    'editions',
+      COALESCE((
+        SELECT jsonb_agg(to_jsonb(e) ORDER BY e.created_at)
+        FROM editions e
+        JOIN artworks a ON a.id = e.artwork_id
+        WHERE a.user_id = p_user_id
+      ), '[]'::jsonb),
+
+    'edition_files',
+      COALESCE((
+        SELECT jsonb_agg(to_jsonb(f) ORDER BY f.created_at)
+        FROM edition_files f
+        JOIN editions e ON e.id = f.edition_id
+        JOIN artworks a ON a.id = e.artwork_id
+        WHERE a.user_id = p_user_id
+      ), '[]'::jsonb),
+
+    'edition_history',
+      COALESCE((
+        SELECT jsonb_agg(to_jsonb(h) ORDER BY h.created_at)
+        FROM edition_history h
+        JOIN editions e ON e.id = h.edition_id
+        JOIN artworks a ON a.id = e.artwork_id
+        WHERE a.user_id = p_user_id
+      ), '[]'::jsonb),
+
+    'locations',
+      COALESCE((
+        SELECT jsonb_agg(to_jsonb(l) ORDER BY l.created_at)
+        FROM locations l
+        WHERE l.user_id = p_user_id
+      ), '[]'::jsonb),
+
+    'gallery_links',
+      COALESCE((
+        SELECT jsonb_agg(to_jsonb(g) ORDER BY g.created_at)
+        FROM gallery_links g
+        WHERE g.created_by = p_user_id
+      ), '[]'::jsonb),
+
+    'api_keys',
+      COALESCE((
+        SELECT jsonb_agg(to_jsonb(k) ORDER BY k.created_at)
+        FROM api_keys k
+        WHERE k.user_id = p_user_id
+      ), '[]'::jsonb)
+  )
+  INTO v_result;
+
+  RETURN v_result;
+END;
+$$;
+
+-- service_role 调用（cron / 后端端点）；authenticated 不直接调，防止前端绕路
+REVOKE EXECUTE ON FUNCTION public.backup_snapshot(UUID) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.backup_snapshot(UUID) FROM anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.backup_snapshot(UUID) TO service_role;
+
+-- =====================================================
 -- DATA API EXPOSURE (PostgREST / GraphQL grants)
 -- =====================================================
 -- 自 2026-05-30 起，新建 Supabase 项目 public schema 默认不再自动暴露到 Data API；
@@ -429,6 +537,9 @@ CREATE POLICY "Anon can read active gallery_links" ON gallery_links
 -- =====================================================
 -- STORAGE BUCKETS
 -- =====================================================
+-- NOTE: 工作室备份 ZIP 不在 Supabase Storage —— 走 Vercel Blob private store。
+-- 详见 api/lib/backup/storage.ts + api/export/backup.ts。Supabase Free 计划单文件
+-- 50MB 上限装不下完整快照（~340MB），Vercel Pro Blob 5TB 单文件上限完全够。
 
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
@@ -518,3 +629,9 @@ COMMENT ON TABLE editions IS 'Individual edition instances';
 COMMENT ON TABLE edition_files IS 'File attachments';
 COMMENT ON TABLE edition_history IS 'Audit trail';
 COMMENT ON COLUMN artworks.deleted_at IS 'Soft delete timestamp, NULL = active';
+COMMENT ON COLUMN users.backup_frequency IS 'Backup cadence: weekly | monthly | off (migration 009)';
+COMMENT ON COLUMN users.last_backup_at IS 'Last successful backup timestamp (cron / manual export endpoint writes)';
+COMMENT ON COLUMN users.last_backup_downloaded_at IS 'Timestamp the user actually downloaded a backup (only /api/export/backup/download writes)';
+COMMENT ON COLUMN users.last_backup_size_bytes IS 'Last backup ZIP size in bytes';
+COMMENT ON COLUMN users.last_backup_stats IS 'Per-table row counts JSON {artworks, editions, edition_files, edition_history, locations, gallery_links, api_keys}';
+COMMENT ON FUNCTION public.backup_snapshot(UUID) IS 'Returns consistent jsonb snapshot of all user-owned tables in a single PG transaction (migration 009)';

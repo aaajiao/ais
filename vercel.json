@@ -5,6 +5,12 @@
       "includeFiles": "api/export/fonts/**"
     }
   },
+  "crons": [
+    {
+      "path": "/api/cron/backup",
+      "schedule": "0 3 * * *"
+    }
+  ],
   "rewrites": [
     { "source": "/api/view/:token", "destination": "/api/view/[token]" },
     { "source": "/api/(.*)", "destination": "/api/$1" },

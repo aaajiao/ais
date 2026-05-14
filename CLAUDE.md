@@ -17,7 +17,7 @@ bun run test:run      # 运行测试（使用 vitest）
 - **Frontend**: React 19 + TypeScript 5.9 + Vite 7 + TailwindCSS 4
 - **UI**: shadcn/ui + Lucide icons + react-i18next
 - **Data**: TanStack React Query + Virtual + IndexedDB 离线缓存
-- **Backend**: Vercel Functions + Supabase (PostgreSQL)
+- **Backend**: Vercel Functions + Supabase (PostgreSQL) + Vercel Blob（工作室备份 ZIP 存储）
 - **AI**: Vercel AI SDK + Claude/GPT + streamdown（流式 Markdown 渲染）
 - **PDF**: Puppeteer + @sparticuz/chromium-min
 
@@ -29,12 +29,13 @@ api/                    # Serverless API
 ├── models.ts          # 可用模型列表
 ├── fetch-title.ts     # URL 标题抓取（OG metadata）
 ├── profile.ts         # 用户资料 API
-├── lib/               # 工具函数（auth, api-key-auth, search-utils, artwork-extractor, image-downloader, model-provider, system-prompt, i18n, message-utils）
+├── lib/               # 工具函数（auth, api-key-auth, search-utils, artwork-extractor, image-downloader, model-provider, system-prompt, i18n, message-utils, backup/）
 ├── tools/             # AI 工具（10 个工具 + types + index + createReadOnlyTools）
 ├── keys/              # API Key 管理 API（CRUD）
 ├── external/          # 外部查询 API（v1/query, v1/schema）
 ├── import/            # 导入 API（md, migrate-thumbnails, process-image）
-├── export/            # 导出 API（pdf, pdf-helpers, catalog-template, font-loader, md, shared, fonts/）
+├── export/            # 导出 API（pdf, pdf-helpers, catalog-template, font-loader, md, shared, fonts/, backup, backup/download）
+├── cron/              # Vercel Cron handlers（backup）
 ├── links/             # 公开链接 API
 ├── profile/           # 公开资料 API（public）
 └── view/              # 公开查看 API
@@ -79,6 +80,8 @@ docs/                   # 详细文档
 | `api/tools/index.ts` | AI 工具注册 + createReadOnlyTools 导出 |
 | `api/lib/api-key-auth.ts` | 外部 API Key 生成、哈希、验证 |
 | `api/lib/system-prompt.ts` | AI 系统提示词（中文） |
+| `api/lib/backup/zip-builder.ts` | 工作室数据备份 ZIP 构建器（migration 009） |
+| `api/lib/backup/storage.ts` | 备份 Blob 路径 + 下载文件名约定（单一来源） |
 | `src/lib/inventoryNumber.ts` | 库存编号智能补全逻辑 |
 | `src/components/chat/MemoizedMarkdown.tsx` | Streamdown Markdown 渲染 |
 
@@ -93,9 +96,15 @@ OPENAI_API_KEY=sk-xxx                             # Sensitive
 ALLOWED_EMAILS=email1@example.com,email2@example.com       # 服务端白名单（实际安全边界）
 VITE_ALLOWED_EMAILS=email1@example.com,email2@example.com  # 客户端 UX，必须与 ALLOWED_EMAILS 同值
 CONTEXT7_API_KEY=xxx                              # Context7 API（获取最新库文档）
+CRON_SECRET=xxx                                   # Sensitive，Vercel Cron 调用 /api/cron/* 时通过 Authorization: Bearer 校验（备份系统使用）
+BLOB_READ_WRITE_TOKEN=vercel_blob_rw_...          # Sensitive，Vercel 自动注入（连接 Blob Store 后），@vercel/blob SDK 自动读取
 ```
 
 > **必须同时配 `ALLOWED_EMAILS` 与 `VITE_ALLOWED_EMAILS`，值一致**。前者是服务端检查（实际拦截 API 调用），后者只控登录页 UX（VITE\_ 前缀打包进 client bundle）。v1.3.5 起 production 缺 `ALLOWED_EMAILS` 会 fail-closed（API 全拒绝 + CRITICAL log），守护测试 `api/__tests__/auth.test.ts`。
+
+> **`CRON_SECRET`** 由 Vercel Cron 自动注入到 `Authorization: Bearer <secret>` 请求头；`api/cron/backup.ts` 校验该 header，不匹配 → 401。本地开发不需要 cron。
+
+> **`BLOB_READ_WRITE_TOKEN`** 在 Vercel Dashboard → Storage → 创建 Blob Store 并连到当前项目后**自动注入**所有运行时（dev / preview / production），代码里不要手动 export 或硬编码。Blob Store 必须配 **Private access mode**（不是 Public）—— public URL "不可猜但永久泄漏" 是 security-by-obscurity 反模式；备份 ZIP 走 `/api/export/backup/download` Function 中转，每次访问过 verifyAuth。
 
 ## Database
 
@@ -145,6 +154,7 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 - **Markets 列数据驱动而非 schema 驱动 —— 不要硬编码货币列表**: `CurrencyType` schema 列了 7 种（USD/EUR/CNY/GBP/CHF/HKD/JPY），但 MarketsView 只渲染**数据里实际出现的**货币，按交易数降序。新增货币到 enum 不需要改 Markets。**关键设计：每列独立 price scale，不是全局统一** —— 否则 CNY ¥50K 折算汇率显示比 USD $7K 圆大一倍，造成"中国市场贵"的视觉误导。重构时不要"统一为全局 scale"，那是错的。详见 [docs/visualize.md `Markets`](docs/visualize.md#markets)。
 - **vi.mock 不要 `importActual` env-dependent 模块（v1.5 教训）**: vitest 的 `vi.importActual` 会强制加载真模块。如果模块顶部有 side-effect init（e.g. `supabase.ts` 调 `createClient(VITE_SUPABASE_URL)` / dotenv / 任何 env-dependent 初始化），CI 缺环境变量就会抛错。**类型导入用 `import type` 编译期擦除，根本不需要 importActual 兜底**——mock 只 export 测试运行时用到的值即可。本地 `.env.local` 有变量会掩盖这个 bug，CI 才暴露。守护测试 `src/pages/__tests__/Visualize.test.tsx`（commit a390b55 复现）。
 - **i18n key 跨 view 借用是 ticking bomb**: visualize 的 4 个 view 共享 `visualize.json`，每个 view 只能用自己段下的 key（`strata.*` / `markets.*` / `terminal.*` / `diaspora.*`）。**跨段借用**（比如 `DiasporaView` 用 `t('strata.tooltip.click')`）会让某个 view 的文案改动静默破坏另一个 view 的渲染——v1.5 实证：Strata redesign 改了 `strata.tooltip.click` 值，Diaspora 的默认提示信息瞬间变错，组件测试也跟着断。**规则**：每个 view 缺 key 就在自己段下加，不偷别人的；zh / en 同步（`visualize-parity.test.ts` 守护）。这条原则也适用于未来其他多 view 共享一个 i18n 命名空间的场景。
+- **备份 ZIP 走 Vercel Blob private + Function 中转，禁止 public 模式**: 工作室数据备份系统（migration 009）的存储后端是 Vercel Blob 不是 Supabase Storage —— Supabase Free 单文件 50MB 装不下 ~340MB 完整快照；Vercel Pro Blob 单文件 5TB 完全够。**关键约束**：上传必须 `access: 'private'`、`allowOverwrite: true`、`addRandomSuffix: false`；下载必须走 `/api/export/backup/download` 经 `verifyAuth` + stream 中转，**绝不**给前端返回 Blob URL。`access: 'public'` 给的 URL "不可猜但永久泄漏"（一旦在 Slack/截图/日志泄漏永久可下），是 security-by-obscurity 反模式。`BLOB_READ_WRITE_TOKEN` 由 Vercel 自动从连接的 Blob Store 注入；@vercel/blob SDK 自动读取，不要手动 export 或硬编码 token。所有路径 / 文件名约定集中在 `api/lib/backup/storage.ts` 单一来源。
 
 ## Verification
 

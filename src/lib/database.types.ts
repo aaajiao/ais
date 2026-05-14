@@ -39,6 +39,8 @@ export type HistoryAction =
   | 'file_deleted'
   | 'number_assigned';
 export type GalleryLinkStatus = 'active' | 'disabled';
+// Backup frequency (migration 009)
+export type BackupFrequency = 'weekly' | 'monthly' | 'off';
 
 export interface Database {
   public: {
@@ -89,6 +91,12 @@ export interface Database {
           role: UserRole;
           status: UserStatus;
           last_login: string | null;
+          // Backup metadata (migration 009)
+          backup_frequency: BackupFrequency;
+          last_backup_at: string | null;
+          last_backup_downloaded_at: string | null;
+          last_backup_size_bytes: number | null;
+          last_backup_stats: Json | null;
           created_at: string;
         };
         Insert: {
@@ -98,6 +106,11 @@ export interface Database {
           role?: UserRole;
           status?: UserStatus;
           last_login?: string | null;
+          backup_frequency?: BackupFrequency;
+          last_backup_at?: string | null;
+          last_backup_downloaded_at?: string | null;
+          last_backup_size_bytes?: number | null;
+          last_backup_stats?: Json | null;
           created_at?: string;
         };
         Update: {
@@ -107,6 +120,11 @@ export interface Database {
           role?: UserRole;
           status?: UserStatus;
           last_login?: string | null;
+          backup_frequency?: BackupFrequency;
+          last_backup_at?: string | null;
+          last_backup_downloaded_at?: string | null;
+          last_backup_size_bytes?: number | null;
+          last_backup_stats?: Json | null;
           created_at?: string;
         };
       };
@@ -420,7 +438,14 @@ export interface Database {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      // RPC: 工作室数据备份快照（migration 009）
+      // 在单个 PG 事务内 SELECT 所有用户域表（artworks / editions / edition_files /
+      // edition_history / locations / gallery_links / api_keys），返回 jsonb。
+      // service_role 调用（前端 / authenticated 已 REVOKE）；SECURITY DEFINER + auth.uid 校验。
+      backup_snapshot: {
+        Args: { p_user_id: string };
+        Returns: Json;
+      };
     };
     Enums: {
       user_role: UserRole;
@@ -434,6 +459,7 @@ export interface Database {
       file_source_type: FileSourceType;
       history_action: HistoryAction;
       gallery_link_status: GalleryLinkStatus;
+      backup_frequency: BackupFrequency;
     };
   };
 }
