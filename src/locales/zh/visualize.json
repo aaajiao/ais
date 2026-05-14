@@ -167,9 +167,11 @@
     },
     "constellation": {
       "centerLabel": "aaajiao",
-      "centerSubLabelEmpty": "暂无在库 · {{outflow}} 件流出",
-      "centerSubLabel": "在 {{studios}} 个工作室·{{held}} 件在库 · {{outflow}} 件流出",
-      "centerSubLabelNoStudio": "{{held}} 件在库 · {{outflow}} 件流出",
+      "centerSubLabelEmpty": "暂无版本",
+      "centerSubSegStudios": "{{count}} 个工作室",
+      "centerSubSegHeld": "{{count}} 件在库",
+      "centerSubSegOnLoan": "{{count}} 件外借中",
+      "centerSubSegOutflow": "{{count}} 件流出",
       "ringLabel": {
         "inner": "机构",
         "middle": "私人买家",

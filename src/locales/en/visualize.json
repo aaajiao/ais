@@ -167,9 +167,11 @@
     },
     "constellation": {
       "centerLabel": "aaajiao",
-      "centerSubLabelEmpty": "none held · {{outflow}} departed",
-      "centerSubLabel": "{{held}} in {{studios}} studios · {{outflow}} departed",
-      "centerSubLabelNoStudio": "{{held}} held · {{outflow}} departed",
+      "centerSubLabelEmpty": "no editions",
+      "centerSubSegStudios": "{{count}} studios",
+      "centerSubSegHeld": "{{count}} held",
+      "centerSubSegOnLoan": "{{count}} on loan",
+      "centerSubSegOutflow": "{{count}} departed",
       "ringLabel": {
         "inner": "Institutions",
         "middle": "Private buyers",

@@ -685,7 +685,7 @@ describe('buildConstellation', () => {
     expect(museumNode.editionIds).toEqual(['e2']);
   });
 
-  it('at_gallery / at_museum 缺 location_id → 跳过（不强行兜成匿名，数据脏不静默）', () => {
+  it('at_gallery / at_museum 缺 location_id → 跳过节点渲染但 totalOnLoanCount 仍累计（脏数据不静默）', () => {
     const editions = [
       makeEdition('e1', null, { status: 'at_gallery' }),
       makeEdition('e2', null, { status: 'at_museum' }),
@@ -695,6 +695,25 @@ describe('buildConstellation', () => {
     expect(c.namedPrivateBuyers).toEqual([]);
     expect(c.anonymous.count).toBe(0);
     expect(c.artist.totalOutflowCount).toBe(0);
+    // stat 反映现实里 2 件外借，即便孤儿没有 location_id
+    expect(c.artist.totalOnLoanCount).toBe(2);
+  });
+
+  it('totalOnLoanCount = at_gallery + at_museum 总数（含孤儿，跨 location）', () => {
+    const editions = [
+      makeEdition('e1', 'loc-g1', { status: 'at_gallery' }),
+      makeEdition('e2', 'loc-m1', { status: 'at_museum' }),
+      makeEdition('e3', null, { status: 'at_gallery' }), // 孤儿
+      makeEdition('e4', 'loc-g1', { status: 'sold' }), // 不算
+      makeEdition('e5', 'loc-g1', { status: 'in_studio' }), // 不算
+    ];
+    const locations = [
+      makeLocation('loc-g1', 'Gallery A', 'gallery'),
+      makeLocation('loc-m1', 'Museum B', 'museum'),
+    ];
+    const c = buildConstellation(editions, locations);
+    expect(c.artist.totalOnLoanCount).toBe(3);
+    expect(c.artist.totalOutflowCount).toBe(1);
   });
 
   it('lost / damaged editions 不进 Constellation（degenerate 不算 outflow）', () => {

@@ -944,21 +944,38 @@ export default function DiasporaView({
             const heldCount = constellation.artist.heldEditionIds.length;
             const studioCount = constellation.artist.studios.length;
             const outflow = constellation.artist.totalOutflowCount;
+            const onLoan = constellation.artist.totalOnLoanCount;
+            // v1.8.x：4 段独立 segment 组合，避免 3 模板 → 4 字段时 2^4=16 permutation
+            // 爆炸。0 值的段省略；全 0 才走 fallback「暂无在库」。
+            const subSegments: string[] = [];
+            if (studioCount > 0)
+              subSegments.push(
+                t('diaspora.constellation.centerSubSegStudios', {
+                  count: studioCount,
+                })
+              );
+            if (heldCount > 0)
+              subSegments.push(
+                t('diaspora.constellation.centerSubSegHeld', {
+                  count: heldCount,
+                })
+              );
+            if (onLoan > 0)
+              subSegments.push(
+                t('diaspora.constellation.centerSubSegOnLoan', {
+                  count: onLoan,
+                })
+              );
+            if (outflow > 0)
+              subSegments.push(
+                t('diaspora.constellation.centerSubSegOutflow', {
+                  count: outflow,
+                })
+              );
             const subLabel =
-              studioCount === 0 && heldCount === 0
-                ? t('diaspora.constellation.centerSubLabelEmpty', {
-                    outflow,
-                  })
-                : studioCount === 0
-                  ? t('diaspora.constellation.centerSubLabelNoStudio', {
-                      held: heldCount,
-                      outflow,
-                    })
-                  : t('diaspora.constellation.centerSubLabel', {
-                      studios: studioCount,
-                      held: heldCount,
-                      outflow,
-                    });
+              subSegments.length > 0
+                ? subSegments.join(' · ')
+                : t('diaspora.constellation.centerSubLabelEmpty');
             return (
               <g
                 data-node="aaajiao"

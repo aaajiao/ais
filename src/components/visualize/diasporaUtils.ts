@@ -58,11 +58,16 @@ export interface ArtistCenterNode {
   id: 'aaajiao';
   /** 流出去的 editions 总数（sold + gifted），用于中心 label */
   totalOutflowCount: number;
+  /** 外借中的 editions 总数（at_gallery + at_museum）。**含无 location_id 的
+   *  孤儿** —— stat 反映"现实里物理在外的版本数"，不被脏数据吞掉。
+   *  v1.8.x：与 EXTERNAL_LOAN_STATUSES 配对；artist center label "X 件外借中"。 */
+  totalOnLoanCount: number;
   /** 所有 location.type === 'studio' 的位置，按 heldEditionCount desc 排序 */
   studios: StudioInfo[];
   /** "还在艺术家手里"的 editions：status ∈ {in_studio, in_production, in_transit}，
    *  含 location_id 落在 studio 上的 + 没有 location_id 的（孤儿在库）。不含
-   *  at_gallery / at_museum（那是外借中，已经在 location 节点里反映）。 */
+   *  at_gallery / at_museum（那是外借中，由 location 节点 + totalOnLoanCount
+   *  双向承载语义，见 EXTERNAL_LOAN_STATUSES）。 */
   heldEditionIds: string[];
   /** heldEditionIds 涉及的 artwork id 集合（去重） */
   heldArtworkIds: string[];
@@ -209,6 +214,7 @@ export function buildConstellation(
   const anonArtworkIds = new Set<string>();
   const anonItems: AnonymousItem[] = [];
   let totalOutflowCount = 0;
+  let totalOnLoanCount = 0;
   // 中心点"在艺术家手里"的 editions —— 按 studio location 桶聚合 + 一个孤儿桶
   // （held 但没有 location_id，或 location_id 指向非 studio 时也归到这里 ——
   // 视为艺术家流转中的版本）
@@ -234,9 +240,12 @@ export function buildConstellation(
 
     // External loan：路由到 location bucket，跟 outflow→location 同桶聚合。
     // 走在 outflow 前面，因为这条不增加 totalOutflowCount，也不走 buyer/anonymous
-    // 兜底（外借没有 buyer_name 的概念）。要求有 location_id；缺则跳过 ——
-    // "at_museum 但没填美术馆"是数据脏，不强行兜成匿名。
+    // 兜底（外借没有 buyer_name 的概念）。要求有 location_id 才上图；缺则
+    // 跳过节点渲染（"at_museum 但没填美术馆"是数据脏，不强行兜成匿名）。
+    // 但 **totalOnLoanCount 仍累计孤儿** —— artist center "X 件外借中" stat
+    // 反映现实里的外借数，不被脏数据吞掉。
     if (EXTERNAL_LOAN_STATUSES.has(ed.status)) {
+      totalOnLoanCount++;
       if (!ed.location_id) continue;
       const loc = locById.get(ed.location_id);
       if (!loc) continue;
@@ -376,6 +385,7 @@ export function buildConstellation(
       kind: 'artist',
       id: 'aaajiao',
       totalOutflowCount,
+      totalOnLoanCount,
       studios,
       heldEditionIds,
       heldArtworkIds: Array.from(heldArtworkIds),
