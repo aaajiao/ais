@@ -145,10 +145,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { buffer, manifest } = await buildBackupZip(user.id, user.email, supabase);
 
       const blobPath = getBackupBlobPath(user.id);
-      // SDK v2.3.3 access 字面只接受 'public'；私有性由 store 级别决定（Dashboard 创建时选 Private）
-      // —— blob URL 直接访问返 401，必须带 BLOB_READ_WRITE_TOKEN。详见 api/export/backup.ts 文件头说明。
+      // 私有 store 必须传 access: 'private'（v2.3.3 TS 类型只声明 'public'，runtime 支持 'private'；
+      // docs / context7 也写的 'public' | 'private'）。详见 api/export/backup.ts 头部注释。
       await put(blobPath, buffer, {
-        access: 'public',
+        // @ts-expect-error v2.3.3 types lag runtime; private store requires access: 'private'
+        access: 'private',
         allowOverwrite: true,
         addRandomSuffix: false,
         contentType: 'application/zip',

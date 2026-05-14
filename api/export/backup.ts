@@ -93,11 +93,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // 2) 上传到 Vercel Blob，每用户单 slot
     const blobPath = getBackupBlobPath(userId);
-    // SDK v2.3.3 的 access 参数字面只接受 'public'；私有性由 store 级别（Dashboard 创建时
-    // 选 Private）决定 —— blob URL 直接访问返 401，必须带 BLOB_READ_WRITE_TOKEN。
-    // 下载侧用 list() + fetch(Authorization Bearer) 拉内容，见 download.ts。
+    // @vercel/blob v2.3.3 的 TS 类型定义只声明 access: 'public'（types 滞后于 runtime），
+    // 但 Vercel Blob 实际 runtime + API 支持 'private' 并且**对私有 store 必须传 'private'**，
+    // 否则服务端返 "Cannot use public access on a private store"。docs / context7 写的是
+    // 完整的 'public' | 'private'。等 SDK 类型修正后可去掉 ts-expect-error。
     await put(blobPath, buffer, {
-      access: 'public',
+      // @ts-expect-error v2.3.3 types lag runtime; private store requires access: 'private'
+      access: 'private',
       allowOverwrite: true,
       addRandomSuffix: false,
       contentType: 'application/zip',

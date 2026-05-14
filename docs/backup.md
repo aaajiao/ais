@@ -265,28 +265,42 @@ Supabase Free 单文件 **50 MB 上限**（[官方 pricing 页](https://supabase
 - 备份恢复时图片重传回 thumbnails，保留现有 `<img src>` 工作流不动
 - Blob 只存"整个工作室档案" = 单文件价值最高的资产
 
-### v2.3.3 SDK 字面陷阱
+### v2.3.3 SDK 类型滞后于 runtime
 
-文档（[https://vercel.com/docs/vercel-blob](https://vercel.com/docs/vercel-blob)）写了 `get()` 函数 + `access: 'private'` 调用参数。**安装的 v2.3.3 包里两个都没有**——文档跑得比发布快。本系统的实际写法：
+`@vercel/blob@2.3.3` 的 TS 类型定义里只声明 `access: 'public'`（参见 `node_modules/@vercel/blob/dist/create-folder-*.d.ts`：`The only currently allowed value is 'public'`），但 **runtime + Vercel Blob 服务端 API 实际支持 `'public' | 'private'`**。Vercel 官方 docs / context7 写的也是完整的两值枚举。
+
+对**私有 store 必须传 `access: 'private'`**，否则服务端返：
+
+```
+Vercel Blob: Cannot use public access on a private store.
+The store is configured with private access.
+```
+
+实际写法（用 `@ts-expect-error` 暂时压住类型错误）：
 
 ```ts
-// 上传：access 字面只接受 'public'（SDK 类型限制）
-//      私有性靠 store 级别（Dashboard 创建时选 Private mode 决定）
 await put(path, buffer, {
-  access: 'public',         // ← 不是 'private'，SDK 字面要求
+  // @ts-expect-error v2.3.3 types lag runtime; private store requires access: 'private'
+  access: 'private',
   allowOverwrite: true,
   addRandomSuffix: false,
   contentType: 'application/zip',
 });
+```
 
-// 下载：v2.3.3 没 get()，用 list() 找 URL + fetch with token + stream
+SDK 类型修正后去掉 `@ts-expect-error` 即可。
+
+**另一个 SDK 缺口**：v2.3.3 还没导出 `get()`（docs / context7 写有），下载内容用：
+
+```ts
 const { blobs } = await list({ prefix: `backups/${userId}/`, limit: 1 });
 const upstream = await fetch(blobs[0].url, {
   headers: { Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` },
 });
 ```
 
-未来 SDK 升级补齐 `get()` / `access: 'private'` 后可以简化下载侧代码。检查方法：`grep -E "^(export|declare)" node_modules/@vercel/blob/dist/index.d.ts`。
+**通用教训**：SDK 行为存疑时 **runtime / docs / context7 > `.d.ts`**。类型定义是 best-effort 元数据，可能滞后或不准；runtime + 官方 docs 才是事实。可以 `curl context7.com/api/v2/context?...` 拉权威 doc 验证。
+
 
 ### 为什么 Vercel Cron 每天跑而不是 weekly/monthly schedule
 

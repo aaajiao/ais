@@ -170,7 +170,7 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 
 ### Backup (migration 009 起)
 
-- **备份 ZIP 走 Vercel Blob Private Store + Function 中转 + v2.3.3 SDK 字面陷阱**：Supabase Free 单文件 50MB 装不下 ~340MB 完整快照，走 Vercel Blob。私有性走 Dashboard 创建 Store 时的 Access mode（必选 Private）。`@vercel/blob` v2.3.3 SDK 与 docs 有差异：`access` 字面只接受 `'public'`、不导出 `get()`，下载用 `list({ prefix }) + fetch(url, Authorization Bearer token)`。下载必须走 `/api/export/backup/download` Function 中转，**绝不**返回 Blob URL。SDK 异常先看 `node_modules/@vercel/blob/dist/index.d.ts` 不看 docs。详见 [docs/backup.md](docs/backup.md)。
+- **备份 ZIP 走 Vercel Blob Private Store + Function 中转 + v2.3.3 SDK 类型滞后**：Supabase Free 单文件 50MB 装不下 ~340MB 完整快照，走 Vercel Blob。Store 在 Dashboard 创建时必选 Private。**`@vercel/blob` v2.3.3 的 TS 类型定义只声明 `access: 'public'`（types 滞后于 runtime），但 runtime + 服务端 API 实际支持 `'private'` 且对私有 store 必须传 `'private'`**，否则返 `"Cannot use public access on a private store"`。修复用 `@ts-expect-error` 注掉那行 + `access: 'private'`，等 SDK 类型修正后可去掉。SDK 行为存疑时 **docs / context7 优于 `.d.ts`**（types 是 best-effort 元数据，runtime 是事实）。SDK 不导出 `get()`，下载用 `list({ prefix }) + fetch(url, Authorization Bearer token)` + `/api/export/backup/download` Function 中转，**绝不**返回 Blob URL。详见 [docs/backup.md](docs/backup.md)。
 - **备份恢复是覆盖语义 + Rollback Gate UX 闸门 + 服务端 412 兜底**：`/api/import/backup` 不是合并/upsert，是 DELETE 全部 + INSERT 备份（保留原 UUID 让公开 URL 继续有效）。前端 UI 强制下载回滚包 + 输入 CONFIRM 双闸门，服务端 `X-Rollback-Confirmed: true` header 是真正拦截。三层服务端校验：user_id ≠ → 403 cross_account / schema_version ≠ → 400 schema_mismatch / format_version ≠ → 400 format_mismatch。`users` 表全程不碰。守护 `api/lib/backup/__tests__/restore.test.ts`。详见 [docs/backup.md `导入 / 恢复流程`](docs/backup.md#导入--恢复流程)。
 
 ## Verification
