@@ -20,7 +20,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { restoreBackup } from '../restore';
 import type { BackupManifest, BackupData } from '../manifest';
-import type { ParsedBackup, ParsedBackupImage } from '../zip-parser';
+import type { ParsedBackup, ParsedBackupAsset } from '../zip-parser';
 
 // =====================================================
 // 类型 + 工具
@@ -138,7 +138,11 @@ function manifest(): BackupManifest {
 
 function makeParsed(
   dataOverrides: Partial<BackupData> = {},
-  images: Record<string, ParsedBackupImage> = {},
+  /** key 形态：'artwork:{id}' 或 'file:{id}'，避免两条路径 ID 串扰 */
+  assets: {
+    artworkThumbnails?: Record<string, ParsedBackupAsset>;
+    editionFiles?: Record<string, ParsedBackupAsset>;
+  } = {},
 ): ParsedBackup {
   const data: BackupData = {
     artworks: [],
@@ -153,7 +157,8 @@ function makeParsed(
   return {
     manifest: manifest(),
     data,
-    getImage: vi.fn(async (id: string) => images[id] ?? null),
+    getArtworkThumbnail: vi.fn(async (id: string) => assets.artworkThumbnails?.[id] ?? null),
+    getEditionFileAttachment: vi.fn(async (id: string) => assets.editionFiles?.[id] ?? null),
   };
 }
 
@@ -241,8 +246,8 @@ describe('restoreBackup — DELETE 反 FK 顺序', () => {
 // 测试：图片重传
 // =====================================================
 
-describe('restoreBackup — 图片重传到 thumbnails', () => {
-  it('image 类型 + images/ 前缀 → upload 到 thumbnails + 改写为 public URL + 删 _original_url', async () => {
+describe('restoreBackup — 资产回灌（双 bucket）', () => {
+  it('edition_files source_type=upload + files/ 前缀 → upload edition-files bucket + file_url 改为 storage path', async () => {
     const { client, rec } = makeFakeSupabase({});
     const parsed = makeParsed(
       {
@@ -250,55 +255,81 @@ describe('restoreBackup — 图片重传到 thumbnails', () => {
           {
             id: 'f1',
             edition_id: 'ed-1',
+            source_type: 'upload',
             file_type: 'image',
-            file_url: 'images/f1.jpg',
-            _original_url: 'https://old-thumbnails.example/f1.jpg',
+            file_url: 'files/f1.jpg',
+            _original_url: 'old/path.jpg',
           },
         ],
       },
-      {
-        f1: { buffer: Buffer.from([0xff, 0xd8]), contentType: 'image/jpeg' },
-      },
+      { editionFiles: { f1: { buffer: Buffer.from([0xff, 0xd8]), contentType: 'image/jpeg' } } },
     );
     const result = await restoreBackup({ userId: 'user-1', supabase: client, parsed });
 
     expect(result.imagesRestored).toBe(1);
     expect(result.imagesFailed).toBe(0);
+    // 关键：edition-files bucket，不是 thumbnails
     expect(rec.capturedUploads).toEqual([
-      { bucket: 'thumbnails', path: 'restored/f1.jpg', contentType: 'image/jpeg' },
+      { bucket: 'edition-files', path: 'restored/f1.jpg', contentType: 'image/jpeg' },
     ]);
 
     const insertedFile = rec.capturedInserts.edition_files[0];
-    expect(insertedFile.file_url).toBe('https://fake.example/thumbnails/restored/f1.jpg');
+    // file_url 是 storage path（前端走 getSignedUrl），不是 public URL
+    expect(insertedFile.file_url).toBe('restored/f1.jpg');
     expect(insertedFile._original_url).toBeUndefined();
   });
 
-  it('image 但 getImage 返回 null（ZIP 内没图）→ fallback 到 _original_url + warning', async () => {
+  it('edition_files 附件 = PDF：上传 edition-files bucket（不受 file_type 限制）', async () => {
+    const { client, rec } = makeFakeSupabase({});
+    const parsed = makeParsed(
+      {
+        edition_files: [
+          {
+            id: 'ef-pdf',
+            edition_id: 'ed-1',
+            source_type: 'upload',
+            file_type: 'pdf',
+            file_url: 'files/ef-pdf.pdf',
+            _original_url: 'old/cert.pdf',
+          },
+        ],
+      },
+      { editionFiles: { 'ef-pdf': { buffer: Buffer.from([0x25, 0x50]), contentType: 'application/pdf' } } },
+    );
+    const result = await restoreBackup({ userId: 'user-1', supabase: client, parsed });
+
+    expect(result.imagesRestored).toBe(1);
+    expect(rec.capturedUploads).toEqual([
+      { bucket: 'edition-files', path: 'restored/ef-pdf.pdf', contentType: 'application/pdf' },
+    ]);
+    expect(rec.capturedInserts.edition_files[0].file_url).toBe('restored/ef-pdf.pdf');
+  });
+
+  it('edition_files getEditionFileAttachment 返回 null → fallback 到 _original_url + warning', async () => {
     const { client, rec } = makeFakeSupabase({});
     const parsed = makeParsed({
       edition_files: [
         {
-          id: 'missing-img',
+          id: 'missing-att',
           edition_id: 'ed-1',
+          source_type: 'upload',
           file_type: 'image',
-          file_url: 'images/missing-img.jpg',
-          _original_url: 'https://original.example/img.jpg',
+          file_url: 'files/missing-att.jpg',
+          _original_url: 'old/path.jpg',
         },
       ],
     });
     const result = await restoreBackup({ userId: 'user-1', supabase: client, parsed });
 
-    expect(result.imagesRestored).toBe(0);
     expect(result.imagesFailed).toBe(1);
-    expect(result.warnings.length).toBe(1);
-    expect(result.warnings[0]).toMatch(/Image not found in ZIP for edition_file missing-img/);
+    expect(result.warnings[0]).toMatch(/Attachment not found in ZIP for edition_file missing-att/);
 
     const insertedFile = rec.capturedInserts.edition_files[0];
-    expect(insertedFile.file_url).toBe('https://original.example/img.jpg');
-    expect(insertedFile._original_url).toBeUndefined(); // 即使 fallback，DB 字段也不该有
+    expect(insertedFile.file_url).toBe('old/path.jpg');
+    expect(insertedFile._original_url).toBeUndefined();
   });
 
-  it('Storage upload 失败 → fallback + warning，row 仍 INSERT', async () => {
+  it('edition-files bucket upload 失败 → fallback + warning', async () => {
     const { client, rec } = makeFakeSupabase({
       storageUploadShouldFail: () => true,
     });
@@ -308,13 +339,14 @@ describe('restoreBackup — 图片重传到 thumbnails', () => {
           {
             id: 'f1',
             edition_id: 'ed-1',
+            source_type: 'upload',
             file_type: 'image',
-            file_url: 'images/f1.jpg',
-            _original_url: 'https://orig.example/f1.jpg',
+            file_url: 'files/f1.jpg',
+            _original_url: 'old/f1.jpg',
           },
         ],
       },
-      { f1: { buffer: Buffer.from([1]), contentType: 'image/jpeg' } },
+      { editionFiles: { f1: { buffer: Buffer.from([1]), contentType: 'image/jpeg' } } },
     );
     const result = await restoreBackup({ userId: 'user-1', supabase: client, parsed });
 
@@ -322,29 +354,48 @@ describe('restoreBackup — 图片重传到 thumbnails', () => {
     expect(result.warnings[0]).toMatch(/Upload failed for edition_file f1/);
 
     const inserted = rec.capturedInserts.edition_files[0];
-    expect(inserted.file_url).toBe('https://orig.example/f1.jpg');
-    expect(inserted._original_url).toBeUndefined();
+    expect(inserted.file_url).toBe('old/f1.jpg');
   });
 
-  it('artwork.thumbnail_url + images/ 前缀 → upload + 改写为 public URL + 删 _original_thumbnail_url', async () => {
+  it('source_type=link 行：不 upload，file_url 原样保留', async () => {
+    const { client, rec } = makeFakeSupabase({});
+    const parsed = makeParsed({
+      edition_files: [
+        {
+          id: 'ef-link',
+          edition_id: 'ed-1',
+          source_type: 'link',
+          file_type: 'document',
+          file_url: 'https://public.3.basecamp.com/p/abc',
+        },
+      ],
+    });
+    await restoreBackup({ userId: 'user-1', supabase: client, parsed });
+
+    expect(rec.capturedUploads).toEqual([]);
+    expect(rec.capturedInserts.edition_files[0].file_url).toBe(
+      'https://public.3.basecamp.com/p/abc',
+    );
+  });
+
+  it('artwork.thumbnail_url + artworks/ 前缀 → upload thumbnails bucket + 改写为 public URL', async () => {
     const { client, rec } = makeFakeSupabase({});
     const parsed = makeParsed(
       {
         artworks: [
           {
             id: 'aw-1',
-            thumbnail_url: 'images/aw-1.jpg',
+            thumbnail_url: 'artworks/aw-1.jpg',
             _original_thumbnail_url: 'https://old.example/aw-1.jpg',
           },
         ],
       },
-      { 'aw-1': { buffer: Buffer.from([0xff]), contentType: 'image/jpeg' } },
+      { artworkThumbnails: { 'aw-1': { buffer: Buffer.from([0xff]), contentType: 'image/jpeg' } } },
     );
     const result = await restoreBackup({ userId: 'user-1', supabase: client, parsed });
 
     expect(result.imagesRestored).toBe(1);
-    expect(result.imagesFailed).toBe(0);
-    // 走的还是 thumbnails bucket + restored/{id}.{ext} 路径约定
+    // artwork 走 thumbnails bucket（public） + 写回 public URL
     expect(rec.capturedUploads).toContainEqual({
       bucket: 'thumbnails',
       path: 'restored/aw-1.jpg',
@@ -356,13 +407,13 @@ describe('restoreBackup — 图片重传到 thumbnails', () => {
     expect(insertedArt._original_thumbnail_url).toBeUndefined();
   });
 
-  it('artwork.thumbnail_url getImage 返回 null → fallback 到 _original_thumbnail_url + warning', async () => {
+  it('artwork.thumbnail_url getArtworkThumbnail 返回 null → fallback + warning', async () => {
     const { client, rec } = makeFakeSupabase({});
     const parsed = makeParsed({
       artworks: [
         {
           id: 'aw-missing',
-          thumbnail_url: 'images/aw-missing.jpg',
+          thumbnail_url: 'artworks/aw-missing.jpg',
           _original_thumbnail_url: 'https://original.example/aw.jpg',
         },
       ],
@@ -381,17 +432,16 @@ describe('restoreBackup — 图片重传到 thumbnails', () => {
     const { client, rec } = makeFakeSupabase({});
     const parsed = makeParsed({
       artworks: [
-        { id: 'aw-no-thumb' }, // 没 thumbnail_url
+        { id: 'aw-no-thumb' },
         {
           id: 'aw-abs',
-          thumbnail_url: 'https://existing.example/x.jpg', // 已经是绝对 URL，不走 ZIP
+          thumbnail_url: 'https://existing.example/x.jpg',
           _original_thumbnail_url: 'should-be-stripped',
         },
       ],
     });
     await restoreBackup({ userId: 'user-1', supabase: client, parsed });
 
-    // 没有任何 upload 调用（fake supabase rec.capturedUploads 为空）
     expect(rec.capturedUploads).toEqual([]);
     const arts = rec.capturedInserts.artworks;
     expect(arts[0].thumbnail_url).toBeUndefined();

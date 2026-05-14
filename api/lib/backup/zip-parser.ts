@@ -30,7 +30,7 @@ import {
 // 类型
 // =====================================================
 
-export interface ParsedBackupImage {
+export interface ParsedBackupAsset {
   buffer: Buffer;
   contentType: string;
 }
@@ -39,17 +39,24 @@ export interface ParsedBackup {
   manifest: BackupManifest;
   data: BackupData;
   /**
-   * 按 edition_file.id 取图片 buffer + contentType。
-   * 找不到（包括 ZIP 里没打包 / file_type !== 'image'）返 null。
+   * 按 artwork.id 取 artworks/{id}.* 文件。找不到返 null。
    */
-  getImage(fileId: string): Promise<ParsedBackupImage | null>;
+  getArtworkThumbnail(artworkId: string): Promise<ParsedBackupAsset | null>;
+  /**
+   * 按 edition_file.id 取 files/{id}.* 文件。找不到返 null。
+   */
+  getEditionFileAttachment(fileId: string): Promise<ParsedBackupAsset | null>;
 }
+
+/** @deprecated 兼容 zip-parser 旧 caller，新代码用 ParsedBackupAsset。 */
+export type ParsedBackupImage = ParsedBackupAsset;
 
 // =====================================================
 // 工具：扩展名 → MIME
 // =====================================================
 
 const EXT_TO_MIME: Record<string, string> = {
+  // 图片
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',
   png: 'image/png',
@@ -59,6 +66,17 @@ const EXT_TO_MIME: Record<string, string> = {
   svg: 'image/svg+xml',
   heic: 'image/heic',
   avif: 'image/avif',
+  // 文档 / 附件（edition_files 上传类含 PDF / Office 文档等）
+  pdf: 'application/pdf',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ppt: 'application/vnd.ms-powerpoint',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  txt: 'text/plain',
+  csv: 'text/csv',
+  zip: 'application/zip',
 };
 
 function extToMime(ext: string): string {
@@ -179,15 +197,16 @@ export async function parseBackupZip(buffer: Buffer): Promise<ParsedBackup> {
   assertValidData(dataRaw);
   const data = dataRaw;
 
-  // 3) getImage：懒加载 images/<fileId>.<ext>
-  //    扩展名未知 → 按 prefix 找首个匹配；找不到返 null（不抛，由调用方决定怎么 fallback）
-  const getImage = async (fileId: string): Promise<ParsedBackupImage | null> => {
-    // jszip file lookup by name 是 O(1) hash，但我们不知道扩展名，只能扫
-    // `images/` 目录下名字以 `${fileId}.` 开头的条目
-    const prefix = `images/${fileId}.`;
+  // 3) 懒加载：按 prefix 找首个匹配；找不到返 null（不抛，由调用方决定怎么 fallback）
+  //    artworks/{artwork_id}.{ext}  → getArtworkThumbnail
+  //    files/{file_id}.{ext}        → getEditionFileAttachment
+  const lookupAsset = async (
+    subdir: 'artworks' | 'files',
+    id: string,
+  ): Promise<ParsedBackupAsset | null> => {
+    const prefix = `${subdir}/${id}.`;
     let matched: JSZip.JSZipObject | null = null;
     let matchedName = '';
-    // jszip files map iteration —— 备份内典型几百条目，遍历可接受
     for (const [name, file] of Object.entries(zip.files)) {
       if (name.startsWith(prefix) && !file.dir) {
         matched = file;
@@ -206,5 +225,10 @@ export async function parseBackupZip(buffer: Buffer): Promise<ParsedBackup> {
     };
   };
 
-  return { manifest, data, getImage };
+  return {
+    manifest,
+    data,
+    getArtworkThumbnail: (artworkId: string) => lookupAsset('artworks', artworkId),
+    getEditionFileAttachment: (fileId: string) => lookupAsset('files', fileId),
+  };
 }

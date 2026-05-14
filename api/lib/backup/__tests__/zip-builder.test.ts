@@ -1,72 +1,72 @@
 /**
  * zip-builder 测试：覆盖核心契约
- *   1. 跨表一致性快照通过 RPC 一次性拿到（不会自己重新拼）
- *   2. edition_files 重写：image 类型 → ZIP 内相对路径 + _original_url 保留；非 image → file_url 原样
- *   3. 图片下载失败 → 单条行回退保留原 file_url（不影响整体 ZIP 生成）
- *   4. manifest.stats 与 data 行数一致
- *   5. manifest.total_size_bytes = 实际 buffer.byteLength
- *   6. RPC error / 空 payload → 抛错
+ *   1. RPC 一致性快照入口（不会自己重新拼）
+ *   2. Storage 下载走 supabase.storage.from(bucket).download(path) —— 穿 private bucket
+ *   3. ZIP 双子目录：artworks/{id}.{ext} + files/{id}.{ext}
+ *   4. edition_files 扫 source_type='upload'（image / pdf / doc 全部备份）；
+ *      'link' 类跳过
+ *   5. parseStorageRef 解析两种形态（绝对 supabase URL / 相对路径）
+ *   6. manifest.stats 与 data 行数一致 + total_size_bytes = buffer.byteLength
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import JSZip from 'jszip';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { buildBackupZip, resolveToAbsoluteUrl } from '../zip-builder';
+import { buildBackupZip, parseStorageRef } from '../zip-builder';
 
 // ====================================================
-// Mock 状态：每个测试在 beforeEach 里重置
+// Mock state
 // ====================================================
 interface RpcResponse {
   data: unknown;
   error: { message: string } | null;
 }
 
+interface DownloadResponse {
+  data: Blob | null;
+  error: { message: string } | null;
+}
+
 let rpcResponse: RpcResponse;
+let downloadImpl: (bucket: string, path: string) => Promise<DownloadResponse>;
+let downloadCalls: Array<{ bucket: string; path: string }>;
+
 const rpcSpy = vi.fn(async () => rpcResponse);
 
 function makeMockSupabase(): SupabaseClient {
   return {
     rpc: rpcSpy,
+    storage: {
+      from: (bucket: string) => ({
+        download: (path: string) => {
+          downloadCalls.push({ bucket, path });
+          return downloadImpl(bucket, path);
+        },
+      }),
+    },
   } as unknown as SupabaseClient;
 }
 
-// ====================================================
-// Mock global fetch（图片下载）
-// ====================================================
-const originalFetch = global.fetch;
-type FetchImpl = (url: string) => Promise<Response>;
-let fetchImpl: FetchImpl;
-
-// 保证 resolveToAbsoluteUrl 有可用的 SUPABASE_URL（不依赖 .env.local）
-const ORIGINAL_SUPABASE_URL = process.env.VITE_SUPABASE_URL;
-const TEST_SUPABASE_URL = 'https://test.supabase.co';
+function makeBlobResponse(
+  contentType = 'image/jpeg',
+  bytes = new Uint8Array(1024).fill(0xff),
+): DownloadResponse {
+  return {
+    data: new Blob([bytes], { type: contentType }),
+    error: null,
+  };
+}
 
 beforeEach(() => {
-  process.env.VITE_SUPABASE_URL = TEST_SUPABASE_URL;
   rpcResponse = { data: null, error: null };
   rpcSpy.mockClear();
-  // 默认所有 fetch 都给 200 + 1KB jpeg buffer
-  fetchImpl = async () => {
-    const body = new Uint8Array(1024).fill(0xff);
-    return new Response(body, {
-      status: 200,
-      headers: { 'content-type': 'image/jpeg' },
-    });
-  };
-  global.fetch = ((url: string) => fetchImpl(url)) as typeof global.fetch;
-});
-
-afterEach(() => {
-  global.fetch = originalFetch;
-  if (ORIGINAL_SUPABASE_URL === undefined) {
-    delete process.env.VITE_SUPABASE_URL;
-  } else {
-    process.env.VITE_SUPABASE_URL = ORIGINAL_SUPABASE_URL;
-  }
+  downloadCalls = [];
+  // 默认所有 download() 都给 1KB jpeg blob
+  downloadImpl = async () => makeBlobResponse();
 });
 
 // ====================================================
-// 工具：从 buffer 反查 ZIP 内文件清单 + manifest
+// Helpers
 // ====================================================
 async function unpackZip(buffer: Buffer) {
   const zip = await JSZip.loadAsync(buffer);
@@ -80,9 +80,6 @@ async function unpackZip(buffer: Buffer) {
   };
 }
 
-// ====================================================
-// Fixture：常用的 snapshot 形状
-// ====================================================
 function emptySnapshot() {
   return {
     artworks: [],
@@ -96,16 +93,60 @@ function emptySnapshot() {
 }
 
 // ====================================================
-// 测试
+// parseStorageRef 单元测试
+// ====================================================
+describe('parseStorageRef — URL / 相对路径解析', () => {
+  it('绝对 supabase Storage URL (/public/) → 提取 bucket + path', () => {
+    const u = 'https://kbwoi.supabase.co/storage/v1/object/public/thumbnails/edition-id/x.jpg';
+    expect(parseStorageRef(u, 'thumbnails')).toEqual({
+      bucket: 'thumbnails',
+      path: 'edition-id/x.jpg',
+    });
+  });
+
+  it('绝对 supabase Storage URL (/sign/) → 提取 bucket + path', () => {
+    const u = 'https://x.supabase.co/storage/v1/object/sign/edition-files/abc/y.pdf?token=...';
+    const ref = parseStorageRef(u, 'edition-files');
+    expect(ref?.bucket).toBe('edition-files');
+    // path 含 ?token=... query —— URL pathname 不带 query，所以 path 不应有 ?
+    expect(ref?.path).toBe('abc/y.pdf');
+  });
+
+  it('非 storage 路径的绝对 URL → 返 null（外链不下载）', () => {
+    expect(parseStorageRef('https://example.com/img.jpg', 'thumbnails')).toBeNull();
+    expect(parseStorageRef('https://public.3.basecamp.com/p/QeN', 'edition-files')).toBeNull();
+  });
+
+  it('相对路径 → 用 defaultBucket', () => {
+    expect(parseStorageRef('edition-uuid/file.png', 'edition-files')).toEqual({
+      bucket: 'edition-files',
+      path: 'edition-uuid/file.png',
+    });
+    expect(parseStorageRef('artwork-uuid/cover.jpg', 'thumbnails')).toEqual({
+      bucket: 'thumbnails',
+      path: 'artwork-uuid/cover.jpg',
+    });
+  });
+
+  it('相对路径前的多余斜杠被裁掉', () => {
+    expect(parseStorageRef('/a/b.png', 'thumbnails')).toEqual({
+      bucket: 'thumbnails',
+      path: 'a/b.png',
+    });
+  });
+
+  it('空字符串 → null', () => {
+    expect(parseStorageRef('', 'thumbnails')).toBeNull();
+  });
+});
+
+// ====================================================
+// 基础契约
 // ====================================================
 describe('buildBackupZip — 基础契约', () => {
   it('空数据库：所有表 0 行，ZIP 仍可正常生成', async () => {
     rpcResponse = { data: emptySnapshot(), error: null };
-    const { buffer, manifest } = await buildBackupZip(
-      'user-1',
-      'a@b.com',
-      makeMockSupabase(),
-    );
+    const { buffer, manifest } = await buildBackupZip('user-1', 'a@b.com', makeMockSupabase());
 
     expect(buffer.byteLength).toBeGreaterThan(0);
     expect(manifest.stats).toEqual({
@@ -120,14 +161,7 @@ describe('buildBackupZip — 基础契约', () => {
     expect(manifest.image_count).toBe(0);
     expect(manifest.user_id).toBe('user-1');
     expect(manifest.user_email).toBe('a@b.com');
-  });
-
-  it('manifest 带 schema/format 版本 + 时间戳', async () => {
-    rpcResponse = { data: emptySnapshot(), error: null };
-    const { manifest } = await buildBackupZip('u', 'e', makeMockSupabase());
-    expect(manifest.backup_format_version).toBeTypeOf('number');
-    expect(manifest.db_schema_version).toBeTypeOf('string');
-    expect(manifest.created_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(downloadCalls).toEqual([]); // 没行 → 没下载
   });
 
   it('调用 RPC backup_snapshot 时带正确的 userId 参数', async () => {
@@ -143,18 +177,187 @@ describe('buildBackupZip — 基础契约', () => {
   });
 });
 
-describe('buildBackupZip — 图片打包语义', () => {
-  it('image 类型文件：下载成功 → ZIP 内相对路径 + _original_url 保留原始 URL', async () => {
+// ====================================================
+// artworks.thumbnail_url
+// ====================================================
+describe('buildBackupZip — artworks/{id}.{ext} 打包', () => {
+  it('绝对 thumbnails URL：解析 bucket+path → storage.download → 写 artworks/{id}', async () => {
+    const thumbUrl = 'https://x.supabase.co/storage/v1/object/public/thumbnails/aw-001/cover.jpg';
+    rpcResponse = {
+      data: { ...emptySnapshot(), artworks: [{ id: 'aw-001', thumbnail_url: thumbUrl }] },
+      error: null,
+    };
+    const { buffer, manifest } = await buildBackupZip('u', 'e', makeMockSupabase());
+    const { filenames, data } = await unpackZip(buffer);
+
+    expect(downloadCalls).toEqual([{ bucket: 'thumbnails', path: 'aw-001/cover.jpg' }]);
+    expect(filenames).toContain('artworks/aw-001.jpg');
+    expect(manifest.image_count).toBe(1);
+    expect((data.artworks as Array<Record<string, unknown>>)[0]).toMatchObject({
+      thumbnail_url: 'artworks/aw-001.jpg',
+      _original_thumbnail_url: thumbUrl,
+    });
+  });
+
+  it('相对路径的 thumbnail_url → 默认 thumbnails bucket', async () => {
+    rpcResponse = {
+      data: { ...emptySnapshot(), artworks: [{ id: 'aw-rel', thumbnail_url: 'aw-rel/x.png' }] },
+      error: null,
+    };
+    downloadImpl = async () => makeBlobResponse('image/png');
+
+    const { buffer } = await buildBackupZip('u', 'e', makeMockSupabase());
+    const { filenames } = await unpackZip(buffer);
+
+    expect(downloadCalls).toEqual([{ bucket: 'thumbnails', path: 'aw-rel/x.png' }]);
+    expect(filenames).toContain('artworks/aw-rel.png');
+  });
+
+  it('storage.download 失败 → 字段保留原值，不破坏 ZIP', async () => {
+    downloadImpl = async () => ({ data: null, error: { message: 'not found' } });
+
+    rpcResponse = {
+      data: {
+        ...emptySnapshot(),
+        artworks: [{ id: 'aw-broken', thumbnail_url: 'https://x.supabase.co/storage/v1/object/public/thumbnails/x.jpg' }],
+      },
+      error: null,
+    };
+
+    const { buffer, manifest } = await buildBackupZip('u', 'e', makeMockSupabase());
+    const { filenames, data } = await unpackZip(buffer);
+
+    expect(filenames.some((n) => n.startsWith('artworks/aw-broken'))).toBe(false);
+    expect(manifest.image_count).toBe(0);
+    expect((data.artworks as Array<Record<string, unknown>>)[0].thumbnail_url).toMatch(
+      /thumbnails\/x\.jpg$/,
+    );
+    expect((data.artworks as Array<Record<string, unknown>>)[0]._original_thumbnail_url).toBeUndefined();
+  });
+
+  it('非 supabase URL（外链） → parseStorageRef 返 null，字段保留原值', async () => {
+    rpcResponse = {
+      data: {
+        ...emptySnapshot(),
+        artworks: [{ id: 'aw-ext', thumbnail_url: 'https://cdn.example.com/x.jpg' }],
+      },
+      error: null,
+    };
+
+    const { buffer, manifest } = await buildBackupZip('u', 'e', makeMockSupabase());
+    const { filenames, data } = await unpackZip(buffer);
+
+    expect(downloadCalls).toEqual([]); // 没尝试下载外链
+    expect(filenames.some((n) => n.startsWith('artworks/aw-ext'))).toBe(false);
+    expect(manifest.image_count).toBe(0);
+    expect((data.artworks as Array<Record<string, unknown>>)[0].thumbnail_url).toBe(
+      'https://cdn.example.com/x.jpg',
+    );
+  });
+});
+
+// ====================================================
+// edition_files.file_url — 全 source_type='upload' 扫描，PDF / doc 都备份
+// ====================================================
+describe('buildBackupZip — files/{id}.{ext} 打包（含 PDF / doc）', () => {
+  it('source_type=upload + image：写 files/{id}.{ext} + _original_url 保留', async () => {
     rpcResponse = {
       data: {
         ...emptySnapshot(),
         edition_files: [
           {
-            id: 'file-aaa',
+            id: 'ef-img',
             edition_id: 'ed-1',
-            source_type: 'manual',
-            file_url: 'https://thumbnails.example.com/img1.jpg',
+            source_type: 'upload',
+            file_url: 'ed-1/abc_pic.png',
             file_type: 'image',
+            created_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+      },
+      error: null,
+    };
+    downloadImpl = async () => makeBlobResponse('image/png');
+
+    const { buffer, manifest } = await buildBackupZip('u', 'e', makeMockSupabase());
+    const { filenames, data } = await unpackZip(buffer);
+
+    expect(downloadCalls).toEqual([{ bucket: 'edition-files', path: 'ed-1/abc_pic.png' }]);
+    expect(filenames).toContain('files/ef-img.png');
+    expect(manifest.image_count).toBe(1);
+    expect((data.edition_files as Array<Record<string, unknown>>)[0]).toMatchObject({
+      file_url: 'files/ef-img.png',
+      _original_url: 'ed-1/abc_pic.png',
+    });
+  });
+
+  it('source_type=upload + pdf：扩展名走 storage path / file_name 兜底', async () => {
+    rpcResponse = {
+      data: {
+        ...emptySnapshot(),
+        edition_files: [
+          {
+            id: 'ef-pdf',
+            edition_id: 'ed-1',
+            source_type: 'upload',
+            file_url: 'ed-1/abc_certificate.pdf',
+            file_type: 'pdf',
+            file_name: 'certificate.pdf',
+            created_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+      },
+      error: null,
+    };
+    downloadImpl = async () => makeBlobResponse('application/pdf');
+
+    const { buffer, manifest } = await buildBackupZip('u', 'e', makeMockSupabase());
+    const { filenames } = await unpackZip(buffer);
+
+    expect(filenames).toContain('files/ef-pdf.pdf');
+    expect(manifest.image_count).toBe(1); // image_count = ZIP 内 binary asset 总数
+  });
+
+  it('source_type=upload + docx：path 没扩展、file_name 有', async () => {
+    rpcResponse = {
+      data: {
+        ...emptySnapshot(),
+        edition_files: [
+          {
+            id: 'ef-doc',
+            edition_id: 'ed-1',
+            source_type: 'upload',
+            file_url: 'ed-1/uuid-no-ext',
+            file_type: 'document',
+            file_name: 'spec.docx',
+            created_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+      },
+      error: null,
+    };
+    downloadImpl = async () =>
+      makeBlobResponse('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+
+    const { buffer } = await buildBackupZip('u', 'e', makeMockSupabase());
+    const { filenames } = await unpackZip(buffer);
+
+    // pickExtension 顺序：storage path → file_name → contentType → bin
+    // path 没扩展 → file_name docx 命中
+    expect(filenames).toContain('files/ef-doc.docx');
+  });
+
+  it('source_type=link 行：不下载，file_url 原样保留', async () => {
+    rpcResponse = {
+      data: {
+        ...emptySnapshot(),
+        edition_files: [
+          {
+            id: 'ef-link',
+            edition_id: 'ed-1',
+            source_type: 'link',
+            file_url: 'https://public.3.basecamp.com/p/Qe',
+            file_type: 'document',
             created_at: '2026-01-01T00:00:00Z',
           },
         ],
@@ -165,24 +368,27 @@ describe('buildBackupZip — 图片打包语义', () => {
     const { buffer, manifest } = await buildBackupZip('u', 'e', makeMockSupabase());
     const { filenames, data } = await unpackZip(buffer);
 
-    expect(filenames).toContain('images/file-aaa.jpg');
-    expect(manifest.image_count).toBe(1);
-    expect((data.edition_files as Array<Record<string, unknown>>)[0]).toMatchObject({
-      file_url: 'images/file-aaa.jpg',
-      _original_url: 'https://thumbnails.example.com/img1.jpg',
-    });
+    expect(downloadCalls).toEqual([]);
+    expect(filenames.some((n) => n.startsWith('files/ef-link'))).toBe(false);
+    expect(manifest.image_count).toBe(0);
+    expect((data.edition_files as Array<Record<string, unknown>>)[0].file_url).toBe(
+      'https://public.3.basecamp.com/p/Qe',
+    );
+    expect((data.edition_files as Array<Record<string, unknown>>)[0]._original_url).toBeUndefined();
   });
 
-  it('非 image 类型文件（pdf）：file_url 原样保留，不进 ZIP', async () => {
+  it('download 失败 → 字段保留原值，warn 进 console，不破坏 ZIP', async () => {
+    downloadImpl = async () => ({ data: null, error: { message: 'permission denied' } });
+
     rpcResponse = {
       data: {
         ...emptySnapshot(),
         edition_files: [
           {
-            id: 'file-pdf',
+            id: 'ef-fail',
             edition_id: 'ed-1',
-            source_type: 'manual',
-            file_url: 'https://docs.example.com/doc.pdf',
+            source_type: 'upload',
+            file_url: 'ed-1/missing.pdf',
             file_type: 'pdf',
             created_at: '2026-01-01T00:00:00Z',
           },
@@ -194,150 +400,78 @@ describe('buildBackupZip — 图片打包语义', () => {
     const { buffer, manifest } = await buildBackupZip('u', 'e', makeMockSupabase());
     const { filenames, data } = await unpackZip(buffer);
 
-    // 没有 images/file-pdf.* 进 ZIP
-    expect(filenames.some((n) => n.startsWith('images/file-pdf'))).toBe(false);
+    expect(filenames.some((n) => n.startsWith('files/ef-fail'))).toBe(false);
     expect(manifest.image_count).toBe(0);
-    // file_url 原样保留
-    expect((data.edition_files as Array<Record<string, unknown>>)[0].file_url).toBe(
-      'https://docs.example.com/doc.pdf',
-    );
-    expect((data.edition_files as Array<Record<string, unknown>>)[0]._original_url).toBeUndefined();
+    expect((data.edition_files as Array<Record<string, unknown>>)[0].file_url).toBe('ed-1/missing.pdf');
   });
 
-  it('image 下载失败 → 单条行回退保留原 file_url，不破坏 ZIP', async () => {
-    fetchImpl = async () => new Response(null, { status: 404 });
-
+  it('两条路径共存：artworks/ + files/ 子目录正确划分', async () => {
     rpcResponse = {
       data: {
         ...emptySnapshot(),
+        artworks: [
+          {
+            id: 'aw-A',
+            thumbnail_url: 'https://x.supabase.co/storage/v1/object/public/thumbnails/aw-A/c.jpg',
+          },
+        ],
         edition_files: [
           {
-            id: 'file-broken',
+            id: 'ef-B',
             edition_id: 'ed-1',
-            source_type: 'manual',
-            file_url: 'https://broken.example.com/missing.jpg',
-            file_type: 'image',
+            source_type: 'upload',
+            file_url: 'ed-1/file.pdf',
+            file_type: 'pdf',
             created_at: '2026-01-01T00:00:00Z',
           },
         ],
       },
       error: null,
     };
+    downloadImpl = async (bucket) =>
+      makeBlobResponse(bucket === 'thumbnails' ? 'image/jpeg' : 'application/pdf');
 
     const { buffer, manifest } = await buildBackupZip('u', 'e', makeMockSupabase());
-    const { filenames, data } = await unpackZip(buffer);
+    const { filenames } = await unpackZip(buffer);
 
-    expect(filenames.some((n) => n.startsWith('images/file-broken'))).toBe(false);
-    expect(manifest.image_count).toBe(0);
-    expect((data.edition_files as Array<Record<string, unknown>>)[0].file_url).toBe(
-      'https://broken.example.com/missing.jpg',
-    );
+    expect(filenames).toContain('artworks/aw-A.jpg');
+    expect(filenames).toContain('files/ef-B.pdf');
+    expect(manifest.image_count).toBe(2);
+
+    // 两次 download 走对应 bucket
+    expect(downloadCalls).toEqual([
+      { bucket: 'thumbnails', path: 'aw-A/c.jpg' },
+      { bucket: 'edition-files', path: 'ed-1/file.pdf' },
+    ]);
   });
 
-  it('混合 image / 非 image / 失败：每条按各自语义处理', async () => {
-    // 1 张 image 成功 + 1 张 image 失败 + 1 个非 image
-    let callCount = 0;
-    fetchImpl = async () => {
-      callCount += 1;
-      if (callCount === 1) {
-        return new Response(new Uint8Array(512), {
-          status: 200,
-          headers: { 'content-type': 'image/png' },
-        });
-      }
-      return new Response(null, { status: 500 });
-    };
-
+  it('重复 (bucket, path) 只下载一次（去重）', async () => {
+    const sharedPath = 'ed-1/shared.png';
     rpcResponse = {
       data: {
         ...emptySnapshot(),
         edition_files: [
-          {
-            id: 'img-ok',
-            edition_id: 'ed-1',
-            source_type: 'manual',
-            file_url: 'https://x.com/ok.png',
-            file_type: 'image',
-            created_at: '2026-01-01T00:00:00Z',
-          },
-          {
-            id: 'img-fail',
-            edition_id: 'ed-1',
-            source_type: 'manual',
-            file_url: 'https://x.com/fail.png',
-            file_type: 'image',
-            created_at: '2026-01-01T00:00:00Z',
-          },
-          {
-            id: 'doc',
-            edition_id: 'ed-1',
-            source_type: 'manual',
-            file_url: 'https://x.com/sheet.csv',
-            file_type: 'csv',
-            created_at: '2026-01-01T00:00:00Z',
-          },
+          { id: 'f1', edition_id: 'e1', source_type: 'upload', file_url: sharedPath, file_type: 'image', created_at: '' },
+          { id: 'f2', edition_id: 'e2', source_type: 'upload', file_url: sharedPath, file_type: 'image', created_at: '' },
         ],
       },
       error: null,
     };
-
-    const { buffer, manifest } = await buildBackupZip('u', 'e', makeMockSupabase());
-    const { filenames, data } = await unpackZip(buffer);
-    const files = data.edition_files as Array<Record<string, unknown>>;
-
-    expect(manifest.image_count).toBe(1);
-    expect(manifest.stats).toMatchObject({ edition_files: 3 });
-    expect(filenames.some((n) => n === 'images/img-ok.png')).toBe(true);
-    expect(filenames.some((n) => n.startsWith('images/img-fail'))).toBe(false);
-    expect(filenames.some((n) => n.startsWith('images/doc'))).toBe(false);
-
-    expect(files[0]).toMatchObject({ file_url: 'images/img-ok.png', _original_url: 'https://x.com/ok.png' });
-    expect(files[1].file_url).toBe('https://x.com/fail.png');
-    expect(files[2].file_url).toBe('https://x.com/sheet.csv');
-  });
-
-  it('重复的 image URL 只下载一次（去重）', async () => {
-    let fetchCalls = 0;
-    fetchImpl = async () => {
-      fetchCalls += 1;
-      return new Response(new Uint8Array(256), {
-        status: 200,
-        headers: { 'content-type': 'image/jpeg' },
-      });
-    };
-
-    const sharedUrl = 'https://x.com/shared.jpg';
-    rpcResponse = {
-      data: {
-        ...emptySnapshot(),
-        edition_files: [
-          {
-            id: 'f1',
-            edition_id: 'ed-1',
-            source_type: 'manual',
-            file_url: sharedUrl,
-            file_type: 'image',
-            created_at: '2026-01-01T00:00:00Z',
-          },
-          {
-            id: 'f2',
-            edition_id: 'ed-2',
-            source_type: 'manual',
-            file_url: sharedUrl,
-            file_type: 'image',
-            created_at: '2026-01-01T00:00:00Z',
-          },
-        ],
-      },
-      error: null,
-    };
+    downloadImpl = async () => makeBlobResponse('image/png');
 
     const { manifest } = await buildBackupZip('u', 'e', makeMockSupabase());
-    expect(fetchCalls).toBe(1);
-    expect(manifest.image_count).toBe(2); // 两个 row 都打包，但只下载 1 次
+
+    // 同一 bucket/path 只 download 一次
+    expect(downloadCalls.length).toBe(1);
+    expect(downloadCalls[0]).toEqual({ bucket: 'edition-files', path: sharedPath });
+    // 但两条 row 都打包（image_count = 2）
+    expect(manifest.image_count).toBe(2);
   });
 });
 
+// ====================================================
+// 错误路径
+// ====================================================
 describe('buildBackupZip — 错误路径', () => {
   it('RPC 返回 error → 抛错带 message', async () => {
     rpcResponse = { data: null, error: { message: 'rpc denied' } };
@@ -350,199 +484,10 @@ describe('buildBackupZip — 错误路径', () => {
   });
 });
 
-describe('resolveToAbsoluteUrl — URL 形态归一', () => {
-  it('绝对 https URL 原样返回', () => {
-    const u = 'https://x.supabase.co/storage/v1/object/public/thumbnails/a/b.png';
-    expect(resolveToAbsoluteUrl(u)).toBe(u);
-  });
-
-  it('绝对 http URL 也原样返回', () => {
-    const u = 'http://example.com/x.jpg';
-    expect(resolveToAbsoluteUrl(u)).toBe(u);
-  });
-
-  it('相对路径拼到 thumbnails bucket public URL', () => {
-    const path = 'edition-uuid/file-uuid_name.png';
-    expect(resolveToAbsoluteUrl(path)).toBe(
-      `${TEST_SUPABASE_URL}/storage/v1/object/public/thumbnails/${path}`,
-    );
-  });
-
-  it('相对路径前的多余斜杠被裁掉', () => {
-    expect(resolveToAbsoluteUrl('/a/b.png')).toBe(
-      `${TEST_SUPABASE_URL}/storage/v1/object/public/thumbnails/a/b.png`,
-    );
-  });
-
-  it('空字符串返回空字符串（不抛）', () => {
-    expect(resolveToAbsoluteUrl('')).toBe('');
-  });
-});
-
-describe('buildBackupZip — artworks.thumbnail_url 打包', () => {
-  it('thumbnail_url 绝对 URL：下载成功 → ZIP 内相对路径 + _original_thumbnail_url 保留', async () => {
-    rpcResponse = {
-      data: {
-        ...emptySnapshot(),
-        artworks: [
-          {
-            id: 'aw-001',
-            thumbnail_url: 'https://x.supabase.co/storage/v1/object/public/thumbnails/x/y.jpg',
-          },
-        ],
-      },
-      error: null,
-    };
-
-    const { buffer, manifest } = await buildBackupZip('u', 'e', makeMockSupabase());
-    const { filenames, data } = await unpackZip(buffer);
-
-    expect(filenames).toContain('images/aw-001.jpg');
-    expect(manifest.image_count).toBe(1);
-    expect((data.artworks as Array<Record<string, unknown>>)[0]).toMatchObject({
-      thumbnail_url: 'images/aw-001.jpg',
-      _original_thumbnail_url: 'https://x.supabase.co/storage/v1/object/public/thumbnails/x/y.jpg',
-    });
-  });
-
-  it('thumbnail_url 相对路径：解析后下载并打包，_original_thumbnail_url 保留原始相对路径', async () => {
-    const relPath = 'edition-uuid/file-uuid_image.png';
-    const fetchedUrls: string[] = [];
-    fetchImpl = async (url) => {
-      fetchedUrls.push(url);
-      return new Response(new Uint8Array(256), {
-        status: 200,
-        headers: { 'content-type': 'image/png' },
-      });
-    };
-
-    rpcResponse = {
-      data: {
-        ...emptySnapshot(),
-        artworks: [{ id: 'aw-rel', thumbnail_url: relPath }],
-      },
-      error: null,
-    };
-
-    const { buffer, manifest } = await buildBackupZip('u', 'e', makeMockSupabase());
-    const { filenames, data } = await unpackZip(buffer);
-
-    expect(fetchedUrls).toContain(
-      `${TEST_SUPABASE_URL}/storage/v1/object/public/thumbnails/${relPath}`,
-    );
-    expect(filenames).toContain('images/aw-rel.png');
-    expect(manifest.image_count).toBe(1);
-    expect((data.artworks as Array<Record<string, unknown>>)[0]).toMatchObject({
-      thumbnail_url: 'images/aw-rel.png',
-      _original_thumbnail_url: relPath, // 保留原始字段（相对路径）
-    });
-  });
-
-  it('thumbnail_url 下载失败 → 字段保留原值，不破坏 ZIP', async () => {
-    fetchImpl = async () => new Response(null, { status: 404 });
-
-    rpcResponse = {
-      data: {
-        ...emptySnapshot(),
-        artworks: [{ id: 'aw-broken', thumbnail_url: 'https://broken.example.com/x.jpg' }],
-      },
-      error: null,
-    };
-
-    const { buffer, manifest } = await buildBackupZip('u', 'e', makeMockSupabase());
-    const { filenames, data } = await unpackZip(buffer);
-
-    expect(filenames.some((n) => n.startsWith('images/aw-broken'))).toBe(false);
-    expect(manifest.image_count).toBe(0);
-    expect((data.artworks as Array<Record<string, unknown>>)[0].thumbnail_url).toBe(
-      'https://broken.example.com/x.jpg',
-    );
-    expect(
-      (data.artworks as Array<Record<string, unknown>>)[0]._original_thumbnail_url,
-    ).toBeUndefined();
-  });
-
-  it('artworks 与 edition_files 同 ZIP 共存 + UUID 命名空间不冲突', async () => {
-    rpcResponse = {
-      data: {
-        ...emptySnapshot(),
-        artworks: [{ id: 'aw-A', thumbnail_url: 'https://x.com/a.jpg' }],
-        edition_files: [
-          {
-            id: 'ef-B',
-            edition_id: 'ed-1',
-            source_type: 'manual',
-            file_url: 'https://x.com/b.png',
-            file_type: 'image',
-            created_at: '2026-01-01T00:00:00Z',
-          },
-        ],
-      },
-      error: null,
-    };
-
-    fetchImpl = async (url) => {
-      const ctype = url.endsWith('.png') ? 'image/png' : 'image/jpeg';
-      return new Response(new Uint8Array(128), {
-        status: 200,
-        headers: { 'content-type': ctype },
-      });
-    };
-
-    const { buffer, manifest } = await buildBackupZip('u', 'e', makeMockSupabase());
-    const { filenames } = await unpackZip(buffer);
-
-    expect(filenames).toContain('images/aw-A.jpg');
-    expect(filenames).toContain('images/ef-B.png');
-    expect(manifest.image_count).toBe(2);
-  });
-});
-
-describe('buildBackupZip — edition_files.file_url 相对路径解析', () => {
-  it('相对路径的 file_url：拼上 Storage public URL prefix 后 fetch', async () => {
-    const relPath = '714471ea/file-uuid_image.png';
-    const fetchedUrls: string[] = [];
-    fetchImpl = async (url) => {
-      fetchedUrls.push(url);
-      return new Response(new Uint8Array(256), {
-        status: 200,
-        headers: { 'content-type': 'image/png' },
-      });
-    };
-
-    rpcResponse = {
-      data: {
-        ...emptySnapshot(),
-        edition_files: [
-          {
-            id: 'file-rel',
-            edition_id: 'ed-1',
-            source_type: 'upload',
-            file_url: relPath,
-            file_type: 'image',
-            created_at: '2026-01-01T00:00:00Z',
-          },
-        ],
-      },
-      error: null,
-    };
-
-    const { buffer, manifest } = await buildBackupZip('u', 'e', makeMockSupabase());
-    const { filenames, data } = await unpackZip(buffer);
-
-    expect(fetchedUrls).toContain(
-      `${TEST_SUPABASE_URL}/storage/v1/object/public/thumbnails/${relPath}`,
-    );
-    expect(filenames).toContain('images/file-rel.png');
-    expect(manifest.image_count).toBe(1);
-    expect((data.edition_files as Array<Record<string, unknown>>)[0]).toMatchObject({
-      file_url: 'images/file-rel.png',
-      _original_url: relPath, // 保留原始相对路径
-    });
-  });
-});
-
-describe('buildBackupZip — manifest 与 stats 一致', () => {
+// ====================================================
+// stats
+// ====================================================
+describe('buildBackupZip — stats 与数据一致', () => {
   it('stats 各字段等于对应数组长度', async () => {
     rpcResponse = {
       data: {

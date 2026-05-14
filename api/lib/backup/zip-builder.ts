@@ -5,36 +5,43 @@
  * ----
  * 1. 调 RPC `public.backup_snapshot(p_user_id)` 拿到跨表一致性 jsonb 快照
  *    （单事务内所有 SELECT 共享同一 snapshot，避免 supabase-js 多请求间的脏读）。
- * 2. 收集两类图片 URL 一起并发下载（batch size = 5，与 api/export/pdf.ts:414 对齐）：
- *      - `edition_files.file_url`（仅 file_type='image'，且 file_url 可能是相对路径
- *        或绝对 URL —— 见下方 "URL 形态" 说明）
- *      - `artworks.thumbnail_url`（前端列表/详情显示的作品主图，全部用绝对 URL）
+ * 2. 收集两类资产、并发下载（batch size = 5，与 api/export/pdf.ts:414 对齐）：
+ *      a) artworks.thumbnail_url —— 作品主图（thumbnails public bucket）
+ *      b) edition_files：仅 source_type='upload' 的行 —— 上传到 edition-files
+ *         **private** bucket 的附件（image / pdf / document 全部，不再限 file_type='image'）
+ *    source_type='link' 的行（如 Basecamp 外链）跳过 —— 备份 = 工作室自有数据，
+ *    不下载第三方资源。
  * 3. 重写两张表的行：
- *      - edition_files: `file_url` → `images/{file_id}.{ext}`，原 URL 保留到 `_original_url`
- *      - artworks: `thumbnail_url` → `images/{artwork_id}.{ext}`，原 URL 保留到
- *        `_original_thumbnail_url`
- *      ZIP 内文件命名都是 UUID，artwork_id 与 file_id 命名空间天然不冲突，
- *      平铺到一个 `images/` 子目录。
- * 4. 用 jszip 组装 ZIP：manifest.json + data.json + images/{id}.{ext}
+ *      - artworks.thumbnail_url → `artworks/{artwork_id}.{ext}` + _original_thumbnail_url
+ *      - edition_files.file_url → `files/{file_id}.{ext}` + _original_url
+ *    ZIP 子目录拆开（不再平铺 images/），与两张表的语义对齐。
+ * 4. 用 jszip 组装：manifest.json + data.json + artworks/* + files/*
  * 5. 返回 `{ buffer, manifest }`（jszip nodebuffer 模式，内存全打包）。
+ *
+ * Storage 下载策略：service-key download() 穿 public + private
+ * ----------------------------------------------------------
+ * thumbnails bucket 是 public（fetch URL 也能读），但 edition-files bucket 是 **private**
+ * （前端走 `getSignedUrl` 拿临时签名 URL）—— 直接 fetch public URL 会 404。
+ *
+ * 解法：所有 Supabase Storage 资源统一用 `supabase.storage.from(bucket).download(path)`
+ * —— service-key 客户端绕过 RLS 和 bucket public 设置，对 public / private 同效。
  *
  * URL 形态：相对路径 vs 绝对 URL
  * ------------------------------
- * `edition_files.file_url` 是历史遗留双形态：
- *   - 老数据：相对路径 `{edition_id}/{uuid}_filename.png`（早期上传流写入）
- *   - 新数据：绝对 URL `https://{ref}.supabase.co/storage/v1/object/public/thumbnails/...`
- * `artworks.thumbnail_url` 目前观察都是绝对 URL，但为防御性兼容也走同一 resolver。
- * `resolveToAbsoluteUrl()` 统一处理：绝对 URL 原样返；相对路径拼上
- * `${SUPABASE_URL}/storage/v1/object/public/thumbnails/` 前缀。
+ * `edition_files.file_url` 历史上双形态：
+ *   - 老数据：相对路径 `{edition_id}/{uuid}_filename.png`（src/hooks/useFileUpload.ts:150 写入）
+ *   - 新数据：绝对 URL `https://{ref}.supabase.co/storage/v1/object/...`
+ * `artworks.thumbnail_url` 目前观察都是绝对 URL，但代码两种形态都吃。
+ *
+ * `parseStorageRef(raw, defaultBucket)` 把两种形态统一成 `{bucket, path}`：
+ *   - 绝对 supabase Storage URL → 从 path 里 extract `/storage/v1/object/{public|sign}/{bucket}/{path}`
+ *   - 相对路径 → 用 defaultBucket + 路径原样
  *
  * 注意
  * ----
- * - Pro 计划 maxDuration 300s 够用：100 件作品 / 几百张图片 / 顺序串行批量并发都在范围内。
- * - 这里**不复用** api/export/pdf.ts 的 fetchImagesInBatches —— 那个返回 base64
- *   data URL（PDF 嵌入用），我们要原始二进制 Buffer。两条路径同模式不同 payload，
- *   保持职责分离。
- * - 软删行（artworks.deleted_at IS NOT NULL）也进备份 —— RPC 函数没过滤
- *   deleted_at，恢复时保留软删状态。
+ * - Pro 计划 maxDuration 300s 够用：100 件作品 + 几百张附件在 batchSize=5 并发下 p95 < 60s。
+ * - 软删行（artworks.deleted_at IS NOT NULL）也进备份，恢复时保留软删状态。
+ * - `source_type='link'` 行原样保留 file_url（外链），不下载——见 docs/backup.md `链接类外链`。
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -62,16 +69,15 @@ interface EditionFileRow {
   sort_order?: number | null;
   created_at: string;
   created_by?: string | null;
-  // 写入 ZIP 时附加：保留原始外链 URL，导入端可决定是回填还是重传
+  // 写入 ZIP 时附加：保留原始外链 URL / storage path
   _original_url?: string;
 }
 
 interface ArtworkRow {
   id: string;
   thumbnail_url?: string | null;
-  // 写入 ZIP 时附加：保留原始 thumbnail URL，restore 时若 ZIP 内图片缺失走 fallback
+  // 写入 ZIP 时附加：保留原始 thumbnail URL
   _original_thumbnail_url?: string;
-  // 其他字段保持透明，restore 时整行回写
   [key: string]: unknown;
 }
 
@@ -86,88 +92,122 @@ interface BackupSnapshot {
 }
 
 // =====================================================
-// URL 形态归一：相对路径 → 绝对 Storage URL；绝对 URL 原样
+// 常量
 // =====================================================
 
+/** artworks.thumbnail_url 默认所在 bucket（public）。 */
 const THUMBNAILS_BUCKET = 'thumbnails';
+/** edition_files.file_url 默认所在 bucket（private，前端走 signed URL）。 */
+const EDITION_FILES_BUCKET = 'edition-files';
 
-function getSupabaseUrl(): string {
-  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  if (!url) {
-    throw new Error('Missing VITE_SUPABASE_URL / SUPABASE_URL in environment');
-  }
-  return url.replace(/\/+$/, '');
+// =====================================================
+// URL ↔ Storage 引用解析
+// =====================================================
+
+interface StorageRef {
+  bucket: string;
+  path: string;
 }
 
 /**
- * 把可能是相对路径的 file_url / thumbnail_url 归一成绝对 https URL。
- *   - 已经是 http(s):// 开头：原样返回（已是 Storage public URL 或外链）
- *   - 否则：当作 `${THUMBNAILS_BUCKET}/${path}` 拼出 public URL
- *     —— 项目当前唯一的公开图片 bucket 就是 thumbnails，老相对路径都属于这里
+ * 把可能是相对路径或绝对 supabase Storage URL 的字段值，归一为 `{bucket, path}`。
+ * 解析失败（外链 / 格式异常）返 null —— 调用方决定 fallback 行为。
+ *
+ *   - 相对路径 → `{ bucket: defaultBucket, path: raw }`
+ *   - 绝对 supabase Storage URL → 从 pathname `/storage/v1/object/{public|sign}/{bucket}/{...}`
+ *     里提取 bucket 与 path
+ *   - 其它绝对 URL（非 supabase storage） → null（外链不下载）
  */
-export function resolveToAbsoluteUrl(raw: string): string {
-  if (!raw) return raw;
-  if (/^https?:\/\//i.test(raw)) return raw;
-  const base = getSupabaseUrl();
+export function parseStorageRef(raw: string, defaultBucket: string): StorageRef | null {
+  if (!raw) return null;
+
+  // 绝对 URL 路径
+  if (/^https?:\/\//i.test(raw)) {
+    try {
+      const u = new URL(raw);
+      // 期望路径：/storage/v1/object/{public|sign|authenticated}/{bucket}/{...}
+      const m = u.pathname.match(/\/storage\/v1\/object\/(?:public|sign|authenticated)\/([^/]+)\/(.+)$/);
+      if (!m) return null;
+      const bucket = decodeURIComponent(m[1]);
+      const path = decodeURIComponent(m[2]);
+      return { bucket, path };
+    } catch {
+      return null;
+    }
+  }
+
+  // 相对路径
   const cleaned = raw.replace(/^\/+/, '');
-  return `${base}/storage/v1/object/public/${THUMBNAILS_BUCKET}/${cleaned}`;
+  return { bucket: defaultBucket, path: cleaned };
 }
 
 // =====================================================
-// 图片下载（仿 fetchImagesInBatches，但返回 Buffer 而非 base64）
+// Storage 下载：service-key 穿 public + private
 // =====================================================
 
-interface DownloadedImage {
+interface DownloadedAsset {
   buffer: Buffer;
   contentType: string;
+  /** 用于 dedup 的 key（bucket/path 组合）。 */
+  key: string;
 }
 
-async function fetchImageBuffer(url: string, timeoutMs = 10000): Promise<DownloadedImage | null> {
+/**
+ * 通过 service-key 下载 Storage 对象。private bucket 也能读。
+ * 失败（path 不存在 / network / etc）返 null —— 调用方据此决定 ZIP 内是否打包。
+ */
+async function downloadFromStorage(
+  supabase: SupabaseClient,
+  bucket: string,
+  path: string,
+): Promise<DownloadedAsset | null> {
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-    const response = await fetch(url, { signal: controller.signal });
-    clearTimeout(timer);
-
-    if (!response.ok) return null;
-
-    const arrayBuffer = await response.arrayBuffer();
+    const { data, error } = await supabase.storage.from(bucket).download(path);
+    if (error || !data) {
+      console.error(`[Backup ZIP] storage.download(${bucket}/${path}) failed:`, error?.message);
+      return null;
+    }
+    const arrayBuffer = await data.arrayBuffer();
     return {
       buffer: Buffer.from(arrayBuffer),
-      contentType: response.headers.get('content-type') || 'image/jpeg',
+      contentType: data.type || 'application/octet-stream',
+      key: `${bucket}/${path}`,
     };
-  } catch (error) {
-    const name = (error as Error).name;
-    if (name === 'AbortError') {
-      console.error(`[Backup ZIP] Image fetch timeout: ${url}`);
-    } else {
-      console.error('[Backup ZIP] Failed to fetch image:', (error as Error).message);
-    }
+  } catch (e) {
+    console.error(`[Backup ZIP] storage.download exception (${bucket}/${path}):`, (e as Error).message);
     return null;
   }
 }
 
 /**
- * 分批并发下载图片（batch size 5），与 api/export/pdf.ts:414 模式对齐。
- * 失败的 URL 不进结果 Map —— 调用方据此决定怎么重写 file_url。
+ * 分批并发下载（batch size 5），与 api/export/pdf.ts:414 模式对齐。
+ * 失败的 ref 不进结果 Map —— 调用方据此决定怎么重写字段。
+ * cache key 用 `bucket/path` 组合，跨字段共用一份。
  */
-async function fetchImagesInBatches(
-  urls: string[],
+async function downloadInBatches(
+  supabase: SupabaseClient,
+  refs: StorageRef[],
   batchSize = 5,
-): Promise<Map<string, DownloadedImage>> {
-  const cache = new Map<string, DownloadedImage>();
+): Promise<Map<string, DownloadedAsset>> {
+  const cache = new Map<string, DownloadedAsset>();
 
-  for (let i = 0; i < urls.length; i += batchSize) {
-    const batch = urls.slice(i, i + batchSize);
+  // 去重
+  const uniqueRefs: StorageRef[] = [];
+  const seen = new Set<string>();
+  for (const r of refs) {
+    const k = `${r.bucket}/${r.path}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    uniqueRefs.push(r);
+  }
+
+  for (let i = 0; i < uniqueRefs.length; i += batchSize) {
+    const batch = uniqueRefs.slice(i, i + batchSize);
     const results = await Promise.all(
-      batch.map(async (url) => {
-        const img = await fetchImageBuffer(url);
-        return { url, img };
-      }),
+      batch.map(async (r) => downloadFromStorage(supabase, r.bucket, r.path)),
     );
-    for (const { url, img } of results) {
-      if (img) cache.set(url, img);
+    for (const asset of results) {
+      if (asset) cache.set(asset.key, asset);
     }
   }
 
@@ -175,32 +215,41 @@ async function fetchImagesInBatches(
 }
 
 // =====================================================
-// 文件名工具
+// 文件名工具：决定 ZIP 内文件扩展名
 // =====================================================
 
 /**
- * 从 URL 提取扩展名（无 query），fallback 到 contentType。
- * 安全输出 lowercase ASCII，仅取首段（防 `.tar.gz` 之类的多段误判）。
+ * 决定 ZIP 内文件扩展名的优先级：
+ *   1. storage path 末尾扩展（最权威，与上传时文件名一致）
+ *   2. DB 行的 file_name 字段末尾扩展（用户可读文件名）
+ *   3. contentType 末段 → 常见 mime 映射
+ *   4. 'bin' 兜底
+ *
+ * 仅保留 a-z0-9，最多 5 字符，防奇异 path。
  */
-function extractExtension(url: string, contentType: string): string {
-  try {
-    const pathname = new URL(url).pathname;
-    const idx = pathname.lastIndexOf('.');
-    if (idx >= 0 && idx < pathname.length - 1) {
-      const ext = pathname.slice(idx + 1).toLowerCase();
-      // 只保留 a-z0-9，最多 5 字符（防奇异 path）
-      const clean = ext.replace(/[^a-z0-9]/g, '').slice(0, 5);
-      if (clean) return clean;
+function pickExtension(
+  storagePath: string,
+  fileNameHint: string | null | undefined,
+  contentType: string,
+): string {
+  const cleanExt = (s: string) =>
+    s.replace(/[^a-z0-9]/g, '').slice(0, 5);
+
+  for (const candidate of [storagePath, fileNameHint ?? '']) {
+    if (!candidate) continue;
+    const idx = candidate.lastIndexOf('.');
+    if (idx >= 0 && idx < candidate.length - 1) {
+      const raw = candidate.slice(idx + 1).toLowerCase();
+      // 去掉 query / fragment（path 可能含 ?）
+      const stripped = raw.split(/[?#]/)[0];
+      const cleaned = cleanExt(stripped);
+      if (cleaned) return cleaned;
     }
-  } catch {
-    /* fallthrough */
   }
 
-  // fallback: contentType 末段
   const sub = contentType.split('/')[1]?.toLowerCase() || 'bin';
-  // image/jpeg → jpg
   if (sub === 'jpeg') return 'jpg';
-  return sub.replace(/[^a-z0-9]/g, '').slice(0, 5) || 'bin';
+  return cleanExt(sub) || 'bin';
 }
 
 // =====================================================
@@ -217,14 +266,14 @@ export interface BuildBackupZipResult {
  *
  * @param userId    被备份用户 UUID（service key 上下文，由 verifyAuth / cron 提供）
  * @param userEmail 用户邮箱（manifest 元数据用）
- * @param supabase  service-role Supabase client（绕过 RLS）
+ * @param supabase  service-role Supabase client（绕过 RLS + 穿 private bucket）
  */
 export async function buildBackupZip(
   userId: string,
   userEmail: string,
   supabase: SupabaseClient,
 ): Promise<BuildBackupZipResult> {
-  // 1) 跨表一致性快照（单事务 RPC）
+  // 1) 跨表一致性快照
   const { data: snapshot, error: rpcError } = await supabase.rpc('backup_snapshot', {
     p_user_id: userId,
   });
@@ -237,84 +286,95 @@ export async function buildBackupZip(
   }
 
   const data = snapshot as BackupSnapshot;
-
-  // 2) 收集两类图片 URL：
-  //    a) edition_files (file_type='image' 且 file_url 非空)
-  //    b) artworks.thumbnail_url（前端列表/详情主图）
-  //    file_url 可能是相对 Storage 路径，先 resolveToAbsoluteUrl 归一成绝对 URL 再 fetch。
   const fileRows: EditionFileRow[] = Array.isArray(data.edition_files) ? data.edition_files : [];
   const artworkRows: ArtworkRow[] = Array.isArray(data.artworks) ? data.artworks : [];
 
-  const imageFileRows = fileRows.filter(
-    (f) => f.file_type === 'image' && typeof f.file_url === 'string' && f.file_url.length > 0,
-  );
-  const thumbArtworkRows = artworkRows.filter(
-    (a) => typeof a.thumbnail_url === 'string' && a.thumbnail_url.length > 0,
-  );
+  // 2) 解析两条路径的 StorageRef
+  //
+  //    artworks.thumbnail_url —— 全部（默认 thumbnails bucket）
+  //    edition_files —— 仅 source_type='upload'（默认 edition-files bucket）。
+  //                     source_type='link' 跳过；上传类不限 file_type，pdf/doc/image 都备份。
 
-  // 收集所有需要下载的绝对 URL（去重）
-  const urlSet = new Set<string>();
-  for (const f of imageFileRows) urlSet.add(resolveToAbsoluteUrl(f.file_url));
-  for (const a of thumbArtworkRows) urlSet.add(resolveToAbsoluteUrl(a.thumbnail_url as string));
-  const uniqueUrls = [...urlSet];
-
-  const imageCache = await fetchImagesInBatches(uniqueUrls);
-
-  // 3) 重写两张表的图片字段：
-  //    - 成功下载 → file_url / thumbnail_url 改 `images/{id}.{ext}`，原 URL 存 _original*
-  //    - 失败 → 字段保持原值（restore 时若也找不到 ZIP buffer，落到 fallback 原 URL）
-  const zip = new JSZip();
-  const imagesFolder = zip.folder('images');
-  if (!imagesFolder) {
-    throw new Error('jszip: failed to create images/ folder');
+  type ArtworkRefEntry = { row: ArtworkRow; ref: StorageRef };
+  const artworkRefs: ArtworkRefEntry[] = [];
+  for (const row of artworkRows) {
+    const thumb = row.thumbnail_url;
+    if (typeof thumb !== 'string' || thumb.length === 0) continue;
+    const ref = parseStorageRef(thumb, THUMBNAILS_BUCKET);
+    if (!ref) continue; // 外链 / 解析失败 → 字段保留原值
+    artworkRefs.push({ row, ref });
   }
 
-  let packedImageCount = 0;
-  let packedThumbCount = 0;
+  type FileRefEntry = { row: EditionFileRow; ref: StorageRef };
+  const fileRefs: FileRefEntry[] = [];
+  for (const row of fileRows) {
+    if (row.source_type !== 'upload') continue; // link 类不下载
+    if (typeof row.file_url !== 'string' || row.file_url.length === 0) continue;
+    const ref = parseStorageRef(row.file_url, EDITION_FILES_BUCKET);
+    if (!ref) continue;
+    fileRefs.push({ row, ref });
+  }
 
-  // 3a) edition_files
-  const rewrittenFileRows: EditionFileRow[] = fileRows.map((row) => {
-    if (row.file_type !== 'image') return row;
-    const absUrl = resolveToAbsoluteUrl(row.file_url);
-    const img = imageCache.get(absUrl);
-    if (!img) return row; // 下载失败 → 保留原 file_url
+  // 3) 下载（去重在 downloadInBatches 内部完成）
+  const allRefs = [...artworkRefs.map((e) => e.ref), ...fileRefs.map((e) => e.ref)];
+  const assetCache = await downloadInBatches(supabase, allRefs);
 
-    const ext = extractExtension(absUrl, img.contentType);
+  // 4) 组装 ZIP：拆 artworks/ 与 files/ 子目录
+  const zip = new JSZip();
+  const artworksFolder = zip.folder('artworks');
+  const filesFolder = zip.folder('files');
+  if (!artworksFolder || !filesFolder) {
+    throw new Error('jszip: failed to create artworks/ or files/ folder');
+  }
+
+  let packedThumbnails = 0;
+  let packedFiles = 0;
+  const refOf = (r: StorageRef) => `${r.bucket}/${r.path}`;
+
+  // 4a) artworks.thumbnail_url → artworks/{artwork_id}.{ext}
+  const rewrittenArtworkRows: ArtworkRow[] = artworkRows.map((row) => {
+    const entry = artworkRefs.find((e) => e.row.id === row.id);
+    if (!entry) return row;
+    const asset = assetCache.get(refOf(entry.ref));
+    if (!asset) return row; // 下载失败 → 保留原 thumbnail_url
+
+    const ext = pickExtension(entry.ref.path, null, asset.contentType);
     const zipPath = `${row.id}.${ext}`;
-    imagesFolder.file(zipPath, img.buffer);
-    packedImageCount += 1;
+    artworksFolder.file(zipPath, asset.buffer);
+    packedThumbnails += 1;
 
     return {
       ...row,
-      file_url: `images/${zipPath}`,
+      thumbnail_url: `artworks/${zipPath}`,
+      _original_thumbnail_url: typeof row.thumbnail_url === 'string' ? row.thumbnail_url : undefined,
+    };
+  });
+
+  // 4b) edition_files (source_type='upload') → files/{file_id}.{ext}
+  //     不限 file_type —— image / pdf / document 全部入 ZIP。
+  //     source_type='link' 行不改 file_url。
+  const rewrittenFileRows: EditionFileRow[] = fileRows.map((row) => {
+    if (row.source_type !== 'upload') return row;
+    const entry = fileRefs.find((e) => e.row.id === row.id);
+    if (!entry) return row;
+    const asset = assetCache.get(refOf(entry.ref));
+    if (!asset) return row;
+
+    const ext = pickExtension(entry.ref.path, row.file_name, asset.contentType);
+    const zipPath = `${row.id}.${ext}`;
+    filesFolder.file(zipPath, asset.buffer);
+    packedFiles += 1;
+
+    return {
+      ...row,
+      file_url: `files/${zipPath}`,
       _original_url: row.file_url,
     };
   });
 
-  // 3b) artworks.thumbnail_url
-  const rewrittenArtworkRows: ArtworkRow[] = artworkRows.map((row) => {
-    const thumb = row.thumbnail_url;
-    if (typeof thumb !== 'string' || thumb.length === 0) return row;
-    const absUrl = resolveToAbsoluteUrl(thumb);
-    const img = imageCache.get(absUrl);
-    if (!img) return row; // 下载失败 → 保留原 thumbnail_url
-
-    const ext = extractExtension(absUrl, img.contentType);
-    const zipPath = `${row.id}.${ext}`;
-    // artwork_id 与 file_id 都是 UUID，同一 images/ 子目录命名空间不冲突
-    imagesFolder.file(zipPath, img.buffer);
-    packedThumbCount += 1;
-
-    return {
-      ...row,
-      thumbnail_url: `images/${zipPath}`,
-      _original_thumbnail_url: thumb,
-    };
-  });
-
-  // 4) Stats
+  // 5) Stats
   const stats: BackupStats = {
-    artworks: Array.isArray(data.artworks) ? data.artworks.length : 0,
+    artworks: artworkRows.length,
     editions: Array.isArray(data.editions) ? data.editions.length : 0,
     edition_files: fileRows.length,
     edition_history: Array.isArray(data.edition_history) ? data.edition_history.length : 0,
@@ -323,8 +383,10 @@ export async function buildBackupZip(
     api_keys: Array.isArray(data.api_keys) ? data.api_keys.length : 0,
   };
 
-  // 5) Manifest（total_size_bytes 暂填 0，generateAsync 完成后回填）
-  //    image_count 同时含 edition_files 图片 + artworks thumbnail（两条路径合计）
+  // 6) Manifest（total_size_bytes 暂填 0，generateAsync 完成后回填）
+  //    image_count 现在含义 = ZIP 内所有 binary asset 总数（artworks + edition_files 上传类合计）。
+  //    旧 v1 备份语义只含 image；新备份语义扩展为含 pdf/doc 等。format_version 不 bump，
+  //    parser 仍按必填字段校验。
   const manifest: BackupManifest = {
     backup_format_version: BACKUP_FORMAT_VERSION,
     db_schema_version: DB_SCHEMA_VERSION,
@@ -332,22 +394,18 @@ export async function buildBackupZip(
     user_email: userEmail,
     created_at: new Date().toISOString(),
     stats,
-    image_count: packedImageCount + packedThumbCount,
+    image_count: packedThumbnails + packedFiles,
     total_size_bytes: 0,
   };
 
-  // 6) data.json: 完整快照（edition_files + artworks 已重写）
+  // 7) data.json: 完整快照（artworks + edition_files 已重写）
   const dataPayload = {
     ...data,
     artworks: rewrittenArtworkRows,
     edition_files: rewrittenFileRows,
   };
 
-  // 7) 先写 data.json，再生成 buffer 拿 size，最后回填 manifest.total_size_bytes 写 manifest.json
-  //    顺序：jszip 不保证 entry 顺序与添加顺序一致，但读取端无依赖（按 name 取）
   zip.file('data.json', JSON.stringify(dataPayload, null, 2));
-
-  // 临时 manifest（先放进去占位，最后用 buffer.byteLength 回写一次）
   zip.file('manifest.json', JSON.stringify(manifest, null, 2));
 
   // 第一轮 generateAsync 拿到 size
@@ -358,8 +416,5 @@ export async function buildBackupZip(
   zip.file('manifest.json', JSON.stringify(manifest, null, 2));
   const buffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
 
-  // total_size_bytes 是"包含含 size 字段的 manifest 的 ZIP"大小。第二轮 buffer 可能比
-  // 第一轮多出几个字节（manifest.total_size_bytes 由 0 变成实际值），可接受 ——
-  // 调用方依赖的 sizeBytes（返回给前端展示 + DB 存）我们用第二轮 buffer.byteLength 重赋。
   return { buffer, manifest: { ...manifest, total_size_bytes: buffer.byteLength } };
 }

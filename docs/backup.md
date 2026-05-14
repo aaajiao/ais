@@ -45,14 +45,15 @@
 每个备份 ZIP 内部结构：
 
 ```
-manifest.json         # 元数据 + 完整性自描述
-data.json             # 所有用户域表的 jsonb 快照
-images/
-  {edition_file_id}.{jpg|png|webp|gif|...}    # edition_files.file_url 重写后的图片
-  {artwork_id}.{jpg|png|webp|gif|...}          # artworks.thumbnail_url 重写后的图片
+manifest.json
+data.json
+artworks/                                # artworks.thumbnail_url 重写后的图（public bucket: thumbnails）
+  {artwork_id}.{jpg|png|webp|...}
+files/                                   # edition_files.file_url 重写后的附件（private bucket: edition-files）
+  {edition_file_id}.{jpg|png|pdf|docx|...}    # 含 image / pdf / doc / etc，全部源自 source_type='upload'
 ```
 
-> `images/` 目录平铺，artwork_id 与 edition_file_id 同为 UUID（命名空间不冲突）。restore 通过查 row 的 `id` 字段去 ZIP 内取 buffer，两条路径共用 lookup 逻辑。
+> 子目录按"哪张表 / 哪个 bucket"语义分开 —— artworks/ 走 public bucket，files/ 走 private bucket，restore 时两套独立 lookup + 上传逻辑。`source_type='link'` 的 edition_files 行（外链引用）**不进 ZIP**，行的 `file_url` 原样保留。
 
 ### `manifest.json` schema
 
@@ -72,7 +73,7 @@ images/
     "gallery_links": number,
     "api_keys": number
   },
-  "image_count": number,               // ZIP 内 images/ 子目录的图片总数（含 edition_files 图片 + artworks 缩略图）
+  "image_count": number,               // ZIP 内 binary asset 总数（artworks/ + files/ 合计；含 PDF / doc 等非图）
   "total_size_bytes": number           // ZIP 文件本身的 size，与 buffer.byteLength 一致
 }
 ```
@@ -83,48 +84,68 @@ images/
 
 ```ts
 {
-  "artworks":        ArtworkRow[], // thumbnail_url 已重写为 images/ 路径，_original_thumbnail_url 保留原 URL
+  "artworks":        ArtworkRow[],   // thumbnail_url 已重写为 artworks/ 路径，_original_thumbnail_url 保留原 URL
   "editions":        Row[],
-  "edition_files":   FileRow[],    // file_url 已重写为 images/ 路径，_original_url 保留原 URL
+  "edition_files":   FileRow[],      // source_type='upload' 的 file_url 已重写为 files/ 路径，_original_url 保留原 path/URL
+                                     //   source_type='link' 行原样保留（file_url 仍是外链 URL）
   "edition_history": Row[],
   "locations":       Row[],
   "gallery_links":   Row[],
-  "api_keys":        Row[]         // 注意：含 key_hash（哈希值）而非明文 key，泄漏 ZIP 不直接给到可用 key
+  "api_keys":        Row[]           // 注意：含 key_hash（哈希值）而非明文 key，泄漏 ZIP 不直接给到可用 key
 }
 ```
 
 **不包含** `users` 表 —— 账号身份保护。备份只是工作室数据，不是账号凭据。
 
-### 行重写：两条路径
+### 两条 bucket 路径
 
-**`edition_files`**（file_type='image' 的行）：
+项目里两张表的图/附件来自**两个不同 Storage bucket**，性质相反，导出与恢复时必须分流：
+
+| 字段 | Bucket | 性质 | DB 存什么 | 前端读取方式 |
+|------|--------|------|-----------|--------------|
+| `artworks.thumbnail_url` | `thumbnails` | **public** | 绝对 public URL | `<img src>` 直接用 |
+| `edition_files.file_url` (source_type='upload') | `edition-files` | **private** | storage path（相对路径） | `getSignedUrl('edition-files', path)` 拿临时签名 URL |
+| `edition_files.file_url` (source_type='link') | n/a | n/a | 外链 URL 字符串 | 点击直接跳外链 |
+
+**为什么 service-key download 而不是 fetch public URL**：private bucket 直接 fetch public URL 返 404。service-role Supabase client 绕过 RLS + bucket public 设置，对两种 bucket 一视同仁：
+
+```ts
+// zip-builder.ts
+await supabase.storage.from(bucket).download(path)
+```
+
+### 行重写：两条独立路径
+
+**`artworks.thumbnail_url`** → 下载到 `artworks/{artwork_id}.{ext}`：
 
 ```json
 // 打包前
-{ "id": "f1", "file_url": "https://xxx.supabase.co/.../thumbnails/img.jpg", "file_type": "image" }
+{ "id": "aw1", "thumbnail_url": "https://xxx.supabase.co/storage/v1/object/public/thumbnails/a/b.jpg" }
 // 打包后
-{ "id": "f1", "file_url": "images/f1.jpg", "_original_url": "https://xxx.../img.jpg", "file_type": "image" }
+{ "id": "aw1", "thumbnail_url": "artworks/aw1.jpg", "_original_thumbnail_url": "https://xxx.../b.jpg" }
 ```
 
-**`artworks.thumbnail_url`**（前端列表 / 详情显示的作品主图）：
+**`edition_files` (source_type='upload')** → 下载到 `files/{file_id}.{ext}`：
 
 ```json
-// 打包前
-{ "id": "aw1", "thumbnail_url": "https://xxx.supabase.co/.../thumbnails/a/b.jpg" }
+// 打包前（file_url 可能是相对 storage path，也可能是绝对 URL）
+{ "id": "f1", "source_type": "upload", "file_url": "ed-1/uuid_pic.png", "file_type": "image" }
 // 打包后
-{ "id": "aw1", "thumbnail_url": "images/aw1.jpg", "_original_thumbnail_url": "https://xxx.../b.jpg" }
+{ "id": "f1", "source_type": "upload", "file_url": "files/f1.png", "_original_url": "ed-1/uuid_pic.png", "file_type": "image" }
 ```
 
-恢复时 `_original_url` / `_original_thumbnail_url` 一律剥离不进 DB；图片重传后的新 public URL 写回对应字段。
+**`edition_files` (source_type='link')** 行不动 `file_url`，原样保留外链 URL。
+
+恢复时 `_original_url` / `_original_thumbnail_url` 一律剥离不进 DB；详见下面 `restoreBackup` 一节。
 
 ### URL 形态归一：相对 vs 绝对
 
-`edition_files.file_url` 在 DB 里历史上**双形态共存**：
+DB 字段历史上同时存了两种形态：
 
-- 老数据：相对 Storage 路径，如 `{edition_id}/{uuid}_filename.png`
-- 新数据：绝对 URL `https://{ref}.supabase.co/storage/v1/object/public/thumbnails/...`
+- 相对 storage path：`{edition_id}/{uuid}_filename.png`（早期上传流写入，前端调 `getSignedUrl(bucket, path)` 解析）
+- 绝对 URL：`https://{ref}.supabase.co/storage/v1/object/public/{bucket}/{...}`（thumbnails 上传流的 publicUrl 写入）
 
-`buildBackupZip` 在下载图片前会调 `resolveToAbsoluteUrl()` 把字符串归一成可 fetch 的绝对 URL（相对路径默认拼到 `thumbnails` bucket public URL，绝对 URL 原样）。下载失败的行（含外链 404 / 网络超时）字段保持原值，restore 时若 ZIP 内也找不到 buffer 就走 fallback 原 URL + warning，**单条失败不阻断整体备份**。
+`buildBackupZip` 用 `parseStorageRef(raw, defaultBucket)` 把两种形态归一成 `{bucket, path}`：绝对 URL 从 pathname 提取；相对路径用 defaultBucket。非 supabase storage 的绝对 URL（基本是外链）返 `null` —— **不下载外链**，备份只装工作室自有数据。下载失败的行字段保持原值，restore 时若 ZIP 内也找不到 buffer 就走 fallback 原 URL + warning，**单条失败不阻断整体备份**。
 
 ---
 
@@ -230,16 +251,19 @@ restoreBackup                       → 500 + hint 用回滚包还原
    edition_history → edition_files → editions
                   → gallery_links → api_keys → locations → artworks
 
-2. 图片重传（两条平行路径）：
-   a) edition_files 行（file_type='image' 且 file_url 以 'images/' 开头）：
-      - 从 ZIP getImage(file_id) 取 buffer
-      - upload 到 Supabase Storage `thumbnails` bucket，路径 `restored/{file_id}.{ext}`
-      - 改写 row.file_url 为新 public URL，删 _original_url
-   b) artworks 行（thumbnail_url 以 'images/' 开头）：
-      - 从 ZIP getImage(artwork_id) 取 buffer
-      - 同 bucket 同路径模板 `restored/{artwork_id}.{ext}`
-      - 改写 row.thumbnail_url 为新 public URL，删 _original_thumbnail_url
-   失败 row 仍 INSERT（fallback 到 _original* 或原 images/ 字符串 + warning）
+2. 资产回灌（双 bucket 分流）：
+   a) artworks（thumbnail_url 以 'artworks/' 开头）：
+      - 从 ZIP getArtworkThumbnail(artwork_id) 取 buffer
+      - upload 到 **thumbnails (public) bucket**，路径 `restored/{artwork_id}.{ext}`
+      - 改写 row.thumbnail_url 为**绝对 public URL**（前端 <img src> 直接用）
+      - 删 _original_thumbnail_url
+   b) edition_files（source_type='upload' 且 file_url 以 'files/' 开头）：
+      - 从 ZIP getEditionFileAttachment(file_id) 取 buffer
+      - upload 到 **edition-files (private) bucket**，路径 `restored/{file_id}.{ext}`
+      - 改写 row.file_url 为 **storage path**（不是绝对 URL！前端走 getSignedUrl 解析）
+      - 删 _original_url
+   source_type='link' 行不进这一步，file_url 原样保留外链。
+   失败 row 仍 INSERT（fallback 到 _original* 或原字符串 + warning）。
    imagesRestored / imagesFailed 是两条路径合计。
 
 3. INSERT 备份内容（正 FK 顺序）：

@@ -55,7 +55,10 @@ async function buildZip(opts: {
   skipData?: boolean;
   manifestJsonString?: string; // 测无效 JSON
   dataJsonString?: string;
-  images?: Array<{ name: string; content: Uint8Array }>;
+  /** 写入 artworks/ 子目录 */
+  artworkAssets?: Array<{ name: string; content: Uint8Array }>;
+  /** 写入 files/ 子目录 */
+  fileAssets?: Array<{ name: string; content: Uint8Array }>;
 }): Promise<Buffer> {
   const zip = new JSZip();
   if (!opts.skipManifest) {
@@ -72,12 +75,15 @@ async function buildZip(opts: {
         : JSON.stringify(opts.data ?? emptyData());
     zip.file('data.json', content);
   }
-  if (opts.images) {
-    const imagesFolder = zip.folder('images');
-    if (!imagesFolder) throw new Error('failed to create images folder');
-    for (const img of opts.images) {
-      imagesFolder.file(img.name, img.content);
-    }
+  if (opts.artworkAssets) {
+    const f = zip.folder('artworks');
+    if (!f) throw new Error('failed to create artworks folder');
+    for (const a of opts.artworkAssets) f.file(a.name, a.content);
+  }
+  if (opts.fileAssets) {
+    const f = zip.folder('files');
+    if (!f) throw new Error('failed to create files folder');
+    for (const a of opts.fileAssets) f.file(a.name, a.content);
   }
   return await zip.generateAsync({ type: 'nodebuffer' });
 }
@@ -87,12 +93,13 @@ async function buildZip(opts: {
 // =====================================================
 
 describe('parseBackupZip — 合法备份', () => {
-  it('空数据 ZIP：返回 manifest + 空 data + getImage 工具', async () => {
+  it('空数据 ZIP：返回 manifest + 空 data + lookup helpers', async () => {
     const buf = await buildZip({});
     const parsed = await parseBackupZip(buf);
     expect(parsed.manifest.user_id).toBe('user-test');
     expect(parsed.data.artworks).toEqual([]);
-    expect(typeof parsed.getImage).toBe('function');
+    expect(typeof parsed.getArtworkThumbnail).toBe('function');
+    expect(typeof parsed.getEditionFileAttachment).toBe('function');
   });
 
   it('manifest 所有 8 个必填字段都返回', async () => {
@@ -131,58 +138,84 @@ describe('parseBackupZip — 合法备份', () => {
 });
 
 // =====================================================
-// 测试：getImage 懒加载
+// 测试：getArtworkThumbnail / getEditionFileAttachment 懒加载
 // =====================================================
 
-describe('parseBackupZip — getImage', () => {
-  it('找到匹配文件 ID 的图片 → 返回 buffer + contentType', async () => {
-    const pngBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47]); // PNG magic
+describe('parseBackupZip — getArtworkThumbnail', () => {
+  it('找到匹配 artwork_id 的图片 → 返回 buffer + contentType', async () => {
+    const pngBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
     const buf = await buildZip({
-      images: [{ name: 'file-abc.png', content: pngBytes }],
+      artworkAssets: [{ name: 'aw-001.png', content: pngBytes }],
     });
     const parsed = await parseBackupZip(buf);
-    const img = await parsed.getImage('file-abc');
-    expect(img).not.toBeNull();
-    expect(img?.contentType).toBe('image/png');
-    expect(img?.buffer).toEqual(Buffer.from(pngBytes));
+    const asset = await parsed.getArtworkThumbnail('aw-001');
+    expect(asset).not.toBeNull();
+    expect(asset?.contentType).toBe('image/png');
+    expect(asset?.buffer).toEqual(Buffer.from(pngBytes));
   });
 
   it('jpg 扩展名 → contentType image/jpeg', async () => {
     const buf = await buildZip({
-      images: [{ name: 'f1.jpg', content: new Uint8Array([0xff, 0xd8]) }],
+      artworkAssets: [{ name: 'f1.jpg', content: new Uint8Array([0xff, 0xd8]) }],
     });
     const parsed = await parseBackupZip(buf);
-    const img = await parsed.getImage('f1');
-    expect(img?.contentType).toBe('image/jpeg');
+    const asset = await parsed.getArtworkThumbnail('f1');
+    expect(asset?.contentType).toBe('image/jpeg');
   });
 
-  it('未知扩展名 → fallback 到 application/octet-stream', async () => {
+  it('找不到对应 artwork_id → 返回 null', async () => {
+    const buf = await buildZip({});
+    const parsed = await parseBackupZip(buf);
+    expect(await parsed.getArtworkThumbnail('non-existent')).toBeNull();
+  });
+
+  it('artworks/ 与 files/ 子目录不串扰：相同 ID 不会跨目录命中', async () => {
     const buf = await buildZip({
-      images: [{ name: 'f1.xyz', content: new Uint8Array([0x00]) }],
+      artworkAssets: [{ name: 'shared-id.png', content: new Uint8Array([1]) }],
+      fileAssets: [{ name: 'shared-id.pdf', content: new Uint8Array([2]) }],
     });
     const parsed = await parseBackupZip(buf);
-    const img = await parsed.getImage('f1');
-    expect(img?.contentType).toBe('application/octet-stream');
+    const a = await parsed.getArtworkThumbnail('shared-id');
+    const b = await parsed.getEditionFileAttachment('shared-id');
+    expect(a?.contentType).toBe('image/png');
+    expect(b?.contentType).toBe('application/pdf');
+  });
+});
+
+describe('parseBackupZip — getEditionFileAttachment', () => {
+  it('pdf 扩展名 → application/pdf', async () => {
+    const buf = await buildZip({
+      fileAssets: [{ name: 'ef-1.pdf', content: new Uint8Array([0x25, 0x50, 0x44, 0x46]) }],
+    });
+    const parsed = await parseBackupZip(buf);
+    const asset = await parsed.getEditionFileAttachment('ef-1');
+    expect(asset?.contentType).toBe('application/pdf');
+  });
+
+  it('docx 扩展名 → wordprocessingml mime', async () => {
+    const buf = await buildZip({
+      fileAssets: [{ name: 'ef-doc.docx', content: new Uint8Array([0x50, 0x4b]) }],
+    });
+    const parsed = await parseBackupZip(buf);
+    const asset = await parsed.getEditionFileAttachment('ef-doc');
+    expect(asset?.contentType).toBe(
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    );
+  });
+
+  it('未知扩展名 → fallback application/octet-stream', async () => {
+    const buf = await buildZip({
+      fileAssets: [{ name: 'f1.xyz', content: new Uint8Array([0x00]) }],
+    });
+    const parsed = await parseBackupZip(buf);
+    const asset = await parsed.getEditionFileAttachment('f1');
+    expect(asset?.contentType).toBe('application/octet-stream');
   });
 
   it('找不到对应 fileId → 返回 null（不抛错）', async () => {
     const buf = await buildZip({});
     const parsed = await parseBackupZip(buf);
-    const img = await parsed.getImage('non-existent');
-    expect(img).toBeNull();
-  });
-
-  it('多个匹配 prefix → 返回第一个（防 prefix 冲突）', async () => {
-    const buf = await buildZip({
-      images: [
-        { name: 'abc.jpg', content: new Uint8Array([1]) },
-        { name: 'abc.png', content: new Uint8Array([2]) },
-      ],
-    });
-    const parsed = await parseBackupZip(buf);
-    const img = await parsed.getImage('abc');
-    expect(img).not.toBeNull();
-    // 不严格断言哪一个 —— 实现可能按 hash 顺序；只要拿到一个非空就符合契约
+    expect(await parsed.getEditionFileAttachment('non-existent')).toBeNull();
   });
 });
 
