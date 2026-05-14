@@ -52,4 +52,13 @@ export const queryKeys = {
   visualize: {
     snapshot: ['visualize', 'snapshot'] as const,
   },
+  backup: {
+    all: ['backup'] as const,
+    /**
+     * 用户备份元数据查询：last_backup_at / last_backup_size_bytes /
+     * last_backup_stats / last_backup_downloaded_at / backup_frequency。
+     * 直接从 users 表读，不走 API。
+     */
+    status: (userId: string) => ['backup', 'status', userId] as const,
+  },
 };

@@ -1,0 +1,108 @@
+{
+  "settings": {
+    "title": "工作室数据备份",
+    "description": "把整个工作室的数据库 + 图片打包成一份 ZIP，需要时可用它完整恢复。",
+    "lastBackup": "最新备份",
+    "never": "未配置",
+    "noBackup": "尚未生成备份",
+    "stats": "{{date}} · {{size}} · {{artworks}} 件作品 / {{editions}} 个版本",
+    "lastDownload": "上次下载到本地",
+    "lastDownloadNever": "尚未拉取",
+    "generating": "生成中…",
+    "downloading": "下载中…",
+    "actions": {
+      "download": "下载到本地",
+      "regenerate": "立即重新生成",
+      "generateNow": "立即生成备份"
+    },
+    "frequency": {
+      "label": "自动备份频率",
+      "description": "线上服务会按这个频率自动生成新备份。本地开发环境下设置后不会立即触发。",
+      "weekly": "每周",
+      "monthly": "每月",
+      "off": "关闭"
+    },
+    "reminder": {
+      "never": "提示：还没把任何备份拉到本地，立即下载一份留底。",
+      "overdue": "提示：你已 {{days}} 天没把备份拉到本地了。立即下载一份留底。"
+    },
+    "mobileNotice": "请在桌面端管理备份。"
+  },
+  "import": {
+    "tab": {
+      "markdown": "Markdown 导入",
+      "backup": "备份恢复"
+    },
+    "tabDescription": "Markdown 导入用于从 Markdown 文件批量录入作品；备份恢复会从 ZIP 文件完整覆盖工作室数据。",
+    "steps": {
+      "upload": "选择备份",
+      "preview": "确认恢复",
+      "complete": "完成"
+    },
+    "upload": {
+      "dropzone": "点击或拖入备份 ZIP",
+      "chooseFile": "选择文件",
+      "fileType": "仅支持工作室备份生成的 .zip 文件",
+      "parsing": "解析备份…",
+      "selected": "已选：{{name}} · {{size}}",
+      "next": "继续"
+    },
+    "preview": {
+      "title": "确认恢复",
+      "manifestHeader": "备份信息",
+      "createdAt": "生成时间",
+      "createdBy": "来源邮箱",
+      "schemaVersion": "数据库版本",
+      "format": "ZIP 格式版本",
+      "size": "文件大小",
+      "imageCount": "包含图片",
+      "imageCountValue": "{{count}} 张",
+      "stats": "备份内含",
+      "statsLine": "{{artworks}} 件作品 · {{editions}} 个版本 · {{files}} 张附件 · {{locations}} 个位置",
+      "diff": {
+        "title": "覆盖对比",
+        "rowCurrent": "当前",
+        "rowBackup": "备份",
+        "warning": "恢复会先删除当前所有数据，再写入备份中的内容。"
+      },
+      "rollback": {
+        "title": "开始恢复前必须下载回滚包",
+        "explanation": "恢复是覆盖式的：先删除当前所有数据，再写入备份内容。开始前请把当前状态打包到本地，万一恢复失败可用它还原。",
+        "downloadButton": "下载当前状态回滚包",
+        "downloading": "正在打包…",
+        "downloaded": "已下载回滚包"
+      },
+      "confirm": {
+        "label": "输入 {{token}} 解锁恢复按钮",
+        "placeholder": "输入 {{token}}",
+        "token": "CONFIRM"
+      },
+      "restoreButton": "覆盖恢复",
+      "restoring": "正在恢复…",
+      "back": "重新选择文件"
+    },
+    "result": {
+      "successTitle": "恢复完成",
+      "failureTitle": "恢复失败",
+      "stats": "恢复了 {{artworks}} 件作品 / {{editions}} 个版本 / {{files}} 张附件",
+      "imagesSuccess": "{{count}} 张图片恢复成功",
+      "imagesFailed": "{{count}} 张图片缺失或失败",
+      "warningsTitle": "警告",
+      "errorMessage": "错误：{{message}}",
+      "rollbackHint": "请使用刚才下载的回滚包还原至导入前状态。如需帮助请联系支持。",
+      "back": "返回 Import 首页"
+    },
+    "errors": {
+      "cross_account": "此备份属于另一账号，无法导入到当前账号。",
+      "schema_mismatch": "备份与当前数据库版本不兼容。当前 {{expected}}，备份 {{got}}。",
+      "format_mismatch": "备份的 ZIP 格式与当前系统不兼容。当前 v{{expected}}，备份 v{{got}}。",
+      "rollback_required": "请先下载当前状态的回滚包再开始恢复。",
+      "no_backup": "ZIP 中找不到有效的备份内容。",
+      "invalid_zip": "不是有效的备份 ZIP 文件。",
+      "no_manifest": "ZIP 中找不到 manifest.json。",
+      "manifest_parse_failed": "解析 manifest.json 失败。",
+      "generic": "恢复过程出错：{{message}}"
+    },
+    "mobileNotice": "请在桌面端进行备份恢复。"
+  }
+}

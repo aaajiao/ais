@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import ModelSettings from '@/components/settings/ModelSettings';
 import ExportSettings from '@/components/settings/ExportSettings';
+import BackupSettings from '@/components/settings/BackupSettings';
 import ApiKeySettings from '@/components/settings/ApiKeySettings';
 import ProfileSettings from '@/components/settings/ProfileSettings';
 import AccountSettings from '@/components/settings/AccountSettings';
@@ -17,6 +18,9 @@ export default function Settings() {
 
       {/* 数据导出 */}
       <ExportSettings />
+
+      {/* 工作室数据备份 */}
+      <BackupSettings />
 
       {/* 外部 API */}
       <ApiKeySettings />

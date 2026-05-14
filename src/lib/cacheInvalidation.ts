@@ -125,3 +125,38 @@ export const invalidateOnArtworkPermanentDelete = async (
     queryClient.invalidateQueries({ queryKey: VISUALIZE_KEY }),
   ]);
 };
+
+/**
+ * 生成新备份后的缓存失效
+ * 影响：备份状态（last_backup_at / last_backup_size_bytes / last_backup_stats 更新）
+ *
+ * 备份元数据跟作品 mutation 不强耦合 —— 只有手动备份 / cron 才会改它，
+ * 留独立轨道更清晰，不挂到 invalidateOnArtworkMutation 等里。
+ */
+export const invalidateOnBackupGenerated = async (queryClient: QueryClient) => {
+  await queryClient.invalidateQueries({ queryKey: queryKeys.backup.all });
+};
+
+/**
+ * 下载备份后的缓存失效
+ * 影响：备份状态（服务端 download 端点会更新 last_backup_downloaded_at）
+ */
+export const invalidateOnBackupDownloaded = async (
+  queryClient: QueryClient
+) => {
+  await queryClient.invalidateQueries({ queryKey: queryKeys.backup.all });
+};
+
+/**
+ * 恢复备份后的缓存失效
+ *
+ * 恢复 = 全数据替换（删除当前所有行 + 插入备份所有行）。所有缓存都过期，
+ * 直接 invalidate 整个 queryClient，让每个挂载的查询按需重拉。
+ *
+ * 不只是 invalidate 作品/版本：location / api_keys / gallery_links /
+ * users.backup_* 全部被重写，列表 / 详情 / 计数 / dashboard / visualize
+ * 都得跟着重读，逐个列举不如全失效来得稳。
+ */
+export const invalidateOnRestoreBackup = async (queryClient: QueryClient) => {
+  await queryClient.invalidateQueries();
+};
