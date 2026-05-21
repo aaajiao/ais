@@ -62,7 +62,7 @@ export default function Layout() {
   const { resolvedTheme, toggleTheme } = useThemeContext();
   const { artistName } = useProfile();
   const location = useLocation();
-  const [chatSidebarOpen, setChatSidebarOpen] = useState(true);
+  const [chatSidebarOpen, setChatSidebarOpen] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
