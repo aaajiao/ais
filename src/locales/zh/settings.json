@@ -67,7 +67,7 @@
     "confirmDelete": "永久删除此 API 密钥？",
     "docsTitle": "API 文档",
     "docsEndpoint": "端点",
-    "docsActions": "可用操作",
+    "docsFullLink": "完整参数、错误码和示例 →",
     "hint": "API 密钥提供对你的库存数据的只读访问，用于外部 AI 代理和集成。"
   },
   "account": {

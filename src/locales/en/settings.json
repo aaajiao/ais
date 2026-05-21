@@ -67,7 +67,7 @@
     "confirmDelete": "Permanently delete this API key?",
     "docsTitle": "API Documentation",
     "docsEndpoint": "Endpoint",
-    "docsActions": "Available Actions",
+    "docsFullLink": "Full parameters, error codes, and examples →",
     "hint": "API keys provide read-only access to your inventory data for external AI agents and integrations."
   },
   "account": {

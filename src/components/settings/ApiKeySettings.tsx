@@ -194,20 +194,20 @@ export default function ApiKeySettings() {
   -d '{"action":"search_artworks","params":{"query":"video"}}'`}</pre>
           </div>
           <div>
-            <p className="font-medium mb-1">{t('apiKeys.docsActions')}</p>
-            <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
-              <li><code>search_artworks</code> — title, year, type, materials</li>
-              <li><code>search_editions</code> — status, location, buyer, price</li>
-              <li><code>search_locations</code> — name, city, type, country</li>
-              <li><code>search_history</code> — edition changes, sales, dates</li>
-              <li><code>get_statistics</code> — overview, by_status, by_location</li>
-            </ul>
-          </div>
-          <div>
             <p className="font-medium mb-1">Schema</p>
             <code className="text-xs bg-background px-2 py-1 rounded border border-border">
               GET {baseUrl}/api/external/v1/schema
             </code>
+          </div>
+          <div>
+            <a
+              href="https://github.com/aaajiao/ais/blob/main/docs/external-api.md"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-primary hover:underline"
+            >
+              {t('apiKeys.docsFullLink')}
+            </a>
           </div>
         </div>
       )}
