@@ -13,6 +13,61 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <script src="/theme-init.js"></script>
+    <!--
+      PWA 自愈看门狗（防部署后白屏）。
+      故障模式：返回访客的旧 service worker 把 app 外壳指向某个已被新部署删除的
+      bundle hash → 浏览器取回 SPA fallback 的 HTML（200 + text/html）当 JS 执行 →
+      入口 bundle 解析失败 → React 永远挂不上 #root → 整页白屏，且没有任何 app JS
+      能补救（因为入口都没跑起来）。所以自愈逻辑必须内联在 index.html。
+      策略：(1) 精准——监听入口 / 代码分块 js·css 的加载失败（含 MIME 错配）立即自愈；
+            (2) 兜底——12s 后 #root 仍为空也自愈。
+      自愈 = 注销 SW + 清空 caches + 硬重载；sessionStorage 守卫确保最多一次，防死循环。
+    -->
+    <script>
+      (function () {
+        var KEY = '__pwa_self_heal__';
+        function recover(reason) {
+          try { if (sessionStorage.getItem(KEY)) return; } catch (e) {}
+          try { sessionStorage.setItem(KEY, reason || '1'); } catch (e) {}
+          var reload = function () { location.reload(); };
+          var jobs = [];
+          try {
+            if ('serviceWorker' in navigator) {
+              jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) {
+                return Promise.all(rs.map(function (r) { return r.unregister(); }));
+              }));
+            }
+            if (window.caches && caches.keys) {
+              jobs.push(caches.keys().then(function (ks) {
+                return Promise.all(ks.map(function (k) { return caches.delete(k); }));
+              }));
+            }
+          } catch (e) {}
+          (jobs.length ? Promise.all(jobs) : Promise.resolve()).then(reload, reload);
+        }
+        // (1) 精准触发：/assets/ 下的 js·css 加载失败（捕获阶段，资源错误不冒泡）
+        window.addEventListener('error', function (e) {
+          var el = e && e.target;
+          if (!el || !el.tagName) return;
+          var url = el.src || el.href || '';
+          if ((el.tagName === 'SCRIPT' || el.tagName === 'LINK') &&
+              /\/assets\/.*\.(js|css)(\?|$)/.test(url)) {
+            recover('asset:' + url.split('/').pop());
+          }
+        }, true);
+        // (2) 兜底：加载结束后 #root 仍为空 → 视为挂载失败
+        window.addEventListener('load', function () {
+          setTimeout(function () {
+            var root = document.getElementById('root');
+            if (root && root.childElementCount > 0) {
+              try { sessionStorage.removeItem(KEY); } catch (e) {} // 成功挂载，解锁下次自愈
+              return;
+            }
+            recover('not-mounted');
+          }, 12000);
+        });
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

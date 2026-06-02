@@ -48,6 +48,11 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // 部署后白屏防护：清掉旧 precache（防止新旧 hash 错位的半更新态残留），
+        // 并让新 SW 立即接管已打开的页面。配合 registerType:'autoUpdate'（skipWaiting）
+        // 与 index.html 内联的自愈看门狗，三层兜底。
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
         runtimeCaching: [
           // Google Fonts
           {
