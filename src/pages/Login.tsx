@@ -2,10 +2,12 @@ import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthContext } from '@/contexts/useAuthContext';
 import { usePublicProfile } from '@/hooks/queries/useProfile';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 export default function Login() {
   const { isAuthenticated, loading, error, signInWithGoogle, clearError } = useAuthContext();
   const { artistName, studioName } = usePublicProfile();
+  useDocumentTitle([], `${artistName} 作品管理系统`);
   const navigate = useNavigate();
   const location = useLocation();
 

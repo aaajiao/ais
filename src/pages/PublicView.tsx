@@ -11,6 +11,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import { AlertCircle, Lock, Image as ImageIcon, ArrowLeft, FileDown } from 'lucide-react';
 import type { EditionStatus } from '@/lib/types';
 import { usePublicProfile } from '@/hooks/queries/useProfile';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 // 公开展示项目类型
 interface PublicViewItem {
@@ -260,15 +261,8 @@ export default function PublicView() {
 
   // 浏览器 tab 标题：展示该链接对应的位置名（如「XX 画廊 · aaajiao」）
   // 默认 index.html 是静态 "aaajiao Inventory"，未反映当前查看的位置
-  useEffect(() => {
-    const previous = document.title;
-    if (data?.location.name) {
-      document.title = `${data.location.name} · ${artistName}`;
-    }
-    return () => {
-      document.title = previous;
-    };
-  }, [data?.location.name, artistName]);
+  // brandOverride 用 usePublicProfile 的 artistName —— 匿名访客无 token，useProfile 拿不到
+  useDocumentTitle(data?.location.name, artistName);
 
   // 启用页面滚动（绕过全局 overflow: hidden）
   useEffect(() => {

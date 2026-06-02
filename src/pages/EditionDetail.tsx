@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useBackToList } from '@/hooks/useBackToList';
 import { useTranslation } from 'react-i18next';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { queryKeys } from '@/lib/queryKeys';
@@ -66,6 +67,9 @@ export default function EditionDetail() {
 
   // 格式化版本号（用于删除确认对话框等）
   const editionNumber = formatEditionNumberUtil(edition as EditionWithDetails, t);
+
+  // 浏览器 tab 标题：作品名 + 版本号（如「作品标题 · 1/3 · aaajiao」）
+  useDocumentTitle([edition?.artwork?.title_en, edition ? editionNumber : null]);
 
   // 处理文件上传完成
   const handleFileUploaded = useCallback((file: FileListEditionFile) => {

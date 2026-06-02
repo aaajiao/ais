@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { invalidateOnArtworkDelete, invalidateOnArtworkPermanentDelete } from '@/lib/cacheInvalidation';
@@ -12,6 +13,7 @@ type Artwork = Database['public']['Tables']['artworks']['Row'];
 
 export default function Trash() {
   const { t, i18n } = useTranslation('trash');
+  useDocumentTitle(t('nav:trash'));
   const queryClient = useQueryClient();
   const [artworks, setArtworks] = useState<Artwork[]>([]);
   const [loading, setLoading] = useState(true);

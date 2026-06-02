@@ -6,6 +6,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -73,6 +74,7 @@ const LoadingSkeleton = (
 
 export default function Artworks() {
   const { t, i18n } = useTranslation('artworks');
+  useDocumentTitle(t('nav:artworks'));
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();

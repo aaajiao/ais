@@ -5,6 +5,7 @@
 
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useLinks, type Link } from '@/hooks/useLinks';
 import { useLocations } from '@/hooks/useLocations';
 import { toast } from 'sonner';
@@ -283,6 +284,7 @@ function CreateLinkDialog({
 
 export default function Links() {
   const { t } = useTranslation('links');
+  useDocumentTitle(t('nav:links'));
   const {
     links,
     isLoading,

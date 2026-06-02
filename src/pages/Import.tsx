@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import MDImport from '@/components/import/MDImport';
 import BackupImport from '@/components/import/BackupImport';
 import ThumbnailMigration from '@/components/import/ThumbnailMigration';
@@ -10,6 +11,7 @@ type ImportTab = 'md' | 'backup';
 export default function Import() {
   const { t } = useTranslation('import');
   const { t: tBackup } = useTranslation('backup');
+  useDocumentTitle(t('nav:import'));
   const [tab, setTab] = useState<ImportTab>('md');
 
   return (

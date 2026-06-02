@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import ModelSettings from '@/components/settings/ModelSettings';
 import ExportSettings from '@/components/settings/ExportSettings';
 import BackupSettings from '@/components/settings/BackupSettings';
@@ -8,6 +9,7 @@ import AccountSettings from '@/components/settings/AccountSettings';
 
 export default function Settings() {
   const { t } = useTranslation('settings');
+  useDocumentTitle(t('nav:settings'));
 
   return (
     <div className="p-6 pb-[var(--spacing-nav-bottom)] lg:pb-6">

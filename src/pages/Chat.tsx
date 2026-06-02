@@ -3,6 +3,7 @@ import { DefaultChatTransport } from 'ai';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import type { ConfirmCardData } from '@/components/chat/EditableConfirmCard';
 import CollapsibleChatHistory from '@/components/chat/CollapsibleChatHistory';
 import {
@@ -20,6 +21,7 @@ import { MessageSquare, Trash2, ArrowUp, AlertCircle, RotateCcw } from 'lucide-r
 
 export default function Chat() {
   const { t, i18n } = useTranslation('chat');
+  useDocumentTitle(t('nav:chat'));
   const location = useLocation();
   const inputRef = useRef<HTMLInputElement>(null);
   const historyLoadedRef = useRef(false);

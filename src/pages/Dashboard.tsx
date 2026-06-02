@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
 import { Package, Layers, MapPin, Link as LinkIcon, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
 import { useDashboardStats, useRecentUpdates } from '@/hooks/queries/useDashboard';
@@ -13,6 +14,7 @@ export default function Dashboard() {
   const { t: tNav } = useTranslation('nav');
   const { t: tCommon } = useTranslation('common');
   const { t: tEditions } = useTranslation('editions');
+  useDocumentTitle(tNav('home'));
 
   const [expanded, setExpanded] = useState(false);
 

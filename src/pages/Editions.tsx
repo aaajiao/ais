@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useQuery } from '@tanstack/react-query';
 import type { EditionStatus } from '@/lib/database.types';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
@@ -42,6 +43,7 @@ const filterButtons: {
 export default function Editions() {
   const { t } = useTranslation('editions');
   const { t: tStatus } = useTranslation('status');
+  useDocumentTitle(t('nav:editions'));
   const [searchParams, setSearchParams] = useSearchParams();
   const initialFilter =
     (searchParams.get('status') as FilterStatus) || 'all';

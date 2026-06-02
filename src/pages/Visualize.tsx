@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { Loader2, RefreshCw, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useVisualizationData } from '@/hooks/queries/useVisualizationData';
@@ -20,6 +21,7 @@ function isValidView(v: string | null): v is ViewKey {
 
 export default function Visualize() {
   const { t } = useTranslation('visualize');
+  useDocumentTitle(t('nav:visualize'));
   const [searchParams, setSearchParams] = useSearchParams();
   const viewParam = searchParams.get('view');
   const activeView: ViewKey = isValidView(viewParam) ? viewParam : 'strata';

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useBackToList } from '@/hooks/useBackToList';
 import { useTranslation } from 'react-i18next';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { invalidateOnArtworkEdit, invalidateOnEditionCreate, invalidateOnArtworkDelete } from '@/lib/cacheInvalidation';
@@ -36,6 +37,9 @@ export default function ArtworkDetail() {
     isLoading: artworkLoading,
     error: artworkError,
   } = useArtworkDetail(id);
+
+  // 浏览器 tab 标题：当前作品名（如「作品标题 · aaajiao」）
+  useDocumentTitle(artwork?.title_en);
 
   const {
     data: editions = [],

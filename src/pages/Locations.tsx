@@ -5,6 +5,7 @@
 
 import { useState, useCallback, useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useLocations, type Location } from '@/hooks/useLocations';
 import type { LocationType } from '@/lib/database.types';
 import LocationDialog from '@/components/editions/LocationDialog';
@@ -27,6 +28,7 @@ const LOCATION_TYPE_ICONS: Record<LocationType, ReactNode> = {
 
 export default function Locations() {
   const { t } = useTranslation('locations');
+  useDocumentTitle(t('nav:locations'));
   const {
     locations,
     locationsByType,
