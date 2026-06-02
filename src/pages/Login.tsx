@@ -1,13 +1,16 @@
 import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuthContext } from '@/contexts/useAuthContext';
 import { usePublicProfile } from '@/hooks/queries/useProfile';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 export default function Login() {
+  const { t } = useTranslation('nav');
   const { isAuthenticated, loading, error, signInWithGoogle, clearError } = useAuthContext();
   const { artistName, studioName } = usePublicProfile();
-  useDocumentTitle([], `${artistName} 作品管理系统`);
+  // tab 标题复用双语 appTitle key（zh「{name} 作品管理」/ en「{name} Inventory」）
+  useDocumentTitle([], t('appTitle', { artistName }));
   const navigate = useNavigate();
   const location = useLocation();
 
