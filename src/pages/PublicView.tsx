@@ -234,6 +234,9 @@ function ArtworkCard({
 export default function PublicView() {
   const { token } = useParams<{ token: string }>();
   const { t, i18n } = useTranslation('publicView');
+  // 实际生效的语言（已归一为 'zh' / 'en'）。非中文系统访客的 i18n.language 可能是 'de-DE' 之类
+  // 的请求值，内容已回退到英文，故判断 / 传后端都用 resolvedLanguage。
+  const currentLang = i18n.resolvedLanguage ?? i18n.language;
   const { studioName, artistName } = usePublicProfile();
 
   const [data, setData] = useState<PublicViewData | null>(null);
@@ -332,7 +335,8 @@ export default function PublicView() {
       }
 
       try {
-        const response = await fetch(`/api/view/${token}`);
+        // 把当前语言传给后端：服务端生成的文案（版本标签、错误消息）随访客语言走，不再恒为中文。
+        const response = await fetch(`/api/view/${token}?lang=${currentLang}`);
         const result = await response.json();
 
         if (!response.ok) {
@@ -357,7 +361,7 @@ export default function PublicView() {
     };
 
     fetchData();
-  }, [token, t]);
+  }, [token, t, currentLang]);
 
   // 加载状态
   if (isLoading) {
@@ -437,9 +441,9 @@ export default function PublicView() {
         <Button
           variant="ghost"
           size="small"
-          onClick={() => i18n.changeLanguage(i18n.language === 'zh' ? 'en' : 'zh')}
+          onClick={() => i18n.changeLanguage(currentLang === 'zh' ? 'en' : 'zh')}
         >
-          {i18n.language === 'zh' ? 'English' : '中文'}
+          {currentLang === 'zh' ? 'English' : '中文'}
         </Button>
       </div>
 

@@ -98,7 +98,16 @@ i18n
   .use(initReactI18next)
   .init({
     resources,
-    fallbackLng: 'zh',
+    // 仅支持中 / 英两种语言。
+    supportedLngs: ['zh', 'en'],
+    // 把带地区码的系统语言归一到基语言：en-US/en-GB → en，zh-CN/zh-TW/zh-HK → zh，
+    // de-DE → de（不支持，落回 fallback）。
+    load: 'languageOnly',
+    nonExplicitSupportedLngs: true,
+    // 默认回退到英文，中文兜底。关键：未登录的画廊访客若系统不是中文（德/法/日/韩…），
+    // 浏览器检测到的语言在本项目无对应翻译时，落回英文而非中文。中文系统仍命中 zh。
+    // 访客一旦手动切换，选择会写入 localStorage（detection.order 中 localStorage 优先），永远尊重。
+    fallbackLng: ['en', 'zh'],
     defaultNS: 'common',
     detection: {
       order: ['localStorage', 'navigator'],
