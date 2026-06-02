@@ -233,7 +233,7 @@ function ArtworkCard({
 export default function PublicView() {
   const { token } = useParams<{ token: string }>();
   const { t, i18n } = useTranslation('publicView');
-  const { studioName } = usePublicProfile();
+  const { studioName, artistName } = usePublicProfile();
 
   const [data, setData] = useState<PublicViewData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -257,6 +257,18 @@ export default function PublicView() {
       setShowBackButton(false);
     }
   }, []);
+
+  // 浏览器 tab 标题：展示该链接对应的位置名（如「XX 画廊 · aaajiao」）
+  // 默认 index.html 是静态 "aaajiao Inventory"，未反映当前查看的位置
+  useEffect(() => {
+    const previous = document.title;
+    if (data?.location.name) {
+      document.title = `${data.location.name} · ${artistName}`;
+    }
+    return () => {
+      document.title = previous;
+    };
+  }, [data?.location.name, artistName]);
 
   // 启用页面滚动（绕过全局 overflow: hidden）
   useEffect(() => {
