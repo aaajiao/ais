@@ -5,6 +5,7 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 // Chinese translations
 import zhCommon from './zh/common.json';
 import zhNav from './zh/nav.json';
+import zhLogin from './zh/login.json';
 import zhStatus from './zh/status.json';
 import zhDashboard from './zh/dashboard.json';
 import zhArtworks from './zh/artworks.json';
@@ -26,6 +27,7 @@ import zhBackup from './zh/backup.json';
 // English translations
 import enCommon from './en/common.json';
 import enNav from './en/nav.json';
+import enLogin from './en/login.json';
 import enStatus from './en/status.json';
 import enDashboard from './en/dashboard.json';
 import enArtworks from './en/artworks.json';
@@ -48,6 +50,7 @@ const resources = {
   zh: {
     common: zhCommon,
     nav: zhNav,
+    login: zhLogin,
     status: zhStatus,
     dashboard: zhDashboard,
     artworks: zhArtworks,
@@ -69,6 +72,7 @@ const resources = {
   en: {
     common: enCommon,
     nav: enNav,
+    login: enLogin,
     status: enStatus,
     dashboard: enDashboard,
     artworks: enArtworks,

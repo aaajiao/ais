@@ -1,0 +1,13 @@
+{
+  "title": "{{artistName}} Inventory System",
+  "welcomeBack": "Welcome back",
+  "signInWithGoogle": "Sign in with Google",
+  "inviteOnly": "Invited users only",
+  "errors": {
+    "unauthorized": "Access denied — your email is not on the allowlist",
+    "initFailed": "Failed to initialize authentication",
+    "sessionExpired": "Your session has expired, please sign in again",
+    "signInFailed": "Sign-in failed",
+    "signOutFailed": "Sign-out failed"
+  }
+}

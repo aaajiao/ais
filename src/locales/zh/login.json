@@ -1,0 +1,13 @@
+{
+  "title": "{{artistName}} 作品管理系统",
+  "welcomeBack": "欢迎回来",
+  "signInWithGoogle": "使用 Google 账号登录",
+  "inviteOnly": "仅限受邀用户",
+  "errors": {
+    "unauthorized": "未授权访问，您的邮箱不在允许列表中",
+    "initFailed": "初始化认证失败",
+    "sessionExpired": "会话已过期，请重新登录",
+    "signInFailed": "登录失败",
+    "signOutFailed": "登出失败"
+  }
+}

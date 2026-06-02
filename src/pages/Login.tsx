@@ -6,11 +6,11 @@ import { usePublicProfile } from '@/hooks/queries/useProfile';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 export default function Login() {
-  const { t } = useTranslation('nav');
+  const { t } = useTranslation('login');
   const { isAuthenticated, loading, error, signInWithGoogle, clearError } = useAuthContext();
   const { artistName, studioName } = usePublicProfile();
-  // tab 标题复用双语 appTitle key（zh「{name} 作品管理」/ en「{name} Inventory」）
-  useDocumentTitle([], t('appTitle', { artistName }));
+  // tab 标题 = 页面 h1（双语，zh「{name} 作品管理系统」/ en「{name} Inventory System」）
+  useDocumentTitle([], t('title', { artistName }));
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -34,8 +34,8 @@ export default function Login() {
       <div className="w-full max-w-sm">
         {/* 标题 */}
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold mb-2">{artistName} 作品管理系统</h1>
-          <p className="text-muted-foreground">欢迎回来</p>
+          <h1 className="text-2xl font-bold mb-2">{t('title', { artistName })}</h1>
+          <p className="text-muted-foreground">{t('welcomeBack')}</p>
         </div>
 
         {/* 登录卡片 */}
@@ -75,12 +75,12 @@ export default function Login() {
                 />
               </svg>
             )}
-            <span>使用 Google 账号登录</span>
+            <span>{t('signInWithGoogle')}</span>
           </button>
 
           {/* 提示文字 */}
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            仅限受邀用户
+            {t('inviteOnly')}
           </p>
         </div>
 

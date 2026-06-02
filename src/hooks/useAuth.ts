@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import i18n from '@/locales';
+
+// 认证错误文案走 i18n（在 login 命名空间）。这里用 i18n.t 而非 useTranslation —
+// 错误在异步回调 / onAuthStateChange 监听器里生成，i18n.t 总取当前语言。
+const authError = (key: string): string => i18n.t(`login:errors.${key}`);
 
 interface AuthState {
   user: User | null;
@@ -48,7 +53,7 @@ export function useAuth() {
               user: null,
               session: null,
               loading: false,
-              error: '未授权访问，您的邮箱不在允许列表中',
+              error: authError('unauthorized'),
             });
             return;
           }
@@ -86,7 +91,7 @@ export function useAuth() {
               user: null,
               session: null,
               loading: false,
-              error: '未授权访问，您的邮箱不在允许列表中',
+              error: authError('unauthorized'),
             });
             return;
           }
@@ -104,7 +109,7 @@ export function useAuth() {
           user: null,
           session: null,
           loading: false,
-          error: err instanceof Error ? err.message : '初始化认证失败',
+          error: err instanceof Error ? err.message : authError('initFailed'),
         });
       }
     };
@@ -135,7 +140,7 @@ export function useAuth() {
             console.error('[auth] 刷新会话失败:', error);
             setState((prev) => ({
               ...prev,
-              error: '会话已过期，请重新登录',
+              error: authError('sessionExpired'),
             }));
           } else if (data.session) {
             setState((prev) => ({
@@ -180,7 +185,7 @@ export function useAuth() {
       setState(prev => ({
         ...prev,
         loading: false,
-        error: err instanceof Error ? err.message : '登录失败',
+        error: err instanceof Error ? err.message : authError('signInFailed'),
       }));
     }
   };
@@ -206,7 +211,7 @@ export function useAuth() {
       setState(prev => ({
         ...prev,
         loading: false,
-        error: err instanceof Error ? err.message : '登出失败',
+        error: err instanceof Error ? err.message : authError('signOutFailed'),
       }));
     }
   };
