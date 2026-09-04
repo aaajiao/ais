@@ -22,7 +22,7 @@ An artwork inventory management system for artist aaajiao. Manage the full lifec
 Click any screenshot to view the full-resolution image.
 
 <p align="center">
-  <a href="docs/screenshots/home-dashboard.png?raw=true">
+  <a href="https://raw.githubusercontent.com/aaajiao/ais/main/docs/screenshots/home-dashboard.png">
     <img src="docs/screenshots/home-dashboard.png" alt="AIS home dashboard in light mode, showing inventory totals, quick actions, and recent updates" width="100%">
   </a>
   <br>
@@ -33,14 +33,14 @@ Click any screenshot to view the full-resolution image.
 <table>
   <tr>
     <td width="50%" valign="top">
-      <a href="docs/screenshots/editions-list.png?raw=true">
+      <a href="https://raw.githubusercontent.com/aaajiao/ais/main/docs/screenshots/editions-list.png">
         <img src="docs/screenshots/editions-list.png" alt="AIS editions list in dark mode, filtered to sold editions with artwork thumbnails and locations" width="100%">
       </a>
       <strong>Editions</strong><br>
       <sub>Browse artwork editions by status and location.</sub>
     </td>
     <td width="50%" valign="top">
-      <a href="docs/screenshots/edition-detail.png?raw=true">
+      <a href="https://raw.githubusercontent.com/aaajiao/ais/main/docs/screenshots/edition-detail.png">
         <img src="docs/screenshots/edition-detail.png" alt="AIS edition detail in dark mode, showing an individual edition record, attachments, and history" width="100%">
       </a>
       <strong>Edition detail</strong><br>
@@ -49,14 +49,14 @@ Click any screenshot to view the full-resolution image.
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="docs/screenshots/visualize-diaspora.png?raw=true">
+      <a href="https://raw.githubusercontent.com/aaajiao/ais/main/docs/screenshots/visualize-diaspora.png">
         <img src="docs/screenshots/visualize-diaspora.png" alt="AIS Diaspora visualization in light mode, connecting the artist's studio with institutions and collectors" width="100%">
       </a>
       <strong>Visualize / Diaspora</strong><br>
       <sub>Artwork circulation and relationships with institutions and collectors.</sub>
     </td>
     <td width="50%" valign="top">
-      <a href="docs/screenshots/gallery-share-tabula-rasa.png?raw=true">
+      <a href="https://raw.githubusercontent.com/aaajiao/ais/main/docs/screenshots/gallery-share-tabula-rasa.png">
         <img src="docs/screenshots/gallery-share-tabula-rasa.png" alt="Tabula Rasa London public artwork view in light mode, showing artwork cards and a PDF download option" width="100%">
       </a>
       <strong>Gallery sharing</strong><br>

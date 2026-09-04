@@ -20,7 +20,7 @@
 点击任意截图可查看高清原图。
 
 <p align="center">
-  <a href="screenshots/home-dashboard.png?raw=true">
+  <a href="https://raw.githubusercontent.com/aaajiao/ais/main/docs/screenshots/home-dashboard.png">
     <img src="screenshots/home-dashboard.png" alt="AIS 浅色主题首页，展示作品库存统计、快捷操作与最近更新" width="100%">
   </a>
   <br>
@@ -31,14 +31,14 @@
 <table>
   <tr>
     <td width="50%" valign="top">
-      <a href="screenshots/editions-list.png?raw=true">
+      <a href="https://raw.githubusercontent.com/aaajiao/ais/main/docs/screenshots/editions-list.png">
         <img src="screenshots/editions-list.png" alt="AIS 深色主题版数列表，按已售出状态筛选并显示作品缩略图与位置" width="100%">
       </a>
       <strong>版数列表</strong><br>
       <sub>按状态与位置浏览作品版数。</sub>
     </td>
     <td width="50%" valign="top">
-      <a href="screenshots/edition-detail.png?raw=true">
+      <a href="https://raw.githubusercontent.com/aaajiao/ais/main/docs/screenshots/edition-detail.png">
         <img src="screenshots/edition-detail.png" alt="AIS 深色主题版数详情，展示单版作品档案、附件与历史记录" width="100%">
       </a>
       <strong>版数详情</strong><br>
@@ -47,14 +47,14 @@
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="screenshots/visualize-diaspora.png?raw=true">
+      <a href="https://raw.githubusercontent.com/aaajiao/ais/main/docs/screenshots/visualize-diaspora.png">
         <img src="screenshots/visualize-diaspora.png" alt="AIS 浅色主题 Diaspora 可视化，连接艺术家工作室、艺术机构与藏家" width="100%">
       </a>
       <strong>可视化 / Diaspora</strong><br>
       <sub>作品流转及工作室与艺术机构、藏家的关系。</sub>
     </td>
     <td width="50%" valign="top">
-      <a href="screenshots/gallery-share-tabula-rasa.png?raw=true">
+      <a href="https://raw.githubusercontent.com/aaajiao/ais/main/docs/screenshots/gallery-share-tabula-rasa.png">
         <img src="screenshots/gallery-share-tabula-rasa.png" alt="Tabula Rasa London 浅色主题公开作品页面，展示作品卡片与 PDF 下载入口" width="100%">
       </a>
       <strong>画廊分享</strong><br>
