@@ -17,6 +17,54 @@ An artwork inventory management system for artist aaajiao. Manage the full lifec
 - **Offline Support** - PWA + IndexedDB cache for offline browsing
 - **i18n** - Chinese / English
 
+## Screenshots
+
+Click any screenshot to view the full-resolution image.
+
+<p align="center">
+  <a href="docs/screenshots/home-dashboard.png?raw=true">
+    <img src="docs/screenshots/home-dashboard.png" alt="AIS home dashboard in light mode, showing inventory totals, quick actions, and recent updates" width="100%">
+  </a>
+  <br>
+  <strong>Home dashboard</strong><br>
+  <sub>Inventory overview, quick actions, and recent updates.</sub>
+</p>
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/screenshots/editions-list.png?raw=true">
+        <img src="docs/screenshots/editions-list.png" alt="AIS editions list in dark mode, filtered to sold editions with artwork thumbnails and locations" width="100%">
+      </a>
+      <strong>Editions</strong><br>
+      <sub>Browse artwork editions by status and location.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/screenshots/edition-detail.png?raw=true">
+        <img src="docs/screenshots/edition-detail.png" alt="AIS edition detail in dark mode, showing an individual edition record, attachments, and history" width="100%">
+      </a>
+      <strong>Edition detail</strong><br>
+      <sub>An individual edition's record, attachments, and history.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/screenshots/visualize-diaspora.png?raw=true">
+        <img src="docs/screenshots/visualize-diaspora.png" alt="AIS Diaspora visualization in light mode, connecting the artist's studio with institutions and collectors" width="100%">
+      </a>
+      <strong>Visualize / Diaspora</strong><br>
+      <sub>Artwork circulation and relationships with institutions and collectors.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/screenshots/gallery-share-tabula-rasa.png?raw=true">
+        <img src="docs/screenshots/gallery-share-tabula-rasa.png" alt="Tabula Rasa London public artwork view in light mode, showing artwork cards and a PDF download option" width="100%">
+      </a>
+      <strong>Gallery sharing</strong><br>
+      <sub>Tabula Rasa London's public artwork view with PDF export.</sub>
+    </td>
+  </tr>
+</table>
+
 ## Tech Stack
 
 | Layer | Technology |
