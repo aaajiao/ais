@@ -67,7 +67,7 @@
 
 | 层级 | 技术 |
 |------|------|
-| 前端 | React 19, TypeScript 5.9, Vite 7, TailwindCSS 4 |
+| 前端 | React 19, TypeScript 7.0, Vite 7, TailwindCSS 4 |
 | UI | shadcn/ui (Radix), Lucide Icons |
 | 数据 | TanStack Query + Virtual, react-i18next |
 | 后端 | Vercel Functions |
@@ -85,6 +85,8 @@ bun start          # 前端 + API (port 3000)
 bun run dev        # 前端 (port 5173)
 bun run dev:api    # API (port 3000)
 ```
+
+类型检查和构建使用 TypeScript 7.0.2 稳定版（`tsc`）。`typescript` 依赖通过别名指向官方 TypeScript 6 兼容包，供 ESLint 和 Vercel 调用编译器 API；`@typescript/native` 提供 TypeScript 7。详见[编译器配置](local-dev.md#typescript-编译器)。
 
 ## 环境变量
 

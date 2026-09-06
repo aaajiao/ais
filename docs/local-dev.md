@@ -46,6 +46,25 @@ bun start
 | `bun run preview` | 预览生产构建 |
 | `bun run lint` | ESLint 代码检查 |
 
+## TypeScript 编译器
+
+项目采用 [TypeScript 官方推荐的并存配置](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6-0)：
+
+- `@typescript/native` 是稳定版 `typescript@7.0.2` 的 npm 别名，提供原生 `tsc`，用于 `bun run typecheck` 和 `bun run build`。
+- `typescript` 是 `@typescript/typescript6@6.0.2` 的 npm 别名，提供兼容 API 和 `tsc6`；当前锁文件将底层编译器固定到 6.0.3。ESLint 与 Vercel 的 API 编译仍需这些接口，因为 TypeScript 7.0 不提供旧版 JavaScript 编译器 API。
+- `typescript-eslint` 使用支持 TypeScript 6 的 8.69.0。`tsconfig` 移除 TS7 不再支持的 `baseUrl`，`@/*` 仍通过相对项目目录的 `paths` 解析。
+- 根 `tsconfig.json` 显式设置 `rootDir: "."` 和 `types: ["node"]`，保留 Vercel API 编译的输出目录和 Node 全局类型；前端独立配置的类型范围不变。
+
+```bash
+bun install --frozen-lockfile
+bunx --no-install tsc --version   # Version 7.0.2
+bunx --no-install tsc6 --version  # Version 6.0.3
+bun run typecheck
+bun run lint
+bun run test:run
+bun run build
+```
+
 ## 项目链接详解
 
 ### vercel link

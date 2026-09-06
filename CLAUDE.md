@@ -14,7 +14,7 @@ bun run test:run      # 运行测试（使用 vitest）
 
 ## Tech Stack
 
-- **Frontend**: React 19 + TypeScript 5.9 + Vite 7 + TailwindCSS 4
+- **Frontend**: React 19 + TypeScript 7.0 + Vite 7 + TailwindCSS 4
 - **UI**: shadcn/ui + Lucide icons + react-i18next
 - **Data**: TanStack React Query + Virtual + IndexedDB 离线缓存
 - **Backend**: Vercel Functions + Supabase (PostgreSQL) + Vercel Blob（工作室备份 ZIP 存储）
@@ -130,6 +130,7 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 ## Code Conventions
 
 - **TypeScript**: 严格模式，无未使用变量
+- **Compiler**: `tsc` 使用 `@typescript/native` 别名提供的 TypeScript 7.0.2；`typescript` 别名保留官方 TypeScript 6 编译器 API，供 ESLint / Vercel 使用。不要直接用 TS7 替换此兼容包。详见 [docs/local-dev.md](docs/local-dev.md#typescript-编译器)。
 - **Imports**: 使用 `@/` 路径别名
 - **State**: React Query 管理服务端状态，Context 管理全局状态
 - **Styling**: TailwindCSS + shadcn/ui 组件

@@ -69,7 +69,7 @@ Click any screenshot to view the full-resolution image.
 
 | Layer | Technology |
 |-------|------------|
-| Frontend | React 19, TypeScript 5.9, Vite 7, TailwindCSS 4 |
+| Frontend | React 19, TypeScript 7.0, Vite 7, TailwindCSS 4 |
 | UI | shadcn/ui (Radix), Lucide Icons |
 | Data | TanStack Query + Virtual, react-i18next |
 | Backend | Vercel Functions |
@@ -87,6 +87,8 @@ bun start          # Frontend + API (port 3000)
 bun run dev        # Frontend (port 5173)
 bun run dev:api    # API (port 3000)
 ```
+
+Type checks and builds use stable TypeScript 7.0.2 (`tsc`). The `typescript` dependency aliases the official TypeScript 6 compatibility package for ESLint and Vercel's compiler API; `@typescript/native` supplies TypeScript 7. See [the compiler setup](docs/local-dev.md#typescript-编译器) for details.
 
 ## Environment Variables
 
