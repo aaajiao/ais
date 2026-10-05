@@ -93,6 +93,7 @@ export default function FileUploadDialog({
           previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
         };
       });
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Sync a new editable upload draft with its external object URLs.
       setStagedFiles(files);
       // 单文件时自动展开
       if (files.length === 1) {

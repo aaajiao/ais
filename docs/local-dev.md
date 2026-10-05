@@ -2,8 +2,9 @@
 
 ## 前置要求
 
-- [Bun](https://bun.sh/) v1.0+
-- [Vercel CLI](https://vercel.com/docs/cli) v30+
+- [Bun](https://bun.sh/) v1.4.2（锁文件 v3，CI 使用同一版本）
+- [Node.js](https://nodejs.org/) v22.17+；推荐当前 LTS
+- 项目内 [Vercel CLI](https://vercel.com/docs/cli) v62，通过 `bun start` / `bunx --no-install vercel` 使用
 - [Git](https://git-scm.com/)
 - 已部署的 Supabase 项目（见 `docs/database.md`）
 
@@ -52,7 +53,8 @@ bun start
 
 - `@typescript/native` 是稳定版 `typescript@7.0.2` 的 npm 别名，提供原生 `tsc`，用于 `bun run typecheck` 和 `bun run build`。
 - `typescript` 是 `@typescript/typescript6@6.0.2` 的 npm 别名，提供兼容 API 和 `tsc6`；当前锁文件将底层编译器固定到 6.0.3。ESLint 与 Vercel 的 API 编译仍需这些接口，因为 TypeScript 7.0 不提供旧版 JavaScript 编译器 API。
-- `typescript-eslint` 使用支持 TypeScript 6 的 8.69.0。`tsconfig` 移除 TS7 不再支持的 `baseUrl`，`@/*` 仍通过相对项目目录的 `paths` 解析。
+- `typescript-eslint` 使用支持 TypeScript 6 的 8.71.0。`tsconfig` 移除 TS7 不再支持的 `baseUrl`，`@/*` 仍通过相对项目目录的 `paths` 解析。
+- `tsconfig.api.json` 将 `api/**/*.ts` 运行时代码纳入类型检查，排除 `__tests__`；SDK 迁移错误会在本地与 CI 阻止构建。
 - 根 `tsconfig.json` 显式设置 `rootDir: "."` 和 `types: ["node"]`，保留 Vercel API 编译的输出目录和 Node 全局类型；前端独立配置的类型范围不变。
 
 ```bash
@@ -137,7 +139,7 @@ ALLOWED_EMAILS=your@email.com
 VITE_ALLOWED_EMAILS=your@email.com
 ```
 
-## Vite 7 + Vercel Dev 兼容性
+## Vite + Vercel Dev 兼容性
 
 ### 问题
 
@@ -292,3 +294,12 @@ bun run preview
 # 完整预览（含 API）
 vercel build && vercel dev --local-config vercel-dev.json
 ```
+
+## 依赖升级约束
+
+- AI SDK 7、React adapter 4、Anthropic/OpenAI provider 4 和 provider-utils 5 一起升级，保持同一代协议。聊天接口迁移见 `docs/ai-chat-tools.md`。
+- Puppeteer 与 puppeteer-core 固定 `25.11.0`，匹配 `@sparticuz/chromium-min 153.0.0`；后者及 `api/export/pdf.ts` 的下载包地址必须一起更新。最新 Puppeteer 25.12 对应 Chrome 154，暂不混用。
+- `@supabase/supabase-js` 使用精确版本；`@types/jszip` 已移除，JSZip 自带类型。
+- `package.json` 中按版本范围限定的 overrides 用于更新 Vercel 工具链固定的间接依赖：AJV 8、js-yaml 4、minimatch 10、path-to-regexp 6/8、tar 7、tsx 4、undici 5 与 smol-toml 1。保持各依赖原有主版本；上游解除旧版本固定后可删除对应规则。
+- `vercel`、`@vercel/node` 与 `@vercel/build-utils` 属于开发/构建依赖。安全审计需区分 `bun audit` 与 `bun audit --production`；命中公告还需核对实际执行路径。
+- 2026-10-05 升级后生产依赖审计为零告警；完整审计仍命中开发工具链的 `braces@3.0.3`（无修复版）、`undici@5.29.0` 和其 `@fastify/busboy@2.1.1`。后两者被最新 Vercel CLI/Node builder 固定在旧主版本，等待上游升级，避免强制跨主版本替换构建器内部 HTTP 实现。

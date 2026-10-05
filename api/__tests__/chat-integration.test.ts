@@ -187,18 +187,18 @@ describe('chat integration — per-provider system prompt contract (v1.2.4)', ()
 
     it('buildProviderOptions(openai gpt-5.4, off) returns reasoningEffort: low', () => {
       expect(buildProviderOptions(false, 'gpt-5.4', 'openai')).toEqual({
-        openai: { reasoningEffort: 'low' },
+        openai: { reasoningEffort: 'low', reasoningSummary: null },
       });
     });
 
-    it('buildStopConditions returns 2-element array (stepCountIs + hasToolCall)', () => {
+    it('buildStopConditions returns 2-element array (isStepCount + hasToolCall)', () => {
       const conditions = buildStopConditions();
       expect(conditions).toHaveLength(2);
     });
   });
 });
 
-describe('buildStepLogPayload — onStepFinish observability (v1.2.4)', () => {
+describe('buildStepLogPayload — onStepEnd observability (v1.2.4)', () => {
   it('captures stepNumber, model, toolCalls (name+input), toolResults (name+output)', () => {
     const payload = buildStepLogPayload(
       {

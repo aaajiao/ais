@@ -26,6 +26,7 @@ type MigrationStep = 'idle' | 'previewing' | 'preview' | 'migrating' | 'complete
 export default function ThumbnailMigration() {
   const { t } = useTranslation('common');
   const { session } = useAuthContext();
+  const accessToken = session?.access_token;
   const [step, setStep] = useState<MigrationStep>('idle');
   const [previewData, setPreviewData] = useState<MigrateResponse | null>(null);
   const [migrateResult, setMigrateResult] = useState<MigrateResponse | null>(null);
@@ -41,7 +42,7 @@ export default function ThumbnailMigration() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token || ''}`,
+          'Authorization': `Bearer ${accessToken || ''}`,
         },
         body: JSON.stringify({ dryRun: true }),
       });
@@ -57,7 +58,7 @@ export default function ThumbnailMigration() {
       setError(err instanceof Error ? err.message : t('thumbnailMigration.previewError'));
       setStep('idle');
     }
-  }, [session?.access_token, t]);
+  }, [accessToken, t]);
 
   // 执行迁移
   const handleMigrate = useCallback(async () => {
@@ -69,7 +70,7 @@ export default function ThumbnailMigration() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token || ''}`,
+          'Authorization': `Bearer ${accessToken || ''}`,
         },
         body: JSON.stringify({ dryRun: false }),
       });
@@ -85,7 +86,7 @@ export default function ThumbnailMigration() {
       setError(err instanceof Error ? err.message : t('thumbnailMigration.migrateError'));
       setStep('preview');
     }
-  }, [session?.access_token, t]);
+  }, [accessToken, t]);
 
   // 重置状态
   const handleReset = useCallback(() => {

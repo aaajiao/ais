@@ -14,7 +14,7 @@ bun run test:run      # 运行测试（使用 vitest）
 
 ## Tech Stack
 
-- **Frontend**: React 19 + TypeScript 7.0 + Vite 7 + TailwindCSS 4
+- **Frontend**: React 19 + TypeScript 7.0 + Vite 8 + TailwindCSS 4
 - **UI**: shadcn/ui + Lucide icons + react-i18next
 - **Data**: TanStack React Query + Virtual + IndexedDB 离线缓存
 - **Backend**: Vercel Functions + Supabase (PostgreSQL) + Vercel Blob（工作室备份 ZIP 存储）
@@ -147,7 +147,7 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 - **OpenAI strict mode：optional 字段必须 `.nullable().optional()` + execute 必须归一化**：GPT 会给 `z.X.optional()` 塞类型默认值（`''` / `0` / 首 enum），把搜索过滤器归零、写脏 update payload。三层防御：schema + `api/lib/normalize-filters.ts` 物理拦截 + OpenAI prompt 显式 "Pass null"。Sonnet 不受影响。详见 [docs/ai-chat-tools.md `OpenAI strict mode schema 兼容性`](docs/ai-chat-tools.md#openai-strict-mode-schema-兼容性)。
 - **Update 工具：归一化后必须过滤 undefined 字段（v1.3.2 起）**：search 归一化最多让结果归零；update/execute 类（`execute-update` / `update-confirmation` / `export-artworks`）不过滤会用 null/''/0 覆盖既有 DB 数据（破外键、清零价格）。范式：`for ([k,v] of Object.entries(norm)) if (v !== undefined) payload[k] = v;`，payload 空返 `t('update.noFields')`。参考 `api/tools/execute-update.ts`。详见 [docs/ai-chat-tools.md `更新类工具：payload 过滤铁律`](docs/ai-chat-tools.md#更新类工具payload-过滤铁律v132-起)。
 - **外部 API 自动继承 L2 归一化（v1.3.4 起）**：`/api/external/v1/query` 绕过 zod 但 L2 在 execute() 入口，外部 LLM default-padded payload 自动被拦。**绝不**把归一化挪出 execute() 内部（例如挪到 chat.ts 钩子），否则外部 API 失去保护。`schema.ts` 给非 required 参数标 `nullable: true`。详见 [docs/external-api.md `参数处理铁律`](docs/external-api.md#参数处理铁律v134-起)。
-- **`onStepFinish` 必须 fire-and-forget**：回调声明 sync + 双 try/catch + payload 截 200 字符（见 `truncateForLog`）。await 拖慢流，抛错炸函数，不截 Vercel logs 会爆。OTel exporter 接入只改 `logStepForObservability` 一处。
+- **`onStepEnd` 必须 fire-and-forget**：回调声明 sync + 双 try/catch + payload 截 200 字符（见 `truncateForLog`）。await 拖慢流，抛错炸函数，不截 Vercel logs 会爆。OTel exporter 接入只改 `logStepForObservability` 一处。
 - **Thinking 模式：Anthropic off 必须 `{}` / OpenAI 按模型族分支**：Anthropic off 传 `{ type: 'disabled' }` 会改 Claude 行为，必须空对象；gpt-5.4/5.5 off 必须传 `'low'`（不传字段 GPT 不响应），on 传 `'high'`。各 GPT 模型 reasoningEffort enum 不统一，hardcode 必 break。守护 `api/__tests__/chat.test.ts`。详见 [docs/ai-chat-tools.md `深度推理（Thinking 模式）`](docs/ai-chat-tools.md#深度推理thinking-模式)。
 - **Anthropic-only providerOptions 必须按 provider 分支**：`cacheControl`（prompt caching）等 Anthropic-only 字段只能注入 Anthropic 路径（按 `getProviderName(model)` 判断），给 OpenAI 带上会请求体异常。`contextManagement.compact_20260112` 还有额外子集约束（见下条）。
 - **`compact_20260112` 是 Anthropic 子集模型特性（v1.5.x 修复）**：只支持 Sonnet 4.6+ / Opus 4.6+/4.7 / mythos-preview。发给老 Claude / Haiku 4.5 服务端会拒，错误以 "Conversation too long" 形式上抛——**即使对话历史为空也失败**，迷惑性极高。门控**必须**用 `supportsCompactBeta(modelId)`（`api/lib/model-provider.ts`），不能写 `provider === 'anthropic'`。注入失败走 `prepareMessagesForModel({ useServerSideCompaction: false })` 客户端截断兜底。新模型查 https://platform.claude.com/docs/en/build-with-claude/compaction 后扩 `COMPACT_SUPPORTED_MODELS`。守护 `api/lib/__tests__/model-provider.test.ts` + `message-utils.test.ts`。
@@ -171,7 +171,7 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 
 ### Backup (migration 009 起)
 
-- **备份 ZIP 走 Vercel Blob Private Store + Function 中转 + v2.3.3 SDK 类型滞后**：Supabase Free 单文件 50MB 装不下 ~340MB 完整快照，走 Vercel Blob。Store 在 Dashboard 创建时必选 Private。**`@vercel/blob` v2.3.3 的 TS 类型定义只声明 `access: 'public'`（types 滞后于 runtime），但 runtime + 服务端 API 实际支持 `'private'` 且对私有 store 必须传 `'private'`**，否则返 `"Cannot use public access on a private store"`。修复用 `@ts-expect-error` 注掉那行 + `access: 'private'`，等 SDK 类型修正后可去掉。SDK 行为存疑时 **docs / context7 优于 `.d.ts`**（types 是 best-effort 元数据，runtime 是事实）。SDK 不导出 `get()`，下载用 `list({ prefix }) + fetch(url, Authorization Bearer token)` + `/api/export/backup/download` Function 中转，**绝不**返回 Blob URL。详见 [docs/backup.md](docs/backup.md)。
+- **备份 ZIP 使用 Vercel Blob Private Store**：`@vercel/blob` 2.8 支持 `access: 'private'` 和 `get()`；下载按当前用户的精确 pathname 调 `get(pathname, { access: 'private', useCache: false })`，仍经鉴权 Function 中转，不能向客户端返回 Blob URL。`useCache: false` 避免覆盖备份后读到旧内容。详见 [docs/backup.md](docs/backup.md)。
 - **备份恢复是覆盖语义 + Rollback Gate UX 闸门 + 服务端 412 兜底**：`/api/import/backup` 不是合并/upsert，是 DELETE 全部 + INSERT 备份（保留原 UUID 让公开 URL 继续有效）。前端 UI 强制下载回滚包 + 输入 CONFIRM 双闸门，服务端 `X-Rollback-Confirmed: true` header 是真正拦截。三层服务端校验：user_id ≠ → 403 cross_account / schema_version ≠ → 400 schema_mismatch / format_version ≠ → 400 format_mismatch。`users` 表全程不碰。守护 `api/lib/backup/__tests__/restore.test.ts`。详见 [docs/backup.md `导入 / 恢复流程`](docs/backup.md#导入--恢复流程)。
 - **项目有两个 Storage bucket，性质相反（v1.8.2 实证）**：`thumbnails` (public, `<img src>` 直接用) vs `edition-files` (private, 前端 `getSignedUrl` / 服务端 service-key `download`)。涉及 storage 资源**任何**回源下载、迁移、备份的功能都要意识到这个区分 —— 对 private bucket 拼 public URL `fetch()` 永远 404。`edition_files.file_url` 字段历史上**双形态共存**（相对 storage path / 绝对 URL），且 `source_type` 分流：`'upload'` = 项目自有 storage / `'link'` = 第三方外链不下载。备份代码用 `parseStorageRef(raw, defaultBucket)` 归一两种形态、用 `supabase.storage.from(bucket).download(path)` 穿 private。详见 [docs/backup.md `两条 bucket 路径`](docs/backup.md#两条-bucket-路径)。
 

@@ -87,7 +87,7 @@ export function getProviderName(modelId: string): 'anthropic' | 'openai' {
 /**
  * 根据模型 ID 与 thinking 开关推断 OpenAI reasoningEffort 值。
  *
- * 背景：@ai-sdk/openai v3 默认走 Responses API。`gpt-5.1+` / `gpt-5.4` / `gpt-5.5`
+ * 背景：@ai-sdk/openai v4 默认走 Responses API。`gpt-5.1+` / `gpt-5.4` / `gpt-5.5`
  * 的默认 reasoning_effort 是 `'none'` —— 模型几乎不做内部规划，多步工具调用决策
  * 失效（v1.2.2 实证：用户问"什么作品在 london"GPT 完全不调 search 工具）。
  * 必须显式传一个非零的 effort 才能让模型正常调用工具。
@@ -95,7 +95,7 @@ export function getProviderName(modelId: string): 'anthropic' | 'openai' {
  * 项目实际只用 gpt-5.4 / gpt-5.5（含 -mini 变体）：两者都需显式 effort。
  *   - thinking off → 'low'（不再退化到 none，仍调工具但 reasoning 开销小）
  *   - thinking on → 'high'（深度推理；曾在 v1.2.0 配 stepCountIs(5) 时引发循环，
- *     当前 stepCountIs(8) + hasToolCall 应已缓解；如再现循环可降到 'medium'）
+ *     当前 isStepCount(8) + hasToolCall 应已缓解；如再现循环可降到 'medium'）
  *
  * 其他模型（gpt-4 / claude-* / 未知前缀）→ 返回 undefined，调用方不传字段。
  *

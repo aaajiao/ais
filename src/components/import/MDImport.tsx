@@ -16,6 +16,7 @@ import {
 export default function MDImport() {
   const { t } = useTranslation('import');
   const { session } = useAuthContext();
+  const accessToken = session?.access_token;
   const [step, setStep] = useState<ImportStep>('upload');
   const [parsedArtworks, setParsedArtworks] = useState<ParsedArtwork[]>([]);
   const [previewResult, setPreviewResult] = useState<PreviewResult | null>(null);
@@ -64,7 +65,7 @@ export default function MDImport() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token || ''}`,
+          'Authorization': `Bearer ${accessToken || ''}`,
         },
         body: JSON.stringify({
           artworks: artworks.map((a, index) => ({
@@ -108,7 +109,7 @@ export default function MDImport() {
     } finally {
       setLoading(false);
     }
-  }, [session?.access_token, t]);
+  }, [accessToken, t]);
 
   // 处理缩略图选择
   const handleThumbnailSelect = (uid: string, imageUrl: string) => {
@@ -191,7 +192,7 @@ export default function MDImport() {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session?.access_token || ''}`,
+              'Authorization': `Bearer ${accessToken || ''}`,
             },
             body: JSON.stringify({ artworks: batch, mode: 'execute' }),
           });

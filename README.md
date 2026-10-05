@@ -69,7 +69,7 @@ Click any screenshot to view the full-resolution image.
 
 | Layer | Technology |
 |-------|------------|
-| Frontend | React 19, TypeScript 7.0, Vite 7, TailwindCSS 4 |
+| Frontend | React 19, TypeScript 7.0, Vite 8, TailwindCSS 4 |
 | UI | shadcn/ui (Radix), Lucide Icons |
 | Data | TanStack Query + Virtual, react-i18next |
 | Backend | Vercel Functions |

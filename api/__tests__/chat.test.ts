@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { stepCountIs, hasToolCall } from 'ai';
+import { isStepCount, hasToolCall } from 'ai';
 import { buildProviderOptions, buildSystemMessage, buildStopConditions } from '../chat';
 
 describe('buildProviderOptions', () => {
@@ -87,13 +87,13 @@ describe('buildProviderOptions', () => {
     for (const { model, off, on } of cases) {
       it(`${model} thinking off → reasoningEffort: '${off}'`, () => {
         const opts = buildProviderOptions(false, model, 'openai');
-        expect(opts.openai).toEqual({ reasoningEffort: off });
+        expect(opts.openai).toEqual({ reasoningEffort: off, reasoningSummary: null });
         expect(opts).not.toHaveProperty('anthropic');
       });
 
       it(`${model} thinking on → reasoningEffort: '${on}'`, () => {
         const opts = buildProviderOptions(true, model, 'openai');
-        expect(opts.openai).toEqual({ reasoningEffort: on });
+        expect(opts.openai).toEqual({ reasoningEffort: on, reasoningSummary: null });
         expect(opts).not.toHaveProperty('anthropic');
       });
     }
@@ -152,22 +152,22 @@ describe('buildSystemMessage', () => {
 });
 
 describe('buildStopConditions', () => {
-  // P0-2: hasToolCall + stepCountIs 数组（任一满足即停止）
+  // P0-2: hasToolCall + isStepCount 数组（任一满足即停止）
   it('returns an array with two stop conditions', () => {
     const conditions = buildStopConditions();
     expect(Array.isArray(conditions)).toBe(true);
     expect(conditions).toHaveLength(2);
   });
 
-  it('first condition is stepCountIs(8) (硬上限兜底)', () => {
+  it('first condition is isStepCount(8) (硬上限兜底)', () => {
     const conditions = buildStopConditions();
     expect(conditions[0]).not.toBe(conditions[1]);
     expect(typeof conditions[0]).toBe('function');
     expect(typeof conditions[1]).toBe('function');
   });
 
-  it('uses sdk-exported stepCountIs and hasToolCall (regression: imports must come from "ai" package)', () => {
-    expect(typeof stepCountIs).toBe('function');
+  it('uses sdk-exported isStepCount and hasToolCall (regression: imports must come from "ai" package)', () => {
+    expect(typeof isStepCount).toBe('function');
     expect(typeof hasToolCall).toBe('function');
   });
 });

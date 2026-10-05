@@ -47,6 +47,7 @@ export default function ExportDialog({
   // 对话框关闭时重置版本选择状态
   useEffect(() => {
     if (!isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Reset the closed dialog's selection, including parent-initiated closes.
       setEditionMode('all');
       setSelectedEditionIds([]);
     }

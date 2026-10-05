@@ -246,21 +246,19 @@ export default function PublicView() {
 
   // 检测是否从应用内部跳转（管理员预览场景）
   // 只有从同源页面跳转过来时才显示返回按钮
-  const [showBackButton, setShowBackButton] = useState(false);
-
-  useEffect(() => {
+  const [showBackButton] = useState(() => {
     try {
       // 检查 referrer 是否为同源
       if (document.referrer) {
         const referrerOrigin = new URL(document.referrer).origin;
         const currentOrigin = window.location.origin;
-        setShowBackButton(referrerOrigin === currentOrigin);
+        return referrerOrigin === currentOrigin;
       }
     } catch {
       // URL 解析失败，不显示返回按钮
-      setShowBackButton(false);
     }
-  }, []);
+    return false;
+  });
 
   // 浏览器 tab 标题：展示该链接对应的位置名（如「XX 画廊 · aaajiao」）
   // 默认 index.html 是静态 "aaajiao Inventory"，未反映当前查看的位置

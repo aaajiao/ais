@@ -4,6 +4,22 @@
 
 ---
 
+## AI SDK 7 升级约定
+
+使用 `ai` 7 和同代 `@ai-sdk/anthropic`、`@ai-sdk/openai`、`@ai-sdk/react` 4；直接使用的 `@ai-sdk/provider-utils` 5 显式声明在依赖中。升级时一起更新并检查锁文件，避免前后端解析不同代的流协议。AI SDK 7 的 Node.js 最低要求为 22；项目依赖整体要求 Node.js >=22.17.0，CI 使用 Bun。
+
+- `streamText` / `generateText` 使用 `instructions`，逐步日志回调使用 `onStepEnd`，停止上限使用 `isStepCount(8)`。
+- 响应通过 `toUIMessageStream({ stream: result.stream, tools })` 与 `createUIMessageStreamResponse` 输出，保持 `DefaultChatTransport` 的 SSE 协议与工具信息。
+- GPT 的非零 `reasoningEffort` 在 v7 默认开启 detailed reasoning summary。本项目显式设置 `reasoningSummary: null`，保留原有文字和工具卡片行为；Thinking 的 low/high 分支不变。
+- Claude prompt caching、Thinking 和 compaction 仍按 provider / 模型白名单注入。不要用新的通用 `reasoning` 参数覆盖这些已有分支。
+- `api/__tests__/chat-sdk.test.ts` 使用真实 SDK、mock provider 和 `DefaultChatTransport`，覆盖增量文字、provider 参数、搜索后确认卡片即停、八步上限及流错误；无模型网络调用或数据库写入。它补充现有纯函数契约测试，不能代替部署后的真实模型验证。
+- `api/lib/__tests__/structured-output-sdk.test.ts` 通过真实 `generateText` / `Output.object` 验证中文搜索扩展、无效输出回退与 URL 作品提取；网页内容和模型输出均使用本地 fixture。
+- 根 `typecheck` 通过 `tsconfig.api.json` 检查 API 运行时代码；测试仍通过 Vitest 验证。
+
+迁移依据：[官方 AI SDK 7 指南](https://ai-sdk.dev/docs/migration-guides/migration-guide-7-0)。
+
+---
+
 ## 功能概览
 
 - 查询作品和版本
@@ -70,7 +86,7 @@
 
 ### 为什么 GPT 关闭时也传 `low`
 
-`gpt-5.4` / `gpt-5.5` 通过 `@ai-sdk/openai` v3 默认走 **OpenAI Responses API**，该路径下这些模型的 `reasoning_effort` 默认值是 **`none`** —— 模型几乎不做内部规划，导致工具调用决策失效（v1.2.2 实证：用户问"什么作品在 london"GPT 完全不调用 `search_editions` 工具）。
+`gpt-5.4` / `gpt-5.5` 通过 `@ai-sdk/openai` v4 默认走 **OpenAI Responses API**，该路径下这些模型的 `reasoning_effort` 默认值是 **`none`** —— 模型几乎不做内部规划，导致工具调用决策失效（v1.2.2 实证：用户问"什么作品在 london"GPT 完全不调用 `search_editions` 工具）。
 
 修复办法：显式传 `'low'`，让模型有最低限度的内部规划，但开销小。
 
@@ -143,11 +159,11 @@ streamText 的 `stopWhen` 同时启用两种条件（满足任一即停步）：
 | 条件 | 用途 |
 |------|------|
 | `hasToolCall('generate_update_confirmation')` | 自然停止信号：模型生成确认卡片 → 立即结束当前轮 |
-| `stepCountIs(8)` | 兜底硬上限：防止工具链失控（曾导致工具链断裂 bug） |
+| `isStepCount(8)` | 兜底硬上限：防止工具链失控（曾导致工具链断裂 bug） |
 
-**为什么要 hasToolCall？** 仅靠 `stepCountIs(8)` 时，模型可能在生成确认卡片后还想继续多调一次工具，浪费一步并增加延迟。`hasToolCall` 让模型生成更新确认卡片即停步。
+**为什么要 hasToolCall？** 仅靠 `isStepCount(8)` 时，模型可能在生成确认卡片后还想继续多调一次工具，浪费一步并增加延迟。`hasToolCall` 让模型生成更新确认卡片即停步。
 
-`api/chat.ts:buildStopConditions()` 返回 `[stepCountIs(8), hasToolCall('generate_update_confirmation')]`。
+`api/chat.ts:buildStopConditions()` 返回 `[isStepCount(8), hasToolCall('generate_update_confirmation')]`。
 
 ---
 
@@ -192,13 +208,13 @@ search_editions internally matches by name, city, AND country.
 ### 关键文件
 
 - `api/lib/system-prompt.ts` —— 三个导出：`getSystemPrompt` / `getSystemPromptForAnthropic` / `getSystemPromptForOpenAI` / `getSystemPromptByProvider`
-- `api/chat.ts:182` —— `system: buildSystemMessage(getSystemPromptByProvider(provider, artistName), provider)`
+- `api/chat.ts` —— `instructions: buildSystemMessage(getSystemPromptByProvider(provider, artistName), provider)`
 
 ---
 
-## Step Logging（onStepFinish 可观测性）
+## Step Logging（onStepEnd 可观测性）
 
-**自 v1.2.4 起**，`streamText` 接 `onStepFinish` 回调，每个 step（一次 LLM 调用，可能含若干工具调用）完成时输出一条结构化 log，让"GPT 实际调了什么工具传了什么参数"肉眼可见。
+**自 v1.2.4 起**，`streamText` 接 `onStepEnd` 回调，每个 step（一次 LLM 调用，可能含若干工具调用）完成时输出一条结构化 log，让"GPT 实际调了什么工具传了什么参数"肉眼可见。
 
 ### Log 内容
 
@@ -219,7 +235,7 @@ search_editions internally matches by name, city, AND country.
 
 ### 关键设计：fire-and-forget
 
-`onStepFinish` 必须**绝不抛错**且**不能 await**：
+`onStepEnd` 必须**绝不抛错**且**不能 await**：
 
 - 内部 `try/catch` 吞掉序列化异常
 - 外层 `try/catch` 再防御一层

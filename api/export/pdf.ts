@@ -173,6 +173,7 @@ async function handleCatalogExport(request: CatalogRequest, userId: string, res:
     .from('locations')
     .select('id, name')
     .eq('name', request.locationName)
+    .eq('user_id', userId)
     .single();
 
   if (!location) {
@@ -316,7 +317,7 @@ async function generateAndSendPDF(
 /**
  * 使用 Puppeteer 渲染 HTML → PDF
  */
-async function renderHTMLToPDF(html: string): Promise<ArrayBuffer> {
+export async function renderHTMLToPDF(html: string): Promise<Uint8Array> {
   const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
 
   let browser;
@@ -326,8 +327,10 @@ async function renderHTMLToPDF(html: string): Promise<ArrayBuffer> {
     const chromium = await import('@sparticuz/chromium-min');
     const puppeteer = await import('puppeteer-core');
 
+    // Keep the pack and chromium-min version aligned; Puppeteer 25.11 targets Chromium 153.
+    const architecture = process.arch === 'arm64' ? 'arm64' : 'x64';
     const remoteExecutablePath =
-      'https://github.com/Sparticuz/chromium/releases/download/v133.0.0/chromium-v133.0.0-pack.tar';
+      `https://github.com/Sparticuz/chromium/releases/download/v153.0.0/chromium-v153.0.0-pack.${architecture}.tar`;
 
     const executablePath = await chromium.default.executablePath(remoteExecutablePath);
 
@@ -343,8 +346,9 @@ async function renderHTMLToPDF(html: string): Promise<ArrayBuffer> {
         '--font-render-hinting=none',
         '--force-color-profile=srgb',
       ],
-      headless: true,
-      defaultViewport: chromium.default.defaultViewport,
+      // Sparticuz ships chrome-headless-shell, not Chrome's regular headless mode.
+      headless: 'shell',
+      defaultViewport: { width: 1920, height: 1080, deviceScaleFactor: 1 },
     });
   } else {
     // 本地开发：使用系统 Chrome
@@ -359,9 +363,11 @@ async function renderHTMLToPDF(html: string): Promise<ArrayBuffer> {
     const page = await browser.newPage();
 
     await page.setContent(html, {
-      waitUntil: 'networkidle0',
+      waitUntil: 'load',
       timeout: 30000,
     });
+    // Puppeteer 25 separates network-idle waiting from setContent lifecycle events.
+    await page.waitForNetworkIdle({ idleTime: 500, timeout: 30000 });
 
     // 等待所有字体加载完成（base64 内嵌字体 + CDN 中文字体）
     await page.evaluate(() => document.fonts.ready);
@@ -373,7 +379,8 @@ async function renderHTMLToPDF(html: string): Promise<ArrayBuffer> {
       margin: { top: '0', bottom: '0', left: '0', right: '0' },
     });
 
-    return pdfBuffer.buffer as ArrayBuffer;
+    // Preserve the byte range if Puppeteer returns a view into a larger buffer.
+    return pdfBuffer;
   } finally {
     await browser.close();
   }

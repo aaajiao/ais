@@ -1,4 +1,4 @@
-import { streamText, stepCountIs, hasToolCall, type UIMessage } from 'ai';
+import { streamText, isStepCount, hasToolCall, toUIMessageStream, createUIMessageStreamResponse, type UIMessage } from 'ai';
 import type { ProviderOptions, SystemModelMessage } from '@ai-sdk/provider-utils';
 import { verifyAuth, unauthorizedResponse } from './lib/auth.js';
 import { getModel, getSupabase, getProviderName, getOpenAIReasoningEffort, supportsCompactBeta } from './lib/model-provider.js';
@@ -57,7 +57,9 @@ export function buildProviderOptions(
   if (effort === undefined) {
     return {};
   }
-  return { openai: { reasoningEffort: effort } };
+  // AI SDK 7 enables detailed reasoning summaries for non-zero effort by default.
+  // Keep the existing text/tool response format and avoid introducing hidden summaries.
+  return { openai: { reasoningEffort: effort, reasoningSummary: null } };
 }
 
 /**
@@ -93,16 +95,16 @@ export function buildSystemMessage(
 /**
  * 构造 streamText 的 stopWhen 数组。
  * - hasToolCall('generate_update_confirmation')：模型生成确认卡片即停步（自然停止信号）
- * - stepCountIs(8)：兜底硬上限，防止工具链失控（曾导致工具链断裂 bug）
+ * - isStepCount(8)：兜底硬上限，防止工具链失控（曾导致工具链断裂 bug）
  *
  * 数组语义：满足任一条件即停止（v6.0.132+ 支持，d.ts:2736）。
  *
- * 不带泛型注解：让 TS 按 stepCountIs / hasToolCall 自身签名（StopCondition<any>）推断，
+ * 不带泛型注解：让 TS 按 isStepCount / hasToolCall 自身签名（StopCondition<any>）推断，
  * 与 streamText 的 stopWhen?: StopCondition<NoInfer<typeof tools>> 兼容（any 兼容一切）。
  * 显式 <TOOLS extends ToolSet> 会被 NoInfer 屏蔽反向推断，导致 nodenext typecheck 失败。
  */
 export function buildStopConditions() {
-  return [stepCountIs(8), hasToolCall('generate_update_confirmation')];
+  return [isStepCount(8), hasToolCall('generate_update_confirmation')];
 }
 
 /**
@@ -258,7 +260,7 @@ export default async function handler(req: Request) {
     // 6. 流式对话
     const result = streamText({
       model: selectedModel,
-      system: buildSystemMessage(getSystemPromptByProvider(provider, artistName), provider),
+      instructions: buildSystemMessage(getSystemPromptByProvider(provider, artistName), provider),
       messages: modelMessages,
       tools,
       stopWhen: buildStopConditions(),
@@ -266,12 +268,12 @@ export default async function handler(req: Request) {
       // 每个 step（一次 LLM 调用）完成时记录工具调用决策。
       // 用途：观察 GPT/Claude 在 search_editions(location='London') 这类路由上的实际行为。
       // 关键约束：必须 fire-and-forget + try/catch 吞错。绝不能让 logger 异常中断流。
-      onStepFinish(step) {
+      onStepEnd(step) {
         try {
           logStepForObservability(step, auth.userId!, model);
         } catch (err) {
           // 日志兜底失败也不能影响流。这里再 catch 一层防御。
-          console.error('[chat] onStepFinish logger threw:', err);
+          console.error('[chat] onStepEnd logger threw:', err);
         }
       },
       onError({ error }) {
@@ -293,13 +295,16 @@ export default async function handler(req: Request) {
       },
     });
 
-    return result.toUIMessageStreamResponse({
+    const uiStream = toUIMessageStream({
+      stream: result.stream,
+      tools,
       onError(error) {
         // 提取错误信息发送给客户端
         console.error('[chat] Response error:', error);
         return error instanceof Error ? error.message : 'Unknown error';
       },
     });
+    return createUIMessageStreamResponse({ stream: uiStream });
   } catch (error) {
     const err = error as Error & { cause?: Error; status?: number; statusText?: string };
     console.error('[chat] Error:', {

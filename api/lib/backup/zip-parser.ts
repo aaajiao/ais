@@ -166,7 +166,7 @@ export async function parseBackupZip(buffer: Buffer): Promise<ParsedBackup> {
   try {
     zip = await JSZip.loadAsync(buffer);
   } catch (err) {
-    throw new Error(`Failed to read ZIP: ${(err as Error).message}`);
+    throw new Error(`Failed to read ZIP: ${(err as Error).message}`, { cause: err });
   }
 
   // 1) manifest.json
@@ -178,7 +178,7 @@ export async function parseBackupZip(buffer: Buffer): Promise<ParsedBackup> {
   try {
     manifestRaw = JSON.parse(await manifestFile.async('string'));
   } catch (err) {
-    throw new Error(`Invalid manifest: not valid JSON (${(err as Error).message})`);
+    throw new Error(`Invalid manifest: not valid JSON (${(err as Error).message})`, { cause: err });
   }
   assertValidManifest(manifestRaw);
   const manifest = manifestRaw;
@@ -192,7 +192,7 @@ export async function parseBackupZip(buffer: Buffer): Promise<ParsedBackup> {
   try {
     dataRaw = JSON.parse(await dataFile.async('string'));
   } catch (err) {
-    throw new Error(`Invalid data.json: not valid JSON (${(err as Error).message})`);
+    throw new Error(`Invalid data.json: not valid JSON (${(err as Error).message})`, { cause: err });
   }
   assertValidData(dataRaw);
   const data = dataRaw;

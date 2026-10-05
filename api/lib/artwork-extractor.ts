@@ -153,7 +153,7 @@ async function fetchPage(url: string): Promise<string> {
   } catch (error) {
     clearTimeout(timeoutId);
     if ((error as Error).name === 'AbortError') {
-      throw new Error('TIMEOUT');
+      throw new Error('TIMEOUT', { cause: error });
     }
     throw error;
   }
@@ -180,7 +180,7 @@ export async function extractArtworkFromUrl(url: string, modelId?: string, local
     const result = await generateText({
       model: getModel(modelId),
       output: Output.object({ schema: artworkSchema }),
-      system: `你是一个艺术作品信息提取专家。从给定的网页 HTML 内容中提取作品信息。
+      instructions: `你是一个艺术作品信息提取专家。从给定的网页 HTML 内容中提取作品信息。
 
 提取规则：
 1. 标题：可能是 "English Title / 中文标题" 格式，需要分别提取到 title_en 和 title_cn

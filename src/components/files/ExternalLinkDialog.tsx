@@ -109,13 +109,13 @@ export default function ExternalLinkDialog({
     }
   }, [extractFallbackName]);
 
-  // 自动检测链接类型
-  useEffect(() => {
-    if (url.trim()) {
-      const detected = detectLinkType(url) as FileType;
-      setFileType(detected);
+  // URL 输入时检测类型；之后仍允许用户手动选择类型。
+  const handleUrlChange = (nextUrl: string) => {
+    setUrl(nextUrl);
+    if (nextUrl.trim()) {
+      setFileType(detectLinkType(nextUrl) as FileType);
     }
-  }, [url]);
+  };
 
   // URL 变化时 debounce 获取标题
   useEffect(() => {
@@ -281,7 +281,7 @@ export default function ExternalLinkDialog({
             <input
               type="url"
               value={url}
-              onChange={e => setUrl(e.target.value)}
+              onChange={e => handleUrlChange(e.target.value)}
               placeholder="https://..."
               className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
               autoFocus

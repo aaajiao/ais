@@ -169,7 +169,7 @@ DB 字段历史上同时存了两种形态：
 
 ```
 verifyAuth → buildBackupZip(userId, userEmail, service-supabase)
-          → put(blob/`backups/{userId}/latest.zip`, buffer, { access: 'public', allowOverwrite: true })
+          → put(blob/`backups/{userId}/latest.zip`, buffer, { access: 'private', allowOverwrite: true })
           → UPDATE users SET last_backup_at, last_backup_size_bytes, last_backup_stats
           → return { manifest, sizeBytes, downloadEndpoint: '/api/export/backup/download' }
 ```
@@ -207,11 +207,11 @@ Vercel Cron schedule（`vercel.json`）：`0 3 * * *` 每天 03:00 UTC。handler
 - 这是 [security-by-obscurity 反模式](https://en.wikipedia.org/wiki/Security_through_obscurity) 的明确规避
 
 ```
-verifyAuth → list({ prefix: `backups/${userId}/`, limit: 1 })   ← v2.3.3 SDK 没 get()，靠 list 找 URL
-          → 0 命中 → 404 { error: 'no_backup' }
-          → fetch(blobUrl, { Authorization: Bearer <BLOB_READ_WRITE_TOKEN> })  ← 私有 store 必须带 token
+verifyAuth → get(`backups/${userId}/latest.zip`, { access: 'private', useCache: false })
+          → null → 404 { error: 'no_backup' }
+          → SDK 自动携带服务端凭据，绕过缓存读取最新覆盖的备份
           → set Content-Disposition + Cache-Control: no-store, private
-          → Readable.fromWeb(upstream.body).pipe(res)
+          → Readable.fromWeb(upstream.stream).pipe(res)
           → stream 'end' → UPDATE users.last_backup_downloaded_at = now()
 ```
 
@@ -315,9 +315,9 @@ Supabase Free 单文件 **50 MB 上限**（[官方 pricing 页](https://supabase
 - 备份恢复时图片重传回 thumbnails，保留现有 `<img src>` 工作流不动
 - Blob 只存"整个工作室档案" = 单文件价值最高的资产
 
-### v2.3.3 SDK 类型滞后于 runtime
+### Blob SDK 私有存储接口
 
-`@vercel/blob@2.3.3` 的 TS 类型定义里只声明 `access: 'public'`（参见 `node_modules/@vercel/blob/dist/create-folder-*.d.ts`：`The only currently allowed value is 'public'`），但 **runtime + Vercel Blob 服务端 API 实际支持 `'public' | 'private'`**。Vercel 官方 docs / context7 写的也是完整的两值枚举。
+`@vercel/blob@2.8.0` 已正式声明 `access: 'public' | 'private'`，并导出 `get()`。旧版 2.3.3 的类型豁免和 `list() + fetch()` 下载兼容代码已不再需要。
 
 对**私有 store 必须传 `access: 'private'`**，否则服务端返：
 
@@ -326,11 +326,10 @@ Vercel Blob: Cannot use public access on a private store.
 The store is configured with private access.
 ```
 
-实际写法（用 `@ts-expect-error` 暂时压住类型错误）：
+上传继续使用每用户单 slot 的覆盖语义：
 
 ```ts
 await put(path, buffer, {
-  // @ts-expect-error v2.3.3 types lag runtime; private store requires access: 'private'
   access: 'private',
   allowOverwrite: true,
   addRandomSuffix: false,
@@ -338,18 +337,16 @@ await put(path, buffer, {
 });
 ```
 
-SDK 类型修正后去掉 `@ts-expect-error` 即可。
-
-**另一个 SDK 缺口**：v2.3.3 还没导出 `get()`（docs / context7 写有），下载内容用：
+下载通过精确 pathname 读取，SDK 在服务端自动处理凭据：
 
 ```ts
-const { blobs } = await list({ prefix: `backups/${userId}/`, limit: 1 });
-const upstream = await fetch(blobs[0].url, {
-  headers: { Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` },
+const upstream = await get(getBackupBlobPath(userId), {
+  access: 'private',
+  useCache: false,
 });
 ```
 
-**通用教训**：SDK 行为存疑时 **runtime / docs / context7 > `.d.ts`**。类型定义是 best-effort 元数据，可能滞后或不准；runtime + 官方 docs 才是事实。可以 `curl context7.com/api/v2/context?...` 拉权威 doc 验证。
+`useCache: false` 保证覆盖后立即下载到最新备份；浏览器响应仍设置 `Cache-Control: no-store, private`。缺文件返回 `null`，成功时通过 `upstream.stream` 流式传输，不向前端暴露 Blob URL 或 token。参考 [官方 SDK 文档](https://vercel.com/docs/vercel-blob/using-blob-sdk#get-a-blob)。
 
 
 ### 为什么 Vercel Cron 每天跑而不是 weekly/monthly schedule

@@ -30,9 +30,8 @@
  *
  * SDK access 参数注意
  * ------------------
- * @vercel/blob v2.3.3 的 put() options.access 字面要求 'public'（SDK 类型限制）。
- * 这与 store 的私有性无关 —— store 私有性看 Dashboard 创建时的选项决定 URL 域。
- * 这个 API 设计违反直觉但是当前真实行为；未来 SDK 升级支持 'private' 调用时再切。
+ * @vercel/blob 2.8 已支持 access: 'private' 的类型定义与私有读取 get()。
+ * 参数必须与 Dashboard 创建的 Private Store 匹配；无需旧版的类型豁免。
  *
  * Atomic replace
  * --------------

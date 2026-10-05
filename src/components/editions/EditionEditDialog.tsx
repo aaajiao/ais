@@ -107,6 +107,8 @@ export default function EditionEditDialog({
   // 初始化表单数据
   useEffect(() => {
     if (isOpen && edition) {
+      // Opening or replacing the edition starts a fresh editable draft.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormData({
         edition_type: edition.edition_type as 'numbered' | 'ap' | 'unique',
         edition_number: edition.edition_number,

@@ -66,6 +66,7 @@ export default function LocationDialog({
     if (isOpen) {
       if (isEditMode && editingLocation) {
         // 编辑模式：填充现有数据
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- Sync the editable draft when the dialog opens or its location changes.
         setFormData({
           name: editingLocation.name,
           type: editingLocation.type,
@@ -399,4 +400,3 @@ export default function LocationDialog({
     </div>
   );
 }
-

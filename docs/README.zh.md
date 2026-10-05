@@ -67,7 +67,7 @@
 
 | 层级 | 技术 |
 |------|------|
-| 前端 | React 19, TypeScript 7.0, Vite 7, TailwindCSS 4 |
+| 前端 | React 19, TypeScript 7.0, Vite 8, TailwindCSS 4 |
 | UI | shadcn/ui (Radix), Lucide Icons |
 | 数据 | TanStack Query + Virtual, react-i18next |
 | 后端 | Vercel Functions |

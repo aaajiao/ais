@@ -67,6 +67,7 @@ export function useLocations() {
 
   // 初始加载
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Start the external request with the same loading state used by refetch.
     fetchLocations();
   }, [fetchLocations]);
 

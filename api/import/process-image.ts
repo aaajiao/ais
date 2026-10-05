@@ -2,7 +2,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import sharp from 'sharp';
+import sharp, { type OutputInfo } from 'sharp';
 import { verifyAuth } from '../lib/auth.js';
 
 // Vercel 配置：使用 Node.js runtime
@@ -57,14 +57,14 @@ async function fetchImage(url: string, timeoutMs: number = 15000): Promise<Buffe
   } catch (error) {
     clearTimeout(timeoutId);
     if ((error as Error).name === 'AbortError') {
-      throw new Error('Image fetch timeout');
+      throw new Error('Image fetch timeout', { cause: error });
     }
     throw error;
   }
 }
 
 // 压缩图片
-async function compressImage(inputBuffer: Buffer): Promise<{ buffer: Buffer; info: sharp.OutputInfo }> {
+async function compressImage(inputBuffer: Buffer): Promise<{ buffer: Buffer; info: OutputInfo }> {
   const image = sharp(inputBuffer);
 
   // 压缩处理

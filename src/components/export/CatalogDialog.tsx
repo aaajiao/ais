@@ -60,6 +60,7 @@ export default function CatalogDialog({
   useEffect(() => {
     if (!isOpen) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Opening the dialog starts an external request and its loading state.
     setLoading(true);
     setError(null);
 
@@ -85,6 +86,7 @@ export default function CatalogDialog({
   // 重置状态
   useEffect(() => {
     if (!isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Discard the closed dialog's draft, including parent-initiated closes.
       setItems([]);
       setSelectedIds(new Set());
       setIncludePrice(link.show_prices);
