@@ -233,9 +233,11 @@ export default async function handler(req: Request) {
     // 4. 准备消息：
     //    - 服务端 compaction 路径（Sonnet 4.6+ / Opus 4.6+/4.7）：跳过客户端截断
     //    - 其他路径（OpenAI + Haiku 4.5 / Sonnet 4.5 等不支持 compact 的 Claude）：客户端 token 截断兜底
+    //    - 传 tools：历史里的工具结果走 toModelOutput 摘要，而不是原始数据库行
     const useCompact = provider === 'anthropic' && supportsCompactBeta(model);
     const modelMessages = await prepareMessagesForModel(uiMessages as UIMessage[], 150000, {
       useServerSideCompaction: useCompact,
+      tools,
     });
 
     // 5. providerOptions：thinking + （仅支持 compact_20260112 的 Claude 模型注入 contextManagement）

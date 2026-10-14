@@ -286,7 +286,32 @@ search_editions internally matches by name, city, AND country.
 | **Haiku 4.5 / Sonnet 4.5 / 老 Claude** | 客户端 token 截断兜底（`prepareMessagesForModel({ useServerSideCompaction: false })`），跟 OpenAI 同款 |
 | **OpenAI 全部** | 客户端 token 截断兜底；OpenAI 没有等效官方机制 |
 
-`pruneMessages`（去除重复工具调用）对所有路径生效，与压缩/截断正交。
+历史修剪（`pruneMessages`）对所有路径生效，与压缩/截断正交，规则见下节。
+
+### 历史修剪与 thinking 块完整性（v1.9.1 修复）
+
+**症状**：开着深度推理问过一个用了工具的问题，之后每次提问都报 Anthropic 400 `messages.3.content.1: thinking or redacted_thinking blocks in the latest assistant message cannot be modified`，重试也没用，只有清空对话才恢复。
+
+**根因**：一个 assistant UIMessage 含多个 step，`convertToModelMessages` 按 `step-start` 拆成 `assistant[reasoning, tool-call] → tool[result] → assistant[reasoning, text]`。旧实现对整段历史跑 `pruneMessages({ toolCalls: 'before-last-2-messages' })`，删掉前面 step 的 tool-call / tool-result 却保留 reasoning（`reasoning` 默认 `'none'`），两个 assistant 消息变成相邻，`@ai-sdk/anthropic` 的 `groupIntoBlocks` 把它们合并成 `[thinking(step1), thinking(step2), text]`。两次不同响应的 thinking 拼在同一条消息里，API 判为篡改。历史存在 localStorage（`chat-history`），每次请求都带着这条消息；失败请求不追加 assistant 消息，所以重试和新提问都卡在同一处。离线复现确认 AI SDK 6 / 7 生成的请求体完全一致，不是 SDK 升级引入的。
+
+**Anthropic 规则**（[Preserving thinking blocks](https://platform.claude.com/docs/en/build-with-claude/thinking#preserving-thinking-blocks)）：
+
+- 最新 assistant 消息里连续 thinking 块的序列必须与原始响应一致——不能重排、编辑或部分删除
+- tool-use 轮次内必须回传 thinking 块
+- 工具调用之外可以省略更早轮次的 thinking
+
+**现行规则**（`api/lib/message-utils.ts:prepareMessagesForModel`）：
+
+| 范围 | 处理 |
+|------|------|
+| 最近一个 assistant UIMessage 及之后的消息 | 原样转换：每个 step 的 thinking / tool-call / tool-result 保持原状；只丢弃被中断、只剩 reasoning 的最后一个 step（有报告称 Anthropic 会拒绝以 thinking 结尾的 assistant 消息，OpenAI 会拒绝后面没有内容的 reasoning item） |
+| 更早的轮次 | `pruneMessages({ reasoning: 'all', toolCalls: 'all', emptyMessages: 'remove' })`：工具调用与 reasoning **一起**剥离；剩下的文字去掉 `providerOptions` 以纯文本内联发送（OpenAI store=true 会把带 itemId 的文字发成 `item_reference`，而它对应的 reasoning item 已被剥离） |
+| 两者 | `convertToModelMessages(..., { tools, ignoreIncompleteToolCalls: true })`：`tools` 让历史工具结果走 `toModelOutput` 摘要（不传会发原始数据库行，体积数倍）；断网 / 切后台 / 离开页面时 `onFinish` 仍会保存 `input-available` 的工具调用，不忽略会让之后每次请求报 `AI_MissingToolResultsError` |
+| 客户端截断兜底 | 只从更早的轮次开头删，最近一轮整轮保留——从中间切开会留下没有 `tool_use` 的 `tool_result` |
+
+**铁律**：修剪工具调用时绝不能单独保留同一 step 的 reasoning——孤立的 thinking 块会和相邻 step 合并。修复在服务端，已存在用户设备上的旧历史无需清空即可恢复。
+
+守护测试：`api/lib/__tests__/message-utils.test.ts`「thinking blocks survive history pruning」——走真实 `@ai-sdk/anthropic` / `@ai-sdk/openai` 请求体转换（只 mock fetch），断言任何 assistant 消息的 thinking 只来自同一个 step、最新 assistant 消息与原始响应一致、`tool_use` / `tool_result` 成对、OpenAI 不出现孤立的 `item_reference`。
 
 ### 关键文件
 
@@ -294,7 +319,7 @@ search_editions internally matches by name, city, AND country.
 - `api/chat.ts` —— `useCompact = provider === 'anthropic' && supportsCompactBeta(model)` 决定是否注入 + 决定 `useServerSideCompaction`
 - `api/lib/message-utils.ts:prepareMessagesForModel(messages, max, { useServerSideCompaction })` —— 显式 boolean，不要再用 provider 名字推断
 - `node_modules/@ai-sdk/anthropic/dist/index.d.ts:199-234` —— `contextManagement` 类型签名
-- 守护测试：`api/lib/__tests__/model-provider.test.ts`（白名单钉死） + `api/lib/__tests__/message-utils.test.ts`（两条路径行为对比）
+- 守护测试：`api/lib/__tests__/model-provider.test.ts`（白名单钉死） + `api/lib/__tests__/message-utils.test.ts`（两条路径行为对比 + thinking 块完整性）
 - Anthropic 文档：https://platform.claude.com/docs/en/build-with-claude/compaction
 
 ### 多模型共存场景
