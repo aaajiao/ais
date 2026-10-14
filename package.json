@@ -15,6 +15,7 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
+    "smoke:live": "bun scripts/live-smoke.ts",
     "prepare": "husky"
   },
   "dependencies": {

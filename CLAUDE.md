@@ -10,6 +10,7 @@ bun start             # 启动开发（推荐，端口 3000）
 bun run build         # 构建生产版本
 bun run lint          # 代码检查
 bun run test:run      # 运行测试（使用 vitest）
+bun run smoke:live    # 真实 API 冒烟（读 .env.local，花钱；升级 AI SDK / 换模型后发版前跑）
 ```
 
 ## Tech Stack
@@ -68,6 +69,7 @@ src/
 ├── pages/             # 路由页面（13 个）
 └── test/              # 测试工具和 mocks
 docs/                   # 详细文档
+scripts/                # 手动运行的脚本（live-smoke.ts：真实 API 冒烟）
 ```
 
 ## Key Files
@@ -187,6 +189,7 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 | 任何源码 (.ts/.tsx) | `bun run lint` + `bun run typecheck` |
 | 逻辑改动 | `bun run test:run` |
 | 构建相关 | `bun run build`（包含 typecheck，比单跑慢） |
+| 升级 AI SDK / 换模型 / 改 providerOptions 或历史准备 | `bun run smoke:live`（真实 API，见 [docs/testing.md](docs/testing.md#真实-api-冒烟测试bun-run-smokelive)） |
 | 数据库查询 | 确认包含 `.is('deleted_at', null)` 和 `userId` 过滤 |
 
 ## Common Tasks

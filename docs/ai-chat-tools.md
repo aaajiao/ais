@@ -12,7 +12,7 @@
 - 响应通过 `toUIMessageStream({ stream: result.stream, tools })` 与 `createUIMessageStreamResponse` 输出，保持 `DefaultChatTransport` 的 SSE 协议与工具信息。
 - GPT 的非零 `reasoningEffort` 在 v7 默认开启 detailed reasoning summary。本项目显式设置 `reasoningSummary: null`，保留原有文字和工具卡片行为；Thinking 的 low/high 分支不变。
 - Claude prompt caching、Thinking 和 compaction 仍按 provider / 模型白名单注入。不要用新的通用 `reasoning` 参数覆盖这些已有分支。
-- `api/__tests__/chat-sdk.test.ts` 使用真实 SDK、mock provider 和 `DefaultChatTransport`，覆盖增量文字、provider 参数、搜索后确认卡片即停、八步上限及流错误；无模型网络调用或数据库写入。它补充现有纯函数契约测试，不能代替部署后的真实模型验证。
+- `api/__tests__/chat-sdk.test.ts` 使用真实 SDK、mock provider 和 `DefaultChatTransport`，覆盖增量文字、provider 参数、搜索后确认卡片即停、八步上限及流错误；无模型网络调用或数据库写入。它补充现有纯函数契约测试，不能代替真实模型验证——升级 SDK / 换模型后跑 `bun run smoke:live`（`scripts/live-smoke.ts`，真实 API、假数据库，见 [testing.md](testing.md#真实-api-冒烟测试bun-run-smokelive)）。
 - `api/lib/__tests__/structured-output-sdk.test.ts` 通过真实 `generateText` / `Output.object` 验证中文搜索扩展、无效输出回退与 URL 作品提取；网页内容和模型输出均使用本地 fixture。
 - 根 `typecheck` 通过 `tsconfig.api.json` 检查 API 运行时代码；测试仍通过 Vitest 验证。
 

@@ -16,6 +16,39 @@ bun run test:ui       # 可视化 UI
 
 ---
 
+## 真实 API 冒烟测试（`bun run smoke:live`）
+
+Vitest 里的 AI 测试只 mock 网络，验证"发出去的请求体长什么样"。`scripts/live-smoke.ts` 补上另一半：真实的 Anthropic / OpenAI API 接不接受。它按 `api/chat.ts` 的方式构造 `streamText`（推理强度、compaction、system prompt、工具、停止条件、历史准备），每个模型提问 + 追问一次。
+
+**什么时候跑**：升级 AI SDK、换模型代际、改 `buildProviderOptions` / `getReasoningProviderOptions` / `prepareMessagesForModel` 之后，发版前。不进 CI，也不放进 `test:run`。
+
+**前提与成本**：
+- 读 `.env.local` 的 `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`，产生真实调用费用（完整一轮约百次请求）
+- 工具是真实定义，数据库换成假的 Supabase（任何查询都返回空），不读写任何数据
+- 模型列表来自 `api/models.ts`，即账号可用 ∩ `model-ids` 白名单，与线上设置页一致
+
+**覆盖内容**：
+
+| 段 | 内容 |
+|---|---|
+| A | 每个模型 × 深度推理开/关 × 提问 + 追问（追问带上真实返回的工具调用历史） |
+| B | 对话中途换 provider：Claude → GPT、GPT → Claude |
+| C | v1.9 时代带签名 thinking 块的旧历史（Claude 路径必须全部剥离，否则签名校验失败） |
+| D | `generateText` 路径：搜索扩展（`expandSearchQuery`）、URL 提取（`extractArtworkFromUrl`） |
+
+工具卡片出现 `output-error`（例如模型发出非法工具入参）也算失败——前端会显示红色错误。
+
+```bash
+bun run smoke:live                                    # 全部
+bun run smoke:live --only=claude-sonnet-5,gpt-6-luna  # 只跑这些模型的 A 段
+bun run smoke:live --quick                            # 只跑 A 段
+bun run smoke:live --repeat=4 --only=claude-sonnet-5  # 重复跑，查偶发问题
+```
+
+v1.10.1 的 `toolStreaming: false` 修复就是它发现的：`claude-sonnet-5` 约半数追问发出 `{"query": }`，单靠 mock 测试看不出来。
+
+---
+
 ## 测试结构
 
 ```
