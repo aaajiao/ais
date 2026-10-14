@@ -15,25 +15,29 @@ POST /api/chat
 ```typescript
 {
   messages: UIMessage[];           // 对话历史
-  model?: string;                  // 聊天模型 ID，默认 claude-sonnet-4-6
+  model?: string;                  // 聊天模型 ID，默认 claude-sonnet-5-5
   extractionModel?: string;        // URL 导入提取模型（默认使用 model）
-  searchExpansionModel?: string;   // 搜索翻译模型（默认 claude-haiku-4-5）
+  searchExpansionModel?: string;   // 搜索翻译模型（默认 claude-haiku-5-5）
   artistName?: string;             // 项目名称，用于系统提示词（默认 "aaajiao"）
 }
 ```
 
 ### 支持的模型
 
-可以使用别名（alias）或完整快照版本。别名会自动指向最新快照，但生产环境建议使用完整版本以确保行为一致。
+v1.10 起只接受 Claude 5 系列和 GPT-6 系列（规则在 `api/lib/model-ids.ts`）。Claude 5 的模型 ID 不带日期后缀。`/api/models` 返回当前账号实际可用的列表。
 
-| 别名 | 完整快照版本 | 说明 |
-|------|-------------|------|
-| `claude-sonnet-4-6` | `claude-sonnet-4-6-20251015` | Claude Sonnet 4.6（默认） |
-| `claude-sonnet-4-5` | `claude-sonnet-4-5-20250929` | Claude Sonnet 4.5 |
-| `claude-opus-4-5` | `claude-opus-4-5-20251101` | Claude Opus 4.5 |
-| `claude-haiku-4-5` | `claude-haiku-4-5-20251001` | Claude Haiku 4.5 |
-| `gpt-4o` | — | GPT-4o |
-| `o1-*` / `o3-*` / `o4-*` | — | OpenAI 推理模型 |
+| 模型 ID | 说明 |
+|---------|------|
+| `claude-sonnet-5-5` | Claude Sonnet 5.5（默认对话模型） |
+| `claude-opus-5-5` | Claude Opus 5.5 |
+| `claude-haiku-5-5` | Claude Haiku 5.5（默认搜索翻译模型） |
+| `claude-fable-5-1` | Claude Fable 5.1（最强，成本最高） |
+| `claude-fable-5` / `claude-opus-5` / `claude-sonnet-5` | 上一代 5 系列 |
+| `gpt-6.1-sol` / `gpt-6-sol` | GPT-6 Sol（性能与成本平衡） |
+| `gpt-6-astra` | GPT-6 Astra（旗舰） |
+| `gpt-6-luna` | GPT-6 Luna（快速、低成本） |
+
+`model` / `extractionModel` / `searchExpansionModel` 传入不在范围内的 ID（例如旧版本客户端存下的 `claude-sonnet-4-6`、`gpt-5.5`）时，服务端回退到默认模型并记一条 warn log，不报错。
 
 ### 响应
 
@@ -45,12 +49,12 @@ POST /api/chat
 
 | 用途 | 参数 | localStorage Key | 默认值 |
 |------|------|------------------|--------|
-| 对话 | `model` | `ai-model` | `claude-sonnet-4-6` |
+| 对话 | `model` | `ai-model` | `claude-sonnet-5-5` |
 | URL 导入提取 | `extractionModel` | `extraction-model` | 使用对话模型 |
-| 搜索翻译 | `searchExpansionModel` | `search-expansion-model` | `claude-haiku-4-5` |
+| 搜索翻译 | `searchExpansionModel` | `search-expansion-model` | `claude-haiku-5-5` |
 
 **设计考虑**：
-- URL 导入是复杂任务（HTML 解析、多字段提取），推荐使用 Sonnet/GPT-4o
+- URL 导入是复杂任务（HTML 解析、多字段提取），推荐使用 Sonnet 5.5 / GPT-6.1 Sol
 - 搜索翻译是简单任务（单词翻译），默认使用 Haiku 以保证速度和低成本
 
 ---
@@ -391,7 +395,7 @@ AI: [调用 search_history { action: "sold", after: "2025-01-01", before: "2025-
 **处理流程**
 
 1. 抓取网页 HTML
-2. 使用 LLM 提取作品信息（使用 `extractionModel`，推荐 Sonnet/GPT-4o）
+2. 使用 LLM 提取作品信息（使用 `extractionModel`，推荐 Sonnet 5.5 / GPT-6.1 Sol）
 3. 选择最佳缩略图 URL
 4. 检查是否已存在（通过 `source_url` 匹配，仅当恰好一个匹配时；或通过 `title_en`）
 5. 创建或更新作品

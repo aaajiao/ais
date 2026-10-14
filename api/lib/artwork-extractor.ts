@@ -3,40 +3,15 @@
  */
 
 import { generateText, Output } from 'ai';
-import { createAnthropic } from '@ai-sdk/anthropic';
-import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
 import { createT, type Locale } from './i18n.js';
-
-// 默认提取模型（使用别名）
-const DEFAULT_EXTRACTION_MODEL = 'claude-sonnet-4-6';
-
-/**
- * 根据模型 ID 获取对应的 provider 实例
- */
-function getModel(modelId?: string) {
-  const id = modelId || DEFAULT_EXTRACTION_MODEL;
-
-  if (id.startsWith('claude-')) {
-    const anthropic = createAnthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-      baseURL: 'https://api.anthropic.com/v1',
-    });
-    return anthropic(id);
-  } else if (id.startsWith('gpt-') || id.startsWith('o1') || id.startsWith('o3') || id.startsWith('o4')) {
-    const openai = createOpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-    return openai(id);
-  }
-
-  // 默认使用 Anthropic
-  const anthropic = createAnthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY,
-    baseURL: 'https://api.anthropic.com/v1',
-  });
-  return anthropic(id);
-}
+import {
+  DEFAULT_MODEL,
+  getModel,
+  getProviderName,
+  getReasoningProviderOptions,
+  resolveModelId,
+} from './model-provider.js';
 
 // 作品信息 Schema
 export const artworkSchema = z.object({
@@ -162,7 +137,7 @@ async function fetchPage(url: string): Promise<string> {
 /**
  * 使用 LLM 从 HTML 提取作品信息
  * @param url - 要提取的网页 URL
- * @param modelId - 可选的模型 ID，支持 Anthropic (claude-*) 和 OpenAI (gpt-*, o1, o3, o4) 模型
+ * @param modelId - 可选的模型 ID（Claude 5 / GPT-6），不在允许范围内时用 DEFAULT_MODEL
  */
 export async function extractArtworkFromUrl(url: string, modelId?: string, locale?: Locale): Promise<ExtractionResult> {
   const t = createT(locale);
@@ -177,8 +152,11 @@ export async function extractArtworkFromUrl(url: string, modelId?: string, local
     const cleanedHtml = cleanHtml(html);
 
     // 4. 使用 LLM 提取结构化数据
+    // 5 系列 Claude / GPT-6 默认都会思考，结构化提取用 low 推理强度控制延迟和成本
+    const selectedModelId = resolveModelId(modelId, DEFAULT_MODEL);
     const result = await generateText({
-      model: getModel(modelId),
+      model: getModel(selectedModelId),
+      providerOptions: getReasoningProviderOptions(getProviderName(selectedModelId), 'low'),
       output: Output.object({ schema: artworkSchema }),
       instructions: `你是一个艺术作品信息提取专家。从给定的网页 HTML 内容中提取作品信息。
 

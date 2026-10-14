@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Lightbulb, ChevronDown, ChevronRight } from 'lucide-react';
+import { DEFAULT_CHAT_MODEL, DEFAULT_SEARCH_EXPANSION_MODEL, getModelDisplayName } from '@/lib/modelIds';
 import { useModelSettings, formatModelIdForDisplay } from './useModelSettings';
 
 export default function ModelSettings() {
@@ -33,6 +34,8 @@ export default function ModelSettings() {
     thinkingEnabled,
     setThinkingEnabled,
   } = useModelSettings();
+
+  const mainModelName = selectedModelInfo?.name || getModelDisplayName(selectedModel || DEFAULT_CHAT_MODEL);
 
   // 渲染加载/错误状态
   if (loadingModels) {
@@ -197,8 +200,8 @@ export default function ModelSettings() {
               hint={t('ai.backgroundModelHint')}
               selectedModel={extractionModel}
               selectedModelInfo={extractionModelInfo}
-              mainModelName={selectedModelInfo?.name || selectedModel || 'Claude Sonnet 4.6'}
-              defaultLabel={t('ai.usingMainModel', { modelName: selectedModelInfo?.name || selectedModel || 'Claude Sonnet 4.6' })}
+              mainModelName={mainModelName}
+              defaultLabel={t('ai.usingMainModel', { modelName: mainModelName })}
               models={models}
               descLang={descLang}
               onModelChange={handleExtractionModelChange}
@@ -220,7 +223,7 @@ export default function ModelSettings() {
                 descLang={descLang}
                 onModelChange={handleSearchExpansionModelChange}
                 onReset={() => handleSearchExpansionModelChange('')}
-                onSelectDifferent={() => handleSearchExpansionModelChange('claude-haiku-4-5')}
+                onSelectDifferent={() => handleSearchExpansionModelChange(models?.defaultExpansionModel || DEFAULT_SEARCH_EXPANSION_MODEL)}
                 t={t}
               />
             </div>

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import MessageBubble from '@/components/chat/MessageBubble';
 import { saveChatHistory, loadChatHistory, clearChatHistory, getChatTimestamp } from '@/lib/chatStorage';
+import { DEFAULT_CHAT_MODEL, MODEL_STORAGE_KEYS, readStoredModelId } from '@/lib/modelIds';
 import { useAuthContext } from '@/contexts/useAuthContext';
 import { IconButton } from '@/components/ui/icon-button';
 import { Trash2, X, MessageSquare, ArrowUp } from 'lucide-react';
@@ -23,19 +24,19 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
   const [inputValue, setInputValue] = useState('');
   const { session } = useAuthContext();
 
-  // 获取用户选择的模型
+  // 获取用户选择的模型（旧版本存下的 4 系列 / GPT-5 等 ID 会被清掉）
   const [selectedModel] = useState(() => {
-    return localStorage.getItem('ai-model') || 'claude-sonnet-4-6';
+    return readStoredModelId(MODEL_STORAGE_KEYS.chat) || DEFAULT_CHAT_MODEL;
   });
 
   // 获取提取模型（空字符串表示使用聊天模型）
   const [extractionModel] = useState(() => {
-    return localStorage.getItem('extraction-model') || '';
+    return readStoredModelId(MODEL_STORAGE_KEYS.extraction);
   });
 
   // 获取搜索扩展模型（空字符串表示使用默认快速模型）
   const [searchExpansionModel] = useState(() => {
-    return localStorage.getItem('search-expansion-model') || '';
+    return readStoredModelId(MODEL_STORAGE_KEYS.searchExpansion);
   });
 
   // 深度推理开关（默认 false）

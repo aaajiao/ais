@@ -13,6 +13,7 @@ import {
   getChatTimestamp,
   type StorageStatus,
 } from '@/lib/chatStorage';
+import { DEFAULT_CHAT_MODEL, MODEL_STORAGE_KEYS, getModelDisplayName, readStoredModelId } from '@/lib/modelIds';
 import { useAuthContext } from '@/contexts/useAuthContext';
 import { useProfile } from '@/hooks/queries/useProfile';
 import { Button } from '@/components/ui/button';
@@ -38,69 +39,25 @@ export default function Chat() {
   const { artistName } = useProfile();
   const [storageWarning, setStorageWarning] = useState<string | null>(null);
 
-  // 获取用户选择的模型（现在存储的是完整的模型 ID）
+  // 获取用户选择的模型（完整模型 ID；旧版本存下的 4 系列 / GPT-5 等 ID 会被清掉）
   const [selectedModel] = useState(() => {
-    return localStorage.getItem('ai-model') || 'claude-sonnet-4-6';
+    return readStoredModelId(MODEL_STORAGE_KEYS.chat) || DEFAULT_CHAT_MODEL;
   });
 
   // 获取提取模型（空字符串表示使用聊天模型）
   const [extractionModel] = useState(() => {
-    return localStorage.getItem('extraction-model') || '';
+    return readStoredModelId(MODEL_STORAGE_KEYS.extraction);
   });
 
   // 获取搜索扩展模型（空字符串表示使用默认快速模型）
   const [searchExpansionModel] = useState(() => {
-    return localStorage.getItem('search-expansion-model') || '';
+    return readStoredModelId(MODEL_STORAGE_KEYS.searchExpansion);
   });
 
   // 深度推理开关（默认 false）
   const [thinkingEnabled] = useState(() => {
     return localStorage.getItem('thinking-enabled') === 'true';
   });
-
-  // 获取模型显示名称（包含版本号）
-  const getModelDisplayName = (modelId: string) => {
-    // Claude 模型：提取版本号
-    // claude-sonnet-4-5-20250929 → Claude Sonnet 4.5
-    // claude-opus-4-5-20251101 → Claude Opus 4.5
-    // claude-3-5-haiku-20241022 → Claude 3.5 Haiku
-    // claude-3-5-sonnet-20241022 → Claude 3.5 Sonnet
-
-    // 新格式：claude-{tier}-{major}-{minor}-{date}
-    const newFormatMatch = modelId.match(/^claude-(opus|sonnet|haiku)-(\d+)-(\d+)/i);
-    if (newFormatMatch) {
-      const [, tier, major, minor] = newFormatMatch;
-      const tierName = tier.charAt(0).toUpperCase() + tier.slice(1);
-      return `Claude ${tierName} ${major}.${minor}`;
-    }
-
-    // 旧格式：claude-{major}-{minor}-{tier}-{date}
-    const oldFormatMatch = modelId.match(/^claude-(\d+)-(\d+)-(opus|sonnet|haiku)/i);
-    if (oldFormatMatch) {
-      const [, major, minor, tier] = oldFormatMatch;
-      const tierName = tier.charAt(0).toUpperCase() + tier.slice(1);
-      return `Claude ${major}.${minor} ${tierName}`;
-    }
-
-    // OpenAI GPT 模型
-    if (modelId.startsWith('gpt-')) {
-      // gpt-4o-2024-08-06 → GPT-4o
-      // gpt-4.1-2025-04-14 → GPT-4.1
-      // gpt-4o-mini → GPT-4o-mini
-      const match = modelId.match(/^gpt-(\d+\.?\d*[a-z]*(?:-mini)?)/i);
-      if (match) return `GPT-${match[1]}`;
-    }
-
-    // O 系列推理模型（o1, o3, o4）
-    if (/^o[134]/i.test(modelId)) {
-      // o1-2024-12-17 → O1
-      // o3-mini → O3-mini
-      const match = modelId.match(/^(o[134](?:-mini|-pro)?)/i);
-      if (match) return match[1].toUpperCase();
-    }
-
-    return modelId;
-  };
 
   // 创建带认证的 fetch 函数
   const authenticatedFetch = useCallback(async (url: RequestInfo | URL, options?: RequestInit) => {

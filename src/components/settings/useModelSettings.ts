@@ -1,4 +1,10 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import {
+  DEFAULT_SEARCH_EXPANSION_MODEL,
+  MODEL_STORAGE_KEYS,
+  getModelDisplayName,
+  readStoredModelId,
+} from '@/lib/modelIds';
 
 export interface ModelInfo {
   id: string;
@@ -10,9 +16,9 @@ export interface ModelInfo {
 export interface ModelsResponse {
   anthropic: ModelInfo[];
   openai: ModelInfo[];
-  /** 主聊天默认模型 ID（后端 DEFAULT_MODEL，当前 Sonnet 4.6） */
+  /** 主聊天默认模型 ID（后端 DEFAULT_MODEL，当前 Sonnet 5.5） */
   defaultModel: string | null;
-  /** 翻译 / 搜索扩展默认模型 ID（后端 DEFAULT_EXPANSION_MODEL，当前 Haiku 4.5） */
+  /** 翻译 / 搜索扩展默认模型 ID（后端 DEFAULT_EXPANSION_MODEL，当前 Haiku 5.5） */
   defaultExpansionModel: string | null;
 }
 
@@ -30,17 +36,18 @@ export function formatModelIdForDisplay(modelId: string): string {
 }
 
 export function useModelSettings() {
+  // 旧版本存下的 4 系列 / GPT-5 / o 系列 ID 读取时被清掉，主模型随后由 /api/models 的默认值补上
   const [selectedModel, setSelectedModel] = useState<string>(() => {
-    return localStorage.getItem('ai-model') || '';
+    return readStoredModelId(MODEL_STORAGE_KEYS.chat);
   });
   const [extractionModel, setExtractionModel] = useState<string>(() => {
-    return localStorage.getItem('extraction-model') || '';
+    return readStoredModelId(MODEL_STORAGE_KEYS.extraction);
   });
   const [searchExpansionModel, setSearchExpansionModel] = useState<string>(() => {
-    return localStorage.getItem('search-expansion-model') || '';
+    return readStoredModelId(MODEL_STORAGE_KEYS.searchExpansion);
   });
-  // 深度推理开关：独立于模型选择，控制 thinking / reasoningEffort
-  // 默认 false → Claude 路径行为不变（不传 thinking），OpenAI 路径走 minimal
+  // 深度推理开关：独立于模型选择，控制推理强度
+  // 默认 false → 两家都走 low effort；开启 → high
   const [thinkingEnabled, setThinkingEnabledState] = useState<boolean>(() => {
     return localStorage.getItem('thinking-enabled') === 'true';
   });
@@ -69,7 +76,7 @@ export function useModelSettings() {
         // 如果没有保存的模型选择，使用默认模型
         if (!selectedModel && data.defaultModel) {
           setSelectedModel(data.defaultModel);
-          localStorage.setItem('ai-model', data.defaultModel);
+          localStorage.setItem(MODEL_STORAGE_KEYS.chat, data.defaultModel);
         }
       } catch (err) {
         console.error('Failed to load models:', err);
@@ -84,24 +91,24 @@ export function useModelSettings() {
 
   const handleModelChange = (modelId: string) => {
     setSelectedModel(modelId);
-    localStorage.setItem('ai-model', modelId);
+    localStorage.setItem(MODEL_STORAGE_KEYS.chat, modelId);
   };
 
   const handleExtractionModelChange = (modelId: string) => {
     setExtractionModel(modelId);
     if (modelId === '') {
-      localStorage.removeItem('extraction-model');
+      localStorage.removeItem(MODEL_STORAGE_KEYS.extraction);
     } else {
-      localStorage.setItem('extraction-model', modelId);
+      localStorage.setItem(MODEL_STORAGE_KEYS.extraction, modelId);
     }
   };
 
   const handleSearchExpansionModelChange = (modelId: string) => {
     setSearchExpansionModel(modelId);
     if (modelId === '') {
-      localStorage.removeItem('search-expansion-model');
+      localStorage.removeItem(MODEL_STORAGE_KEYS.searchExpansion);
     } else {
-      localStorage.setItem('search-expansion-model', modelId);
+      localStorage.setItem(MODEL_STORAGE_KEYS.searchExpansion, modelId);
     }
   };
 
@@ -131,9 +138,10 @@ export function useModelSettings() {
 
   // 默认翻译模型的显示名（用于"默认：xxx（独立于主聊天）"文案，避免硬编码）
   const defaultExpansionModelName = useMemo(() => {
-    if (!models?.defaultExpansionModel) return 'Claude Haiku 4.5';
+    const fallbackName = getModelDisplayName(DEFAULT_SEARCH_EXPANSION_MODEL);
+    if (!models?.defaultExpansionModel) return fallbackName;
     const allModels = [...models.anthropic, ...models.openai];
-    return allModels.find(m => m.id === models.defaultExpansionModel)?.name || 'Claude Haiku 4.5';
+    return allModels.find(m => m.id === models.defaultExpansionModel)?.name || fallbackName;
   }, [models]);
 
   return {

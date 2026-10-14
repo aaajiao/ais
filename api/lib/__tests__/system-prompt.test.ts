@@ -88,7 +88,7 @@ describe('getSystemPromptForAnthropic — v1.2.3 中文 imperative 版本', () =
   });
 });
 
-describe('getSystemPromptForOpenAI — GPT-5 友好的 tool preambles 版本', () => {
+describe('getSystemPromptForOpenAI — GPT 友好的 tool preambles 版本', () => {
   it('contains the explicit "USE search_editions" routing instruction', () => {
     const prompt = getSystemPromptForOpenAI();
     expect(prompt).toMatch(/search_editions/);

@@ -67,7 +67,7 @@ describe('chat integration — per-provider system prompt contract (v1.2.4)', ()
       expect(prompt).toMatch(/DO NOT call search_locations first/);
     });
 
-    it('contains the london few-shot example (the key GPT-5 failure mode)', () => {
+    it('contains the london few-shot example (the key v1.2.x failure mode)', () => {
       expect(prompt).toContain('在 london 画廊有哪些作品');
       expect(prompt).toMatch(/search_editions\(\{ location: ['"]London['"] \}\)/);
     });
@@ -175,18 +175,20 @@ describe('chat integration — per-provider system prompt contract (v1.2.4)', ()
     it('buildSystemMessage(openai) returns plain string (no cacheControl)', () => {
       const sysMsg = buildSystemMessage(getSystemPromptByProvider('openai'), 'openai');
       expect(typeof sysMsg).toBe('string');
-      // sanity: the string still contains the GPT-5 preamble
+      // sanity: the string still contains the GPT preamble
       expect(sysMsg as string).toMatch(/USE search_editions DIRECTLY/);
     });
 
-    it('buildProviderOptions(anthropic, off) STILL returns {} (key v1.2.3 regression assertion)', () => {
-      // 这条断言是 v1.2.3 hotfix 的核心保护项 —— 如果未来某个 PR 误改成
-      // { anthropic: { thinking: { type: 'disabled' } } } 之类的写法，Claude 行为会变。
-      expect(buildProviderOptions(false, 'claude-sonnet-4-6', 'anthropic')).toEqual({});
+    it('buildProviderOptions(anthropic, off) sends adaptive thinking at low effort (Claude 5)', () => {
+      // 4 系列时代 off 必须是 {}；5 系列省略 thinking = adaptive thinking 开启（默认 effort high/medium），
+      // 所以 off 必须显式降到 low。不要改回 {}，也不要改成 { type: 'disabled' }（Opus 5.5 / Sonnet 5.5 不允许关闭）。
+      expect(buildProviderOptions(false, 'anthropic')).toEqual({
+        anthropic: { thinking: { type: 'adaptive' }, effort: 'low' },
+      });
     });
 
-    it('buildProviderOptions(openai gpt-5.4, off) returns reasoningEffort: low', () => {
-      expect(buildProviderOptions(false, 'gpt-5.4', 'openai')).toEqual({
+    it('buildProviderOptions(openai, off) returns reasoningEffort: low', () => {
+      expect(buildProviderOptions(false, 'openai')).toEqual({
         openai: { reasoningEffort: 'low', reasoningSummary: null },
       });
     });
@@ -203,7 +205,7 @@ describe('buildStepLogPayload — onStepEnd observability (v1.2.4)', () => {
     const payload = buildStepLogPayload(
       {
         stepNumber: 0,
-        model: { provider: 'openai', modelId: 'gpt-5.4' },
+        model: { provider: 'openai', modelId: 'gpt-6.1-sol' },
         toolCalls: [
           { toolName: 'search_editions', input: { location: 'London' } },
         ],
@@ -214,10 +216,10 @@ describe('buildStepLogPayload — onStepEnd observability (v1.2.4)', () => {
         usage: { totalTokens: 1234 },
       },
       'user-123',
-      'gpt-5.4'
+      'gpt-6.1-sol'
     );
     expect(payload.userId).toBe('user-123');
-    expect(payload.modelId).toBe('gpt-5.4');
+    expect(payload.modelId).toBe('gpt-6.1-sol');
     expect(payload.stepNumber).toBe(0);
     expect(payload.stepProvider).toBe('openai');
     expect(payload.toolCalls).toEqual([

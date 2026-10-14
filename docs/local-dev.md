@@ -114,9 +114,7 @@ vercel env pull
 
 ### 可选变量
 
-| 变量 | 默认 | 说明 |
-|------|------|------|
-| `THINKING_BUDGET` | `4000` | 设置页「深度推理」开关开启时，可选值：`数字`（如 `8000`）→ `thinking.budgetTokens`；字符串 `adaptive` → `{ type: 'adaptive', display: 'summarized' }`，让 Claude 自决 thinking 长度（@ai-sdk/anthropic v3.0.74 GA）。仅后端读取。 |
+无。v1.10 起移除 `THINKING_BUDGET`：Claude 5 系列不接受 `budgetTokens`，深度推理开关改为切换 effort（off → `low` / on → `high`），见 [ai-chat-tools.md](ai-chat-tools.md#深度推理thinking-模式)。
 
 ### 变量前缀规则
 

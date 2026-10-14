@@ -2,7 +2,7 @@
 //
 // 自 v1.2.4 起，按 provider 拆分为两份内容：
 //   - getSystemPromptForAnthropic(...)  ——  原 v1.2.3 中文 imperative 版本，Sonnet 表现良好
-//   - getSystemPromptForOpenAI(...)     ——  GPT-5 友好的英文 + tool preambles 风格
+//   - getSystemPromptForOpenAI(...)     ——  GPT 友好的英文 + tool preambles 风格
 // 调用方应使用 getSystemPromptByProvider(provider, artistName) 路由。
 //
 // 设计动机（v1.2.x hotfix 教训）：
@@ -110,10 +110,10 @@ export function getSystemPromptForAnthropic(artistName?: string): string {
 }
 
 /**
- * OpenAI / GPT 路径。GPT-5 友好的 condition→action 表 + few-shot tool preambles。
+ * OpenAI / GPT 路径。GPT 友好的 condition→action 表 + few-shot tool preambles。
  *
  * 关键差异（相比 Anthropic 版）：
- * - 英文为主（GPT-5 对英文工具调度比中文 imperative 列表更稳定）
+ * - 英文为主（v1.2.x 在 GPT-5 上实测：英文工具调度比中文 imperative 列表更稳定）
  *   中文场景词保留，因为用户多用中文提问
  * - 开头加 tool preambles（OpenAI cookbook 推荐做法），用具体例子告诉 GPT
  *   "看到 london → 立即调 search_editions(location='London')"
@@ -163,7 +163,7 @@ Only include a parameter when the user actually mentioned it. The schema's \`.nu
 
 # Tool call examples (follow this style)
 
-Example 1 — place query (THE most common GPT-5 failure mode):
+Example 1 — place query (THE most common failure mode):
   User: 在 london 画廊有哪些作品
   Thought: User mentioned "london". Per the routing table, call search_editions
   with location="London" directly. Do NOT call search_locations first.

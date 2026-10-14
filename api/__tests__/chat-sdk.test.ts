@@ -43,11 +43,11 @@ function toolStep(toolName: string, toolCallId: string, input: object): ModelStr
   return step([{ type: 'tool-call', toolCallId, toolName, input: JSON.stringify(input) }], 'tool-calls');
 }
 
-async function sendChat(model: string, thinkingEnabled = false) {
+async function sendChat(model: string, thinkingEnabled = false, extraBody: Record<string, unknown> = {}) {
   // Exercise the HTTP/SSE boundary used by useChat without a server or any network request.
   const transport = new DefaultChatTransport({
     api: 'http://localhost/api/chat',
-    body: { model, thinkingEnabled },
+    body: { model, thinkingEnabled, ...extraBody },
     fetch: async (url, init) => {
       const response = await handler(new Request(url, init));
       expect(response.status).toBe(200);
@@ -90,11 +90,13 @@ describe('AI SDK 7 chat HTTP stream and tool loop', () => {
     vi.unstubAllGlobals();
   });
 
+  const compaction = { contextManagement: { edits: [{ type: 'compact_20260112' }] } };
+
   it.each([
-    ['gpt-5.4', false, { openai: { reasoningEffort: 'low', reasoningSummary: null } }],
-    ['gpt-5.5', true, { openai: { reasoningEffort: 'high', reasoningSummary: null } }],
-    ['claude-haiku-4-5', false, {}],
-    ['claude-sonnet-4-6', false, { anthropic: { contextManagement: { edits: [{ type: 'compact_20260112' }] } } }],
+    ['gpt-6.1-sol', false, { openai: { reasoningEffort: 'low', reasoningSummary: null } }],
+    ['gpt-6-astra', true, { openai: { reasoningEffort: 'high', reasoningSummary: null } }],
+    ['claude-haiku-5-5', false, { anthropic: { thinking: { type: 'adaptive' }, effort: 'low', ...compaction } }],
+    ['claude-sonnet-5-5', true, { anthropic: { thinking: { type: 'adaptive' }, effort: 'high', ...compaction } }],
   ] as const)('streams %s text and preserves provider options (thinking %s)', async (modelId, thinking, options) => {
     const model = new MockLanguageModelV4({ doStream: textStep() });
     installModel(model);
@@ -115,6 +117,61 @@ describe('AI SDK 7 chat HTTP stream and tool loop', () => {
     }
   });
 
+  it.each([['claude-sonnet-4-6'], ['claude-haiku-4-5'], ['gpt-5.5'], ['o3-mini']])(
+    'coerces stale stored model id %s to the Claude 5 default',
+    async (staleModelId) => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const model = new MockLanguageModelV4({ doStream: textStep() });
+      installModel(model);
+
+      const result = await sendChat(staleModelId);
+
+      expect(result.errors).toEqual([]);
+      expect(models.getModel).toHaveBeenCalledWith('claude-sonnet-5-5');
+      expect(model.doStreamCalls[0].providerOptions).toEqual({
+        anthropic: { thinking: { type: 'adaptive' }, effort: 'low', ...compaction },
+      });
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining(staleModelId));
+    }
+  );
+
+  it('resolves extraction / search expansion models before building tools', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    installModel(new MockLanguageModelV4({ doStream: textStep() }));
+
+    await sendChat('claude-opus-5-5', false, { extractionModel: 'gpt-5.4', searchExpansionModel: 'claude-haiku-4-5' });
+
+    expect(toolRegistry.createTools).toHaveBeenCalledWith(expect.objectContaining({
+      extractionModel: 'claude-opus-5-5',
+      searchExpansionModel: 'claude-haiku-5-5',
+    }));
+  });
+
+  it.each([
+    ['claude-sonnet-5-5', false],
+    ['gpt-6.1-sol', true],
+  ] as const)('%s: reasoning parts reach the client only on the OpenAI path', async (modelId, expectReasoning) => {
+    // Anthropic 路径下一轮会剥离全部 reasoning（Claude 5 preserved thinking），不存进 localStorage；
+    // OpenAI 路径最近一轮的 reasoning item 要与正文配对回传
+    const model = new MockLanguageModelV4({
+      doStream: step([
+        { type: 'reasoning-start', id: 'reasoning-1' },
+        { type: 'reasoning-delta', id: 'reasoning-1', delta: '先查 London' },
+        { type: 'reasoning-end', id: 'reasoning-1' },
+        { type: 'text-start', id: 'text-1' },
+        { type: 'text-delta', id: 'text-1', delta: '找到 2 件作品。' },
+        { type: 'text-end', id: 'text-1' },
+      ]),
+    });
+    installModel(model);
+
+    const result = await sendChat(modelId);
+
+    expect(result.errors).toEqual([]);
+    expect(result.finalMessage?.parts.some(part => part.type === 'reasoning')).toBe(expectReasoning);
+    expect(result.finalMessage?.parts).toContainEqual({ type: 'text', text: '找到 2 件作品。', state: 'done' });
+  });
+
   it('executes search, streams the confirmation card, and stops before another model step', async () => {
     const search = vi.fn(async () => ({ editions: [{ id: 'edition-1' }] }));
     const confirmation = vi.fn(async () => ({ editionId: 'edition-1', requiresConfirmation: true }));
@@ -132,7 +189,7 @@ describe('AI SDK 7 chat HTTP stream and tool loop', () => {
       execute_edition_update: tool({ inputSchema: z.object({ editionId: z.string() }), execute: executeUpdate }),
     });
 
-    const result = await sendChat('gpt-5.4');
+    const result = await sendChat('gpt-6.1-sol');
 
     expect(result.errors).toEqual([]);
     expect(search).toHaveBeenCalledOnce();
@@ -154,7 +211,7 @@ describe('AI SDK 7 chat HTTP stream and tool loop', () => {
       search_editions: tool({ inputSchema: z.object({}), execute: async () => ({ editions: [] }) }),
     });
 
-    const result = await sendChat('claude-sonnet-4-6');
+    const result = await sendChat('claude-sonnet-5-5');
 
     expect(result.errors).toEqual([]);
     expect(model.doStreamCalls).toHaveLength(8);
@@ -167,7 +224,7 @@ describe('AI SDK 7 chat HTTP stream and tool loop', () => {
     });
     installModel(model);
 
-    const result = await sendChat('gpt-5.4');
+    const result = await sendChat('gpt-6.1-sol');
 
     expect(result.errors).toHaveLength(1);
     expect(result.errors[0]).toBeInstanceOf(Error);

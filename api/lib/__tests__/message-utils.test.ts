@@ -7,14 +7,14 @@ import { prepareMessagesForModel, estimateTokens } from '../message-utils';
 
 /**
  * 守护测试（P1-1 + P1-2）：
- * - useServerSideCompaction=true（Sonnet 4.6+/Opus 4.6+/4.7）：跳过客户端 token 截断兜底
+ * - useServerSideCompaction=true（Claude 5 系列，supportsCompactBeta 白名单内）：跳过客户端 token 截断兜底
  *   → 长上下文应该原样返回（依赖服务端 compact_20260112）
- * - useServerSideCompaction=false（OpenAI + 不支持 compact 的 Claude 模型如 Haiku 4.5、
- *   Sonnet 4.5）：保留旧的截断逻辑 → 超长上下文应当被截断
+ * - useServerSideCompaction=false（OpenAI + 不在白名单内的 Claude 模型）：保留旧的截断逻辑
+ *   → 超长上下文应当被截断
  *
  * 历史背景：commit 2c5a016 之前用 `JSON.stringify().length / 3` 估算 token 数，对中英
  * 混合不准确。改用 Anthropic 官方 contextManagement 后曾**一刀切**地对所有 Anthropic
- * 模型跳过截断 —— 后果是 Haiku 4.5 / Sonnet 4.5 收到 compact_20260112（它们不支持）
+ * 模型跳过截断 —— 后果是当时的 Haiku 4.5 / Sonnet 4.5 收到 compact_20260112（它们不支持）
  * 直接报 "Conversation too long"（v1.x 实证）。修复：option 改为显式 boolean
  * `useServerSideCompaction`，由 caller 用 supportsCompactBeta(modelId) 判断。
  */
@@ -38,10 +38,11 @@ describe('prepareMessagesForModel — server-side compaction branching', () => {
     logSpy.mockRestore();
   });
 
-  it('useServerSideCompaction=false（OpenAI / Haiku 4.5）：超长消息被客户端截断', async () => {
+  it('useServerSideCompaction=false（OpenAI）：超长消息被客户端截断', async () => {
     const longMessages = buildLongMessages(20, 50_000);
     const result = await prepareMessagesForModel(longMessages, 10_000, {
       useServerSideCompaction: false,
+      provider: 'openai',
     });
 
     // 截断逻辑：保留第一条 + 最近 N 条，总长度应小于原始
@@ -54,7 +55,7 @@ describe('prepareMessagesForModel — server-side compaction branching', () => {
     expect(truncateLogged).toBe(true);
   });
 
-  it('useServerSideCompaction=true（Sonnet 4.6+）：超长消息原样返回，依赖服务端 compaction', async () => {
+  it('useServerSideCompaction=true（Claude 5）：超长消息原样返回，依赖服务端 compaction', async () => {
     const longMessages = buildLongMessages(20, 50_000);
     const result = await prepareMessagesForModel(longMessages, 10_000, {
       useServerSideCompaction: true,
@@ -95,27 +96,33 @@ describe('prepareMessagesForModel — server-side compaction branching', () => {
 });
 
 /**
- * 守护测试（v1.9.1）：Anthropic 400 "thinking blocks in the latest assistant message cannot be modified"
+ * 守护测试（v1.9.1 / v1.10）：历史里的 thinking 块
  *
- * 复现链路：上一轮回答用了工具且开了深度推理 → 存下的 assistant UIMessage 有两个 step，各带一个签名
- * thinking。旧实现 pruneMessages({ toolCalls: 'before-last-2-messages' }) 删掉 step1 的 tool-call /
+ * v1.9.1 复现链路：上一轮回答用了工具且开了深度推理 → 存下的 assistant UIMessage 有两个 step，各带一个
+ * 签名 thinking。旧实现 pruneMessages({ toolCalls: 'before-last-2-messages' }) 删掉 step1 的 tool-call /
  * tool-result 却保留 reasoning → 两个 assistant 消息相邻 → @ai-sdk/anthropic 合并成
- * [thinking(step1), thinking(step2), text] → API 在 messages.3.content.1 报错。历史存在 localStorage，
- * 每次提问都带着它，只有清空对话才恢复。
+ * [thinking(step1), thinking(step2), text] → API 在 messages.3.content.1 报错 "cannot be modified"。
+ *
+ * v1.10（Claude 5）：Fable 5.1 / Opus 5.5 / Sonnet 5.5 / Haiku 5.5 的 thinking 签名绑定之前的全部消息，
+ * 更早轮次被修剪、客户端 30 条窗口滑动都会让回传的 thinking 失效（新账号直接 400）。Anthropic 路径因此
+ * 不回传任何 thinking 块；工具调用与结果在最近一轮保留。
+ *
+ * @ai-sdk/anthropic 4.0.79 起每个 step 开头带 anthropic.message_start 元数据（custom part），经
+ * toUIMessageStream 存进前端历史。Anthropic fixture 都带上它：它不能让本该为空的 step 留下来。
  *
  * 这里走真实的 @ai-sdk/anthropic / @ai-sdk/openai 请求体转换（只 mock fetch），断言发给 API 的 body：
- * - 任何 assistant 消息里的 thinking 都只来自同一次原始响应（同一个 step）
- * - 最新 assistant 消息的 thinking 序列与原始响应完全一致
- * - 每个 tool_result 都有对应的 tool_use；不存在只有 thinking 的 assistant 消息
+ * - Anthropic：任何消息里都没有 thinking / redacted_thinking 块
+ * - 每个 tool_result 都有对应的 tool_use；不存在空的 assistant 消息；user / assistant 严格交替
+ * - OpenAI：最近一轮每个 step 的 reasoning item 与它的 function_call / 正文成对（v1.9.1 规则不变）
  */
-describe('prepareMessagesForModel — thinking blocks survive history pruning', () => {
+describe('prepareMessagesForModel — thinking blocks in history', () => {
   type AnthropicBlock = {
     type: string;
     text?: string;
+    content?: unknown;
     signature?: string;
     id?: string;
     tool_use_id?: string;
-    content?: unknown;
   };
   type AnthropicMessage = { role: 'user' | 'assistant'; content: AnthropicBlock[] };
   type OpenAIInputItem = { type?: string; id?: string; role?: string; content?: unknown };
@@ -125,6 +132,15 @@ describe('prepareMessagesForModel — thinking blocks survive history pruning', 
   const user = (id: string, text: string): UIMessage =>
     ({ id, role: 'user', parts: [{ type: 'text', text }] }) as UIMessage;
 
+  // @ai-sdk/anthropic 4.0.79 起每个 step 开头的元数据，经 toUIMessageStream 存进前端历史
+  const messageStart = (step: string) => ({
+    type: 'custom',
+    kind: 'anthropic.message_start',
+    providerMetadata: {
+      anthropic: { id: `msg_${step}`, model: 'claude-sonnet-5-5', usage: { input_tokens: 1, output_tokens: 1 } },
+    },
+  });
+
   // 单 step 回答：[thinking, text]
   const plainAnswer = (id: string, step: string, text = `answer ${step}`): UIMessage =>
     ({
@@ -132,6 +148,7 @@ describe('prepareMessagesForModel — thinking blocks survive history pruning', 
       role: 'assistant',
       parts: [
         { type: 'step-start' },
+        messageStart(step),
         { type: 'reasoning', text: `thinking ${step}`, providerMetadata: signed(step), state: 'done' },
         { type: 'text', text, state: 'done' },
       ],
@@ -157,9 +174,11 @@ describe('prepareMessagesForModel — thinking blocks survive history pruning', 
       role: 'assistant',
       parts: [
         { type: 'step-start' },
+        messageStart(`${prefix}-s1`),
         { type: 'reasoning', text: `thinking ${prefix}-s1`, providerMetadata: signed(`${prefix}-s1`), state: 'done' },
         searchPart(`${prefix}-search`, output),
         { type: 'step-start' },
+        messageStart(`${prefix}-s2`),
         { type: 'reasoning', text: `thinking ${prefix}-s2`, providerMetadata: signed(`${prefix}-s2`), state: 'done' },
         finalPart,
       ],
@@ -175,7 +194,7 @@ describe('prepareMessagesForModel — thinking blocks survive history pruning', 
     output: { confirmation: { editionId: 'ed-1', status: 'sold' } },
   });
 
-  // 只 mock fetch：请求体由真实的 @ai-sdk/anthropic 生成
+  // 只 mock fetch：请求体由真实的 @ai-sdk/anthropic 生成，providerOptions 与 chat.ts 深度推理开启时一致
   async function captureAnthropicRequest(modelMessages: ModelMessage[]): Promise<AnthropicMessage[]> {
     const bodies: Array<{ messages: AnthropicMessage[] }> = [];
     const anthropic = createAnthropic({
@@ -187,7 +206,7 @@ describe('prepareMessagesForModel — thinking blocks survive history pruning', 
             id: 'msg_test',
             type: 'message',
             role: 'assistant',
-            model: 'claude-sonnet-4-6',
+            model: 'claude-sonnet-5-5',
             content: [{ type: 'text', text: 'ok' }],
             stop_reason: 'end_turn',
             stop_sequence: null,
@@ -199,9 +218,9 @@ describe('prepareMessagesForModel — thinking blocks survive history pruning', 
     });
 
     await generateText({
-      model: anthropic('claude-sonnet-4-6'),
+      model: anthropic('claude-sonnet-5-5'),
       messages: modelMessages,
-      providerOptions: { anthropic: { thinking: { type: 'enabled', budgetTokens: 4000 } } },
+      providerOptions: { anthropic: { thinking: { type: 'adaptive' }, effort: 'high' } },
     });
 
     expect(bodies).toHaveLength(1);
@@ -220,29 +239,31 @@ describe('prepareMessagesForModel — thinking blocks survive history pruning', 
     });
 
     await expect(
-      generateText({ model: openai('gpt-5.4'), messages: modelMessages, maxRetries: 0 })
+      generateText({ model: openai('gpt-6.1-sol'), messages: modelMessages, maxRetries: 0 })
     ).rejects.toThrow();
 
     expect(bodies).toHaveLength(1);
     return bodies[0].input;
   }
 
-  const thinkingSignatures = (message: AnthropicMessage) =>
-    message.content.filter((block) => block.type === 'thinking').map((block) => block.signature);
+  const blockTypes = (message: AnthropicMessage) => message.content.map((block) => block.type);
 
-  // 签名 sig-<step>：同一条 assistant 消息里的 thinking 必须来自同一个 step
-  function expectNoMergedThinking(messages: AnthropicMessage[]) {
-    for (const message of messages.filter((m) => m.role === 'assistant')) {
-      const steps = new Set(thinkingSignatures(message).map((signature) => signature?.replace(/^sig-/, '')));
-      expect(steps.size).toBeLessThanOrEqual(1);
-    }
+  // Claude 5 preserved thinking：回传的任何 thinking 都会被前缀校验，Anthropic 路径一个都不发
+  function expectNoThinking(messages: AnthropicMessage[]) {
+    const types = messages.flatMap(blockTypes);
+    expect(types).not.toContain('thinking');
+    expect(types).not.toContain('redacted_thinking');
   }
 
-  // 每个 tool_result 都紧跟在含同 id tool_use 的 assistant 消息之后；不存在只有 thinking 的 assistant 消息
+  // 每个 tool_result 都紧跟在含同 id tool_use 的 assistant 消息之后；不存在空的 assistant 消息；
+  // user / assistant 严格交替——没被移除的空 step 会被 @ai-sdk/anthropic 丢掉，留下两条相邻的 user 消息
   function expectWellFormedTurns(messages: AnthropicMessage[]) {
     messages.forEach((message, index) => {
+      if (index > 0) {
+        expect(message.role).not.toBe(messages[index - 1].role);
+      }
       if (message.role === 'assistant') {
-        expect(message.content.some((block) => block.type !== 'thinking')).toBe(true);
+        expect(message.content.length).toBeGreaterThan(0);
         return;
       }
       for (const block of message.content.filter((b) => b.type === 'tool_result')) {
@@ -255,9 +276,6 @@ describe('prepareMessagesForModel — thinking blocks survive history pruning', 
 
   const latestAssistant = (messages: AnthropicMessage[]) =>
     messages.filter((m) => m.role === 'assistant').at(-1)!;
-
-  const assistantWithSignature = (messages: AnthropicMessage[], signature: string) =>
-    messages.find((m) => m.role === 'assistant' && thinkingSignatures(m).includes(signature));
 
   let logSpy: ReturnType<typeof vi.spyOn>;
 
@@ -272,7 +290,7 @@ describe('prepareMessagesForModel — thinking blocks survive history pruning', 
   it.each([
     ['compaction path', true],
     ['client truncation path', false],
-  ])('普通追问：上一轮多 step 工具回答原样回传，不再合并成 messages.3.content.1（%s）', async (_label, useServerSideCompaction) => {
+  ])('普通追问：上一轮多 step 工具回答保留工具调用、不带 thinking，不再合并成 messages.3.content.1（%s）', async (_label, useServerSideCompaction) => {
     const history = [
       user('u1', '你好'),
       plainAnswer('a1', 'a1'),
@@ -284,24 +302,29 @@ describe('prepareMessagesForModel — thinking blocks survive history pruning', 
     const modelMessages = await prepareMessagesForModel(history, 150_000, { useServerSideCompaction });
     const body = await captureAnthropicRequest(modelMessages);
 
-    expectNoMergedThinking(body);
+    expectNoThinking(body);
     expectWellFormedTurns(body);
 
-    // 用户报错的位置：旧实现在这里是 [thinking(a2-s1), thinking(a2-s2), text]
+    // 用户报错的位置：v1.9.1 之前这里是 [thinking(a2-s1), thinking(a2-s2), text]
     expect(body[3].role).toBe('assistant');
-    expect(body[3].content.map((block) => block.type)).toEqual(['thinking', 'tool_use']);
-    expect(thinkingSignatures(body[3])).toEqual(['sig-a2-s1']);
+    expect(blockTypes(body[3])).toEqual(['tool_use']);
+    expect(body[4].content[0]).toMatchObject({ type: 'tool_result', tool_use_id: 'a2-search' });
 
-    // 最新 assistant 消息 = step2 的原始响应
-    const latest = latestAssistant(body);
-    expect(latest.content.map((block) => block.type)).toEqual(['thinking', 'text']);
-    expect(thinkingSignatures(latest)).toEqual(['sig-a2-s2']);
-
-    // 更早的轮次不再携带 thinking（工具调用之外允许省略）
-    expect(assistantWithSignature(body, 'sig-a1')).toBeUndefined();
+    // 最近一轮的最后一个 step 只剩正文；更早的 a1 也只剩正文
+    expect(latestAssistant(body).content).toEqual([{ type: 'text', text: '找到 2 件作品。' }]);
+    expect(body[1].content).toEqual([{ type: 'text', text: 'answer a1' }]);
   });
 
-  it('确认卡片流程：最新 assistant 以 tool_use 结束，其 thinking 与 tool_result 原样保留', async () => {
+  it('默认 provider 是 anthropic（与 DEFAULT_MODEL 一致），显式传入结果相同', async () => {
+    const history = [user('u1', 'London 有哪些作品？'), toolAnswer('a1', 'a1', textPart('找到 2 件作品。')), user('u2', '谢谢')];
+
+    const implicit = await prepareMessagesForModel(history, 150_000, { useServerSideCompaction: true });
+    const explicit = await prepareMessagesForModel(history, 150_000, { useServerSideCompaction: true, provider: 'anthropic' });
+
+    expect(explicit).toEqual(implicit);
+  });
+
+  it('确认卡片流程：最新 assistant 以 tool_use 结束，tool_result 原样保留、thinking 剥离', async () => {
     const history = [
       user('u1', '你好'),
       plainAnswer('a1', 'a1'),
@@ -314,12 +337,14 @@ describe('prepareMessagesForModel — thinking blocks survive history pruning', 
       await prepareMessagesForModel(history, 150_000, { useServerSideCompaction: true })
     );
 
-    expectNoMergedThinking(body);
+    expectNoThinking(body);
     expectWellFormedTurns(body);
 
+    // adaptive 模式下 assistant 消息不必以 thinking 开头；确认卡片的 tool_use 输入保留
     const latest = latestAssistant(body);
-    expect(latest.content.map((block) => block.type)).toEqual(['thinking', 'tool_use']);
-    expect(thinkingSignatures(latest)).toEqual(['sig-a2-s2']);
+    expect(latest.content).toEqual([
+      expect.objectContaining({ type: 'tool_use', id: 'a2-confirm', input: { editionId: 'ed-1', status: 'sold' } }),
+    ]);
 
     // tool_result 紧跟在最新 assistant 之后，与确认文字合并在同一条 user 消息里
     const last = body.at(-1)!;
@@ -327,7 +352,7 @@ describe('prepareMessagesForModel — thinking blocks survive history pruning', 
     expect(last.content[0]).toMatchObject({ type: 'tool_result', tool_use_id: 'a2-confirm' });
   });
 
-  it('更早的多 step 工具轮次：工具调用与 reasoning 一起剥离，不留孤立 thinking', async () => {
+  it('更早的多 step 工具轮次：工具调用与 reasoning 一起剥离，只剩文字', async () => {
     const history = [
       user('u1', 'London 有哪些作品？'),
       toolAnswer('a1', 'a1', textPart('找到 2 件作品。')),
@@ -339,17 +364,60 @@ describe('prepareMessagesForModel — thinking blocks survive history pruning', 
     const modelMessages = await prepareMessagesForModel(history, 150_000, { useServerSideCompaction: true });
     const body = await captureAnthropicRequest(modelMessages);
 
-    expectNoMergedThinking(body);
+    expectNoThinking(body);
     expectWellFormedTurns(body);
 
-    // a1 只剩文字，没有 thinking / tool_use / tool_result
+    // a1 只剩文字，没有 tool_use / tool_result
     const olderAssistant = body.find((m) => m.role === 'assistant')!;
     expect(olderAssistant.content).toEqual([{ type: 'text', text: '找到 2 件作品。' }]);
-    expect(
-      body.flatMap((m) => m.content).some((block) => block.type === 'tool_use' || block.type === 'tool_result')
-    ).toBe(false);
+    expect(body.flatMap(blockTypes).some((type) => type === 'tool_use' || type === 'tool_result')).toBe(false);
 
-    expect(thinkingSignatures(latestAssistant(body))).toEqual(['sig-a2']);
+    expect(latestAssistant(body).content).toEqual([{ type: 'text', text: 'answer a2' }]);
+  });
+
+  it('更早的只有工具调用的轮次（确认卡片，v1.10 历史形态）：整轮移除，前后 user 消息合并', async () => {
+    const confirmOnly = {
+      id: 'a1',
+      role: 'assistant',
+      parts: [{ type: 'step-start' }, messageStart('a1'), confirmPart('a1-confirm')],
+    } as UIMessage;
+
+    const modelMessages = await prepareMessagesForModel(
+      [user('u1', '把 London 那件标记为已售'), confirmOnly, user('u2', '确认'), plainAnswer('a2', 'a2'), user('u3', '谢谢')],
+      150_000,
+      { useServerSideCompaction: true }
+    );
+    const body = await captureAnthropicRequest(modelMessages);
+
+    expectNoThinking(body);
+    expectWellFormedTurns(body);
+    expect(body.map((m) => m.role)).toEqual(['user', 'assistant', 'user']);
+    expect(body[0].content.map((block) => block.text)).toEqual(['把 London 那件标记为已售', '确认']);
+    // ModelMessage 层也没有只剩元数据的 assistant 消息
+    expect(modelMessages.filter((m) => m.role === 'assistant')).toHaveLength(1);
+  });
+
+  it('更早轮次的服务端 compaction 块保留 compaction 标记，不当普通文字重发', async () => {
+    const compacted = {
+      id: 'a1',
+      role: 'assistant',
+      parts: [
+        { type: 'step-start' },
+        { type: 'text', text: 'SUMMARY OF EARLIER TURNS', providerMetadata: { anthropic: { type: 'compaction' } }, state: 'done' },
+        { type: 'text', text: 'answer a1', state: 'done' },
+      ],
+    } as UIMessage;
+
+    const body = await captureAnthropicRequest(
+      await prepareMessagesForModel(
+        [user('u1', '很长的对话'), compacted, user('u2', '继续'), plainAnswer('a2', 'a2'), user('u3', '再继续')],
+        150_000,
+        { useServerSideCompaction: true }
+      )
+    );
+
+    expect(body[1].content[0]).toMatchObject({ type: 'compaction', content: 'SUMMARY OF EARLIER TURNS' });
+    expect(body[1].content[1]).toMatchObject({ type: 'text', text: 'answer a1' });
   });
 
   it('中断保存的未完成工具调用（input-available）：整个未完成 step 丢弃，不报 MissingToolResults', async () => {
@@ -358,6 +426,7 @@ describe('prepareMessagesForModel — thinking blocks survive history pruning', 
       role: 'assistant',
       parts: [
         { type: 'step-start' },
+        messageStart('a1'),
         { type: 'reasoning', text: 'thinking a1', providerMetadata: signed('a1'), state: 'done' },
         { type: 'tool-search_editions', toolCallId: 'a1-search', state: 'input-available', input: { location: 'London' } },
       ],
@@ -370,20 +439,26 @@ describe('prepareMessagesForModel — thinking blocks survive history pruning', 
     );
 
     expectWellFormedTurns(body);
-    expect(body.flatMap((m) => m.content).some((block) => block.type === 'tool_use')).toBe(false);
+    expect(body.flatMap(blockTypes).some((type) => type === 'tool_use')).toBe(false);
     expect(body.some((m) => m.role === 'assistant')).toBe(false);
+    expect(body).toHaveLength(1);
   });
 
-  it('第二个 step 在正文前被中断：丢弃只剩 thinking 的 step，前一个完整 step 成为最新 assistant 消息', async () => {
+  it.each([
+    // v1.9.x 存下的历史：Anthropic reasoning 会流到前端
+    ['只剩 thinking', [{ type: 'reasoning', text: 'thinking a1-s2', providerMetadata: signed('a1-s2'), state: 'done' }]],
+    // v1.10 起：Anthropic 路径不再下发 reasoning，被中断的 step 只剩 message_start 元数据
+    ['只剩 message_start 元数据', [messageStart('a1-s2')]],
+  ])('第二个 step 在正文前被中断（%s）：空 step 被移除，前一个 step 的工具调用成为最新 assistant 消息', async (_label, unfinishedStep) => {
     const interrupted = {
       id: 'a1',
       role: 'assistant',
       parts: [
         { type: 'step-start' },
-        { type: 'reasoning', text: 'thinking a1-s1', providerMetadata: signed('a1-s1'), state: 'done' },
+        messageStart('a1-s1'),
         searchPart('a1-search'),
         { type: 'step-start' },
-        { type: 'reasoning', text: 'thinking a1-s2', providerMetadata: signed('a1-s2'), state: 'done' },
+        ...unfinishedStep,
       ],
     } as UIMessage;
 
@@ -393,13 +468,11 @@ describe('prepareMessagesForModel — thinking blocks survive history pruning', 
       })
     );
 
-    expectNoMergedThinking(body);
+    expectNoThinking(body);
     expectWellFormedTurns(body);
 
-    const latest = latestAssistant(body);
-    expect(latest.content.map((block) => block.type)).toEqual(['thinking', 'tool_use']);
-    expect(thinkingSignatures(latest)).toEqual(['sig-a1-s1']);
-    expect(body.at(-1)!.content.map((block) => block.type)).toEqual(['tool_result', 'text']);
+    expect(blockTypes(latestAssistant(body))).toEqual(['tool_use']);
+    expect(blockTypes(body.at(-1)!)).toEqual(['tool_result', 'text']);
   });
 
   it('客户端截断兜底只裁更早的轮次：最近一轮即使很大也整轮保留，不留孤立 tool_result', async () => {
@@ -423,10 +496,10 @@ describe('prepareMessagesForModel — thinking blocks survive history pruning', 
     expect(body[0].content[0]).toMatchObject({ type: 'text', text: '你好' });
 
     // 最近一轮的两个 step 都在，tool_use / tool_result 成对
-    expectNoMergedThinking(body);
+    expectNoThinking(body);
     expectWellFormedTurns(body);
-    expect(assistantWithSignature(body, 'sig-a2-s1')!.content.map((block) => block.type)).toEqual(['thinking', 'tool_use']);
-    expect(thinkingSignatures(latestAssistant(body))).toEqual(['sig-a2-s2']);
+    expect(body.flatMap(blockTypes).filter((type) => type === 'tool_use')).toHaveLength(1);
+    expect(latestAssistant(body).content).toEqual([{ type: 'text', text: '找到很多作品。' }]);
   });
 
   it('传入 tools 时历史工具结果走 toModelOutput 摘要，而不是原始数据库行', async () => {
@@ -479,7 +552,7 @@ describe('prepareMessagesForModel — thinking blocks survive history pruning', 
       ];
 
       const input = await captureOpenAIInput(
-        await prepareMessagesForModel(history, 150_000, { useServerSideCompaction: false })
+        await prepareMessagesForModel(history, 150_000, { useServerSideCompaction: false, provider: 'openai' })
       );
 
       const references = input.filter((item) => item.type === 'item_reference').map((item) => item.id);
@@ -498,11 +571,84 @@ describe('prepareMessagesForModel — thinking blocks survive history pruning', 
       ];
 
       const input = await captureOpenAIInput(
-        await prepareMessagesForModel(history, 150_000, { useServerSideCompaction: false })
+        await prepareMessagesForModel(history, 150_000, { useServerSideCompaction: false, provider: 'openai' })
       );
 
       expect(input.some((item) => item.type === 'item_reference')).toBe(false);
       expect(input.every((item) => item.role === 'user')).toBe(true);
+    });
+
+    // 最近一轮的两个 step：[rs_s1, function_call] → output → [rs_s2, msg_s2]
+    const gptToolAnswer = (id: string, output: unknown = { results: [] }) =>
+      gptAnswer(id, [
+        openaiReasoning(`rs_${id}_s1`),
+        {
+          type: 'tool-search_editions',
+          toolCallId: `call-${id}`,
+          state: 'output-available',
+          input: { location: 'London' },
+          output,
+        },
+        { type: 'step-start' },
+        openaiReasoning(`rs_${id}_s2`),
+        openaiText(`msg_${id}_s2`, '找到 2 件作品。'),
+      ]);
+
+    const inputSequence = (input: OpenAIInputItem[]) =>
+      input.map((item) => {
+        const callId = (item as { call_id?: string }).call_id;
+        if (item.type === 'item_reference') return `ref:${item.id}`;
+        if (callId) return `${item.type}:${callId}`;
+        return `${item.role}`;
+      });
+
+    it('最近一轮多 step：每个 step 的 reasoning 紧挨着它自己的 function_call / 正文，工具调用不被修剪', async () => {
+      const input = await captureOpenAIInput(
+        await prepareMessagesForModel([user('u1', 'London 有哪些作品？'), gptToolAnswer('a1'), user('u2', '继续')], 150_000, {
+          useServerSideCompaction: false,
+          provider: 'openai',
+        })
+      );
+
+      expect(inputSequence(input)).toEqual([
+        'user',
+        'ref:rs_a1_s1',
+        'function_call:call-a1',
+        'function_call_output:call-a1',
+        'ref:rs_a1_s2',
+        'ref:msg_a1_s2',
+        'user',
+      ]);
+    });
+
+    it('客户端截断兜底只裁更早的轮次：最近一轮的 reasoning / function_call 成对保留', async () => {
+      const history = [
+        user('u1', '你好'),
+        gptAnswer('a1', [openaiReasoning('rs_a1'), openaiText('msg_a1', '很长的回答'.repeat(2_000))]),
+        user('u2', 'London 有哪些作品？'),
+        gptToolAnswer('a2', { results: 'x'.repeat(6_000) }),
+        user('u3', '还有别的吗？'),
+      ];
+
+      const input = await captureOpenAIInput(
+        await prepareMessagesForModel(history, 1_000, { useServerSideCompaction: false, provider: 'openai' })
+      );
+
+      const truncateLogged = logSpy.mock.calls.some((call: unknown[]) => String(call[0]).includes('Truncated'));
+      expect(truncateLogged).toBe(true);
+
+      // 更早的长回答被裁掉，开头的 user 消息保留；最近一轮整轮都在
+      expect(JSON.stringify(input)).not.toContain('很长的回答');
+      expect(inputSequence(input)).toEqual([
+        'user',
+        'ref:rs_a2_s1',
+        'function_call:call-a2',
+        'function_call_output:call-a2',
+        'ref:rs_a2_s2',
+        'ref:msg_a2_s2',
+        'user',
+      ]);
+      expect(input[0]).toMatchObject({ role: 'user', content: [{ type: 'input_text', text: '你好' }] });
     });
   });
 });

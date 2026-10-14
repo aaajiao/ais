@@ -1,120 +1,73 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { isStepCount, hasToolCall } from 'ai';
 import { buildProviderOptions, buildSystemMessage, buildStopConditions } from '../chat';
 
 describe('buildProviderOptions', () => {
-  const originalBudget = process.env.THINKING_BUDGET;
-
-  beforeEach(() => {
-    delete process.env.THINKING_BUDGET;
-  });
-
-  afterEach(() => {
-    if (originalBudget === undefined) {
-      delete process.env.THINKING_BUDGET;
-    } else {
-      process.env.THINKING_BUDGET = originalBudget;
-    }
-  });
-
   // ────────────────────────────────────────────────────────────────────────
-  // Anthropic 路径
+  // Anthropic 路径（Claude 5 系列）
   // ────────────────────────────────────────────────────────────────────────
   describe('Anthropic 路径', () => {
-    it('thinking off → 返回空对象（Claude 模型行为零变化的关键回归断言）', () => {
-      const opts = buildProviderOptions(false, 'claude-sonnet-4-6', 'anthropic');
-      expect(opts).toEqual({});
+    it('thinking off → adaptive + effort low（5 系列不传 thinking 就是思考开启、effort high/medium）', () => {
+      const opts = buildProviderOptions(false, 'anthropic');
+      expect(opts).toEqual({ anthropic: { thinking: { type: 'adaptive' }, effort: 'low' } });
+      // v1.10 起 {} 不再表示"不思考"：5 系列省略 thinking = adaptive thinking 开启
+      expect(opts).not.toEqual({});
+    });
+
+    it('thinking on → adaptive + effort high', () => {
+      const opts = buildProviderOptions(true, 'anthropic');
+      expect(opts).toEqual({ anthropic: { thinking: { type: 'adaptive' }, effort: 'high' } });
+    });
+
+    it('never sends enabled/budgetTokens or disabled (not supported on Claude 5.5 models)', () => {
+      for (const thinkingEnabled of [false, true]) {
+        const thinking = (buildProviderOptions(thinkingEnabled, 'anthropic').anthropic as {
+          thinking: Record<string, unknown>;
+        }).thinking;
+        expect(thinking.type).toBe('adaptive');
+        expect(thinking).not.toHaveProperty('budgetTokens');
+      }
+    });
+
+    it('ignores the removed THINKING_BUDGET env var', () => {
+      const original = process.env.THINKING_BUDGET;
+      process.env.THINKING_BUDGET = '8000';
+      try {
+        expect(buildProviderOptions(true, 'anthropic')).toEqual({
+          anthropic: { thinking: { type: 'adaptive' }, effort: 'high' },
+        });
+      } finally {
+        if (original === undefined) delete process.env.THINKING_BUDGET;
+        else process.env.THINKING_BUDGET = original;
+      }
+    });
+
+    it('does not inject openai fields', () => {
+      expect(buildProviderOptions(true, 'anthropic')).not.toHaveProperty('openai');
+    });
+  });
+
+  // ────────────────────────────────────────────────────────────────────────
+  // OpenAI 路径（GPT-6 系列）
+  // ────────────────────────────────────────────────────────────────────────
+  describe('OpenAI 路径', () => {
+    it("thinking off → reasoningEffort 'low'", () => {
+      const opts = buildProviderOptions(false, 'openai');
+      expect(opts).toEqual({ openai: { reasoningEffort: 'low', reasoningSummary: null } });
       expect(opts).not.toHaveProperty('anthropic');
     });
 
-    it('thinking on → 默认 budgetTokens 4000', () => {
-      const opts = buildProviderOptions(true, 'claude-sonnet-4-6', 'anthropic');
-      expect(opts.anthropic).toEqual({
-        thinking: { type: 'enabled', budgetTokens: 4000 },
-      });
+    it("thinking on → reasoningEffort 'high'", () => {
+      const opts = buildProviderOptions(true, 'openai');
+      expect(opts).toEqual({ openai: { reasoningEffort: 'high', reasoningSummary: null } });
     });
 
-    it('thinking on → 不注入 openai 字段', () => {
-      const opts = buildProviderOptions(true, 'claude-sonnet-4-6', 'anthropic');
-      expect(opts).not.toHaveProperty('openai');
+    it("never sends 'none' (gpt-6-astra / gpt-6.1-sol reject it)", () => {
+      for (const thinkingEnabled of [false, true]) {
+        const openai = buildProviderOptions(thinkingEnabled, 'openai').openai as { reasoningEffort: string };
+        expect(openai.reasoningEffort).not.toBe('none');
+      }
     });
-
-    it('thinking on + THINKING_BUDGET=8000 → budgetTokens 覆盖', () => {
-      process.env.THINKING_BUDGET = '8000';
-      const opts = buildProviderOptions(true, 'claude-sonnet-4-6', 'anthropic');
-      expect(opts.anthropic).toMatchObject({
-        thinking: { type: 'enabled', budgetTokens: 8000 },
-      });
-    });
-
-    it('thinking on + 无效 THINKING_BUDGET → fallback 4000', () => {
-      process.env.THINKING_BUDGET = 'not-a-number';
-      const opts = buildProviderOptions(true, 'claude-sonnet-4-6', 'anthropic');
-      expect(opts.anthropic).toMatchObject({
-        thinking: { type: 'enabled', budgetTokens: 4000 },
-      });
-    });
-
-    it('thinking on + THINKING_BUDGET=adaptive → 走 adaptive 模式（v3.0.74 GA）', () => {
-      process.env.THINKING_BUDGET = 'adaptive';
-      const opts = buildProviderOptions(true, 'claude-sonnet-4-6', 'anthropic');
-      expect(opts.anthropic).toEqual({
-        thinking: { type: 'adaptive', display: 'summarized' },
-      });
-    });
-
-    it('adaptive 模式不带 budgetTokens（由模型自决）', () => {
-      process.env.THINKING_BUDGET = 'adaptive';
-      const opts = buildProviderOptions(true, 'claude-sonnet-4-6', 'anthropic');
-      const thinking = (opts.anthropic as { thinking: Record<string, unknown> }).thinking;
-      expect(thinking).not.toHaveProperty('budgetTokens');
-    });
-  });
-
-  // ────────────────────────────────────────────────────────────────────────
-  // OpenAI 路径（v1.2.3 修复 GPT 不调工具问题）
-  // ────────────────────────────────────────────────────────────────────────
-  describe('OpenAI 路径 — gpt-5.4 / gpt-5.5（项目实际使用的模型）', () => {
-    // 项目只用 gpt-5.4 / gpt-5.5（含 -mini 变体）。这两个默认 reasoning_effort='none'，
-    // 必须显式给 effort 才能让模型正常调工具。
-    const cases = [
-      { model: 'gpt-5.4', off: 'low', on: 'high' },
-      { model: 'gpt-5.4-mini', off: 'low', on: 'high' },
-      { model: 'gpt-5.5', off: 'low', on: 'high' },
-      { model: 'gpt-5.5-mini', off: 'low', on: 'high' },
-    ] as const;
-
-    for (const { model, off, on } of cases) {
-      it(`${model} thinking off → reasoningEffort: '${off}'`, () => {
-        const opts = buildProviderOptions(false, model, 'openai');
-        expect(opts.openai).toEqual({ reasoningEffort: off, reasoningSummary: null });
-        expect(opts).not.toHaveProperty('anthropic');
-      });
-
-      it(`${model} thinking on → reasoningEffort: '${on}'`, () => {
-        const opts = buildProviderOptions(true, model, 'openai');
-        expect(opts.openai).toEqual({ reasoningEffort: on, reasoningSummary: null });
-        expect(opts).not.toHaveProperty('anthropic');
-      });
-    }
-  });
-
-  describe('OpenAI 路径 — 未列出的模型（保守降级）', () => {
-    // 项目暂不使用，但保留兜底：未匹配的模型不传 reasoningEffort 字段。
-    // 这避免在 gpt-4 系列（不支持该字段）或未知模型上引入兼容性问题。
-    const unsupportedModels = ['gpt-4o', 'gpt-4-turbo', 'gpt-5', 'gpt-5-pro', 'o3-mini'];
-
-    for (const model of unsupportedModels) {
-      it(`${model} thinking off → 不传任何 providerOptions（{}）`, () => {
-        const opts = buildProviderOptions(false, model, 'openai');
-        expect(opts).toEqual({});
-      });
-
-      it(`${model} thinking on → 不传任何 providerOptions（{}）`, () => {
-        const opts = buildProviderOptions(true, model, 'openai');
-        expect(opts).toEqual({});
-      });
-    }
   });
 });
 

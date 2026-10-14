@@ -1,7 +1,17 @@
 import { streamText, isStepCount, hasToolCall, toUIMessageStream, createUIMessageStreamResponse, type UIMessage } from 'ai';
 import type { ProviderOptions, SystemModelMessage } from '@ai-sdk/provider-utils';
 import { verifyAuth, unauthorizedResponse } from './lib/auth.js';
-import { getModel, getSupabase, getProviderName, getOpenAIReasoningEffort, supportsCompactBeta } from './lib/model-provider.js';
+import {
+  DEFAULT_EXPANSION_MODEL,
+  DEFAULT_MODEL,
+  getModel,
+  getProviderName,
+  getReasoningProviderOptions,
+  getSupabase,
+  resolveModelId,
+  supportsCompactBeta,
+  type ProviderName,
+} from './lib/model-provider.js';
 import { getSystemPromptByProvider } from './lib/system-prompt.js';
 import { createTools } from './tools/index.js';
 import { prepareMessagesForModel } from './lib/message-utils.js';
@@ -17,49 +27,22 @@ export const config = {
 type StreamTextProviderOptions = ProviderOptions;
 
 /**
- * 构造 streamText 的 providerOptions（顶层），按 provider 分支注入。
+ * 构造 streamText 的 providerOptions（顶层），按 provider 分支注入推理强度。
  *
- * Anthropic 路径：
- *   - thinking off → 不传 anthropic.thinking → Claude 模型行为零变化
- *   - thinking on → anthropic.thinking = { type: 'enabled', budgetTokens } 或 adaptive
- *     - THINKING_BUDGET=adaptive → { type: 'adaptive', display: 'summarized' }（v3.0.74 GA）
- *     - 其他值（数字 / 缺省）→ { type: 'enabled', budgetTokens: number || 4000 }
- *
- * OpenAI 路径（v1.2.3 修复 GPT 不调工具的问题）：
- *   - 项目用的 gpt-5.4 / gpt-5.5（含 -mini）默认 reasoning_effort='none' —— 模型几乎
- *     不做内部规划，工具调用决策失效。必须显式传 effort 才能正常调工具。
- *   - thinking off → 'low'（保留 reasoning 但开销小）
- *   - thinking on → 'high'（深度推理）
- *   - 其他模型（gpt-4 等）→ getOpenAIReasoningEffort 返回 undefined，不传字段
+ * 深度推理开关 off → 'low'，on → 'high'，两家统一（细节见 getReasoningProviderOptions）：
+ *   - Anthropic（Claude 5 系列）：{ thinking: { type: 'adaptive' }, effort }。5 系列不传
+ *     thinking 就是 adaptive thinking 开启、默认 effort high/medium，"关"必须显式传 low。
+ *   - OpenAI（GPT-6 系列）：{ reasoningEffort, reasoningSummary: null }。显式传 effort
+ *     （v1.2.3 起的规则：不依赖服务端默认值；GPT-6 永远不发 'none'）。
  *
  * 注：cacheControl 不在这里，而是放在 system message 的 providerOptions 里
  *     （见 buildSystemMessage），这样不影响 OpenAI 路径请求体。
  */
 export function buildProviderOptions(
   thinkingEnabled: boolean,
-  modelId: string,
-  provider: 'anthropic' | 'openai'
+  provider: ProviderName
 ): StreamTextProviderOptions {
-  if (provider === 'anthropic') {
-    if (!thinkingEnabled) {
-      return {};
-    }
-    const rawBudget = process.env.THINKING_BUDGET;
-    const thinking =
-      rawBudget === 'adaptive'
-        ? { type: 'adaptive' as const, display: 'summarized' as const }
-        : { type: 'enabled' as const, budgetTokens: Number(rawBudget) || 4000 };
-    return { anthropic: { thinking } };
-  }
-
-  // provider === 'openai'
-  const effort = getOpenAIReasoningEffort(modelId, thinkingEnabled);
-  if (effort === undefined) {
-    return {};
-  }
-  // AI SDK 7 enables detailed reasoning summaries for non-zero effort by default.
-  // Keep the existing text/tool response format and avoid introducing hidden summaries.
-  return { openai: { reasoningEffort: effort, reasoningSummary: null } };
+  return getReasoningProviderOptions(provider, thinkingEnabled ? 'high' : 'low');
 }
 
 /**
@@ -76,7 +59,7 @@ export function buildProviderOptions(
  */
 export function buildSystemMessage(
   prompt: string,
-  provider: 'anthropic' | 'openai'
+  provider: ProviderName
 ): string | SystemModelMessage {
   if (provider !== 'anthropic') {
     return prompt;
@@ -197,21 +180,24 @@ export default async function handler(req: Request) {
     const body = await req.json();
     const {
       messages: uiMessages,
-      model = 'claude-sonnet-4-6',
-      extractionModel,
-      searchExpansionModel,
       thinkingEnabled = false,
       artistName,
       locale = 'zh',
     } = body;
+
+    // 只接受 Claude 5 / GPT-6；旧版本客户端 localStorage 里的 4 系列 / GPT-5 / o 系列 ID
+    // 收敛到默认值（URL 提取默认跟随主模型）
+    const model = resolveModelId(body.model, DEFAULT_MODEL);
+    const extractionModel = resolveModelId(body.extractionModel, model);
+    const searchExpansionModel = resolveModelId(body.searchExpansionModel, DEFAULT_EXPANSION_MODEL);
 
     // 2. 安全日志（不记录敏感消息内容）
     const requestSize = JSON.stringify(uiMessages || []).length;
     console.log('[chat] Request', {
       userId: auth.userId,
       model,
-      extractionModel: extractionModel || 'default',
-      searchExpansionModel: searchExpansionModel || 'default',
+      extractionModel,
+      searchExpansionModel,
       thinkingEnabled,
       messageCount: uiMessages?.length,
       requestSizeKB: Math.round(requestSize / 1024),
@@ -231,20 +217,22 @@ export default async function handler(req: Request) {
     });
 
     // 4. 准备消息：
-    //    - 服务端 compaction 路径（Sonnet 4.6+ / Opus 4.6+/4.7）：跳过客户端截断
-    //    - 其他路径（OpenAI + Haiku 4.5 / Sonnet 4.5 等不支持 compact 的 Claude）：客户端 token 截断兜底
+    //    - 服务端 compaction 路径（Claude 5 系列）：跳过客户端截断
+    //    - OpenAI 路径：客户端 token 截断兜底
     //    - 传 tools：历史里的工具结果走 toModelOutput 摘要，而不是原始数据库行
+    //    - 传 provider：Anthropic 路径不回传任何 thinking 块（preserved thinking 前缀校验，见 message-utils）
     const useCompact = provider === 'anthropic' && supportsCompactBeta(model);
     const modelMessages = await prepareMessagesForModel(uiMessages as UIMessage[], 150000, {
       useServerSideCompaction: useCompact,
       tools,
+      provider,
     });
 
-    // 5. providerOptions：thinking + （仅支持 compact_20260112 的 Claude 模型注入 contextManagement）
-    // 不能用 `provider === 'anthropic'` 一刀切 —— compact_20260112 是 beta 特性，
-    // 只支持 Sonnet 4.6+ / Opus 4.6+/4.7。发给 Haiku 4.5 / Sonnet 4.5 会被服务端拒
-    // （表现为 "context too long" 即使历史为空），见 model-provider.supportsCompactBeta。
-    const providerOptions = buildProviderOptions(thinkingEnabled, model, provider);
+    // 5. providerOptions：推理强度 + （仅支持 compact_20260112 的 Claude 模型注入 contextManagement）
+    // 不能用 `provider === 'anthropic'` 一刀切 —— compact_20260112 是 beta 特性，只支持列表里的
+    // 模型，发给其他模型会被服务端拒（表现为 "context too long" 即使历史为空），
+    // 见 model-provider.supportsCompactBeta。
+    const providerOptions = buildProviderOptions(thinkingEnabled, provider);
     if (useCompact) {
       providerOptions.anthropic = {
         ...(providerOptions.anthropic ?? {}),
@@ -300,6 +288,9 @@ export default async function handler(req: Request) {
     const uiStream = toUIMessageStream({
       stream: result.stream,
       tools,
+      // Anthropic 路径下一轮会剥离全部 reasoning（见 message-utils），不必把 thinking 块和签名
+      // 存进 localStorage 再发回来；OpenAI 路径需要最近一轮的 reasoning item 配对回传
+      sendReasoning: provider === 'openai',
       onError(error) {
         // 提取错误信息发送给客户端
         console.error('[chat] Response error:', error);

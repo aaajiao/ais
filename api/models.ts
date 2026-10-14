@@ -1,12 +1,12 @@
 /**
  * API endpoint to fetch available models from Anthropic and OpenAI
  * GET /api/models
+ *
+ * 只列出 Claude 5 系列与 GPT-6 系列（规则见 api/lib/model-ids.ts，与 chat.ts 的
+ * resolveModelId 同一来源：列表里看得到的模型，服务端一定接受）。
  */
 
-// 跟 api/lib/model-provider.ts 同步（edge runtime 不能 import 非 edge 模块；
-// 改这两个常量必须同时改 model-provider.ts，单元测试守护两边一致）
-const DEFAULT_MAIN_MODEL_ID = 'claude-sonnet-4-6';
-const DEFAULT_EXPANSION_MODEL_ID = 'claude-haiku-4-5';
+import { DEFAULT_EXPANSION_MODEL, DEFAULT_MODEL, isAllowedModelId } from './lib/model-ids.js';
 
 export const config = {
   runtime: 'edge',
@@ -47,10 +47,6 @@ interface OpenAIModelsResponse {
   data: OpenAIModel[];
 }
 
-// Filter for chat-capable models
-const ANTHROPIC_CHAT_PREFIXES = ['claude-'];
-const OPENAI_CHAT_PREFIXES = ['gpt-', 'o1', 'o3', 'o4'];
-
 // Models to exclude (embeddings, deprecated, images, audio, etc.)
 const EXCLUDED_PATTERNS = [
   'embed',
@@ -81,9 +77,8 @@ function isExcluded(modelId: string): boolean {
   return EXCLUDED_PATTERNS.some(pattern => lower.includes(pattern));
 }
 
-function isChatModel(modelId: string, prefixes: string[]): boolean {
-  const lower = modelId.toLowerCase();
-  return prefixes.some(prefix => lower.startsWith(prefix)) && !isExcluded(modelId);
+function isChatModel(modelId: string): boolean {
+  return isAllowedModelId(modelId) && !isExcluded(modelId);
 }
 
 async function fetchAnthropicModels(): Promise<ModelInfo[]> {
@@ -94,7 +89,8 @@ async function fetchAnthropicModels(): Promise<ModelInfo[]> {
   }
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/models', {
+    // 默认每页 20 个（新的在前，含已弃用模型），取大一点避免 5 系列被分页截掉
+    const response = await fetch('https://api.anthropic.com/v1/models?limit=100', {
       headers: {
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
@@ -109,7 +105,7 @@ async function fetchAnthropicModels(): Promise<ModelInfo[]> {
     const data: AnthropicModelsResponse = await response.json();
 
     return data.data
-      .filter(model => isChatModel(model.id, ANTHROPIC_CHAT_PREFIXES))
+      .filter(model => isChatModel(model.id))
       .map(model => ({
         id: model.id,
         name: model.display_name || model.id,
@@ -121,32 +117,6 @@ async function fetchAnthropicModels(): Promise<ModelInfo[]> {
     console.error('[models] Failed to fetch Anthropic models:', error);
     return [];
   }
-}
-
-// 过滤掉带日期后缀的重复模型和不常用变体，只保留主要版本
-function isMainModel(modelId: string): boolean {
-  const lower = modelId.toLowerCase();
-
-  // 排除带日期后缀的版本（如 gpt-4o-2024-08-06）
-  const datePattern = /-\d{4}-\d{2}-\d{2}$/;
-  const previewPattern = /-preview$/;
-  const latestPattern = /-latest$/;
-
-  if (datePattern.test(modelId)) return false;
-  if (previewPattern.test(modelId)) return false;
-  if (latestPattern.test(modelId)) return false;
-
-  // 排除 codex 变体（用于代码补全，非对话）
-  if (lower.includes('-codex')) return false;
-
-  // 排除 GPT-3.5 老版本号
-  if (lower.includes('3.5-turbo-0125')) return false;
-  if (lower.includes('3.5-turbo-1106')) return false;
-
-  // 排除 GPT-4 老版本号
-  if (lower.includes('4-0613')) return false;
-
-  return true;
 }
 
 async function fetchOpenAIModels(): Promise<ModelInfo[]> {
@@ -171,7 +141,7 @@ async function fetchOpenAIModels(): Promise<ModelInfo[]> {
     const data: OpenAIModelsResponse = await response.json();
 
     return data.data
-      .filter(model => isChatModel(model.id, OPENAI_CHAT_PREFIXES) && isMainModel(model.id))
+      .filter(model => isChatModel(model.id))
       .map(model => ({
         id: model.id,
         name: formatOpenAIModelName(model.id),
@@ -197,20 +167,23 @@ function extractVersion(modelId: string): number {
 }
 
 function formatOpenAIModelName(modelId: string): string {
-  // Format model ID to a readable name
+  // Format model ID to a readable name: gpt-6.1-sol → GPT-6.1 Sol
   return modelId
     .replace(/-/g, ' ')
     .replace(/gpt (\d)/gi, 'GPT-$1')
-    .replace(/\bo(\d)/gi, 'O$1')
     .split(' ')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 }
 
 function getAnthropicDescription(modelId: string): { en: string; zh: string } | undefined {
+  if (modelId.includes('fable') || modelId.includes('mythos')) return {
+    en: 'Most capable, for the hardest tasks (highest cost)',
+    zh: '最强，适合最难的任务（成本最高）'
+  };
   if (modelId.includes('opus')) return {
-    en: 'Most powerful, for complex tasks',
-    zh: '最强大，适合复杂任务'
+    en: 'Powerful, for complex tasks',
+    zh: '强大，适合复杂任务'
   };
   if (modelId.includes('sonnet')) return {
     en: 'Recommended, balanced performance and cost',
@@ -224,30 +197,17 @@ function getAnthropicDescription(modelId: string): { en: string; zh: string } | 
 }
 
 function getOpenAIDescription(modelId: string): { en: string; zh: string } | undefined {
-  const lower = modelId.toLowerCase();
-  if (lower.includes('5.2')) return {
-    en: 'Latest flagship, most accurate',
-    zh: '最新旗舰，最精确'
+  if (modelId.endsWith('-astra')) return {
+    en: 'Flagship, most capable (highest cost)',
+    zh: '旗舰，最强（成本最高）'
   };
-  if (lower.includes('5.1')) return {
-    en: 'Flagship reasoning model',
-    zh: '旗舰推理模型'
+  if (modelId.endsWith('-sol')) return {
+    en: 'Balanced performance and cost',
+    zh: '平衡性能和成本'
   };
-  if (lower.includes('4.1')) return {
-    en: 'Coding optimized, long context',
-    zh: '编码优化，长上下文'
-  };
-  if (lower.includes('4o-mini')) return {
+  if (modelId.endsWith('-luna')) return {
     en: 'Fast and low cost',
     zh: '快速低成本'
-  };
-  if (lower.includes('4o')) return {
-    en: 'Multimodal, high performance',
-    zh: '多模态，高性能'
-  };
-  if (lower.startsWith('o1') || lower.startsWith('o3') || lower.startsWith('o4')) return {
-    en: 'Reasoning model',
-    zh: '推理模型'
   };
   return undefined;
 }
@@ -266,13 +226,13 @@ export default async function handler(req: Request) {
 
     // 找回默认主模型 / 默认翻译模型；若 list 不含则 fallback 第一个 anthropic
     const defaultMainModel =
-      anthropicModels.find((m) => m.id === DEFAULT_MAIN_MODEL_ID)?.id
+      anthropicModels.find((m) => m.id === DEFAULT_MODEL)?.id
       || anthropicModels.find((m) => m.id.includes('sonnet'))?.id
       || anthropicModels[0]?.id
       || openaiModels[0]?.id
       || null;
     const defaultExpansionModel =
-      anthropicModels.find((m) => m.id === DEFAULT_EXPANSION_MODEL_ID)?.id
+      anthropicModels.find((m) => m.id === DEFAULT_EXPANSION_MODEL)?.id
       || anthropicModels.find((m) => m.id.includes('haiku'))?.id
       || null;
 

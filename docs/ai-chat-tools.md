@@ -59,7 +59,7 @@
 
 1. `expandSearchQuery()` 使用 `generateText` + `Output.object()` 翻译和扩展查询
 2. 使用可配置的"搜索翻译模型"（设置 > AI 模型 > 高级选项）
-3. 默认使用 Claude Haiku 4.5（快速、低成本）
+3. 默认使用 Claude Haiku 5.5（快速、低成本），推理强度固定 `low`（5 系列默认会思考，扩展在工具调用路径上要控制延迟）
 4. 生成多个搜索变体，包括翻译、单复数形式和同义词
 
 **示例**："磁铁" → `["magnet", "magnets", "magnetic"]`
@@ -72,37 +72,48 @@
 
 ## 深度推理（Thinking 模式）
 
-设置页提供「深度推理」开关（设置 → AI 模型），控制 Claude / GPT 的 reasoning 强度。**默认关闭**。
+设置页提供「深度推理」开关（设置 → AI 模型），控制 Claude / GPT 的推理强度。**默认关闭**。
 
-### 行为
+### 行为（v1.10 起：只用 Claude 5 系列与 GPT-6 系列）
 
-| 开关 | Claude 路径 | GPT 路径（gpt-5.4 / gpt-5.5，含 -mini） |
+| 开关 | Claude 路径（5 系列） | GPT 路径（GPT-6 系列） |
 |------|-------------|-------------|
-| **关闭**（默认） | 不传 `thinking` 参数 → 行为零变化 | `reasoningEffort: 'low'` |
-| **开启** | `providerOptions.anthropic.thinking = { type: 'enabled', budgetTokens: 4000 }` | `reasoningEffort: 'high'` |
-| **开启** + `THINKING_BUDGET=adaptive` | `{ type: 'adaptive', display: 'summarized' }` —— Claude 自决 thinking 长度（@ai-sdk/anthropic v3.0.74 GA） | 同开启（OpenAI 不支持 adaptive） |
+| **关闭**（默认） | `{ thinking: { type: 'adaptive' }, effort: 'low' }` | `{ reasoningEffort: 'low', reasoningSummary: null }` |
+| **开启** | `{ thinking: { type: 'adaptive' }, effort: 'high' }` | `{ reasoningEffort: 'high', reasoningSummary: null }` |
 
-> **关键设计**：GPT 路径关闭开关时也必须传 `'low'`，不能"完全不传"。原因见下方"为什么 GPT 关闭时也传 low"。
+逻辑在 `getReasoningProviderOptions(provider, level)`（`api/lib/model-provider.ts`），`buildProviderOptions(thinkingEnabled, provider)`（`api/chat.ts`）只做 off → `low` / on → `high` 映射。URL 提取和搜索扩展的 `generateText` 也固定传 `low`。
+
+> **关键设计**：两家关闭开关时都必须**显式**传 `low`，不能"什么都不传"。
+
+### 为什么 Claude 关闭时不能传 `{}`
+
+4 系列时代 off 传 `{}`（不传 `thinking`）就是不思考。**5 系列不传 `thinking` = adaptive thinking 开启**，默认 effort 是 `high`（Sonnet 5.5 / Fable 5.1）或 `medium`（Opus 5.5 / Haiku 5.5）—— 关闭开关反而以高强度思考。
+
+其他写法在 5 系列上不会报错，而是被 @ai-sdk/anthropic 带 warning 静默改写（或各模型行为不一致），开关实际不起作用：
+
+| 写法 | 结果 |
+|---|---|
+| `{ type: 'enabled', budgetTokens }` | Opus 5.5 / Sonnet 5.5 / Haiku 5.5 / Fable 不支持：@ai-sdk/anthropic 带 warning 改写成 adaptive，budget 被丢掉；SDK 能力表里 Opus 5 / Sonnet 5 仍原样发出。各模型行为不一致，不用 |
+| `{ type: 'disabled' }` | Opus 5.5 / Sonnet 5.5 / Fable 不能关：SDK 带 warning 去掉 `thinking` 字段（Sonnet 5.5 改成 `between_tools`），等于没关；Haiku 5.5 只在 effort ≤ high 时接受 |
+| `{ type: 'adaptive' }` + `effort` | 所有 5 系列都接受（effort 支持 low / medium / high / xhigh / max） |
+
+`display` 用默认的 `omitted`：前端不展示 reasoning，省掉 thinking 文本的流式时间。官方文档：https://platform.claude.com/docs/en/build-with-claude/thinking
 
 ### 为什么 GPT 关闭时也传 `low`
 
-`gpt-5.4` / `gpt-5.5` 通过 `@ai-sdk/openai` v4 默认走 **OpenAI Responses API**，该路径下这些模型的 `reasoning_effort` 默认值是 **`none`** —— 模型几乎不做内部规划，导致工具调用决策失效（v1.2.2 实证：用户问"什么作品在 london"GPT 完全不调用 `search_editions` 工具）。
+v1.2.2 实证：当年的 gpt-5.4 在 Responses API 下默认 `reasoning_effort: 'none'`，模型几乎不做内部规划，问"什么作品在 london"完全不调 `search_editions`。从那以后的规则：**永远显式传 effort，不依赖服务端默认值**。
 
-修复办法：显式传 `'low'`，让模型有最低限度的内部规划，但开销小。
+GPT-6 四个模型（`gpt-6-astra` / `gpt-6.1-sol` / `gpt-6-sol` / `gpt-6-luna`）文档默认是 `medium`（Astra 未写明），都接受 `low` / `high`。**永远不发 `none`**：`gpt-6-astra` / `gpt-6.1-sol` 不支持，@ai-sdk/openai 会带 warning 静默丢弃，退回服务端默认值；`gpt-6-sol` / `gpt-6-luna` 支持 `none`，但那会重现 v1.2.2 的不调工具问题。
 
-### 不同 GPT 模型族 reasoningEffort enum 不统一
+`reasoningSummary: null`：AI SDK 7 对非 `none` effort 默认开 detailed 摘要，显式关掉。
 
-| 模型 | 默认值 | 支持的值 |
-|---|---|---|
-| `gpt-5`（base） | `medium` | `none` / `minimal` / `low` / `medium` / `high` / `xhigh` |
-| **`gpt-5.4` / `gpt-5.5`**（项目使用）| **`none`** | `none` / `low` / `medium` / `high` |
-| `gpt-5-pro` | `high` | 仅 `high` |
-| `gpt-5.1-codex-max` 之后 | `none` | 增加 `xhigh` |
-| `gpt-4` 系列 | — | 不支持 `reasoningEffort` 字段 |
+### 只允许 Claude 5 / GPT-6
 
-**项目实际只用 `gpt-5.4` / `gpt-5.5`（含 -mini 变体）**，逻辑见 `getOpenAIReasoningEffort`（`api/lib/model-provider.ts`）。其他模型（gpt-4 / gpt-5-pro / 未列出）→ 函数返回 `undefined`，不传字段。
+`api/lib/model-ids.ts` 是单一来源（前端镜像 `src/lib/modelIds.ts`，`model-ids.test.ts` 守护一致）：
 
-历史教训（v1.2.0/v1.2.1/v1.2.2 实证）：hardcode `'minimal'` 在 gpt-5.4 抛 `Unsupported value` 错；hardcode `'high'` 配 `stepCountIs(5)` 在搜索类查询上引发无限循环；完全不传则 gpt-5.4/5.5 退化到 `none` 不调工具。所以必须按模型族分支。
+- `/api/models` 只列出 `claude-{opus|sonnet|haiku|fable|mythos}-5[-N]` 和 `gpt-6[.N]-{variant}`（排除 `-chat` / `-codex`、日期快照）
+- `/api/chat`、URL 提取、搜索扩展用 `resolveModelId` 把旧版本存下的 4 系列 / GPT-5 / o 系列 ID 收敛到默认值（旧模型仍可调用，不收敛的话用户会一直停留在旧模型上而不报错）
+- 前端 `readStoredModelId` 读到旧 ID 时从 localStorage 删除，设置页再用 `/api/models` 的默认值补上
 
 ### 何时开启
 
@@ -117,9 +128,7 @@
 
 ### 后端环境变量
 
-| 变量 | 默认 | 说明 |
-|------|------|------|
-| `THINKING_BUDGET` | `4000` | 仅当开关开启时生效，可选值：`数字`（如 `8000`）→ `{ type: 'enabled', budgetTokens: <num> }`；字符串 `adaptive` → `{ type: 'adaptive', display: 'summarized' }`，让 Claude 自决 thinking 长度。后端变量（不带 `VITE_` 前缀） |
+无。v1.10 起 `THINKING_BUDGET` 已移除（5 系列不接受 `budgetTokens`），Vercel 上如果还配着可以删掉。
 
 ### 持久化
 
@@ -129,7 +138,9 @@
 
 - `src/components/settings/useModelSettings.ts` - `thinkingEnabled` state + setter
 - `src/components/settings/ModelSettings.tsx` - 开关 UI
-- `api/chat.ts` - `buildProviderOptions(thinkingEnabled)` 构造 streamText 的 providerOptions
+- `api/lib/model-provider.ts` - `getReasoningProviderOptions(provider, level)` 两家的推理强度参数
+- `api/chat.ts` - `buildProviderOptions(thinkingEnabled, provider)` 构造 streamText 的 providerOptions
+- `api/lib/model-ids.ts` / `src/lib/modelIds.ts` - 允许的模型 ID 与默认模型
 
 ---
 
@@ -180,10 +191,10 @@ streamText 的 `stopWhen` 同时启用两种条件（满足任一即停步）：
 
 ### 为什么 GPT 路径用 tool preambles
 
-OpenAI cookbook 推荐 GPT-5 用 **few-shot 工具调用示例**引导多步决策。OpenAI 路径 prompt 内含 5 个 thought + tool call 示例，最关键的一条是：
+OpenAI cookbook 推荐 GPT-5 用 **few-shot 工具调用示例**引导多步决策（GPT-6 沿用）。OpenAI 路径 prompt 内含 5 个 thought + tool call 示例，最关键的一条是：
 
 ```
-Example 1 — place query (THE most common GPT-5 failure mode):
+Example 1 — place query (THE most common failure mode):
   User: 在 london 画廊有哪些作品
   Thought: User mentioned "london". Per the routing table, call search_editions
   with location="London" directly. Do NOT call search_locations first.
@@ -223,7 +234,7 @@ search_editions internally matches by name, city, AND country.
 | 字段 | 说明 |
 |---|---|
 | `userId` | 当前用户 |
-| `modelId` | 配置的模型（如 `gpt-5.4`） |
+| `modelId` | 配置的模型（如 `gpt-6.1-sol`） |
 | `stepNumber` | 0-based step 序号 |
 | `stepProvider` / `stepModelId` | 实际处理 step 的 provider / 模型 ID |
 | `toolCalls` | `[{ name, input }]`，input 截断到 200 字符 |
@@ -276,14 +287,14 @@ search_editions internally matches by name, city, AND country.
 
 ## Context Management（仅 compact-supported Claude 子集 + OpenAI 兜底）
 
-`contextManagement.compact_20260112` 是 Anthropic beta 特性，**只支持子集模型**（Sonnet 4.6+ / Opus 4.6+/4.7 / mythos-preview）。其他 Claude（Haiku 4.5 / Sonnet 4.5 / 老版本）即使是 Anthropic provider 也走客户端 token 截断兜底，跟 OpenAI 同款。
+`contextManagement.compact_20260112` 是 Anthropic beta 特性，**只支持子集模型**。v1.10 起只允许 Claude 5 系列，文档列出的 5 系列（Fable 5.1 / Mythos 5.1 / Opus 5.5 / Sonnet 5.5 / Haiku 5.5 / Fable 5 / Mythos 5 / Opus 5 / Sonnet 5）全部支持；白名单之外的 Claude ID（例如之后新发布、尚未确认的版本）走客户端 token 截断兜底，跟 OpenAI 同款。
 
 历史教训（v1.5.x 修复）：曾按 `provider === 'anthropic'` 一刀切注入 compact，把 Haiku 4.5 / Sonnet 4.5 当主聊天模型时直接报 "Conversation too long" —— **即使历史为空也失败**，因为服务端拒收 beta flag 时把错误包装成 context overflow，迷惑性极高。修复后用 `supportsCompactBeta(modelId)` 显式 gate。
 
 | 路径 | 长上下文处理 |
 |------|-------------|
-| **Sonnet 4.6+ / Opus 4.6+/4.7 / mythos-preview** | 服务端 `contextManagement.edits = [{ type: 'compact_20260112' }]` 自动压缩；客户端截断兜底跳过 |
-| **Haiku 4.5 / Sonnet 4.5 / 老 Claude** | 客户端 token 截断兜底（`prepareMessagesForModel({ useServerSideCompaction: false })`），跟 OpenAI 同款 |
+| **Claude 5 系列（`COMPACT_SUPPORTED_MODELS`）** | 服务端 `contextManagement.edits = [{ type: 'compact_20260112' }]` 自动压缩；客户端截断兜底跳过 |
+| **白名单之外的 Claude** | 客户端 token 截断兜底（`prepareMessagesForModel({ useServerSideCompaction: false })`），跟 OpenAI 同款 |
 | **OpenAI 全部** | 客户端 token 截断兜底；OpenAI 没有等效官方机制 |
 
 历史修剪（`pruneMessages`）对所有路径生效，与压缩/截断正交，规则见下节。
@@ -304,27 +315,41 @@ search_editions internally matches by name, city, AND country.
 
 | 范围 | 处理 |
 |------|------|
-| 最近一个 assistant UIMessage 及之后的消息 | 原样转换：每个 step 的 thinking / tool-call / tool-result 保持原状；只丢弃被中断、只剩 reasoning 的最后一个 step（有报告称 Anthropic 会拒绝以 thinking 结尾的 assistant 消息，OpenAI 会拒绝后面没有内容的 reasoning item） |
-| 更早的轮次 | `pruneMessages({ reasoning: 'all', toolCalls: 'all', emptyMessages: 'remove' })`：工具调用与 reasoning **一起**剥离；剩下的文字去掉 `providerOptions` 以纯文本内联发送（OpenAI store=true 会把带 itemId 的文字发成 `item_reference`，而它对应的 reasoning item 已被剥离） |
+| 最近一个 assistant UIMessage 及之后的消息 | **Anthropic**（v1.10 起）：`pruneMessages({ reasoning: 'all', emptyMessages: 'remove' })`，去掉所有 thinking，tool-call / tool-result 保留（原因见下节）。**OpenAI**：原样转换，每个 step 的 reasoning / tool-call / tool-result 保持原状；只丢弃被中断、只剩 reasoning 的最后一个 step（OpenAI 会拒绝后面没有内容的 reasoning item） |
+| 更早的轮次 | `pruneMessages({ reasoning: 'all', toolCalls: 'all', emptyMessages: 'remove' })`：工具调用与 reasoning **一起**剥离。OpenAI 路径再把剩下的文字去掉 `providerOptions` 以纯文本内联发送（store=true 会把带 itemId 的文字发成 `item_reference`，而它对应的 reasoning item 已被剥离）；Anthropic 路径不去，以保留 compaction 块（`providerOptions.anthropic.type === 'compaction'` 的 text part） |
+| 两者 | 转换后去掉 assistant 消息里的 `anthropic.message_start` custom part（@ai-sdk/anthropic 4.0.79 起每个 step 开头都带，存进了前端历史；两家请求体都忽略它，但留着会让被中断或只有工具调用的 step 不算空、移除不掉，Anthropic 请求体里出现两条相邻的 user 消息） |
 | 两者 | `convertToModelMessages(..., { tools, ignoreIncompleteToolCalls: true })`：`tools` 让历史工具结果走 `toModelOutput` 摘要（不传会发原始数据库行，体积数倍）；断网 / 切后台 / 离开页面时 `onFinish` 仍会保存 `input-available` 的工具调用，不忽略会让之后每次请求报 `AI_MissingToolResultsError` |
 | 客户端截断兜底 | 只从更早的轮次开头删，最近一轮整轮保留——从中间切开会留下没有 `tool_use` 的 `tool_result` |
 
 **铁律**：修剪工具调用时绝不能单独保留同一 step 的 reasoning——孤立的 thinking 块会和相邻 step 合并。修复在服务端，已存在用户设备上的旧历史无需清空即可恢复。
 
-守护测试：`api/lib/__tests__/message-utils.test.ts`「thinking blocks survive history pruning」——走真实 `@ai-sdk/anthropic` / `@ai-sdk/openai` 请求体转换（只 mock fetch），断言任何 assistant 消息的 thinking 只来自同一个 step、最新 assistant 消息与原始响应一致、`tool_use` / `tool_result` 成对、OpenAI 不出现孤立的 `item_reference`。
+### Claude 5 preserved thinking（v1.10 起：Anthropic 路径不回传 thinking）
+
+Fable 5.1 / Opus 5.5 / Sonnet 5.5 / Haiku 5.5 对回传的 thinking 块做**前缀校验**：thinking 块的签名绑定它生成时的 system prompt、工具定义和之前所有消息。只要前面任何内容和当时不一样（客户端 30 条窗口滑动、更早轮次的工具调用被剥离、存储截断、system prompt 里的日期换了一天），就会报 400 `bound to a different conversation`。按文档，2026-08-31 及之后创建的账号会拦截，更早的账号目前只记录不拦截。
+
+本项目的历史每轮都会被修剪，回传的 thinking 不可能保持前缀一致，所以 Anthropic 路径**整段历史都不发 thinking**：
+
+- 文档允许完全去掉 thinking 块（"不能修改"指的是部分删改，全删是合法的）
+- adaptive 模式不要求 assistant 轮次以 thinking 开头，所以只剩 tool_use 的 assistant 消息也合法
+- 代价：当前轮里模型看不到自己上一 step 的推理过程，只看到工具调用和结果；对库存查询这类短链路影响很小
+- 前端也不再收到 Anthropic 的 reasoning（`toUIMessageStream({ sendReasoning: provider === 'openai' })`），本地历史里不会再存新的 thinking
+
+OpenAI 路径不受影响，沿用上面 v1.9.1 的规则（最新一轮原样回传 reasoning item）。
+
+守护测试：`api/lib/__tests__/message-utils.test.ts`「prepareMessagesForModel — thinking blocks in history」——走真实 `@ai-sdk/anthropic` / `@ai-sdk/openai` 请求体转换（只 mock fetch），断言 Anthropic 请求体里没有任何 thinking / redacted_thinking 块、compaction 块保留、`tool_use` / `tool_result` 成对、user / assistant 严格交替（fixture 带 `anthropic.message_start`）；OpenAI 路径断言最近一轮多 step 时每个 reasoning item 紧挨着自己 step 的 function_call / 正文、客户端截断只裁更早的轮次、不出现孤立的 `item_reference`。`api/__tests__/chat-sdk.test.ts` 断言 reasoning 只在 OpenAI 路径流到前端。
 
 ### 关键文件
 
 - `api/lib/model-provider.ts:supportsCompactBeta(modelId)` —— 白名单单一真源，新模型必须在文档确认后扩
 - `api/chat.ts` —— `useCompact = provider === 'anthropic' && supportsCompactBeta(model)` 决定是否注入 + 决定 `useServerSideCompaction`
-- `api/lib/message-utils.ts:prepareMessagesForModel(messages, max, { useServerSideCompaction })` —— 显式 boolean，不要再用 provider 名字推断
-- `node_modules/@ai-sdk/anthropic/dist/index.d.ts:199-234` —— `contextManagement` 类型签名
+- `api/lib/message-utils.ts:prepareMessagesForModel(messages, max, { useServerSideCompaction, tools, provider })` —— `useServerSideCompaction` 是显式 boolean，不要用 provider 名字推断；`provider` 只决定 thinking 块怎么处理（见上节）
+- `node_modules/@ai-sdk/anthropic/dist/index.d.ts` 中 `anthropicLanguageModelOptions` 的 `contextManagement` —— providerOptions 入参 schema（含 `compact_20260112`）；按符号查，行号随 SDK 版本漂移
 - 守护测试：`api/lib/__tests__/model-provider.test.ts`（白名单钉死） + `api/lib/__tests__/message-utils.test.ts`（两条路径行为对比 + thinking 块完整性）
-- Anthropic 文档：https://platform.claude.com/docs/en/build-with-claude/compaction
+- Anthropic 文档：https://platform.claude.com/docs/en/build-with-claude/compaction-threshold
 
 ### 多模型共存场景
 
-`searchExpansionModel`（默认 Haiku 4.5）和 `extractionModel` 通过 `generateText` 调用，**不注入** providerOptions，因此 Haiku 4.5 一直工作正常。问题只发生在用户把这些模型选作**主聊天模型**时（`api/chat.ts` 的 `streamText`）—— 修复后这条路径也自动降级到客户端截断兜底。
+`searchExpansionModel`（默认 Haiku 5.5）和 `extractionModel` 通过 `generateText` 调用，**不注入** `contextManagement`（单轮调用，没有历史需要压缩），只注入 `low` 推理强度（`getReasoningProviderOptions(provider, 'low')`）。compact 门控只作用于主聊天模型（`api/chat.ts` 的 `streamText`）。
 
 ---
 
@@ -383,8 +408,8 @@ search_editions internally matches by name, city, AND country.
 
 | 任务 | 存储键 | 默认值 | 推荐 |
 |------|--------|--------|------|
-| URL 导入 | `extraction-model` | 主聊天模型 | Sonnet/GPT-4o |
-| 搜索翻译 | `search-expansion-model` | Haiku | Haiku（快速） |
+| URL 导入 | `extraction-model` | 主聊天模型 | Sonnet 5.5 / GPT-6.1 Sol |
+| 搜索翻译 | `search-expansion-model` | Haiku 5.5 | Haiku 5.5 / GPT-6 Luna（快速） |
 
 ---
 
@@ -463,6 +488,8 @@ export function createMyTool(ctx: ToolContext) {
 **自 v1.3.x 起**，所有 AI 工具必须按 OpenAI strict structured outputs 模式编写 schema 与 execute 入口。
 
 根因：`@ai-sdk/openai` 走 Responses API + structured outputs strict mode，要求 schema 里所有字段在响应中出现。Vercel AI SDK 把 `z.X.optional()` 转 JSON schema 时**没有**标记为 nullable，于是 GPT-5 给每个 optional 字段塞类型默认值（string `''` / number `0` / enum 第一个值或某个有效值），把 search 工具的过滤器全部触发，归零所有结果。Sonnet 路径不受影响，因为 Anthropic 不强制 strict 模式。
+
+> **v1.10 现状（@ai-sdk/openai 4.0.93）**：工具定义发送的是 `strict: tool.strict ?? false`，本项目没有给工具设 `strict`，所以 GPT-6 实际走非 strict function calling。非 strict 下模型仍可能给 optional 字段塞默认值，三层防御照旧是唯一的保护，不能因为"不是 strict"就删掉。
 
 详见 [CLAUDE.md → Common Pitfalls](../CLAUDE.md#common-pitfalls) 的 "OpenAI strict structured outputs 强制 optional 字段填类型默认值" 一条。
 

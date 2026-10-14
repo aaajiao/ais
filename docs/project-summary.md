@@ -37,7 +37,7 @@
 - 位置管理（支持别名）
 
 ### AI 对话
-- 多模型支持（Claude Opus/Sonnet/Haiku, GPT-4o, O1/O3）
+- 多模型支持（Claude 5 系列：Fable / Opus / Sonnet / Haiku；GPT-6 系列：Astra / Sol / Luna）
 - 工具调用（查询、更新、导入、导出）
 - URL 导入（LLM 解析网页）
 - 可编辑确认卡片

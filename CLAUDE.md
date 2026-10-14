@@ -29,7 +29,7 @@ api/                    # Serverless API
 ├── models.ts          # 可用模型列表
 ├── fetch-title.ts     # URL 标题抓取（OG metadata）
 ├── profile.ts         # 用户资料 API
-├── lib/               # 工具函数（auth, api-key-auth, search-utils, artwork-extractor, image-downloader, model-provider, system-prompt, i18n, message-utils, backup/）
+├── lib/               # 工具函数（auth, api-key-auth, search-utils, artwork-extractor, image-downloader, model-ids, model-provider, system-prompt, i18n, message-utils, backup/）
 ├── tools/             # AI 工具（10 个工具 + types + index + createReadOnlyTools）
 ├── keys/              # API Key 管理 API（CRUD）
 ├── external/          # 外部查询 API（v1/query, v1/schema）
@@ -80,6 +80,7 @@ docs/                   # 详细文档
 | `api/tools/index.ts` | AI 工具注册 + createReadOnlyTools 导出 |
 | `api/lib/api-key-auth.ts` | 外部 API Key 生成、哈希、验证 |
 | `api/lib/system-prompt.ts` | AI 系统提示词（中文） |
+| `api/lib/model-ids.ts` | 允许的模型 ID（Claude 5 / GPT-6）+ 默认模型（单一来源；前端镜像 `src/lib/modelIds.ts`） |
 | `api/lib/backup/zip-builder.ts` | 工作室数据备份 ZIP 构建器（migration 009） |
 | `api/lib/backup/storage.ts` | 备份 Blob 路径 + 下载文件名约定（单一来源） |
 | `src/lib/inventoryNumber.ts` | 库存编号智能补全逻辑 |
@@ -148,10 +149,10 @@ in_production → in_studio → at_gallery / at_museum / in_transit
 - **Update 工具：归一化后必须过滤 undefined 字段（v1.3.2 起）**：search 归一化最多让结果归零；update/execute 类（`execute-update` / `update-confirmation` / `export-artworks`）不过滤会用 null/''/0 覆盖既有 DB 数据（破外键、清零价格）。范式：`for ([k,v] of Object.entries(norm)) if (v !== undefined) payload[k] = v;`，payload 空返 `t('update.noFields')`。参考 `api/tools/execute-update.ts`。详见 [docs/ai-chat-tools.md `更新类工具：payload 过滤铁律`](docs/ai-chat-tools.md#更新类工具payload-过滤铁律v132-起)。
 - **外部 API 自动继承 L2 归一化（v1.3.4 起）**：`/api/external/v1/query` 绕过 zod 但 L2 在 execute() 入口，外部 LLM default-padded payload 自动被拦。**绝不**把归一化挪出 execute() 内部（例如挪到 chat.ts 钩子），否则外部 API 失去保护。`schema.ts` 给非 required 参数标 `nullable: true`。详见 [docs/external-api.md `参数处理铁律`](docs/external-api.md#参数处理铁律v134-起)。
 - **`onStepEnd` 必须 fire-and-forget**：回调声明 sync + 双 try/catch + payload 截 200 字符（见 `truncateForLog`）。await 拖慢流，抛错炸函数，不截 Vercel logs 会爆。OTel exporter 接入只改 `logStepForObservability` 一处。
-- **Thinking 模式：Anthropic off 必须 `{}` / OpenAI 按模型族分支**：Anthropic off 传 `{ type: 'disabled' }` 会改 Claude 行为，必须空对象；gpt-5.4/5.5 off 必须传 `'low'`（不传字段 GPT 不响应），on 传 `'high'`。各 GPT 模型 reasoningEffort enum 不统一，hardcode 必 break。守护 `api/__tests__/chat.test.ts`。详见 [docs/ai-chat-tools.md `深度推理（Thinking 模式）`](docs/ai-chat-tools.md#深度推理thinking-模式)。
+- **Thinking 模式：off 也必须显式传 `low`（v1.10 起）**：Claude 5 不传 `thinking` = adaptive thinking **开启**（默认 effort high/medium），所以 off 必须是 `{ thinking: { type: 'adaptive' }, effort: 'low' }`，on 是 `'high'`；**不要**回到 4 系列的 `{}`，也不要用 `enabled`+`budgetTokens` / `disabled`（5.5 系列不支持）。GPT-6 off/on 传 `reasoningEffort: 'low'/'high'`，**永远不发 `'none'`**（Astra / 6.1 Sol 不支持，Sol / Luna 会重现 v1.2.2 不调工具）。单一入口 `getReasoningProviderOptions`（`api/lib/model-provider.ts`）。守护 `api/__tests__/chat.test.ts` + `model-provider.test.ts`。详见 [docs/ai-chat-tools.md `深度推理（Thinking 模式）`](docs/ai-chat-tools.md#深度推理thinking-模式)。
 - **Anthropic-only providerOptions 必须按 provider 分支**：`cacheControl`（prompt caching）等 Anthropic-only 字段只能注入 Anthropic 路径（按 `getProviderName(model)` 判断），给 OpenAI 带上会请求体异常。`contextManagement.compact_20260112` 还有额外子集约束（见下条）。
-- **`compact_20260112` 是 Anthropic 子集模型特性（v1.5.x 修复）**：只支持 Sonnet 4.6+ / Opus 4.6+/4.7 / mythos-preview。发给老 Claude / Haiku 4.5 服务端会拒，错误以 "Conversation too long" 形式上抛——**即使对话历史为空也失败**，迷惑性极高。门控**必须**用 `supportsCompactBeta(modelId)`（`api/lib/model-provider.ts`），不能写 `provider === 'anthropic'`。注入失败走 `prepareMessagesForModel({ useServerSideCompaction: false })` 客户端截断兜底。新模型查 https://platform.claude.com/docs/en/build-with-claude/compaction 后扩 `COMPACT_SUPPORTED_MODELS`。守护 `api/lib/__tests__/model-provider.test.ts` + `message-utils.test.ts`。
-- **历史修剪不能拆散 thinking 块（v1.9.1 修复）**：症状是 Anthropic 400 `thinking ... blocks in the latest assistant message cannot be modified`，只有清空对话才恢复。`pruneMessages` 删掉早期 step 的 tool-call 却保留 reasoning → 相邻 assistant 消息被 `@ai-sdk/anthropic` 合并成 `[thinking(step1), thinking(step2), …]`。规则：最近一个 assistant 轮次原样回传；更早轮次修剪工具调用时必须 `reasoning: 'all'` 一起剥离。改 `prepareMessagesForModel` 前读 [docs/ai-chat-tools.md `历史修剪与 thinking 块完整性`](docs/ai-chat-tools.md#历史修剪与-thinking-块完整性v191-修复)。守护 `api/lib/__tests__/message-utils.test.ts`（真实 Anthropic 请求体）。
+- **`compact_20260112` 是 Anthropic 子集模型特性（v1.5.x 修复）**：`COMPACT_SUPPORTED_MODELS` 现在是 Claude 5 系列的 9 个 ID。发给不支持的 Claude（当年是 Haiku 4.5）服务端会拒，错误以 "Conversation too long" 形式上抛——**即使对话历史为空也失败**，迷惑性极高。门控**必须**用 `supportsCompactBeta(modelId)`（`api/lib/model-provider.ts`），不能写 `provider === 'anthropic'`。注入失败走 `prepareMessagesForModel({ useServerSideCompaction: false })` 客户端截断兜底。新模型查 https://platform.claude.com/docs/en/build-with-claude/compaction-threshold 后扩 `COMPACT_SUPPORTED_MODELS`。守护 `api/lib/__tests__/model-provider.test.ts` + `message-utils.test.ts`。
+- **历史修剪不能拆散 thinking 块（v1.9.1 修复）**：症状是 Anthropic 400 `thinking ... blocks in the latest assistant message cannot be modified`，只有清空对话才恢复。`pruneMessages` 删掉早期 step 的 tool-call 却保留 reasoning → 相邻 assistant 消息被 `@ai-sdk/anthropic` 合并成 `[thinking(step1), thinking(step2), …]`。规则：更早轮次修剪工具调用时必须 `reasoning: 'all'` 一起剥离；OpenAI 路径最近一个 assistant 轮次原样回传。**v1.10 起 Anthropic 路径整段历史不回传 thinking**：Claude 5 的 thinking 签名绑定之前所有消息（preserved thinking 前缀校验），窗口滑动 / 修剪都会触发 400 `bound to a different conversation`，全删 thinking 是文档允许的。@ai-sdk/anthropic 4.0.79 起每个 step 带 `anthropic.message_start` custom part，转换后必须先去掉，否则空 step 移除不掉。改 `prepareMessagesForModel` 前读 [docs/ai-chat-tools.md `历史修剪与 thinking 块完整性`](docs/ai-chat-tools.md#历史修剪与-thinking-块完整性v191-修复)。守护 `api/lib/__tests__/message-utils.test.ts`（真实 Anthropic 请求体）。
 
 ### 测试 / 部署
 

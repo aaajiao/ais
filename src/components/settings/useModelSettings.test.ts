@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { formatModelIdForDisplay, useModelSettings } from './useModelSettings';
 
 describe('formatModelIdForDisplay', () => {
@@ -123,5 +123,68 @@ describe('useModelSettings - thinkingEnabled', () => {
     });
     expect(result.current.thinkingEnabled).toBe(false);
     expect(localStorage.getItem('thinking-enabled')).toBe('false');
+  });
+});
+
+describe('useModelSettings - stale model ids from older versions', () => {
+  const makeMemoryStorage = (): Storage => {
+    const store = new Map<string, string>();
+    return {
+      get length() {
+        return store.size;
+      },
+      clear: () => store.clear(),
+      getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
+      setItem: (k: string, v: string) => {
+        store.set(k, String(v));
+      },
+      removeItem: (k: string) => {
+        store.delete(k);
+      },
+      key: (i: number) => Array.from(store.keys())[i] ?? null,
+    };
+  };
+
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', makeMemoryStorage());
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            anthropic: [{ id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5', provider: 'anthropic' }],
+            openai: [],
+            defaultModel: 'claude-sonnet-5-5',
+            defaultExpansionModel: 'claude-haiku-5-5',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      )
+    );
+  });
+
+  it('replaces a stored Claude 4 main model with the server default', async () => {
+    localStorage.setItem('ai-model', 'claude-sonnet-4-6');
+    const { result } = renderHook(() => useModelSettings());
+
+    await waitFor(() => expect(result.current.selectedModel).toBe('claude-sonnet-5-5'));
+    expect(localStorage.getItem('ai-model')).toBe('claude-sonnet-5-5');
+  });
+
+  it('clears stored GPT-5 / Claude 4 background models back to their defaults', () => {
+    localStorage.setItem('extraction-model', 'gpt-5.4');
+    localStorage.setItem('search-expansion-model', 'claude-haiku-4-5');
+    const { result } = renderHook(() => useModelSettings());
+
+    expect(result.current.extractionModel).toBe('');
+    expect(result.current.searchExpansionModel).toBe('');
+    expect(localStorage.getItem('extraction-model')).toBeNull();
+    expect(localStorage.getItem('search-expansion-model')).toBeNull();
+  });
+
+  it('keeps a valid GPT-6 selection', () => {
+    localStorage.setItem('ai-model', 'gpt-6.1-sol');
+    const { result } = renderHook(() => useModelSettings());
+    expect(result.current.selectedModel).toBe('gpt-6.1-sol');
   });
 });

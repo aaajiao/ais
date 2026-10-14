@@ -1,6 +1,12 @@
 import { generateText, Output } from 'ai';
 import { z } from 'zod';
-import { getModel, DEFAULT_EXPANSION_MODEL } from './model-provider.js';
+import {
+  DEFAULT_EXPANSION_MODEL,
+  getModel,
+  getProviderName,
+  getReasoningProviderOptions,
+  resolveModelId,
+} from './model-provider.js';
 
 /**
  * SQL 注入防护：转义 ILIKE 搜索中的特殊字符
@@ -64,14 +70,16 @@ export async function expandSearchQuery(
 
   // 对于非纯英文（如中文）或复杂查询，使用 AI 扩展
   try {
-    // 选择模型：优先使用用户配置，否则使用默认快速模型
-    const selectedModelId = modelId || DEFAULT_EXPANSION_MODEL;
+    // 选择模型：优先使用用户配置，否则（或旧版本存下的 4 系列等 ID）使用默认快速模型
+    const selectedModelId = resolveModelId(modelId, DEFAULT_EXPANSION_MODEL);
     const model = getModel(selectedModelId);
 
     console.log('[expandSearchQuery] Using model:', selectedModelId, 'for term:', term);
 
     const result = await generateText({
       model,
+      // 5 系列 Claude / GPT-6 默认都会思考；搜索词扩展在工具调用路径上，用 low 控制延迟
+      providerOptions: getReasoningProviderOptions(getProviderName(selectedModelId), 'low'),
       output: Output.object({
         schema: z.object({
           searchTerms: z.array(z.string()).describe('English search term variants'),

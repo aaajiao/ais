@@ -41,8 +41,19 @@ describe('AI SDK 7 structured output business paths', () => {
     const model = modelReturning({ searchTerms: ['magnet', 'magnets', 'magnetic'] });
 
     expect(await expandSearchQuery('磁铁')).toEqual(['magnet', 'magnets', 'magnetic']);
-    expect(selectModel).toHaveBeenCalledWith('claude-haiku-4-5');
+    expect(selectModel).toHaveBeenCalledWith('claude-haiku-5-5');
     expect(model.doGenerateCalls[0].responseFormat).toMatchObject({ type: 'json', schema: { type: 'object' } });
+    // Claude 5 不传 thinking 就会以默认 effort 思考；搜索扩展在工具调用路径上，固定 low
+    expect(model.doGenerateCalls[0].providerOptions).toEqual({
+      anthropic: { thinking: { type: 'adaptive' }, effort: 'low' },
+    });
+  });
+
+  it('falls back to the default expansion model for a stale stored model id', async () => {
+    modelReturning({ searchTerms: ['wood'] });
+
+    expect(await expandSearchQuery('木头', 'claude-haiku-4-5')).toEqual(['wood']);
+    expect(selectModel).toHaveBeenCalledWith('claude-haiku-5-5');
   });
 
   it('keeps the original search term when model output fails schema validation', async () => {
@@ -62,10 +73,13 @@ describe('AI SDK 7 structured output business paths', () => {
       '<html><body><h1>Guard I</h1><p>2024 steel installation</p><img src="https://example.com/artwork.jpg"></body></html>',
     )));
 
-    const result = await extractArtworkFromUrl('https://example.com/artwork', 'gpt-5.4', 'en');
+    const result = await extractArtworkFromUrl('https://example.com/artwork', 'gpt-6.1-sol', 'en');
 
     expect(result).toMatchObject({ success: true, artwork, images: ['https://example.com/artwork.jpg'] });
-    expect(selectModel).toHaveBeenCalledWith('gpt-5.4');
+    expect(selectModel).toHaveBeenCalledWith('gpt-6.1-sol');
+    expect(model.doGenerateCalls[0].providerOptions).toEqual({
+      openai: { reasoningEffort: 'low', reasoningSummary: null },
+    });
     expect(model.doGenerateCalls[0].prompt[0]).toMatchObject({ role: 'system' });
     expect(model.doGenerateCalls[0].responseFormat).toMatchObject({ type: 'json', schema: { type: 'object' } });
     expect(fetch).toHaveBeenCalledOnce();
