@@ -95,8 +95,8 @@ describe('AI SDK 7 chat HTTP stream and tool loop', () => {
   it.each([
     ['gpt-6.1-sol', false, { openai: { reasoningEffort: 'low', reasoningSummary: null } }],
     ['gpt-6-astra', true, { openai: { reasoningEffort: 'high', reasoningSummary: null } }],
-    ['claude-haiku-5-5', false, { anthropic: { thinking: { type: 'adaptive' }, effort: 'low', ...compaction } }],
-    ['claude-sonnet-5-5', true, { anthropic: { thinking: { type: 'adaptive' }, effort: 'high', ...compaction } }],
+    ['claude-haiku-5-5', false, { anthropic: { thinking: { type: 'adaptive' }, effort: 'low', toolStreaming: false, ...compaction } }],
+    ['claude-sonnet-5-5', true, { anthropic: { thinking: { type: 'adaptive' }, effort: 'high', toolStreaming: false, ...compaction } }],
   ] as const)('streams %s text and preserves provider options (thinking %s)', async (modelId, thinking, options) => {
     const model = new MockLanguageModelV4({ doStream: textStep() });
     installModel(model);
@@ -129,7 +129,7 @@ describe('AI SDK 7 chat HTTP stream and tool loop', () => {
       expect(result.errors).toEqual([]);
       expect(models.getModel).toHaveBeenCalledWith('claude-sonnet-5-5');
       expect(model.doStreamCalls[0].providerOptions).toEqual({
-        anthropic: { thinking: { type: 'adaptive' }, effort: 'low', ...compaction },
+        anthropic: { thinking: { type: 'adaptive' }, effort: 'low', toolStreaming: false, ...compaction },
       });
       expect(warn).toHaveBeenCalledWith(expect.stringContaining(staleModelId));
     }

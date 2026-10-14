@@ -81,6 +81,8 @@
 | **关闭**（默认） | `{ thinking: { type: 'adaptive' }, effort: 'low' }` | `{ reasoningEffort: 'low', reasoningSummary: null }` |
 | **开启** | `{ thinking: { type: 'adaptive' }, effort: 'high' }` | `{ reasoningEffort: 'high', reasoningSummary: null }` |
 
+聊天的 `streamText` 在 Claude 路径还会多带 `toolStreaming: false`，与推理强度无关，见[工具入参不走 eager streaming](#工具入参不走-eager-streaming仅-anthropic-路径v1101)。
+
 逻辑在 `getReasoningProviderOptions(provider, level)`（`api/lib/model-provider.ts`），`buildProviderOptions(thinkingEnabled, provider)`（`api/chat.ts`）只做 off → `low` / on → `high` 映射。URL 提取和搜索扩展的 `generateText` 也固定传 `low`。
 
 > **关键设计**：两家关闭开关时都必须**显式**传 `low`，不能"什么都不传"。
@@ -162,6 +164,18 @@ AI SDK 按 provider 名称过滤 message-level providerOptions —— 即便给�
 - `node_modules/@ai-sdk/anthropic/dist/index.d.ts:152` —— `cacheControl: { type: 'ephemeral', ttl?: '5m' | '1h' }`
 
 ---
+
+## 工具入参不走 eager streaming（仅 Anthropic 路径，v1.10.1）
+
+`@ai-sdk/anthropic` 流式调用时默认给每个工具开 `eager_input_streaming`（providerOptions `toolStreaming` 默认 `true`，4.0.71 起就是这个默认值）。eager 模式下 API 不缓冲、不校验工具入参 JSON。
+
+v1.10.0 上线后的真实 API 冒烟测试：`claude-sonnet-5` 在深度推理开启的追问里大约一半概率给 `search_locations` 发出 `{"query": }`。AI SDK 把它记成 `output-error` 工具调用，前端显示红色 `AI_InvalidToolInputError`，模型随后自己重试并给出回答。其他 10 个模型这一轮都没出现。设成 `toolStreaming: false` 后同样场景 10/10 正常。
+
+所以 `buildProviderOptions`（`api/chat.ts`）在 Anthropic 路径固定加 `toolStreaming: false`。前端不展示流式工具入参，关掉没有可见差异。`generateText`（URL 提取、搜索扩展）不是流式调用，SDK 本来就不开 eager。
+
+历史里已经存下的 `output-error` 工具调用不影响之后的对话：实测带着它追问，Claude Sonnet 5 / Sonnet 5.5 / GPT-6.1 Sol 都正常。
+
+守护测试：`api/__tests__/chat.test.ts`「Anthropic 流式请求体：eager tool input streaming」——用真实 `@ai-sdk/anthropic` 生成流式请求体（只 mock fetch），断言 SDK 默认会开、`buildProviderOptions` 的结果下所有工具都没有 `eager_input_streaming`。
 
 ## Stop Conditions（停止条件）
 

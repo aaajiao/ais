@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { isStepCount, hasToolCall } from 'ai';
+import { isStepCount, hasToolCall, streamText, tool } from 'ai';
+import { createAnthropic } from '@ai-sdk/anthropic';
+import type { ProviderOptions } from '@ai-sdk/provider-utils';
+import { z } from 'zod';
 import { buildProviderOptions, buildSystemMessage, buildStopConditions } from '../chat';
 
 describe('buildProviderOptions', () => {
@@ -9,14 +12,14 @@ describe('buildProviderOptions', () => {
   describe('Anthropic 路径', () => {
     it('thinking off → adaptive + effort low（5 系列不传 thinking 就是思考开启、effort high/medium）', () => {
       const opts = buildProviderOptions(false, 'anthropic');
-      expect(opts).toEqual({ anthropic: { thinking: { type: 'adaptive' }, effort: 'low' } });
+      expect(opts).toEqual({ anthropic: { thinking: { type: 'adaptive' }, effort: 'low', toolStreaming: false } });
       // v1.10 起 {} 不再表示"不思考"：5 系列省略 thinking = adaptive thinking 开启
       expect(opts).not.toEqual({});
     });
 
     it('thinking on → adaptive + effort high', () => {
       const opts = buildProviderOptions(true, 'anthropic');
-      expect(opts).toEqual({ anthropic: { thinking: { type: 'adaptive' }, effort: 'high' } });
+      expect(opts).toEqual({ anthropic: { thinking: { type: 'adaptive' }, effort: 'high', toolStreaming: false } });
     });
 
     it('never sends enabled/budgetTokens or disabled (not supported on Claude 5.5 models)', () => {
@@ -34,7 +37,7 @@ describe('buildProviderOptions', () => {
       process.env.THINKING_BUDGET = '8000';
       try {
         expect(buildProviderOptions(true, 'anthropic')).toEqual({
-          anthropic: { thinking: { type: 'adaptive' }, effort: 'high' },
+          anthropic: { thinking: { type: 'adaptive' }, effort: 'high', toolStreaming: false },
         });
       } finally {
         if (original === undefined) delete process.env.THINKING_BUDGET;
@@ -44,6 +47,12 @@ describe('buildProviderOptions', () => {
 
     it('does not inject openai fields', () => {
       expect(buildProviderOptions(true, 'anthropic')).not.toHaveProperty('openai');
+    });
+
+    it('turns off eager tool input streaming (claude-sonnet-5 sent malformed tool input JSON with it on)', () => {
+      for (const thinkingEnabled of [false, true]) {
+        expect(buildProviderOptions(thinkingEnabled, 'anthropic').anthropic).toMatchObject({ toolStreaming: false });
+      }
     });
   });
 
@@ -55,6 +64,7 @@ describe('buildProviderOptions', () => {
       const opts = buildProviderOptions(false, 'openai');
       expect(opts).toEqual({ openai: { reasoningEffort: 'low', reasoningSummary: null } });
       expect(opts).not.toHaveProperty('anthropic');
+      expect(JSON.stringify(opts)).not.toContain('toolStreaming');
     });
 
     it("thinking on → reasoningEffort 'high'", () => {
@@ -68,6 +78,47 @@ describe('buildProviderOptions', () => {
         expect(openai.reasoningEffort).not.toBe('none');
       }
     });
+  });
+});
+
+describe('Anthropic 流式请求体：eager tool input streaming', () => {
+  // 只 mock fetch：请求体由真实的 @ai-sdk/anthropic 生成
+  async function captureTools(providerOptions?: ProviderOptions) {
+    const bodies: Array<{ tools: Array<Record<string, unknown>> }> = [];
+    const anthropic = createAnthropic({
+      apiKey: 'test-key',
+      fetch: async (_url, init) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        throw new Error('request captured');
+      },
+    });
+    const result = streamText({
+      model: anthropic('claude-sonnet-5'),
+      messages: [{ role: 'user', content: '列出所有画廊' }],
+      tools: {
+        search_locations: tool({ inputSchema: z.object({ query: z.string().nullable().optional() }) }),
+        search_editions: tool({ inputSchema: z.object({ location: z.string().nullable().optional() }) }),
+      },
+      providerOptions,
+      maxRetries: 0,
+      onError: () => {},
+    });
+    await result.consumeStream();
+    expect(bodies).toHaveLength(1);
+    return bodies[0].tools;
+  }
+
+  it('SDK 默认给每个工具开 eager_input_streaming（API 不校验工具入参 JSON）', async () => {
+    const tools = await captureTools();
+    expect(tools.every((t) => t.eager_input_streaming === true)).toBe(true);
+  });
+
+  it('buildProviderOptions 关掉它：claude-sonnet-5 在 eager 模式下会发出 {"query": } 这类非法 JSON', async () => {
+    for (const thinkingEnabled of [false, true]) {
+      const tools = await captureTools(buildProviderOptions(thinkingEnabled, 'anthropic'));
+      expect(tools).toHaveLength(2);
+      expect(tools.some((t) => 'eager_input_streaming' in t)).toBe(false);
+    }
   });
 });
 

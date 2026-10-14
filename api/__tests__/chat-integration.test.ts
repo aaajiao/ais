@@ -183,7 +183,7 @@ describe('chat integration — per-provider system prompt contract (v1.2.4)', ()
       // 4 系列时代 off 必须是 {}；5 系列省略 thinking = adaptive thinking 开启（默认 effort high/medium），
       // 所以 off 必须显式降到 low。不要改回 {}，也不要改成 { type: 'disabled' }（Opus 5.5 / Sonnet 5.5 不允许关闭）。
       expect(buildProviderOptions(false, 'anthropic')).toEqual({
-        anthropic: { thinking: { type: 'adaptive' }, effort: 'low' },
+        anthropic: { thinking: { type: 'adaptive' }, effort: 'low', toolStreaming: false },
       });
     });
 

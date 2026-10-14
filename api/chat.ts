@@ -35,6 +35,11 @@ type StreamTextProviderOptions = ProviderOptions;
  *   - OpenAI（GPT-6 系列）：{ reasoningEffort, reasoningSummary: null }。显式传 effort
  *     （v1.2.3 起的规则：不依赖服务端默认值；GPT-6 永远不发 'none'）。
  *
+ * Anthropic 另加 toolStreaming: false：@ai-sdk/anthropic 流式调用时默认给每个工具开
+ * eager_input_streaming，API 不再校验工具入参 JSON。v1.10 实测 claude-sonnet-5 在深度推理开启的
+ * 追问里约一半概率给 search_locations 发出 `{"query": }`，前端显示红色
+ * AI_InvalidToolInputError（模型随后会重试）；关掉后 10/10 正常。前端不展示流式工具入参，关掉无感知。
+ *
  * 注：cacheControl 不在这里，而是放在 system message 的 providerOptions 里
  *     （见 buildSystemMessage），这样不影响 OpenAI 路径请求体。
  */
@@ -42,7 +47,11 @@ export function buildProviderOptions(
   thinkingEnabled: boolean,
   provider: ProviderName
 ): StreamTextProviderOptions {
-  return getReasoningProviderOptions(provider, thinkingEnabled ? 'high' : 'low');
+  const options = getReasoningProviderOptions(provider, thinkingEnabled ? 'high' : 'low');
+  if (provider === 'anthropic') {
+    options.anthropic = { ...options.anthropic, toolStreaming: false };
+  }
+  return options;
 }
 
 /**
