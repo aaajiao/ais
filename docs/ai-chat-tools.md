@@ -95,7 +95,7 @@
 
 | 写法 | 结果 |
 |---|---|
-| `{ type: 'enabled', budgetTokens }` | Opus 5.5 / Sonnet 5.5 / Haiku 5.5 / Fable 不支持：@ai-sdk/anthropic 带 warning 改写成 adaptive，budget 被丢掉；SDK 能力表里 Opus 5 / Sonnet 5 仍原样发出。各模型行为不一致，不用 |
+| `{ type: 'enabled', budgetTokens }` | Opus 5.5 / Sonnet 5.5 / Haiku 5.5 / Fable 不支持：@ai-sdk/anthropic 带 warning 改写成 adaptive，budget 被丢掉，不用 |
 | `{ type: 'disabled' }` | Opus 5.5 / Sonnet 5.5 / Fable 不能关：SDK 带 warning 去掉 `thinking` 字段（Sonnet 5.5 改成 `between_tools`），等于没关；Haiku 5.5 只在 effort ≤ high 时接受 |
 | `{ type: 'adaptive' }` + `effort` | 所有 5 系列都接受（effort 支持 low / medium / high / xhigh / max） |
 
@@ -113,7 +113,7 @@ GPT-6 四个模型（`gpt-6-astra` / `gpt-6.1-sol` / `gpt-6-sol` / `gpt-6-luna`�
 
 `api/lib/model-ids.ts` 是单一来源（前端镜像 `src/lib/modelIds.ts`，`model-ids.test.ts` 守护一致）：
 
-- `/api/models` 只列出 `claude-{opus|sonnet|haiku|fable|mythos}-5[-N]` 和 `gpt-6[.N]-{variant}`（排除 `-chat` / `-codex`、日期快照）
+- `/api/models` 只列出 `claude-{opus|sonnet|haiku|fable|mythos}-5-N`（N ≥ 1，即 5.1 / 5.5 这一代起）和 `gpt-6[.N]-{variant}`（排除 `-chat` / `-codex`、日期快照）。v1.10.2 起去掉 5.0 代（`claude-sonnet-5` / `opus-5` / `fable-5` / `mythos-5`）：上一代模型，`claude-sonnet-5` 还出过非法工具入参（见下文 eager streaming 一节）
 - `/api/chat`、URL 提取、搜索扩展用 `resolveModelId` 把旧版本存下的 4 系列 / GPT-5 / o 系列 ID 收敛到默认值（旧模型仍可调用，不收敛的话用户会一直停留在旧模型上而不报错）
 - 前端 `readStoredModelId` 读到旧 ID 时从 localStorage 删除，设置页再用 `/api/models` 的默认值补上
 
@@ -174,6 +174,8 @@ v1.10.0 上线后的真实 API 冒烟测试：`claude-sonnet-5` 在深度推理�
 所以 `buildProviderOptions`（`api/chat.ts`）在 Anthropic 路径固定加 `toolStreaming: false`。前端不展示流式工具入参，关掉没有可见差异。`generateText`（URL 提取、搜索扩展）不是流式调用，SDK 本来就不开 eager。
 
 历史里已经存下的 `output-error` 工具调用不影响之后的对话：实测带着它追问，Claude Sonnet 5 / Sonnet 5.5 / GPT-6.1 Sol 都正常。
+
+v1.10.2 起 5.0 代（含 `claude-sonnet-5`）已不在可选模型里。`toolStreaming: false` 仍保留：eager 模式本身不校验 JSON，别的模型也可能偶发。
 
 守护测试：`api/__tests__/chat.test.ts`「Anthropic 流式请求体：eager tool input streaming」——用真实 `@ai-sdk/anthropic` 生成流式请求体（只 mock fetch），断言 SDK 默认会开、`buildProviderOptions` 的结果下所有工具都没有 `eager_input_streaming`。
 
@@ -301,7 +303,7 @@ search_editions internally matches by name, city, AND country.
 
 ## Context Management（仅 compact-supported Claude 子集 + OpenAI 兜底）
 
-`contextManagement.compact_20260112` 是 Anthropic beta 特性，**只支持子集模型**。v1.10 起只允许 Claude 5 系列，文档列出的 5 系列（Fable 5.1 / Mythos 5.1 / Opus 5.5 / Sonnet 5.5 / Haiku 5.5 / Fable 5 / Mythos 5 / Opus 5 / Sonnet 5）全部支持；白名单之外的 Claude ID（例如之后新发布、尚未确认的版本）走客户端 token 截断兜底，跟 OpenAI 同款。
+`contextManagement.compact_20260112` 是 Anthropic beta 特性，**只支持子集模型**。v1.10.2 起只允许 Claude 5.1 / 5.5 这一代，白名单就是这几个（Fable 5.1 / Mythos 5.1 / Opus 5.5 / Sonnet 5.5 / Haiku 5.5），文档里都支持；白名单之外的 Claude ID（例如之后新发布、尚未确认的版本）走客户端 token 截断兜底，跟 OpenAI 同款。
 
 历史教训（v1.5.x 修复）：曾按 `provider === 'anthropic'` 一刀切注入 compact，把 Haiku 4.5 / Sonnet 4.5 当主聊天模型时直接报 "Conversation too long" —— **即使历史为空也失败**，因为服务端拒收 beta flag 时把错误包装成 context overflow，迷惑性极高。修复后用 `supportsCompactBeta(modelId)` 显式 gate。
 

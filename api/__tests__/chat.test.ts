@@ -93,7 +93,7 @@ describe('Anthropic 流式请求体：eager tool input streaming', () => {
       },
     });
     const result = streamText({
-      model: anthropic('claude-sonnet-5'),
+      model: anthropic('claude-sonnet-5-5'),
       messages: [{ role: 'user', content: '列出所有画廊' }],
       tools: {
         search_locations: tool({ inputSchema: z.object({ query: z.string().nullable().optional() }) }),

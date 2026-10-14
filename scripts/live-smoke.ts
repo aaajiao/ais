@@ -10,9 +10,9 @@
 //
 // 用法：
 //   bun run smoke:live                                   # 全部模型 + 换模型 + 旧历史 + generateText
-//   bun run smoke:live --only=claude-sonnet-5,gpt-6-luna # 只跑这些模型的矩阵
+//   bun run smoke:live --only=claude-sonnet-5-5,gpt-6-luna # 只跑这些模型的矩阵
 //   bun run smoke:live --quick                           # 只跑矩阵
-//   bun run smoke:live --repeat=4 --only=claude-sonnet-5 # 重复跑，查偶发问题
+//   bun run smoke:live --repeat=4 --only=claude-sonnet-5-5 # 重复跑，查偶发问题
 //   bun run smoke:live --url=https://...                 # URL 提取用的页面
 import { config } from 'dotenv';
 config({ path: '.env.local', override: true });

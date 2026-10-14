@@ -1,7 +1,8 @@
 /**
  * 模型 ID 规则 —— 单一来源，无任何依赖。
  *
- * 只允许 Claude 5 系列与 GPT-6 系列（v1.10 起不再使用 Claude 4 / GPT-5 / o 系列）：
+ * 只允许 Claude 5.1 / 5.5 这一代与 GPT-6 系列（v1.10 起不再使用 Claude 4 / GPT-5 / o 系列，
+ * v1.10.2 起也不再使用 5.0 代的 claude-sonnet-5 / opus-5 / fable-5 / mythos-5）：
  * - api/models.ts 用它过滤 provider 返回的模型列表
  * - chat.ts / artwork-extractor / search-utils 用 resolveModelId 把客户端传来的旧 ID
  *   （localStorage 里的 claude-sonnet-4-6、gpt-5.5 等）收敛到默认模型
@@ -15,8 +16,8 @@ export const DEFAULT_MODEL = 'claude-sonnet-5-5';
 // 默认搜索扩展模型（后台翻译材料 / 类型搜索词的快速模型）
 export const DEFAULT_EXPANSION_MODEL = 'claude-haiku-5-5';
 
-// claude-{line}-5 或 claude-{line}-5-{minor}；不接受带日期后缀的快照
-const ANTHROPIC_MODEL_PATTERN = /^claude-(opus|sonnet|haiku|fable|mythos)-5(?:-\d{1,2})?$/;
+// claude-{line}-5-{minor}，minor ≥ 1（5.1 / 5.5 这一代起）；不接受 5.0 代（不带 minor）和带日期后缀的快照
+const ANTHROPIC_MODEL_PATTERN = /^claude-(opus|sonnet|haiku|fable|mythos)-5-[1-9]\d?$/;
 
 // gpt-6-{variant} 或 gpt-6.{minor}-{variant}；不接受日期快照和 -chat-latest
 const OPENAI_MODEL_PATTERN = /^gpt-6(?:\.\d+)?-([a-z]+)$/;

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import handler from '../models.js';
 
 /**
- * 守护测试：/api/models 只列出 Claude 5 系列与 GPT-6 系列（v1.10 起）。
+ * 守护测试：/api/models 只列出 Claude 5.1 / 5.5 这一代与 GPT-6 系列（v1.10 起；v1.10.2 起去掉 5.0 代）。
  * provider 的 /v1/models 会同时返回旧模型、日期快照和非对话模型，这里只 mock fetch。
  */
 const ANTHROPIC_MODELS = [
@@ -11,6 +11,9 @@ const ANTHROPIC_MODELS = [
   { id: 'claude-opus-5-5', display_name: 'Claude Opus 5.5' },
   { id: 'claude-sonnet-5-5', display_name: 'Claude Sonnet 5.5' },
   { id: 'claude-haiku-5-5', display_name: 'Claude Haiku 5.5' },
+  { id: 'claude-fable-5', display_name: 'Claude Fable 5' },
+  { id: 'claude-opus-5', display_name: 'Claude Opus 5' },
+  { id: 'claude-sonnet-5', display_name: 'Claude Sonnet 5' },
   { id: 'claude-sonnet-4-6', display_name: 'Claude Sonnet 4.6' },
   { id: 'claude-haiku-4-5', display_name: 'Claude Haiku 4.5' },
   { id: 'claude-mythos-preview', display_name: 'Claude Mythos Preview' },
@@ -62,7 +65,7 @@ describe('GET /api/models', () => {
     vi.unstubAllGlobals();
   });
 
-  it('lists only Claude 5 models', async () => {
+  it('lists only Claude 5.1 / 5.5 models (not the 5.0 generation or Claude 4)', async () => {
     const body = await getModels();
     expect(body.anthropic.map((model) => model.id).sort()).toEqual([
       'claude-fable-5-1',

@@ -3,7 +3,7 @@ import { DEFAULT_EXPANSION_MODEL, DEFAULT_MODEL, isAllowedModelId, resolveModelI
 import * as clientModelIds from '../../../src/lib/modelIds';
 
 /**
- * 守护测试：只允许 Claude 5 系列与 GPT-6 系列（v1.10 起）。
+ * 守护测试：只允许 Claude 5.1 / 5.5 这一代与 GPT-6 系列（v1.10 起；v1.10.2 起去掉 5.0 代）。
  * api/lib/model-ids.ts 是来源，src/lib/modelIds.ts 是前端镜像（前端不能 import api/），
  * 两边规则与默认值必须一致。
  */
@@ -13,9 +13,6 @@ const ALLOWED = [
   'claude-opus-5-5',
   'claude-sonnet-5-5',
   'claude-haiku-5-5',
-  'claude-fable-5',
-  'claude-opus-5',
-  'claude-sonnet-5',
   'gpt-6-astra',
   'gpt-6-sol',
   'gpt-6-luna',
@@ -29,6 +26,12 @@ const REJECTED = [
   'claude-haiku-4-5',
   'claude-3-5-sonnet-20241022',
   'claude-mythos-preview',
+  // Claude 5.0 代（v1.10.2 起不再使用；claude-sonnet-5 在 eager 工具流下会发出非法工具入参）
+  'claude-sonnet-5',
+  'claude-opus-5',
+  'claude-fable-5',
+  'claude-mythos-5',
+  'claude-sonnet-5-0',
   // 带日期后缀的快照
   'claude-sonnet-5-5-20260928',
   // GPT-5 / GPT-4 / o 系列

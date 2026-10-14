@@ -40,12 +40,12 @@ Vitest 里的 AI 测试只 mock 网络，验证"发出去的请求体长什么�
 
 ```bash
 bun run smoke:live                                    # 全部
-bun run smoke:live --only=claude-sonnet-5,gpt-6-luna  # 只跑这些模型的 A 段
+bun run smoke:live --only=claude-sonnet-5-5,gpt-6-luna  # 只跑这些模型的 A 段
 bun run smoke:live --quick                            # 只跑 A 段
-bun run smoke:live --repeat=4 --only=claude-sonnet-5  # 重复跑，查偶发问题
+bun run smoke:live --repeat=4 --only=claude-sonnet-5-5  # 重复跑，查偶发问题
 ```
 
-v1.10.1 的 `toolStreaming: false` 修复就是它发现的：`claude-sonnet-5` 约半数追问发出 `{"query": }`，单靠 mock 测试看不出来。
+v1.10.1 的 `toolStreaming: false` 修复就是它发现的：`claude-sonnet-5` 约半数追问发出 `{"query": }`，单靠 mock 测试看不出来（该模型 v1.10.2 起已不可选）。
 
 ---
 

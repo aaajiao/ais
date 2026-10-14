@@ -24,7 +24,7 @@ POST /api/chat
 
 ### 支持的模型
 
-v1.10 起只接受 Claude 5 系列和 GPT-6 系列（规则在 `api/lib/model-ids.ts`）。Claude 5 的模型 ID 不带日期后缀。`/api/models` 返回当前账号实际可用的列表。
+v1.10 起只接受 Claude 5 系列和 GPT-6 系列，v1.10.2 起 Claude 只保留 5.1 / 5.5 这一代（规则在 `api/lib/model-ids.ts`）。Claude 5 的模型 ID 不带日期后缀。`/api/models` 返回当前账号实际可用的列表。
 
 | 模型 ID | 说明 |
 |---------|------|
@@ -32,7 +32,6 @@ v1.10 起只接受 Claude 5 系列和 GPT-6 系列（规则在 `api/lib/model-id
 | `claude-opus-5-5` | Claude Opus 5.5 |
 | `claude-haiku-5-5` | Claude Haiku 5.5（默认搜索翻译模型） |
 | `claude-fable-5-1` | Claude Fable 5.1（最强，成本最高） |
-| `claude-fable-5` / `claude-opus-5` / `claude-sonnet-5` | 上一代 5 系列 |
 | `gpt-6.1-sol` / `gpt-6-sol` | GPT-6 Sol（性能与成本平衡） |
 | `gpt-6-astra` | GPT-6 Astra（旗舰） |
 | `gpt-6-luna` | GPT-6 Luna（快速、低成本） |

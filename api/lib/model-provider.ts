@@ -15,7 +15,7 @@ export type ProviderName = 'anthropic' | 'openai';
  * 关键铁律：把 compact_20260112 发给**不在此列表**的 Claude 模型会被服务端拒，错误以
  * "context too long" 形式上抛 —— 即使对话历史是空的也会失败，迷惑性极高（v1.x 实证）。
  *
- * 文档列出的 5 系列全部支持（4 系列已不在允许范围内，不再列出）。新模型发布时
+ * 只列允许使用的 5.1 / 5.5 代（文档里 5.0 代也支持，但 v1.10.2 起不再允许，4 系列同理）。新模型发布时
  * 先查文档确认进入支持列表，再加入这里。**不要靠 startsWith 推断**。
  */
 const COMPACT_SUPPORTED_MODELS: ReadonlySet<string> = new Set([
@@ -24,10 +24,6 @@ const COMPACT_SUPPORTED_MODELS: ReadonlySet<string> = new Set([
   'claude-opus-5-5',
   'claude-sonnet-5-5',
   'claude-haiku-5-5',
-  'claude-fable-5',
-  'claude-mythos-5',
-  'claude-opus-5',
-  'claude-sonnet-5',
 ]);
 
 /**

@@ -17,7 +17,7 @@ import {
  * 修复后用 supportsCompactBeta(modelId) 显式判断。这组测试**钉死**白名单内容，
  * 防止以后改成 startsWith / 模糊匹配。
  *
- * 维护说明：v1.10 起只用 Claude 5 系列，compaction 文档列出的 5 系列全部支持。Anthropic
+ * 维护说明：白名单只列允许使用的模型（v1.10.2 起是 Claude 5.1 / 5.5 代）。Anthropic
  * 发布新版本时查 compaction 文档确认支持后再扩 list；"NOT supported" 用例也要同步更新。
  */
 describe('supportsCompactBeta — model whitelist', () => {
@@ -27,10 +27,6 @@ describe('supportsCompactBeta — model whitelist', () => {
     'claude-opus-5-5',
     'claude-sonnet-5-5',
     'claude-haiku-5-5',
-    'claude-fable-5',
-    'claude-mythos-5',
-    'claude-opus-5',
-    'claude-sonnet-5',
   ])('%s supported', (modelId) => {
     expect(supportsCompactBeta(modelId)).toBe(true);
   });
@@ -40,6 +36,12 @@ describe('supportsCompactBeta — model whitelist', () => {
     expect(supportsCompactBeta('claude-opus-4-7')).toBe(false);
     expect(supportsCompactBeta('claude-haiku-4-5')).toBe(false);
     expect(supportsCompactBeta('claude-mythos-preview')).toBe(false);
+  });
+
+  it('5.0 代已移出白名单（v1.10.2 起不再允许使用）', () => {
+    for (const modelId of ['claude-sonnet-5', 'claude-opus-5', 'claude-fable-5', 'claude-mythos-5']) {
+      expect(supportsCompactBeta(modelId)).toBe(false);
+    }
   });
 
   it('GPT 模型 NOT supported（compact 是 Anthropic 特性）', () => {

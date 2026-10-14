@@ -1,5 +1,5 @@
 /**
- * 模型 ID 规则的前端镜像（只允许 Claude 5 系列与 GPT-6 系列）。
+ * 模型 ID 规则的前端镜像（只允许 Claude 5.1 / 5.5 这一代与 GPT-6 系列）。
  *
  * 来源：api/lib/model-ids.ts —— 前端不能 import api/，改这里必须同步改那边，
  * api/lib/__tests__/model-ids.test.ts 守护两边一致。
@@ -11,7 +11,7 @@ export const DEFAULT_CHAT_MODEL = 'claude-sonnet-5-5';
 /** 搜索扩展默认模型（后端 DEFAULT_EXPANSION_MODEL） */
 export const DEFAULT_SEARCH_EXPANSION_MODEL = 'claude-haiku-5-5';
 
-const ANTHROPIC_MODEL_PATTERN = /^claude-(opus|sonnet|haiku|fable|mythos)-5(?:-\d{1,2})?$/;
+const ANTHROPIC_MODEL_PATTERN = /^claude-(opus|sonnet|haiku|fable|mythos)-5-[1-9]\d?$/;
 const OPENAI_MODEL_PATTERN = /^gpt-6(?:\.\d+)?-([a-z]+)$/;
 const OPENAI_EXCLUDED_VARIANTS: ReadonlySet<string> = new Set(['chat', 'codex']);
 

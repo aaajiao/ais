@@ -50,7 +50,7 @@ describe('readStoredModelId', () => {
     expect(localStorage.getItem(MODEL_STORAGE_KEYS.chat)).toBe('gpt-6.1-sol');
   });
 
-  it.each(['claude-sonnet-4-6', 'claude-haiku-4-5', 'gpt-5.5', 'o3-mini'])(
+  it.each(['claude-sonnet-4-6', 'claude-haiku-4-5', 'claude-sonnet-5', 'claude-opus-5', 'gpt-5.5', 'o3-mini'])(
     'removes the stale id %s saved by an older version',
     (staleModelId) => {
       localStorage.setItem(MODEL_STORAGE_KEYS.searchExpansion, staleModelId);
