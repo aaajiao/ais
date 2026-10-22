@@ -77,6 +77,8 @@
 
 ## 开发
 
+使用 Node.js 24.22.1 或更新的 24.x 安全版本，以及 Bun 1.4.2。本地版本文件和 CI 固定 2026 年 10 月安全基线；生产环境使用 Vercel 托管的 Node 24 运行时。
+
 ```bash
 bun install
 bun start          # 前端 + API (port 3000)
