@@ -3,10 +3,12 @@
 ## 前置要求
 
 - [Bun](https://bun.sh/) v1.4.2（锁文件 v3，CI 使用同一版本）
-- [Node.js](https://nodejs.org/) v22.17+；推荐当前 LTS
+- [Node.js](https://nodejs.org/) v24.22.1 或更新的 24.x 安全版本；`.node-version` / `.nvmrc` 和 CI 固定安全基线 24.22.1
 - 项目内 [Vercel CLI](https://vercel.com/docs/cli) v62，通过 `bun start` / `bunx --no-install vercel` 使用
 - [Git](https://git-scm.com/)
 - 已部署的 Supabase 项目（见 `docs/database.md`）
+
+Node 24.22.1 包含 [2026-10-21 安全更新](https://nodejs.org/en/blog/vulnerability/october-2026-security-releases)。Vercel 选择 24.x 主版本并管理补丁；构建日志会输出 `node --version`，函数实际版本需从运行日志核对。升级自管 Node 后应重启相应服务。
 
 ```bash
 # 安装 Vercel CLI（如未安装）

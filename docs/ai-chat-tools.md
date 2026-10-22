@@ -6,7 +6,7 @@
 
 ## AI SDK 7 升级约定
 
-使用 `ai` 7 和同代 `@ai-sdk/anthropic`、`@ai-sdk/openai`、`@ai-sdk/react` 4；直接使用的 `@ai-sdk/provider-utils` 5 显式声明在依赖中。升级时一起更新并检查锁文件，避免前后端解析不同代的流协议。AI SDK 7 的 Node.js 最低要求为 22；项目依赖整体要求 Node.js >=22.17.0，CI 使用 Bun。
+使用 `ai` 7 和同代 `@ai-sdk/anthropic`、`@ai-sdk/openai`、`@ai-sdk/react` 4；直接使用的 `@ai-sdk/provider-utils` 5 显式声明在依赖中。升级时一起更新并检查锁文件，避免前后端解析不同代的流协议。AI SDK 7 的 Node.js 最低要求为 22；本项目使用 Node.js 24.22.1 或更新的 24.x 安全版本，CI 固定 Node.js 24.22.1 并使用 Bun 1.4.2。
 
 - `streamText` / `generateText` 使用 `instructions`，逐步日志回调使用 `onStepEnd`，停止上限使用 `isStepCount(8)`。
 - 响应通过 `toUIMessageStream({ stream: result.stream, tools })` 与 `createUIMessageStreamResponse` 输出，保持 `DefaultChatTransport` 的 SSE 协议与工具信息。

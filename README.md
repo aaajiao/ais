@@ -79,6 +79,8 @@ Click any screenshot to view the full-resolution image.
 
 ## Development
 
+Use Node.js 24.22.1 or a newer 24.x security patch, together with Bun 1.4.2. The local version files and CI pin the October 2026 security baseline; production uses Vercel's managed Node 24 runtime.
+
 ```bash
 bun install
 bun start          # Frontend + API (port 3000)

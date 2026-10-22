@@ -6,6 +6,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import ogs from 'open-graph-scraper';
 
+// Record the managed runtime patch in private deployment logs on cold start.
+if (process.env.VERCEL === '1') {
+  console.info(`[runtime] node=${process.version}`);
+}
+
 // Use Node.js runtime for open-graph-scraper compatibility
 export const config = {
   runtime: 'nodejs',
